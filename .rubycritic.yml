@@ -1,0 +1,12 @@
+paths:
+  - "lib/**"
+
+minimum_score: 90
+
+merge_duplicates: true
+
+report_root: tmp/rubycritic
+
+reporters:
+  - html
+  - console

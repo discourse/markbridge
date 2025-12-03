@@ -1,0 +1,163 @@
+# frozen_string_literal: true
+
+module Markbridge
+  module Parsers
+    module BBCode
+      # Registry of BBCode tag handlers
+      class HandlerRegistry
+        attr_writer :closing_strategy
+
+        def initialize(closing_strategy: nil)
+          @handlers = {}
+          @normalized_tag_cache = {}
+          @element_handlers = {}
+          @auto_closeable_elements = Set.new
+          @closing_strategy = closing_strategy
+        end
+
+        # Register a handler for one or more tag names and associate it with an element class
+        # @param tag_names [String, Array<String>] tag name(s) to register
+        # @param handler [BaseHandler] the handler instance
+        def register(tag_names, handler)
+          element_class = handler.element_class
+          Array(tag_names).each do |tag_name|
+            normalized = tag_name.to_s.downcase
+            @handlers[normalized] = handler
+            @normalized_tag_cache[tag_name.to_s] = normalized
+          end
+          @element_handlers[element_class] = handler
+          @auto_closeable_elements << element_class if handler.auto_closeable?
+          self
+        end
+
+        # Get handler for a tag name
+        # @param tag_name [String]
+        # @return [BaseHandler, nil]
+        def [](tag_name)
+          tag_str = tag_name.to_s
+          normalized = @normalized_tag_cache[tag_str] || tag_str.downcase
+          @handlers[normalized]
+        end
+
+        # Get handler for an element instance
+        # @param element [Element]
+        # @return [BaseHandler, nil]
+        def handler_for_element(element)
+          @element_handlers[element.class]
+        end
+
+        # Check if an element class is auto-closeable
+        # @param element_class [Class]
+        # @return [Boolean]
+        def auto_closeable?(element_class)
+          @auto_closeable_elements.include?(element_class)
+        end
+
+        # Close an element using the closing strategy
+        # @param token [TagEndToken]
+        # @param context [ParserState]
+        # @param tokens [PeekableEnumerator, nil]
+        def close_element(token:, context:, tokens: nil)
+          @closing_strategy&.handle_close(token:, context:, registry: self, tokens:)
+        end
+
+        # Create the default handler registry with common BBCode tags
+        # @param closing_strategy [Object, nil] optional closing strategy to apply, defaults to Reordering strategy
+        # @return [HandlerRegistry]
+        def self.default(closing_strategy: nil)
+          # Create registry - we'll set closing strategy after registering handlers
+          registry = new
+
+          # Simple formatting handlers (auto-closeable)
+          registry.register(
+            %w[b bold strong],
+            Handlers::SimpleHandler.new(AST::Bold, auto_closeable: true),
+          )
+          registry.register(
+            %w[i italic em],
+            Handlers::SimpleHandler.new(AST::Italic, auto_closeable: true),
+          )
+          registry.register(
+            %w[s strike del],
+            Handlers::SimpleHandler.new(AST::Strikethrough, auto_closeable: true),
+          )
+          registry.register(
+            %w[u underline],
+            Handlers::SimpleHandler.new(AST::Underline, auto_closeable: true),
+          )
+          registry.register(
+            "sup",
+            Handlers::SimpleHandler.new(AST::Superscript, auto_closeable: true),
+          )
+          registry.register(
+            "sub",
+            Handlers::SimpleHandler.new(AST::Subscript, auto_closeable: true),
+          )
+
+          # Code handlers (raw content)
+          registry.register(%w[code pre tt], Handlers::RawHandler.new(AST::Code))
+
+          # Image handler
+          registry.register("img", Handlers::ImageHandler.new)
+
+          # Attachment handler
+          registry.register(%w[attach attachment], Handlers::AttachmentHandler.new)
+
+          # URL handler
+          registry.register(%w[url link iurl], Handlers::UrlHandler.new)
+
+          # Email handler
+          registry.register("email", Handlers::EmailHandler.new)
+
+          # Quote handler
+          registry.register("quote", Handlers::QuoteHandler.new)
+
+          # Spoiler handler
+          registry.register(%w[spoiler hide], Handlers::SpoilerHandler.new)
+
+          # Color handler
+          registry.register("color", Handlers::ColorHandler.new)
+
+          # Size handler
+          registry.register("size", Handlers::SizeHandler.new)
+
+          # Alignment handlers
+          registry.register("center", Handlers::AlignHandler.new("center"))
+          registry.register("left", Handlers::AlignHandler.new("left"))
+          registry.register("right", Handlers::AlignHandler.new("right"))
+          registry.register("justify", Handlers::AlignHandler.new("justify"))
+
+          # Self-closing handlers
+          registry.register("br", Handlers::SelfClosingHandler.new(AST::LineBreak))
+          registry.register("hr", Handlers::SelfClosingHandler.new(AST::HorizontalRule))
+
+          # List handlers
+          registry.register(%w[list ul ol ulist olist], Handlers::ListHandler.new)
+          registry.register(%w[* li .], Handlers::ListItemHandler.new)
+
+          # Set the closing strategy
+          registry.closing_strategy = closing_strategy || default_closing_strategy(registry)
+
+          registry
+        end
+
+        # Build a registry from the default configuration with optional customization
+        # @yield [HandlerRegistry] the registry to customize
+        # @return [HandlerRegistry]
+        def self.build_from_default
+          registry = default
+          yield(registry) if block_given?
+          registry
+        end
+
+        # Create the default closing strategy for a registry
+        # @param registry [HandlerRegistry] the registry to create a strategy for
+        # @return [ClosingStrategies::Reordering]
+        def self.default_closing_strategy(registry)
+          reconciler = ClosingStrategies::TagReconciler.new(registry:)
+          ClosingStrategies::Reordering.new(reconciler)
+        end
+      end
+    end
+  end
+end

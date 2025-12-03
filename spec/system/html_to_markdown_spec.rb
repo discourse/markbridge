@@ -1,0 +1,267 @@
+# frozen_string_literal: true
+
+RSpec.describe "HTML to Markdown Conversion" do
+  describe "simple formatting" do
+    it "converts bold text" do
+      html = "<b>bold text</b>"
+      expected = "**bold text**"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts italic text" do
+      html = "<i>italic text</i>"
+      expected = "*italic text*"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts strikethrough text" do
+      html = "<s>deleted text</s>"
+      expected = "~~deleted text~~"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts nested formatting" do
+      html = "<b><i>bold italic</i></b>"
+      expected = "***bold italic***"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "links" do
+    it "converts simple link" do
+      html = '<a href="https://example.com">Click here</a>'
+      expected = "[Click here](https://example.com)"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts link with no text" do
+      html = '<a href="https://example.com"></a>'
+      expected = "[](https://example.com)"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "images" do
+    it "converts image" do
+      html = '<img src="https://example.com/photo.jpg">'
+      expected = "![](https://example.com/photo.jpg)"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts image with dimensions" do
+      html = '<img src="photo.jpg" width="100" height="200">'
+      expected = "![|100x200](photo.jpg)"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "lists" do
+    it "converts unordered list" do
+      html = <<~HTML
+        <ul>
+        <li>Item 1</li>
+        <li>Item 2</li>
+        <li>Item 3</li>
+        </ul>
+      HTML
+
+      expected = <<~MARKDOWN.strip
+        - Item 1
+        - Item 2
+        - Item 3
+      MARKDOWN
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts ordered list" do
+      html = <<~HTML
+        <ol>
+        <li>First</li>
+        <li>Second</li>
+        <li>Third</li>
+        </ol>
+      HTML
+
+      expected = <<~MARKDOWN.strip
+        1. First
+        1. Second
+        1. Third
+      MARKDOWN
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts nested lists" do
+      html = <<~HTML
+        <ul>
+        <li>Item 1</li>
+        <li>Item 2
+        <ul>
+        <li>Subitem 2.1</li>
+        <li>Subitem 2.2</li>
+        </ul>
+        </li>
+        <li>Item 3</li>
+        </ul>
+      HTML
+
+      expected = <<~MARKDOWN.strip
+        - Item 1
+        - Item 2
+          - Subitem 2.1
+          - Subitem 2.2
+        - Item 3
+      MARKDOWN
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "code" do
+    it "converts inline code" do
+      html = "<code>var x = 1;</code>"
+      expected = "`var x = 1;`"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts code block" do
+      html = "<pre>function hello() {\n  console.log('hi');\n}</pre>"
+      expected = "```\nfunction hello() {\n  console.log('hi');\n}\n```"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "blockquote" do
+    it "converts simple blockquote" do
+      html = "<blockquote>Quoted text</blockquote>"
+      expected = "> Quoted text"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts blockquote with multiple paragraphs" do
+      html = "<blockquote>First paragraph\n\nSecond paragraph</blockquote>"
+      expected = "> First paragraph\n> \n> Second paragraph"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "line breaks and horizontal rules" do
+    it "converts line break" do
+      html = "Line 1<br>Line 2"
+      expected = "Line 1\nLine 2"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts horizontal rule" do
+      html = "Text<hr>More text"
+      expected = "Text\n\n---\n\nMore text"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "complex combinations" do
+    it "converts mixed content" do
+      html = <<~HTML
+        <p>This is <b>bold</b> and <i>italic</i> text.</p>
+        <ul>
+        <li>Item with <a href="https://example.com">link</a></li>
+        <li>Item with <code>code</code></li>
+        </ul>
+      HTML
+
+      expected = <<~MARKDOWN.strip
+        This is **bold** and *italic* text.
+
+        - Item with [link](https://example.com)
+        - Item with `code`
+      MARKDOWN
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "strong and em tags" do
+    it "converts strong to bold" do
+      html = "<strong>strong text</strong>"
+      expected = "**strong text**"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "converts em to italic" do
+      html = "<em>emphasized text</em>"
+      expected = "*emphasized text*"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "paragraphs" do
+    it "separates adjacent paragraphs with blank lines" do
+      html = "<p>One</p><p>Two</p>"
+      expected = "One\n\nTwo"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "handles multiple paragraphs" do
+      html = "<p>First</p><p>Second</p><p>Third</p>"
+      expected = "First\n\nSecond\n\nThird"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "handles paragraphs from minified HTML without whitespace" do
+      html = "<p>Paragraph one</p><p>Paragraph two</p>"
+      expected = "Paragraph one\n\nParagraph two"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "handles paragraphs with formatted content" do
+      html = "<p><b>Bold</b> text</p><p><i>Italic</i> text</p>"
+      expected = "**Bold** text\n\n*Italic* text"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+end
