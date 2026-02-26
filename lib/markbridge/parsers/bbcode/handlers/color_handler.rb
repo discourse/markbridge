@@ -19,6 +19,10 @@ module Markbridge
             context.push(element, token:)
           end
 
+          def auto_closeable?
+            true
+          end
+
           attr_reader :element_class
         end
       end
