@@ -263,7 +263,8 @@ RSpec.describe "BBCode to Markdown Conversion" do
 
   describe "color and size wrapping structural elements" do
     it "converts color wrapping a list without leaking closing tags" do
-      bbcode = "[color=green][b]Skill Name[/b]\n[list]\n[*]Level 2: Upgrade\n[*]Level 3: Upgrade\n[/list][/color]"
+      bbcode =
+        "[color=green][b]Skill Name[/b]\n[list]\n[*]Level 2: Upgrade\n[*]Level 3: Upgrade\n[/list][/color]"
 
       result = Markbridge.bbcode_to_markdown(bbcode)
       expect(result).not_to include("[/color]")
