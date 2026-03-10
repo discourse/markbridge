@@ -261,6 +261,46 @@ RSpec.describe "BBCode to Markdown Conversion" do
     end
   end
 
+  describe "color and size wrapping structural elements" do
+    it "converts color wrapping a list without leaking closing tags" do
+      bbcode =
+        "[color=green][b]Skill Name[/b]\n[list]\n[*]Level 2: Upgrade\n[*]Level 3: Upgrade\n[/list][/color]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+      expect(result).not_to include("[/color]")
+      expect(result).to include("**Skill Name**")
+    end
+
+    it "converts size wrapping a list without leaking closing tags" do
+      bbcode = "[size=150][b]Title[/b]\n[list]\n[*]Item 1\n[*]Item 2\n[/list][/size]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+      expect(result).not_to include("[/size]")
+      expect(result).to include("**Title**")
+    end
+
+    it "converts color with bold inside list items" do
+      bbcode = "[color=#FFBF00][b]Wolverine (X-Force)[/b][/color]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+      expect(result).to eq('<span style="color: #FFBF00">**Wolverine (X-Force)**</span>')
+    end
+
+    it "converts nested color and list pattern from real forum data" do
+      bbcode = <<~BBCODE.chomp
+        [list][color=green][b]Godlike Power - Green 14[/b]
+        Deals 203 damage to all enemies.
+        [list]Level 2: Deals 266 damage.
+        Level 3: Deals 331 damage.[/list][/color][/list]
+      BBCODE
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+      expect(result).not_to include("[/color]")
+      expect(result).not_to include("[/list]")
+      expect(result).to include("**Godlike Power - Green 14**")
+    end
+  end
+
   describe "attachments" do
     it "converts attachment with numeric id (vBulletin/XenForo format)" do
       result = Markbridge.bbcode_to_markdown("[attach]1234[/attach]")

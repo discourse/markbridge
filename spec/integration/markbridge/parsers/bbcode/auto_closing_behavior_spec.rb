@@ -182,4 +182,63 @@ RSpec.describe "BBCode Auto-Closing Behavior" do
       expect(first_item.children[1]).to be_a(Markbridge::AST::Italic)
     end
   end
+
+  describe "color and size auto-closing across structural boundaries" do
+    it "auto-closes color when list closes inside color" do
+      result = parser.parse("[color=green][b]Title[/b]\n[list][*]Item 1[*]Item 2[/list][/color]")
+      color = result.children.first
+
+      expect(color).to be_a(Markbridge::AST::Color)
+      expect(color.children.size).to eq(3)
+      expect(color.children[0]).to be_a(Markbridge::AST::Bold)
+      expect(color.children[2]).to be_a(Markbridge::AST::List)
+    end
+
+    it "auto-closes size when list closes inside size" do
+      result = parser.parse("[size=150][b]Title[/b]\n[list][*]Item 1[/list][/size]")
+      size = result.children.first
+
+      expect(size).to be_a(Markbridge::AST::Size)
+      expect(size.children[0]).to be_a(Markbridge::AST::Bold)
+    end
+
+    it "does not leak closing color tag as text" do
+      result = parser.parse("[list][color=red][b]Skill[/b]\nLevel 2\nLevel 3[/color][/list]")
+
+      # No Text node with "[/color]" should exist anywhere in the tree
+      all_text = collect_text_nodes(result)
+      expect(all_text).not_to include("[/color]")
+    end
+
+    it "does not leak closing size tag as text" do
+      result = parser.parse("[list][size=20][b]Skill[/b]\nLevel 2[/size][/list]")
+
+      all_text = collect_text_nodes(result)
+      expect(all_text).not_to include("[/size]")
+    end
+
+    it "handles color wrapping nested lists" do
+      result =
+        parser.parse(
+          "[list][color=green][b]Skill[/b]\n[list]Level 2\nLevel 3[/list][/color][/list]",
+        )
+      outer_list = result.children.first
+
+      expect(outer_list).to be_a(Markbridge::AST::List)
+      # No Text node with leaked tags
+      all_text = collect_text_nodes(result)
+      expect(all_text).not_to include("[/color]")
+      expect(all_text).not_to include("[/list]")
+    end
+  end
+
+  # Helper to recursively collect all Text node contents
+  def collect_text_nodes(node)
+    texts = []
+    texts << node.text if node.is_a?(Markbridge::AST::Text)
+    if node.respond_to?(:children)
+      node.children.each { |child| texts.concat(collect_text_nodes(child)) }
+    end
+    texts
+  end
 end
