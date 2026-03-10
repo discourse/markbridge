@@ -20,7 +20,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
       element << Markbridge::AST::Text.new("This is a quote")
 
       result = tag.render(element, interface)
-      expect(result).to eq("[quote=\"John\"]\nThis is a quote\n[/quote]")
+      expect(result).to eq("[quote=\"John\"]\nThis is a quote\n[/quote]\n\n")
     end
 
     it "renders quote with full Discourse context" do
@@ -28,7 +28,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
       element << Markbridge::AST::Text.new("This is a quote")
 
       result = tag.render(element, interface)
-      expect(result).to eq("[quote=\"john, post:123, topic:456\"]\nThis is a quote\n[/quote]")
+      expect(result).to eq("[quote=\"john, post:123, topic:456\"]\nThis is a quote\n[/quote]\n\n")
     end
 
     it "renders multi-line plain quote with blockquote syntax" do

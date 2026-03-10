@@ -132,6 +132,14 @@ module Markbridge
           registry.register(%w[list ul ol ulist olist], Handlers::ListHandler.new)
           registry.register(%w[* li .], Handlers::ListItemHandler.new)
 
+          # Table handlers (passthrough: strip wrapper tags, preserve cell content)
+          registry.register("table", Handlers::SimpleHandler.new(AST::Table, auto_closeable: true))
+          registry.register("tr", Handlers::SimpleHandler.new(AST::TableRow, auto_closeable: true))
+          registry.register(
+            %w[td th],
+            Handlers::SimpleHandler.new(AST::TableCell, auto_closeable: true),
+          )
+
           # Set the closing strategy
           registry.closing_strategy = closing_strategy || default_closing_strategy(registry)
 

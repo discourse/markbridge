@@ -59,6 +59,15 @@ module Markbridge
           library.register AST::LineBreak, Tags::LineBreakTag.new
           library.register AST::HorizontalRule, Tags::HorizontalRuleTag.new
 
+          # Table tags: passthrough — strip wrapper tags, preserve cell content
+          passthrough =
+            Tag.new do |element, interface|
+              interface.render_children(element, context: interface.with_parent(element))
+            end
+          library.register AST::Table, passthrough
+          library.register AST::TableRow, passthrough
+          library.register AST::TableCell, passthrough
+
           library
         end
       end

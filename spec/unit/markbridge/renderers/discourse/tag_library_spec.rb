@@ -81,6 +81,18 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
       expect(default_library[Markbridge::AST::HorizontalRule]).not_to be_nil
     end
 
+    it "registers Table tag" do
+      expect(default_library[Markbridge::AST::Table]).not_to be_nil
+    end
+
+    it "registers TableRow tag" do
+      expect(default_library[Markbridge::AST::TableRow]).not_to be_nil
+    end
+
+    it "registers TableCell tag" do
+      expect(default_library[Markbridge::AST::TableCell]).not_to be_nil
+    end
+
     it "renders bold correctly" do
       bold = Markbridge::AST::Bold.new
       bold << Markbridge::AST::Text.new("text")

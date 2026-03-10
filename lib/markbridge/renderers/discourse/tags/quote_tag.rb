@@ -15,13 +15,12 @@ module Markbridge
             # Format: [quote="username, post:123, topic:456"]content[/quote]
             if element.post && element.topic && element.username
               # Full Discourse quote with context
-              "[quote=\"#{element.username}, post:#{element.post}, topic:#{element.topic}\"]\n#{content}\n[/quote]"
+              "[quote=\"#{element.username}, post:#{element.post}, topic:#{element.topic}\"]\n#{content}\n[/quote]\n\n"
             elsif element.author
               # Quote with author attribution only
-              "[quote=\"#{element.author}\"]\n#{content}\n[/quote]"
+              "[quote=\"#{element.author}\"]\n#{content}\n[/quote]\n\n"
             else
-              # Plain quote - could use Markdown blockquote or BBCode
-              # Using Markdown blockquote for plain quotes
+              # Plain Markdown blockquote — no trailing \n\n needed; surrounding paragraph context handles spacing
               content.split("\n").map { |line| "> #{line}" }.join("\n")
             end
           end

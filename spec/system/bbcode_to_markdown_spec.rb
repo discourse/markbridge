@@ -508,4 +508,36 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result).to eq(expected)
     end
   end
+
+  describe "table tags" do
+    it "strips [TABLE][TR][TD] wrapper tags and preserves cell content" do
+      bbcode = "[TABLE][TR][TD]cell content[/TD][/TR][/TABLE]"
+      expect(Markbridge.bbcode_to_markdown(bbcode)).to eq("cell content")
+    end
+
+    it "preserves content from multiple cells" do
+      bbcode = "[TABLE][TR][TD]first[/TD][TD]second[/TD][/TR][/TABLE]"
+      expect(Markbridge.bbcode_to_markdown(bbcode)).to eq("firstsecond")
+    end
+
+    it "strips [TH] header cells and preserves content" do
+      bbcode = "[TABLE][TR][TH]Header[/TH][/TR][TR][TD]value[/TD][/TR][/TABLE]"
+      expect(Markbridge.bbcode_to_markdown(bbcode)).to eq("Headervalue")
+    end
+
+    it "preserves formatted content inside table cells" do
+      bbcode = "[TABLE][TR][TD][B]bold cell[/B][/TD][/TR][/TABLE]"
+      expect(Markbridge.bbcode_to_markdown(bbcode)).to eq("**bold cell**")
+    end
+
+    it "handles empty cells" do
+      bbcode = "[TABLE][TR][TD][/TD][/TR][/TABLE]"
+      expect(Markbridge.bbcode_to_markdown(bbcode)).to eq("")
+    end
+
+    it "handles whitespace-only cells" do
+      bbcode = "[TABLE][TR][TD]   [/TD][/TR][/TABLE]"
+      expect(Markbridge.bbcode_to_markdown(bbcode)).to eq("")
+    end
+  end
 end
