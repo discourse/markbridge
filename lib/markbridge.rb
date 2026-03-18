@@ -5,6 +5,7 @@ require_relative "markbridge/version"
 require_relative "markbridge/ast"
 require_relative "markbridge/renderers/discourse"
 require_relative "markbridge/parsers/text_formatter"
+require_relative "markbridge/processors"
 
 module Markbridge
   class << self
