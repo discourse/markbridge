@@ -44,3 +44,4 @@ puts markdown
 * See `examples/` for runnable scripts such as `examples/basic_usage.rb`.
 * Browse integration and unit coverage under `spec/` to understand supported tags and edge cases.
 * Use `bin/console` during development for interactive exploration.
+* Use `bin/playground` during development to inspect BBCode, HTML, and TextFormatter XML conversions in a local web UI.

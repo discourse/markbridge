@@ -13,4 +13,7 @@ gem "rubocop-rspec"
 gem "rubycritic"
 gem "simplecov"
 gem "syntax_tree"
-gem "webrick"
+gem "sinatra"
+
+gem "rackup", "~> 2.3"
+gem "puma", "~> 7.2"

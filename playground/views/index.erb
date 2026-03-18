@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Markbridge Playground</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <section class="sidebar-card">
+          <div class="section-heading">
+            <span>Examples</span>
+            <span id="example-count" class="section-note"></span>
+          </div>
+          <div id="example-list" class="example-list"></div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <div id="format-tabs" class="format-tab-bar"></div>
+
+        <section class="panel editor-panel">
+          <div class="panel-heading">
+            <div>
+              <div class="panel-title">Input Editor</div>
+              <div class="panel-subtitle">`Cmd/Ctrl + Enter` to render.</div>
+            </div>
+            <div class="panel-actions">
+              <button id="reset-button" class="button button-secondary" type="button">Reset Example</button>
+              <button id="render-button" class="button" type="button">Render</button>
+            </div>
+          </div>
+
+          <textarea id="source-input" class="source-input" spellcheck="false"></textarea>
+        </section>
+
+        <section class="output-grid">
+          <article class="panel ast-panel">
+            <div class="panel-heading">
+              <div>
+                <div class="panel-title">AST Inspector</div>
+              </div>
+              <div class="panel-actions">
+                <button id="expand-tree-button" class="button button-secondary" type="button">Expand All</button>
+                <button id="collapse-tree-button" class="button button-secondary" type="button">Collapse All</button>
+              </div>
+            </div>
+            <div class="legend">
+              <span class="legend-chip is-document">Document</span>
+              <span class="legend-chip is-block">Block</span>
+              <span class="legend-chip is-formatting">Formatting</span>
+              <span class="legend-chip is-link">Link</span>
+              <span class="legend-chip is-media">Media</span>
+              <span class="legend-chip is-code">Code</span>
+              <span class="legend-chip is-structure">Structure</span>
+              <span class="legend-chip is-text">Text</span>
+            </div>
+            <div id="ast-tree" class="ast-tree"></div>
+          </article>
+
+          <article class="panel markdown-panel">
+            <div class="panel-heading">
+              <div>
+                <div class="panel-title">Markdown Output</div>
+              </div>
+              <div class="panel-actions">
+                <button id="copy-markdown-button" class="button button-secondary" type="button">Copy Markdown</button>
+              </div>
+            </div>
+            <div id="markdown-output" class="code-view"></div>
+          </article>
+        </section>
+
+        <footer id="diagnostics-footer" class="diagnostics-footer"></footer>
+      </section>
+    </main>
+
+    <script>
+      window.playgroundData = {
+        examples: <%= examples_json %>,
+        initialExampleId: <%= initial_example_id.inspect %>,
+        initialResult: <%= initial_result_json %>
+      };
+    </script>
+    <script src="/assets/app.js" defer></script>
+  </body>
+</html>
