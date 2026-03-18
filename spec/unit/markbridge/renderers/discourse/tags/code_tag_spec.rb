@@ -32,12 +32,55 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to include("```ruby")
     end
 
-    it "uses ~~~ fence when code contains backticks" do
+    it "uses ``` fence when code contains single backticks" do
       element = Markbridge::AST::Code.new
       element << Markbridge::AST::Text.new("code with `backticks`\nmore")
 
       result = tag.render(element, interface)
-      expect(result).to include("~~~")
+      # Single backticks only need 3-backtick fence (smarter than always using tildes)
+      expect(result).to start_with("```\n")
+      expect(result).to end_with("\n```")
+    end
+
+    it "uses tildes when code contains triple backticks (more efficient)" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("```\ncode block\nwith fences\n```")
+
+      result = tag.render(element, interface)
+      # Tildes (3) are more efficient than backticks (4)
+      expect(result).to start_with("~~~\n")
+      expect(result).to end_with("\n~~~")
+    end
+
+    it "uses tildes when code contains long backtick sequences" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("`````\ncode block\n`````")
+
+      result = tag.render(element, interface)
+      # Tildes (3) are more efficient than backticks (6)
+      expect(result).to start_with("~~~\n")
+      expect(result).to end_with("\n~~~")
+    end
+
+    it "uses backticks when content has long tilde sequences" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("~~~\ncode with tildes\n~~~")
+
+      result = tag.render(element, interface)
+      # Backticks (3) are more efficient than tildes (4)
+      expect(result).to start_with("```\n")
+      expect(result).to end_with("\n```")
+    end
+
+    it "handles content with both backticks and tildes" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("```\nand\n~~~")
+
+      result = tag.render(element, interface)
+      # Should use ~~~~ (4 tildes) since it's shorter than ```` (4 backticks)
+      # Actually both are equal, so backticks win
+      expect(result).to start_with("````\n")
+      expect(result).to end_with("\n````")
     end
   end
 end

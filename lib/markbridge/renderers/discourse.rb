@@ -4,6 +4,7 @@ require_relative "discourse/tag"
 require_relative "discourse/tag_library"
 require_relative "discourse/render_context"
 require_relative "discourse/rendering_interface"
+require_relative "discourse/markdown_escaper"
 
 # Builders
 require_relative "discourse/builders/list_item_builder"
@@ -30,6 +31,12 @@ require_relative "discourse/tags/subscript_tag"
 require_relative "discourse/tags/superscript_tag"
 require_relative "discourse/tags/underline_tag"
 require_relative "discourse/tags/url_tag"
+
+# Discourse-specific tags
+require_relative "discourse/tags/event_tag"
+require_relative "discourse/tags/mention_tag"
+require_relative "discourse/tags/poll_tag"
+require_relative "discourse/tags/upload_tag"
 
 # Renderer itself
 require_relative "discourse/renderer"
