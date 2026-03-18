@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "bundler/setup"
+require_relative "../playground/app"
+
+port = Integer(ENV.fetch("PORT", 4567))
+Markbridge::Playground::App.run!(port:, bind: "127.0.0.1")

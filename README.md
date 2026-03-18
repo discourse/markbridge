@@ -44,3 +44,13 @@ puts markdown
 * See `examples/` for runnable scripts such as `examples/basic_usage.rb`.
 * Browse integration and unit coverage under `spec/` to understand supported tags and edge cases.
 * Use `bin/console` during development for interactive exploration.
+
+## Playground
+
+A local web UI for exploring parsers interactively:
+
+```bash
+bin/playground
+```
+
+Open `http://127.0.0.1:4567` to select a parser (BBCode, HTML, TextFormatter XML, MediaWiki), pick an example, edit the input, and inspect the AST tree and Markdown output. Keyboard shortcuts: `1` Input, `2` Output, `3` AST, `Cmd/Ctrl+Enter` to render.

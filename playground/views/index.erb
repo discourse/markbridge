@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Markbridge Playground</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <section class="sidebar-card">
+          <div class="section-heading">Format</div>
+          <div id="format-list" class="format-list"></div>
+        </section>
+
+        <section class="sidebar-card">
+          <div class="section-heading">Examples</div>
+          <div id="example-list" class="example-list"></div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <div class="workspace-toolbar">
+          <nav id="view-tabs" class="view-tab-bar" role="tablist"></nav>
+          <div class="toolbar-actions">
+            <button id="render-button" class="button" type="button">Render</button>
+          </div>
+        </div>
+
+        <div id="view-panels" class="view-panels">
+          <div id="panel-input" class="view-panel" role="tabpanel">
+            <div class="panel-bar">
+              <span class="panel-hint">Cmd/Ctrl + Enter to render</span>
+              <button id="reset-button" class="button button-secondary button-sm" type="button">Reset</button>
+            </div>
+            <textarea id="source-input" class="source-input" spellcheck="false"></textarea>
+          </div>
+
+          <div id="panel-output" class="view-panel" role="tabpanel" hidden>
+            <div class="panel-bar">
+              <span></span>
+              <button id="copy-markdown-button" class="button button-secondary button-sm" type="button">Copy</button>
+            </div>
+            <div id="markdown-output" class="code-view"></div>
+          </div>
+
+          <div id="panel-ast" class="view-panel" role="tabpanel" hidden>
+            <div class="panel-bar">
+              <span></span>
+              <div class="panel-bar-actions">
+                <button id="expand-tree-button" class="button button-secondary button-sm" type="button">Expand</button>
+                <button id="collapse-tree-button" class="button button-secondary button-sm" type="button">Collapse</button>
+              </div>
+            </div>
+            <div id="ast-tree" class="ast-tree"></div>
+          </div>
+        </div>
+
+        <footer id="diagnostics-footer" class="diagnostics-footer"></footer>
+      </section>
+    </main>
+
+    <script>
+      window.playgroundData = {
+        examples: <%= examples_json %>,
+        initialExampleId: <%= initial_example_id.inspect %>,
+        initialResult: <%= initial_result_json %>
+      };
+    </script>
+    <script src="/assets/app.js" defer></script>
+  </body>
+</html>
