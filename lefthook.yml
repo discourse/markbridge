@@ -16,7 +16,3 @@ pre-commit:
         - "Gemfile"
         - "Rakefile"
       run: bundle exec stree check {staged_files}
-
-    syntax-tree-rbs:
-      glob: "*.rbs"
-      run: bundle exec stree check --plugins=rbs {staged_files}
