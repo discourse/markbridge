@@ -13,7 +13,6 @@ desc "Fix Ruby files with RuboCop and Syntax Tree"
 task :fix do
   sh "bundle exec rubocop -A"
   sh "bundle exec stree write '**/*.rb' '**/*.rake' Gemfile Rakefile *.gemspec"
-  sh "bundle exec stree write --plugins=rbs '**/*.rbs'"
 end
 
 task default: %i[fix spec]
