@@ -11,6 +11,7 @@ require_relative "ast/bold"
 require_relative "ast/code"
 require_relative "ast/color"
 require_relative "ast/email"
+require_relative "ast/heading"
 require_relative "ast/horizontal_rule"
 require_relative "ast/image"
 require_relative "ast/italic"
@@ -25,8 +26,15 @@ require_relative "ast/strikethrough"
 require_relative "ast/subscript"
 require_relative "ast/superscript"
 require_relative "ast/text"
+require_relative "ast/markdown_text"
 require_relative "ast/underline"
 require_relative "ast/url"
+
+# Discourse-specific nodes
+require_relative "ast/event"
+require_relative "ast/mention"
+require_relative "ast/poll"
+require_relative "ast/upload"
 
 module Markbridge
   module AST
