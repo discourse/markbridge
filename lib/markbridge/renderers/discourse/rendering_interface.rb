@@ -76,7 +76,8 @@ module Markbridge
 
           # Preserve leading/trailing whitespace
           content.sub(/^(\s*)(.+?)(\s*)$/m) do
-            "#{::Regexp.last_match(1)}#{open_marker}#{::Regexp.last_match(2)}#{close_marker}#{::Regexp.last_match(3)}"
+            match = Regexp.last_match
+            "#{match[1]}#{open_marker}#{match[2]}#{close_marker}#{match[3]}"
           end
         end
       end

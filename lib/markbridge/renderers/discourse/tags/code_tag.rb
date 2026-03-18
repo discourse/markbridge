@@ -25,11 +25,27 @@ module Markbridge
           end
 
           def render_block(content, language)
-            # Choose fence style based on content
-            fence = content.include?("`") ? "~~~" : "```"
+            fence = calculate_fence(content)
             lang = language || ""
 
             "#{fence}#{lang}\n#{content}\n#{fence}"
+          end
+
+          def calculate_fence(content)
+            # Find longest sequence of backticks and tildes
+            max_backticks = content.scan(/`+/).map(&:length).max || 0
+            max_tildes = content.scan(/~+/).map(&:length).max || 0
+
+            # Need fence longer than any sequence in content (minimum 3)
+            required_backticks = [3, max_backticks + 1].max
+            required_tildes = [3, max_tildes + 1].max
+
+            # Choose whichever requires fewer characters
+            if required_backticks <= required_tildes
+              "`" * required_backticks
+            else
+              "~" * required_tildes
+            end
           end
         end
       end

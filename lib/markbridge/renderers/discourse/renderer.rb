@@ -5,8 +5,9 @@ module Markbridge
     module Discourse
       # Renders AST to Discourse-flavored Markdown in-memory.
       class Renderer
-        def initialize(tag_library: nil)
+        def initialize(tag_library: nil, escaper: nil)
           @tag_library = tag_library || TagLibrary.default
+          @escaper = escaper || MarkdownEscaper.new
         end
 
         # Render a node to Markdown
@@ -26,8 +27,16 @@ module Markbridge
           case node
           when AST::Document, AST::Element
             render_children(node, context:)
-          when AST::Text
+          when AST::MarkdownText
+            # Pass through markdown text as-is (already formatted)
             node.text
+          when AST::Text
+            # Escape plain text unless we're inside a code block
+            if context.has_parent?(AST::Code)
+              node.text
+            else
+              @escaper.escape(node.text)
+            end
           else
             ""
           end
