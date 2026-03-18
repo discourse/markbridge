@@ -7,13 +7,14 @@ module Markbridge
         # Handler for ALIGN tags (center, left, right, justify)
         # Creates a generic Align element with the appropriate alignment
         class AlignHandler < BaseHandler
-          def initialize(alignment)
+          def initialize(alignment = nil)
             @alignment = alignment
             @element_class = AST::Align
           end
 
           def on_open(token:, context:, registry:, tokens: nil)
-            element = AST::Align.new(alignment: @alignment)
+            alignment = @alignment || token.tag.downcase
+            element = AST::Align.new(alignment:)
             context.push(element, token:)
           end
 

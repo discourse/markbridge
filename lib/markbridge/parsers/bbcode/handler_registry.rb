@@ -121,11 +121,8 @@ module Markbridge
           # Size handler
           registry.register("size", Handlers::SizeHandler.new)
 
-          # Alignment handlers
-          registry.register("center", Handlers::AlignHandler.new("center"))
-          registry.register("left", Handlers::AlignHandler.new("left"))
-          registry.register("right", Handlers::AlignHandler.new("right"))
-          registry.register("justify", Handlers::AlignHandler.new("justify"))
+          # Alignment handlers (single instance - reads alignment from tag name)
+          registry.register(%w[center left right justify], Handlers::AlignHandler.new)
 
           # Self-closing handlers
           registry.register("br", Handlers::SelfClosingHandler.new(AST::LineBreak))
