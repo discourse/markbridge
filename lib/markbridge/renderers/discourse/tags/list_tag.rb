@@ -25,13 +25,8 @@ module Markbridge
             nested = has_list_parent || has_list_item_parent
 
             if nested
-              # Nested list inside a ListItem: content only, ListItem handles the newline
-              # Nested list directly inside another List (edge case): add single leading newline
-              if has_list_item_parent
-                content
-              else
-                "\n#{content}"
-              end
+              # Nested list: add leading newline so it starts on its own line
+              "\n#{content}"
             else
               # Top-level list: add spacing
               "\n\n#{content}\n\n"
