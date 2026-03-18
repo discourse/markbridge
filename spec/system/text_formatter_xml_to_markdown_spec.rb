@@ -33,5 +33,94 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       expect(result).to eq("```ruby\nputs 'hello'\nputs 'world'\n```")
     end
+
+    it "converts italic text" do
+      result = Markbridge.text_formatter_xml_to_markdown("<r><I>italic</I></r>")
+      expect(result).to eq("*italic*")
+    end
+
+    it "converts underline text" do
+      result = Markbridge.text_formatter_xml_to_markdown("<r><U>underlined</U></r>")
+      expect(result).to eq("<u>underlined</u>")
+    end
+
+    it "converts strikethrough text" do
+      result = Markbridge.text_formatter_xml_to_markdown("<r><S>deleted</S></r>")
+      expect(result).to eq("~~deleted~~")
+    end
+
+    it "converts unordered lists" do
+      xml = "<r><LIST><LI>One</LI><LI>Two</LI></LIST></r>"
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to eq("- One\n- Two")
+    end
+
+    it "converts images" do
+      xml = '<r><IMG src="https://example.com/photo.jpg"/></r>'
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to eq("![](https://example.com/photo.jpg)")
+    end
+
+    it "converts email links" do
+      xml = '<r><EMAIL email="user@example.com">Contact us</EMAIL></r>'
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to eq("[Contact us](mailto:user@example.com)")
+    end
+
+    it "converts inline code" do
+      xml = "<r><CODE>var x = 1</CODE></r>"
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to eq("`var x = 1`")
+    end
+
+    it "converts nested formatting" do
+      xml = "<r><B><I>bold italic</I></B></r>"
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to eq("***bold italic***")
+    end
+
+    it "handles plain text without XML wrapper" do
+      result = Markbridge.text_formatter_xml_to_markdown("Just plain text")
+      expect(result).to eq("Just plain text")
+    end
+
+    it "handles empty input" do
+      result = Markbridge.text_formatter_xml_to_markdown("")
+      expect(result).to eq("")
+    end
+
+    it "converts spoiler tags" do
+      xml = '<r><SPOILER title="Reveal">hidden content</SPOILER></r>'
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to eq("[spoiler=Reveal]hidden content[/spoiler]")
+    end
+
+    it "converts color tags" do
+      xml = '<r><COLOR color="red">red text</COLOR></r>'
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to eq('<span style="color: red">red text</span>')
+    end
+
+    it "converts size tags" do
+      xml = '<r><SIZE size="20">big text</SIZE></r>'
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to eq('<span style="font-size: 20px">big text</span>')
+    end
   end
 end
