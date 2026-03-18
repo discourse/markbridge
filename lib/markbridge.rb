@@ -4,6 +4,7 @@ require_relative "markbridge/version"
 
 require_relative "markbridge/ast"
 require_relative "markbridge/renderers/discourse"
+require_relative "markbridge/parsers/media_wiki"
 require_relative "markbridge/parsers/text_formatter"
 require_relative "markbridge/processors"
 
@@ -101,6 +102,33 @@ module Markbridge
       tag_library ||= default_tag_library
 
       ast = parse_text_formatter_xml(input, handlers:)
+      renderer = Renderers::Discourse::Renderer.new(tag_library:)
+
+      result = renderer.render(ast)
+      cleanup_markdown(result)
+    end
+
+    # Parse MediaWiki wikitext to AST
+    # @param input [String] MediaWiki source
+    # @return [AST::Document]
+    def parse_mediawiki(input)
+      raise ArgumentError, "input cannot be nil" if input.nil?
+
+      input = input.to_s
+      parser = Parsers::MediaWiki::Parser.new
+      parser.parse(input)
+    end
+
+    # Convert MediaWiki wikitext to Discourse Markdown
+    # @param input [String] MediaWiki source
+    # @param tag_library [TagLibrary, nil] custom tag library or use default
+    # @return [String] Markdown output
+    def mediawiki_to_markdown(input, tag_library: nil)
+      raise ArgumentError, "input cannot be nil" if input.nil?
+
+      tag_library ||= default_tag_library
+
+      ast = parse_mediawiki(input)
       renderer = Renderers::Discourse::Renderer.new(tag_library:)
 
       result = renderer.render(ast)
