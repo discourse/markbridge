@@ -213,6 +213,47 @@ RSpec.describe "HTML to Markdown Conversion" do
     end
   end
 
+  describe "underline" do
+    it "converts underline to HTML" do
+      result = Markbridge.html_to_markdown("<u>underlined text</u>")
+      expect(result).to eq("<u>underlined text</u>")
+    end
+  end
+
+  describe "superscript and subscript" do
+    it "converts superscript" do
+      result = Markbridge.html_to_markdown("<sup>2</sup>")
+      expect(result).to eq("<sup>2</sup>")
+    end
+
+    it "converts subscript" do
+      result = Markbridge.html_to_markdown("<sub>2</sub>")
+      expect(result).to eq("<sub>2</sub>")
+    end
+
+    it "handles inline superscript" do
+      result = Markbridge.html_to_markdown("x<sup>2</sup> + y<sup>3</sup>")
+      expect(result).to eq("x<sup>2</sup> \\+ y<sup>3</sup>")
+    end
+  end
+
+  describe "edge cases" do
+    it "handles empty input" do
+      result = Markbridge.html_to_markdown("")
+      expect(result).to eq("")
+    end
+
+    it "preserves plain text" do
+      result = Markbridge.html_to_markdown("Just plain text")
+      expect(result).to eq("Just plain text")
+    end
+
+    it "handles deeply nested formatting" do
+      result = Markbridge.html_to_markdown("<b><i><u>deep</u></i></b>")
+      expect(result).to eq("***<u>deep</u>***")
+    end
+  end
+
   describe "strong and em tags" do
     it "converts strong to bold" do
       html = "<strong>strong text</strong>"

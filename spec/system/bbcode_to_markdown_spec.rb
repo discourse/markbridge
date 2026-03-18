@@ -301,6 +301,157 @@ RSpec.describe "BBCode to Markdown Conversion" do
     end
   end
 
+  describe "urls" do
+    it "converts url with href option" do
+      result = Markbridge.bbcode_to_markdown("[url=https://example.com]Click here[/url]")
+      expect(result).to eq("[Click here](https://example.com)")
+    end
+
+    it "converts url with content only (no href attribute)" do
+      result = Markbridge.bbcode_to_markdown("[url]https://example.com[/url]")
+      expect(result).to eq("https://example.com")
+    end
+
+    it "converts url with formatted content" do
+      result = Markbridge.bbcode_to_markdown("[url=https://example.com][b]Bold link[/b][/url]")
+      expect(result).to eq("[**Bold link**](https://example.com)")
+    end
+  end
+
+  describe "images" do
+    it "converts simple image" do
+      result = Markbridge.bbcode_to_markdown("[img]https://example.com/photo.jpg[/img]")
+      expect(result).to eq("![](https://example.com/photo.jpg)")
+    end
+
+    it "converts image with dimensions" do
+      result = Markbridge.bbcode_to_markdown("[img=100x200]https://example.com/photo.jpg[/img]")
+      expect(result).to eq("![|100x200](https://example.com/photo.jpg)")
+    end
+
+    it "converts image with width attribute" do
+      result = Markbridge.bbcode_to_markdown("[img width=100]https://example.com/photo.jpg[/img]")
+      expect(result).to eq("![|100](https://example.com/photo.jpg)")
+    end
+  end
+
+  describe "quotes" do
+    it "converts simple quote" do
+      result = Markbridge.bbcode_to_markdown("[quote]Hello world[/quote]")
+      expect(result).to eq("> Hello world")
+    end
+
+    it "converts quote with author" do
+      result = Markbridge.bbcode_to_markdown("[quote=John]Hello world[/quote]")
+      expect(result).to eq("[quote=\"John\"]\nHello world\n[/quote]")
+    end
+
+    it "converts quote with Discourse context" do
+      result =
+        Markbridge.bbcode_to_markdown('[quote="alice, post:123, topic:456"]Quoted text[/quote]')
+      expect(result).to eq("[quote=\"alice, post:123, topic:456\"]\nQuoted text\n[/quote]")
+    end
+  end
+
+  describe "strikethrough" do
+    it "converts strikethrough tags" do
+      result = Markbridge.bbcode_to_markdown("[s]deleted text[/s]")
+      expect(result).to eq("~~deleted text~~")
+    end
+
+    it "converts strike alias" do
+      result = Markbridge.bbcode_to_markdown("[strike]deleted[/strike]")
+      expect(result).to eq("~~deleted~~")
+    end
+  end
+
+  describe "underline" do
+    it "converts underline to HTML" do
+      result = Markbridge.bbcode_to_markdown("[u]underlined[/u]")
+      expect(result).to eq("<u>underlined</u>")
+    end
+  end
+
+  describe "superscript and subscript" do
+    it "converts superscript to HTML" do
+      result = Markbridge.bbcode_to_markdown("[sup]2[/sup]")
+      expect(result).to eq("<sup>2</sup>")
+    end
+
+    it "converts subscript to HTML" do
+      result = Markbridge.bbcode_to_markdown("[sub]2[/sub]")
+      expect(result).to eq("<sub>2</sub>")
+    end
+
+    it "handles superscript in context" do
+      result = Markbridge.bbcode_to_markdown("x[sup]2[/sup] + y[sup]3[/sup]")
+      expect(result).to eq("x<sup>2</sup> \\+ y<sup>3</sup>")
+    end
+  end
+
+  describe "spoiler" do
+    it "converts simple spoiler" do
+      result = Markbridge.bbcode_to_markdown("[spoiler]secret content[/spoiler]")
+      expect(result).to eq("[spoiler]secret content[/spoiler]")
+    end
+
+    it "converts spoiler with title" do
+      result = Markbridge.bbcode_to_markdown("[spoiler=Click to reveal]secret[/spoiler]")
+      expect(result).to eq("\\[spoiler=Click to reveal]secret\\[/spoiler]")
+    end
+
+    it "converts hide alias" do
+      result = Markbridge.bbcode_to_markdown("[hide]hidden content[/hide]")
+      expect(result).to eq("[spoiler]hidden content[/spoiler]")
+    end
+  end
+
+  describe "email" do
+    it "converts email with address option" do
+      result = Markbridge.bbcode_to_markdown("[email=user@example.com]Contact us[/email]")
+      expect(result).to eq("[Contact us](mailto:user@example.com)")
+    end
+
+    it "converts email with content as address" do
+      result = Markbridge.bbcode_to_markdown("[email]user@example.com[/email]")
+      expect(result).to eq("user@example.com")
+    end
+  end
+
+  describe "alignment" do
+    it "converts center alignment" do
+      result = Markbridge.bbcode_to_markdown("[center]centered text[/center]")
+      expect(result).to eq('<div align="center">centered text</div>')
+    end
+
+    it "converts right alignment" do
+      result = Markbridge.bbcode_to_markdown("[right]right-aligned[/right]")
+      expect(result).to eq('<div align="right">right-aligned</div>')
+    end
+  end
+
+  describe "edge cases" do
+    it "drops unknown tag brackets but preserves content" do
+      result = Markbridge.bbcode_to_markdown("[unknown]some text[/unknown]")
+      expect(result).to eq("some text")
+    end
+
+    it "handles empty input" do
+      result = Markbridge.bbcode_to_markdown("")
+      expect(result).to eq("")
+    end
+
+    it "handles deeply nested formatting" do
+      result = Markbridge.bbcode_to_markdown("[b][i][u]deep[/u][/i][/b]")
+      expect(result).to eq("***<u>deep</u>***")
+    end
+
+    it "handles unclosed tags gracefully" do
+      result = Markbridge.bbcode_to_markdown("[b]bold text")
+      expect(result).to eq("**bold text**")
+    end
+  end
+
   describe "attachments" do
     it "converts attachment with numeric id (vBulletin/XenForo format)" do
       result = Markbridge.bbcode_to_markdown("[attach]1234[/attach]")
