@@ -39,6 +39,18 @@ puts markdown
 # => "**Hello** [world](https://example.com)!"
 ```
 
+## Configuration
+
+```ruby
+Markbridge.configure do |config|
+  # Strip trailing spaces before newlines to prevent hard line breaks (<br/>).
+  # Defaults to false (Discourse has this disabled by default).
+  config.escape_hard_line_breaks = true
+end
+```
+
+Configuration applies to all `*_to_markdown` convenience methods (`bbcode_to_markdown`, `html_to_markdown`, etc.).
+
 ## Learn more
 
 * See `examples/` for runnable scripts such as `examples/basic_usage.rb`.

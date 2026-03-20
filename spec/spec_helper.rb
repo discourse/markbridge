@@ -3,6 +3,8 @@
 require "simplecov" if ENV["COVERAGE"]
 require "markbridge/all"
 
+SPEC_ROOT = Pathname(__dir__)
+
 Dir[File.join(__dir__, "support", "**", "*.rb")].each { |f| require f }
 
 RSpec.configure do |config|

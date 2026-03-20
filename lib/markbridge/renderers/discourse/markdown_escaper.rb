@@ -29,14 +29,17 @@ module Markbridge
       #   escaper.escape("<div>content</div>")  # => "\\<div>content\\</div>"
       #   escaper.escape("<?php echo 1; ?>")    # => "\\<?php echo 1; ?>"
       #
-      # @example Autolinks are preserved (intentionally NOT escaped)
-      #   escaper.escape("<https://example.com>")  # => "<https://example.com>"
-      #   escaper.escape("<user@example.com>")     # => "<user@example.com>"
-      #
       class MarkdownEscaper
+        # @param escape_hard_line_breaks [Boolean] when true, strip trailing spaces
+        #   before newlines to prevent CommonMark hard line breaks (<br/>).
+        #   Defaults to false because Discourse has trailing-space hard line
+        #   breaks disabled by default.
+        def initialize(escape_hard_line_breaks: false)
+          @escape_hard_line_breaks = escape_hard_line_breaks
+        end
+
         # Fast-path check: any character that might need escaping
         # Only includes characters we actually escape (removed ], {, }, ^)
-        # Note: We intentionally don't escape autolinks, but DO escape HTML tags
         # > is needed for blockquote detection at line start
         MAYBE_SPECIAL = /[\\`*_\[#+\-.!<>&|~=>)]/
 
@@ -109,9 +112,8 @@ module Markbridge
         # Escapes markdown special characters in the given text.
         #
         # Handles both block-level constructs (headings, lists, code blocks, HTML blocks)
-        # and inline formatting (emphasis, code spans, links, inline HTML). Autolinks
-        # (<https://...>, <mailto:...>, <email@domain>) are intentionally preserved
-        # so URLs and email addresses remain clickable.
+        # and inline formatting (emphasis, code spans, links, inline HTML).
+        # Autolinks (<https://...>, <email@domain>) are intentionally preserved.
         #
         # @param text [String, nil] the text to escape
         # @return [String] the escaped text, or empty string if input is nil
@@ -119,6 +121,10 @@ module Markbridge
         def escape(text)
           return "".freeze if text.nil?
           return text if text.empty?
+
+          # Neutralize hard line breaks (trailing 2+ spaces before newline)
+          text = text.gsub(/  +\n/, "\n") if @escape_hard_line_breaks && text.include?("  \n")
+
           return text unless MAYBE_SPECIAL.match?(text) || MAYBE_INDENTED_CODE.match?(text)
 
           escape_text(text)
@@ -131,7 +137,7 @@ module Markbridge
           return escape_line(lines[0], false) if lines.size == 1
 
           # Pre-allocate result buffer
-          result = String.new(capacity: text.bytesize + text.bytesize / 3)
+          result = String.new(capacity: text.bytesize + text.bytesize / 3, encoding: text.encoding)
           prev_was_paragraph = false
           first = true
 
@@ -202,7 +208,7 @@ module Markbridge
           return line if i >= line.length # Whitespace-only line
 
           # Convert leading whitespace to NBSP (tab = 4 NBSP for visual consistency)
-          nbsp_indent = String.new
+          nbsp_indent = String.new(encoding: line.encoding)
           line[0, i].each_char { |c| nbsp_indent << (c == "\t" ? (NBSP * 4) : NBSP) }
 
           content = line[i..]
@@ -263,7 +269,7 @@ module Markbridge
         end
 
         def escape_all_chars(str, byte_val, escaped)
-          result = String.new(capacity: str.bytesize * 2)
+          result = String.new(capacity: str.bytesize * 2, encoding: str.encoding)
           str.each_byte do |b|
             if b == byte_val
               result << escaped
@@ -278,7 +284,11 @@ module Markbridge
           # Quick check - if no special chars, return as-is
           return content unless INLINE_SPECIAL.match?(content)
 
-          result = String.new(capacity: content.bytesize + content.bytesize / 4)
+          result =
+            String.new(
+              capacity: content.bytesize + content.bytesize / 4,
+              encoding: content.encoding,
+            )
           len = content.bytesize
           i = 0
 

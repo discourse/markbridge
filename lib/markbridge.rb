@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "markbridge/version"
+require_relative "markbridge/configuration"
 
 require_relative "markbridge/ast"
 require_relative "markbridge/renderers/discourse"
@@ -36,7 +37,7 @@ module Markbridge
       tag_library ||= default_tag_library
 
       ast = parse_bbcode(input, handlers:)
-      renderer = Renderers::Discourse::Renderer.new(tag_library:)
+      renderer = build_renderer(tag_library:)
 
       # Clean up output
       result = renderer.render(ast)
@@ -69,7 +70,7 @@ module Markbridge
       tag_library ||= default_tag_library
 
       ast = parse_html(input, handlers:)
-      renderer = Renderers::Discourse::Renderer.new(tag_library:)
+      renderer = build_renderer(tag_library:)
 
       # Clean up output
       result = renderer.render(ast)
@@ -102,7 +103,7 @@ module Markbridge
       tag_library ||= default_tag_library
 
       ast = parse_text_formatter_xml(input, handlers:)
-      renderer = Renderers::Discourse::Renderer.new(tag_library:)
+      renderer = build_renderer(tag_library:)
 
       result = renderer.render(ast)
       cleanup_markdown(result)
@@ -129,7 +130,7 @@ module Markbridge
       tag_library ||= default_tag_library
 
       ast = parse_mediawiki(input)
-      renderer = Renderers::Discourse::Renderer.new(tag_library:)
+      renderer = build_renderer(tag_library:)
 
       result = renderer.render(ast)
       cleanup_markdown(result)
@@ -159,15 +160,36 @@ module Markbridge
       @default_text_formatter_handlers ||= Parsers::TextFormatter::HandlerRegistry.default
     end
 
+    # Get the global configuration
+    # @return [Configuration]
+    def configuration
+      @configuration ||= Configuration.new
+    end
+
+    # Configure Markbridge with a block
+    # @yield [Configuration]
+    def configure
+      yield configuration
+    end
+
     # Reset defaults (useful for testing)
     def reset_defaults!
       @default_handlers = nil
       @default_html_handlers = nil
       @default_tag_library = nil
       @default_text_formatter_handlers = nil
+      @configuration = nil
     end
 
     private
+
+    def build_renderer(tag_library:)
+      escaper =
+        Renderers::Discourse::MarkdownEscaper.new(
+          escape_hard_line_breaks: configuration.escape_hard_line_breaks,
+        )
+      Renderers::Discourse::Renderer.new(tag_library:, escaper:)
+    end
 
     def cleanup_markdown(text)
       text

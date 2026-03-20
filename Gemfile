@@ -4,16 +4,16 @@ source "https://rubygems.org"
 
 gemspec
 
+gem "commonmarker"
 gem "lefthook"
 gem "nokogiri"
+gem "puma"
+gem "rackup"
 gem "rake"
 gem "rspec"
 gem "rubocop-discourse-base"
 gem "rubocop-rspec"
 gem "rubycritic"
 gem "simplecov"
-gem "syntax_tree"
 gem "sinatra"
-
-gem "rackup", "~> 2.3"
-gem "puma", "~> 7.2"
+gem "syntax_tree"

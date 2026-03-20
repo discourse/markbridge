@@ -617,6 +617,32 @@ end
 
 ## Configuration
 
+### Global Configuration
+
+Use `Markbridge.configure` to set options that apply to all `*_to_markdown` convenience methods:
+
+```ruby
+Markbridge.configure do |config|
+  # Strip trailing spaces before newlines to prevent hard line breaks (<br/>).
+  # Defaults to false (Discourse has this disabled by default).
+  config.escape_hard_line_breaks = true
+end
+
+Markbridge.bbcode_to_markdown("[b]Hello[/b]") # uses configured settings
+```
+
+You can also read the current configuration:
+
+```ruby
+Markbridge.configuration.escape_hard_line_breaks # => false (default)
+```
+
+Available settings:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `escape_hard_line_breaks` | `false` | Strip trailing spaces before newlines to prevent `<br/>` |
+
 ### Using Default Library
 
 ```ruby
