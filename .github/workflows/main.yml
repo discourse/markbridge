@@ -1,10 +1,11 @@
-name: Ruby
+name: CI
 
 on:
   push:
     branches:
       - main
-
+    tags:
+      - v*
   pull_request:
 
 jobs:
@@ -12,7 +13,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -38,7 +42,8 @@ jobs:
           - '4.0'
 
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Set up Ruby
@@ -48,3 +53,22 @@ jobs:
           bundler-cache: true
       - name: Run tests
         run: bundle exec rake spec
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    needs:
+      - lint
+      - test
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Release Gem
+        uses: discourse/publish-rubygems-action@v3
+        env:
+          RUBYGEMS_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+          GIT_EMAIL: team@discourse.org
+          GIT_NAME: discoursebot
