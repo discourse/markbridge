@@ -15,4 +15,10 @@ task :fix do
   sh "bundle exec stree write '**/*.rb' '**/*.rake' Gemfile Rakefile *.gemspec"
 end
 
+desc "Run RubyCritic with coverage (runs tests first)"
+task :critique do
+  sh "COVERAGE=1 bundle exec rspec --format progress"
+  sh "bundle exec rubycritic"
+end
+
 task default: %i[fix spec]

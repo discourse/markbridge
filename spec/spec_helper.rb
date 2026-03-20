@@ -1,6 +1,14 @@
 # frozen_string_literal: true
 
-require "simplecov" if ENV["COVERAGE"]
+if ENV["COVERAGE"]
+  require "simplecov"
+  SimpleCov.start do
+    command_name "RSpec"
+    add_filter "/examples/"
+    add_filter "/spec/"
+  end
+end
+
 require "markbridge/all"
 
 SPEC_ROOT = Pathname(__dir__)
