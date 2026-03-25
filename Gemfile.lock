@@ -83,7 +83,7 @@ GEM
     lefthook (2.1.4)
     lint_roller (1.1.0)
     logger (1.7.0)
-    mcp (0.9.0)
+    mcp (0.9.1)
       json-schema (>= 4.1)
     mustermann (3.0.4)
       ruby2_keywords (~> 0.0.1)
@@ -280,7 +280,7 @@ CHECKSUMS
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
   logger (1.7.0) sha256=196edec7cc44b66cfb40f9755ce11b392f21f7967696af15d274dde7edff0203
   markbridge (0.1.0)
-  mcp (0.9.0) sha256=a0a3737b0ac9df0772f4ef7e2b013c260ddbcf217a5d50a66bff0baeddf03e47
+  mcp (0.9.1) sha256=58185e2f80777be85134ead5dea38519520fa61856a36139a13932def6b2b199
   mustermann (3.0.4) sha256=85fadcb6b3c6493a8b511b42426f904b7f27b282835502233dd154daab13aa22
   nio4r (2.7.5) sha256=6c90168e48fb5f8e768419c93abb94ba2b892a1d0602cb06eef16d8b7df1dca1
   nokogiri (1.19.2-aarch64-linux-gnu) sha256=c34d5c8208025587554608e98fd88ab125b29c80f9352b821964e9a5d5cfbd19
