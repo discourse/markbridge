@@ -16,13 +16,8 @@ module Markbridge
     # @param handlers [HandlerRegistry, nil] custom handler registry or use default
     # @return [AST::Document]
     def parse_bbcode(input, handlers: nil)
-      raise ArgumentError, "input cannot be nil" if input.nil?
-
-      input = input.to_s # Coerce to string
       handlers ||= default_handlers
-
-      parser = Parsers::BBCode::Parser.new(handlers:)
-      parser.parse(input)
+      parse_with(Parsers::BBCode::Parser, input, handlers:)
     end
 
     # Convert BBCode to Discourse Markdown
@@ -31,17 +26,8 @@ module Markbridge
     # @param tag_library [TagLibrary, nil] custom tag library or use default
     # @return [String] Markdown output
     def bbcode_to_markdown(input, handlers: nil, tag_library: nil)
-      raise ArgumentError, "input cannot be nil" if input.nil?
-
-      handlers ||= default_handlers
-      tag_library ||= default_tag_library
-
       ast = parse_bbcode(input, handlers:)
-      renderer = build_renderer(tag_library:)
-
-      # Clean up output
-      result = renderer.render(ast)
-      cleanup_markdown(result)
+      render_to_markdown(ast, tag_library:)
     end
 
     # Parse HTML to AST
@@ -49,13 +35,8 @@ module Markbridge
     # @param handlers [HandlerRegistry, nil] custom handler registry or use default
     # @return [AST::Document]
     def parse_html(input, handlers: nil)
-      raise ArgumentError, "input cannot be nil" if input.nil?
-
-      input = input.to_s # Coerce to string
       handlers ||= default_html_handlers
-
-      parser = Parsers::HTML::Parser.new(handlers:)
-      parser.parse(input)
+      parse_with(Parsers::HTML::Parser, input, handlers:)
     end
 
     # Convert HTML to Discourse Markdown
@@ -64,17 +45,8 @@ module Markbridge
     # @param tag_library [TagLibrary, nil] custom tag library or use default
     # @return [String] Markdown output
     def html_to_markdown(input, handlers: nil, tag_library: nil)
-      raise ArgumentError, "input cannot be nil" if input.nil?
-
-      handlers ||= default_html_handlers
-      tag_library ||= default_tag_library
-
       ast = parse_html(input, handlers:)
-      renderer = build_renderer(tag_library:)
-
-      # Clean up output
-      result = renderer.render(ast)
-      cleanup_markdown(result)
+      render_to_markdown(ast, tag_library:)
     end
 
     # Parse s9e/TextFormatter XML to AST
@@ -82,13 +54,8 @@ module Markbridge
     # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handler registry or use default
     # @return [AST::Document]
     def parse_text_formatter_xml(input, handlers: nil)
-      raise ArgumentError, "input cannot be nil" if input.nil?
-
-      input = input.to_s
       handlers ||= default_text_formatter_handlers
-
-      parser = Parsers::TextFormatter::Parser.new(handlers:)
-      parser.parse(input)
+      parse_with(Parsers::TextFormatter::Parser, input, handlers:)
     end
 
     # Convert s9e/TextFormatter XML to Discourse Markdown
@@ -97,16 +64,8 @@ module Markbridge
     # @param tag_library [TagLibrary, nil] custom tag library or use default
     # @return [String] Markdown output
     def text_formatter_xml_to_markdown(input, handlers: nil, tag_library: nil)
-      raise ArgumentError, "input cannot be nil" if input.nil?
-
-      handlers ||= default_text_formatter_handlers
-      tag_library ||= default_tag_library
-
       ast = parse_text_formatter_xml(input, handlers:)
-      renderer = build_renderer(tag_library:)
-
-      result = renderer.render(ast)
-      cleanup_markdown(result)
+      render_to_markdown(ast, tag_library:)
     end
 
     # Parse MediaWiki wikitext to AST
@@ -125,15 +84,8 @@ module Markbridge
     # @param tag_library [TagLibrary, nil] custom tag library or use default
     # @return [String] Markdown output
     def mediawiki_to_markdown(input, tag_library: nil)
-      raise ArgumentError, "input cannot be nil" if input.nil?
-
-      tag_library ||= default_tag_library
-
       ast = parse_mediawiki(input)
-      renderer = build_renderer(tag_library:)
-
-      result = renderer.render(ast)
-      cleanup_markdown(result)
+      render_to_markdown(ast, tag_library:)
     end
 
     # Get default handler registry
@@ -182,6 +134,19 @@ module Markbridge
     end
 
     private
+
+    def parse_with(parser_class, input, handlers:)
+      raise ArgumentError, "input cannot be nil" if input.nil?
+
+      parser = parser_class.new(handlers:)
+      parser.parse(input.to_s)
+    end
+
+    def render_to_markdown(ast, tag_library: nil)
+      tag_library ||= default_tag_library
+      renderer = build_renderer(tag_library:)
+      cleanup_markdown(renderer.render(ast))
+    end
 
     def build_renderer(tag_library:)
       escaper =

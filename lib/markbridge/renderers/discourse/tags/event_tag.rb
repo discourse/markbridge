@@ -18,7 +18,7 @@ module Markbridge
         #     end
         #   end
         class EventTag < Tag
-          def render(element, interface)
+          def render(element, _interface)
             # Return raw BBCode if available, otherwise reconstruct
             return element.raw if element.raw
 

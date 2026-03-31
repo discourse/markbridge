@@ -59,16 +59,6 @@ module Markbridge
 
           private
 
-          def parse_attributes(attr_string)
-            attrs = {}
-            return attrs if attr_string.nil? || attr_string.empty?
-
-            # Match key="value" or key='value' patterns
-            attr_string.scan(/(\w+)=["']([^"']*)["']/) { |key, value| attrs[key.downcase] = value }
-
-            attrs
-          end
-
           def extract_options(content)
             options = []
             content.each_line do |line|

@@ -10,6 +10,12 @@ AllCops:
 Style/HashSyntax:
   EnforcedShorthandSyntax: always
 
+Lint/UnusedMethodArgument:
+  Enabled: true
+  AllowUnusedKeywordArguments: true
+  IgnoreEmptyMethods: true
+  IgnoreNotImplementedMethods: true
+
 RSpec/DescribeClass:
   Exclude:
     - spec/integration/**/*

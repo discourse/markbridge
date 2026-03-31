@@ -52,55 +52,20 @@ module Markbridge
         def check_fenced_boundary(input, pos, line_start:)
           return nil unless line_start
 
-          # Skip up to 3 spaces of indentation
-          scan_pos = pos
-          spaces = 0
-          while spaces < 3 && scan_pos < input.length && input[scan_pos] == " "
-            spaces += 1
-            scan_pos += 1
-          end
-
-          return nil if scan_pos >= input.length
+          input_length = input.length
+          scan_pos = skip_leading_spaces(input, pos, input_length)
+          return nil if scan_pos >= input_length
 
           fence_char = input[scan_pos]
           return nil unless fence_char == "`" || fence_char == "~"
 
-          # Count consecutive fence characters
-          fence_start = scan_pos
-          fence_length = 0
-          while scan_pos < input.length && input[scan_pos] == fence_char
-            fence_length += 1
-            scan_pos += 1
-          end
-
+          fence_length, scan_pos = count_fence_chars(input, scan_pos, fence_char, input_length)
           return nil if fence_length < 3
 
           if @in_fenced_block
-            # Check if this closes the current block
-            if fence_char == @fence_char && fence_length >= @fence_length
-              # Closing fence - must be followed by newline or end of input
-              # Skip any trailing whitespace
-              scan_pos += 1 while scan_pos < input.length && input[scan_pos] == " "
-
-              if scan_pos >= input.length || input[scan_pos] == "\n"
-                @in_fenced_block = false
-                @fence_char = nil
-                @fence_length = 0
-                # Return position after the newline if present
-                return scan_pos < input.length ? scan_pos + 1 : scan_pos
-              end
-            end
-            nil
+            try_close_fence(input, scan_pos, fence_char, fence_length, input_length)
           else
-            # Opening fence - skip to end of line (info string)
-            scan_pos += 1 while scan_pos < input.length && input[scan_pos] != "\n"
-
-            @in_fenced_block = true
-            @fence_char = fence_char
-            @fence_length = fence_length
-
-            # Return position after the newline if present
-            scan_pos < input.length ? scan_pos + 1 : scan_pos
+            open_fence(input, scan_pos, fence_char, fence_length, input_length)
           end
         end
 
@@ -116,38 +81,23 @@ module Markbridge
           return nil unless line_start
           return nil if @in_fenced_block # Fenced blocks take precedence
 
-          # Find end of line
-          line_end = input.index("\n", pos) || input.length
-
-          # Check if line is blank
+          input_length = input.length
+          line_end = input.index("\n", pos) || input_length
           line_content = input[pos...line_end]
           is_blank = line_content.match?(/\A\s*\z/)
-
-          # Check indentation (4+ spaces or tab)
           has_code_indent = line_content.start_with?("    ") || line_content.start_with?("\t")
 
           if @in_indented_block
-            if is_blank
-              # Blank lines continue the indented block
-              # Return end of line (after newline if present)
-              return line_end < input.length ? line_end + 1 : line_end
-            elsif has_code_indent
-              # Still in indented code
-              return line_end < input.length ? line_end + 1 : line_end
+            if is_blank || has_code_indent
+              pos_after_line(line_end, input_length)
             else
-              # Non-blank, non-indented line ends the block
               @in_indented_block = false
-              return nil
+              nil
             end
-          else
-            if has_code_indent
-              # Start of indented code block
-              @in_indented_block = true
-              return line_end < input.length ? line_end + 1 : line_end
-            end
+          elsif has_code_indent
+            @in_indented_block = true
+            pos_after_line(line_end, input_length)
           end
-
-          nil
         end
 
         # Check for inline code boundary
@@ -156,33 +106,95 @@ module Markbridge
         # @return [Integer, nil] end position after inline code, or nil if not at boundary
         def check_inline_boundary(input, pos)
           return nil if @in_fenced_block || @in_indented_block
-          return nil if pos >= input.length || input[pos] != "`"
+
+          input_length = input.length
+          return nil if pos >= input_length || input[pos] != "`"
 
           if @in_inline_code
-            # Check if this closes the current inline code
-            delimiter_length = @inline_delimiter.length
-            if input[pos, delimiter_length] == @inline_delimiter
-              # Check what follows - should not be another backtick
-              next_pos = pos + delimiter_length
-              if next_pos >= input.length || input[next_pos] != "`"
-                @in_inline_code = false
-                @inline_delimiter = nil
-                return next_pos
-              end
-            end
-            nil
+            try_close_inline(input, pos, input_length)
           else
-            # Opening inline code - count backticks
-            delimiter_start = pos
-            pos += 1 while pos < input.length && input[pos] == "`"
-
-            @inline_delimiter = input[delimiter_start...pos]
-            @in_inline_code = true
-
-            # Return position after opening delimiter
-            pos
+            open_inline(input, pos, input_length)
           end
         end
+
+        private
+
+        # Skip up to 3 leading spaces of indentation.
+        def skip_leading_spaces(input, pos, input_length)
+          scan_pos = pos
+          spaces = 0
+          while spaces < 3 && scan_pos < input_length && input[scan_pos] == " "
+            spaces += 1
+            scan_pos += 1
+          end
+          scan_pos
+        end
+
+        # Count consecutive fence characters and return [count, new_position].
+        def count_fence_chars(input, scan_pos, fence_char, input_length)
+          fence_length = 0
+          while scan_pos < input_length && input[scan_pos] == fence_char
+            fence_length += 1
+            scan_pos += 1
+          end
+          [fence_length, scan_pos]
+        end
+
+        # Try to close an open fenced code block. Returns position after fence or nil.
+        def try_close_fence(input, scan_pos, fence_char, fence_length, input_length)
+          return nil unless fence_char == @fence_char && fence_length >= @fence_length
+
+          # Closing fence must be followed only by spaces then newline/EOF
+          scan_pos += 1 while scan_pos < input_length && input[scan_pos] == " "
+          return nil unless scan_pos >= input_length || input[scan_pos] == "\n"
+
+          @in_fenced_block = false
+          @fence_char = nil
+          @fence_length = 0
+          pos_after_line(scan_pos, input_length)
+        end
+
+        # Open a new fenced code block. Returns position after the opening line.
+        def open_fence(input, scan_pos, fence_char, fence_length, input_length)
+          # Skip to end of line (info string)
+          scan_pos += 1 while scan_pos < input_length && input[scan_pos] != "\n"
+
+          @in_fenced_block = true
+          @fence_char = fence_char
+          @fence_length = fence_length
+          pos_after_line(scan_pos, input_length)
+        end
+
+        # Try to close inline code. Returns position after delimiter or nil.
+        def try_close_inline(input, pos, input_length)
+          delimiter_length = @inline_delimiter.length
+          return nil unless input[pos, delimiter_length] == @inline_delimiter
+
+          # Should not be followed by another backtick
+          next_pos = pos + delimiter_length
+          return nil if next_pos < input_length && input[next_pos] == "`"
+
+          @in_inline_code = false
+          @inline_delimiter = nil
+          next_pos
+        end
+
+        # Open inline code. Returns position after opening delimiter.
+        def open_inline(input, pos, input_length)
+          delimiter_start = pos
+          pos += 1 while pos < input_length && input[pos] == "`"
+
+          @inline_delimiter = input[delimiter_start...pos]
+          @in_inline_code = true
+          pos
+        end
+
+        # Return position after a line (after newline if present, otherwise at end).
+        def pos_after_line(line_end, input_length)
+          line_end < input_length ? line_end + 1 : line_end
+        end
+
+        public
 
         # Reset the tracker state
         def reset!

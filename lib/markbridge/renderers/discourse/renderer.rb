@@ -8,6 +8,7 @@ module Markbridge
         def initialize(tag_library: nil, escaper: nil)
           @tag_library = tag_library || TagLibrary.default
           @escaper = escaper || MarkdownEscaper.new
+          @interface_cache = nil
         end
 
         # Render a node to Markdown

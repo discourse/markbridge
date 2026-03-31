@@ -22,7 +22,7 @@ module Markbridge
         #   library = Markbridge::Renderers::Discourse::TagLibrary.default
         #   library.register(Markbridge::AST::Attachment, MyAttachmentTag.new)
         class AttachmentTag < Tag
-          def render(element, interface)
+          def render(element, _interface)
             # Build metadata comment for downstream processing
             metadata = build_metadata(element)
             "<!-- ATTACHMENT: #{metadata} -->"
