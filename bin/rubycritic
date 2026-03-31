@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+coverage_file="coverage/.resultset.json"
+
+if [[ -f "$coverage_file" ]] && \
+   [[ -z "$(find lib spec -newer "$coverage_file" -name '*.rb' -print -quit 2>/dev/null)" ]]; then
+  echo "Coverage data is up to date, skipping tests..."
+else
+  COVERAGE=1 bundle exec rake spec
+fi
+
+bundle exec rubycritic --no-browser
