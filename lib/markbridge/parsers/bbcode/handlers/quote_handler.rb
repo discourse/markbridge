@@ -17,46 +17,53 @@ module Markbridge
           end
 
           def on_open(token:, context:, registry:, tokens: nil)
-            # Extract quote attributes
-            author = nil
-            post = nil
-            topic = nil
-            username = nil
-
-            # Check for author attribute or option
-            if token.attrs[:author]
-              author = token.attrs[:author]
-            elsif token.attrs[:option]
-              # Parse Discourse-style quote: "username, post:123, topic:456"
-              option = token.attrs[:option]
-              if option.match?(/,\s*post:\d+/)
-                # Discourse format with post/topic
-                parts = option.split(",").map(&:strip)
-                username = parts[0]
-                parts[1..].each do |part|
-                  if part =~ /^post:(\d+)$/
-                    post = ::Regexp.last_match(1)
-                  elsif part =~ /^topic:(\d+)$/
-                    topic = ::Regexp.last_match(1)
-                  end
-                end
-                author = username
-              else
-                # Simple author attribution
-                author = option
-              end
-            end
-
-            # Check for explicit username, post, topic attributes (override option if present)
-            username = token.attrs[:username] if token.attrs[:username]
-            post = token.attrs[:post] if token.attrs[:post]
-            topic = token.attrs[:topic] if token.attrs[:topic]
-
-            element = AST::Quote.new(author:, post:, topic:, username:)
+            attrs = extract_quote_attrs(token)
+            element = AST::Quote.new(**attrs)
             context.push(element, token:)
           end
 
           attr_reader :element_class
+
+          private
+
+          def extract_quote_attrs(token)
+            author, post, topic, username = extract_from_option(token)
+            author ||= token.attrs[:author]
+
+            # Explicit attributes override option-parsed values
+            {
+              author:,
+              post: token.attrs[:post] || post,
+              topic: token.attrs[:topic] || topic,
+              username: token.attrs[:username] || username,
+            }
+          end
+
+          def extract_from_option(token)
+            option = token.attrs[:option]
+            return nil, nil, nil, nil unless option
+
+            unless option.match?(/,\s*post:\d+/)
+              # Simple author attribution
+              return option, nil, nil, nil
+            end
+
+            # Discourse format: "username, post:123, topic:456"
+            parts = option.split(",").map(&:strip)
+            username = parts[0]
+            post = nil
+            topic = nil
+
+            parts[1..].each do |part|
+              if part =~ /^post:(\d+)$/
+                post = ::Regexp.last_match(1)
+              elsif part =~ /^topic:(\d+)$/
+                topic = ::Regexp.last_match(1)
+              end
+            end
+
+            [username, post, topic, username]
+          end
         end
       end
     end

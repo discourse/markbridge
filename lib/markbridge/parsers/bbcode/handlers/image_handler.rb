@@ -18,22 +18,24 @@ module Markbridge
           private
 
           def create_element(token:, content:)
-            # Extract dimensions from attributes or option
+            width, height = extract_dimensions(token)
+            AST::Image.new(src: content, width:, height:)
+          end
+
+          def extract_dimensions(token)
             width = sanitize_dimension(token.attrs[:width])
             height = sanitize_dimension(token.attrs[:height])
 
-            # Parse option for WIDTHxHEIGHT format (e.g., [img=100x200])
-            if token.attrs[:option]&.match?(/^\d+x\d+$/i)
-              dimensions = token.attrs[:option].split("x", 2)
-              width = sanitize_dimension(dimensions[0])
-              height = sanitize_dimension(dimensions[1])
-            elsif token.attrs[:option]&.match?(/^\d+$/)
-              # Just a number means width
-              width = sanitize_dimension(token.attrs[:option])
+            option = token.attrs[:option]
+            if option&.match?(/^\d+x\d+$/i)
+              parts = option.split("x", 2)
+              width = sanitize_dimension(parts[0])
+              height = sanitize_dimension(parts[1])
+            elsif option&.match?(/^\d+$/)
+              width = sanitize_dimension(option)
             end
 
-            # Content is the URL
-            AST::Image.new(src: content, width:, height:)
+            [width, height]
           end
 
           # Convert dimension to positive integer or nil

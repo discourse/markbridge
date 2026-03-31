@@ -29,7 +29,7 @@ module Markbridge
         #     end
         #   end
         class UploadTag < Tag
-          def render(element, interface)
+          def render(element, _interface)
             # Return raw Markdown if available, otherwise reconstruct
             return element.raw if element.raw
 

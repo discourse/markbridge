@@ -49,6 +49,13 @@ module Markbridge
         def initialize(detectors: DEFAULT_DETECTORS, tag_library: nil, mention_resolver: nil)
           @detector_instances = build_detectors(detectors, mention_resolver)
           @tag_library = tag_library
+          @code_tracker = nil
+          @result = nil
+          @nodes = nil
+          @node_index = 0
+          @pos = 0
+          @input = nil
+          @line_start = true
         end
 
         # Scan input and extract constructs.
@@ -91,22 +98,8 @@ module Markbridge
           while @pos < @input.length
             # Check for fenced code block boundary at line start
             if @line_start
-              new_pos = @code_tracker.check_fenced_boundary(@input, @pos, line_start: true)
-              if new_pos
-                @result << @input[@pos...new_pos]
-                @pos = new_pos
-                @line_start = new_pos > 0 && @input[new_pos - 1] == "\n"
-                next
-              end
-
-              # Check for indented code block (4+ spaces or tab)
-              new_pos = @code_tracker.check_indented_boundary(@input, @pos, line_start: true)
-              if new_pos
-                @result << @input[@pos...new_pos]
-                @pos = new_pos
-                @line_start = new_pos > 0 && @input[new_pos - 1] == "\n"
-                next
-              end
+              next if advance_code_boundary(:check_fenced_boundary)
+              next if advance_code_boundary(:check_indented_boundary)
             end
 
             # Check for inline code boundary
@@ -143,6 +136,16 @@ module Markbridge
             @line_start = char == "\n"
             @pos += 1
           end
+        end
+
+        def advance_code_boundary(method)
+          new_pos = @code_tracker.public_send(method, @input, @pos, line_start: true)
+          return false unless new_pos
+
+          @result << @input[@pos...new_pos]
+          @pos = new_pos
+          @line_start = new_pos > 0 && @input[new_pos - 1] == "\n"
+          true
         end
 
         def detect_at_position

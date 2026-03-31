@@ -24,7 +24,7 @@ module Markbridge
         #     end
         #   end
         class MentionTag < Tag
-          def render(element, interface)
+          def render(element, _interface)
             "@#{element.name}"
           end
         end

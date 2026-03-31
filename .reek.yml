@@ -1,0 +1,50 @@
+---
+# Smells that produce false positives for performance-oriented parsing code.
+# See: https://github.com/troessner/reek/blob/master/docs/defaults.md
+
+detectors:
+  # Constructor config flags are valid boolean params
+  BooleanParameter:
+    enabled: false
+
+  # Parser/scanner methods naturally pass the same core data (input, pos, context, token)
+  DataClump:
+    enabled: false
+
+  # Pure helper methods on private methods are fine
+  UtilityFunction:
+    enabled: false
+
+  # Methods operating on string params aren't feature envy
+  FeatureEnvy:
+    enabled: false
+
+  # Byte constants and regex patterns belong together
+  TooManyConstants:
+    enabled: false
+
+  # Each method handles one escape case — class is single-purpose
+  TooManyMethods:
+    enabled: false
+
+  # Dispatch/case methods in parsers are inherently statement-heavy
+  TooManyStatements:
+    enabled: false
+
+  # Data params (byte_val) aren't control flow flags
+  ControlParameter:
+    enabled: false
+
+  # Expressions like `pos + 1` in separate case branches aren't real duplication
+  DuplicateMethodCall:
+    enabled: false
+
+  # Interface contract parameters (on_open, on_close, process, detect, render)
+  # must exist for polymorphism but aren't used by every implementation
+  UnusedParameters:
+    enabled: false
+
+  # Parsers naturally have more state (input, pos, result, document, etc.)
+  TooManyInstanceVariables:
+    max_instance_variables: 10
+
