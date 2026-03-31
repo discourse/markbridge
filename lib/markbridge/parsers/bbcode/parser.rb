@@ -114,7 +114,7 @@ module Markbridge
         # while still processing its children
         # @param token [Token]
         # @param context [ParserState]
-        def handle_unknown_tag(token, context)
+        def handle_unknown_tag(token, _context)
           @unknown_tags[token.tag] += 1
         end
       end

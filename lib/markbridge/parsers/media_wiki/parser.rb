@@ -20,6 +20,12 @@ module Markbridge
       #   parser = Markbridge::Parsers::MediaWiki::Parser.new
       #   ast = parser.parse("'''bold''' and ''italic''")
       class Parser
+        def initialize
+          @document = nil
+          @inline_parser = nil
+          @list_stack = []
+        end
+
         # Parse MediaWiki wikitext into an AST Document.
         #
         # @param input [String] MediaWiki source

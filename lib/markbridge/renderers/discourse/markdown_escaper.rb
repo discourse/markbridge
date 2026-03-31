@@ -36,6 +36,9 @@ module Markbridge
         #   breaks disabled by default.
         def initialize(escape_hard_line_breaks: false)
           @escape_hard_line_breaks = escape_hard_line_breaks
+          @inline_content = nil
+          @inline_result = nil
+          @inline_len = 0
         end
 
         # Fast-path check: any character that might need escaping
@@ -137,7 +140,8 @@ module Markbridge
           return escape_line(lines[0], false) if lines.size == 1
 
           # Pre-allocate result buffer
-          result = String.new(capacity: text.bytesize + text.bytesize / 3, encoding: text.encoding)
+          bytesize = text.bytesize
+          result = String.new(capacity: bytesize + bytesize / 3, encoding: text.encoding)
           prev_was_paragraph = false
           first = true
 
@@ -160,14 +164,16 @@ module Markbridge
           return escape_indented_code(line) if INDENTED_CODE.match?(line)
 
           # Extract 0-3 space indent
+          line_length = line.length
           indent_len = 0
-          while indent_len < 3 && indent_len < line.length && line.getbyte(indent_len) == SPACE
+          while indent_len < 3 && indent_len < line_length && line.getbyte(indent_len) == SPACE
             indent_len += 1
           end
 
-          return line if indent_len >= line.length
+          return line if indent_len >= line_length
 
-          content = indent_len > 0 ? line[indent_len..] : line
+          has_indent = indent_len > 0
+          content = has_indent ? line[indent_len..] : line
 
           # Apply block-level escaping (which may also do inline escaping)
           escaped, skip_inline = escape_block_level(content, prev_was_paragraph)
@@ -176,12 +182,12 @@ module Markbridge
           escaped = escape_inline(escaped) unless skip_inline
 
           # Prepend indent if present, preserve encoding
-          if indent_len > 0
-            result = String.new(encoding: line.encoding)
+          if has_indent
+            encoding = line.encoding
+            result = String.new(encoding:)
             result << line[0, indent_len] << escaped
             result
           else
-            # Preserve original encoding
             escaped.is_a?(String) ? escaped.force_encoding(line.encoding) : escaped
           end
         end
@@ -197,21 +203,22 @@ module Markbridge
           # - Content doesn't start at valid block position (no lists, headings, etc.)
           # - Visual indentation is preserved (NBSP renders as space)
           # We still escape inline content since it's no longer protected.
-          i = 0
-          while i < line.length
-            b = line.getbyte(i)
-            break if b != SPACE && b != TAB
-            i += 1
+          line_length = line.length
+          ws_end = 0
+          while ws_end < line_length
+            byte = line.getbyte(ws_end)
+            break if byte != SPACE && byte != TAB
+            ws_end += 1
           end
 
-          return line if i == 0 # No leading whitespace (shouldn't happen, but safe)
-          return line if i >= line.length # Whitespace-only line
+          return line if ws_end == 0 # No leading whitespace (shouldn't happen, but safe)
+          return line if ws_end >= line_length # Whitespace-only line
 
           # Convert leading whitespace to NBSP (tab = 4 NBSP for visual consistency)
           nbsp_indent = String.new(encoding: line.encoding)
-          line[0, i].each_char { |c| nbsp_indent << (c == "\t" ? (NBSP * 4) : NBSP) }
+          line[0, ws_end].each_char { |char| nbsp_indent << (char == "\t" ? (NBSP * 4) : NBSP) }
 
-          content = line[i..]
+          content = line[ws_end..]
           "#{nbsp_indent}#{escape_inline(content)}"
         end
 
@@ -220,22 +227,15 @@ module Markbridge
 
           case first_byte
           when HASH
-            return "\\##{escape_inline(content[1..])}", true if ATX_HEADING.match?(content)
+            return escape_first_char_inline(content, "\\#") if ATX_HEADING.match?(content)
           when GT
-            return "\\>#{escape_inline(content[1..])}", true
+            return escape_first_char_inline(content, "\\>")
           when DASH
-            if THEMATIC_BREAK_DASH.match?(content) ||
-                 (prev_was_paragraph && SETEXT_UNDERLINE_DASH.match?(content))
-              return escape_all_chars(content, DASH, "\\-"), true
-            end
-            return "\\-#{escape_inline(content[1..])}", true if BULLET_LIST.match?(content)
+            return escape_block_dash(content, prev_was_paragraph)
           when PLUS
-            return "\\+#{escape_inline(content[1..])}", true if BULLET_LIST.match?(content)
+            return escape_first_char_inline(content, "\\+") if BULLET_LIST.match?(content)
           when STAR
-            if THEMATIC_BREAK_STAR.match?(content)
-              return escape_all_chars(content, STAR, "\\*"), true
-            end
-            return "\\*#{escape_inline(content[1..])}", true if BULLET_LIST.match?(content)
+            return escape_block_star(content)
           when UNDERSCORE
             if THEMATIC_BREAK_UNDERSCORE.match?(content)
               return escape_all_chars(content, UNDERSCORE, "\\_"), true
@@ -246,162 +246,214 @@ module Markbridge
             end
           when BACKTICK
             if FENCED_CODE_BACKTICK.match?(content)
-              # Escape ALL backticks to prevent code span interpretation
-              # e.g., ```` becomes \`\`\`\` not \```` (which would be \` + ```)
               return escape_all_chars(content, BACKTICK, "\\`"), true
             end
           when TILDE
             return "\\#{content}", true if FENCED_CODE_TILDE.match?(content)
           when BRACKET_OPEN
-            return "\\[#{escape_inline(content[1..])}", true
+            return escape_first_char_inline(content, "\\[")
           when PIPE
-            return "\\|#{escape_inline(content[1..])}", true
+            return escape_first_char_inline(content, "\\|")
           when DIGIT_0..DIGIT_9
-            if (m = ORDERED_LIST.match(content))
-              prefix = m[1]
-              delim = m[2]
-              rest = content[m[0].length..]
-              return "#{prefix}\\#{delim}#{escape_inline(rest)}", true
-            end
+            return escape_block_ordered_list(content)
           end
 
           [content, false]
         end
 
+        # Escape the first character and inline-escape the rest.
+        def escape_first_char_inline(content, escaped_char)
+          ["#{escaped_char}#{escape_inline(content[1..])}", true]
+        end
+
+        def escape_block_dash(content, prev_was_paragraph)
+          if THEMATIC_BREAK_DASH.match?(content) ||
+               (prev_was_paragraph && SETEXT_UNDERLINE_DASH.match?(content))
+            return escape_all_chars(content, DASH, "\\-"), true
+          end
+          return escape_first_char_inline(content, "\\-") if BULLET_LIST.match?(content)
+          [content, false]
+        end
+
+        def escape_block_star(content)
+          return escape_all_chars(content, STAR, "\\*"), true if THEMATIC_BREAK_STAR.match?(content)
+          return escape_first_char_inline(content, "\\*") if BULLET_LIST.match?(content)
+          [content, false]
+        end
+
+        def escape_block_ordered_list(content)
+          if (match = ORDERED_LIST.match(content))
+            rest = content[match[0].length..]
+            return "#{match[1]}\\#{match[2]}#{escape_inline(rest)}", true
+          end
+          [content, false]
+        end
+
         def escape_all_chars(str, byte_val, escaped)
           result = String.new(capacity: str.bytesize * 2, encoding: str.encoding)
-          str.each_byte do |b|
-            if b == byte_val
+          str.each_byte do |byte|
+            if byte == byte_val
               result << escaped
             else
-              result << b
+              result << byte
             end
           end
           result
         end
 
         def escape_inline(content)
-          # Quick check - if no special chars, return as-is
           return content unless INLINE_SPECIAL.match?(content)
 
-          result =
-            String.new(
-              capacity: content.bytesize + content.bytesize / 4,
-              encoding: content.encoding,
-            )
-          len = content.bytesize
-          i = 0
+          bytesize = content.bytesize
+          @inline_content = content
+          @inline_result = String.new(capacity: bytesize + bytesize / 4, encoding: content.encoding)
+          @inline_len = bytesize
+          pos = 0
 
-          while i < len
-            b = content.getbyte(i)
-
-            case b
-            when BACKSLASH # \
-              if i + 1 < len && ascii_punctuation?(content.getbyte(i + 1))
-                # Escape the backslash, but let the next char be processed on its own
-                result << "\\\\"
-                i += 1
-              elsif i + 1 == len # backslash at end (hard break)
-                result << "\\\\"
-                i += 1
-              else
-                result << b
-                i += 1
-              end
-            when DASH # -
-              if i + 1 < len && content.getbyte(i + 1) == DASH
-                # Consecutive dashes - escape each for Discourse ndash prevention
-                while i < len && content.getbyte(i) == DASH
-                  result << "\\-"
-                  i += 1
-                end
-              else
-                result << b
-                i += 1
-              end
-            when TILDE # ~
-              if i + 1 < len && content.getbyte(i + 1) == TILDE
-                result << "\\~\\~"
-                i += 2
-              else
-                result << b
-                i += 1
-              end
-            when STAR # *
-              while i < len && content.getbyte(i) == STAR
-                result << "\\*"
-                i += 1
-              end
-            when UNDERSCORE # _
-              while i < len && content.getbyte(i) == UNDERSCORE
-                result << "\\_"
-                i += 1
-              end
-            when BACKTICK # `
-              while i < len && content.getbyte(i) == BACKTICK
-                result << "\\`"
-                i += 1
-              end
-            when BANG # !
-              if i + 1 < len && content.getbyte(i + 1) == BRACKET_OPEN
-                result << "\\!\\["
-                i += 2
-              else
-                result << b
-                i += 1
-              end
-            when BRACKET_OPEN # [
-              result << "\\["
-              i += 1
-            when PIPE # |
-              result << "\\|"
-              i += 1
-            when LT # <
-              remaining = content.byteslice(i, len - i)
-              # Check for autolinks first - pass through entirely unchanged
-              if (m = AUTOLINK.match(remaining))
-                result << m[0]
-                i += m[0].bytesize
-                # Escape complete HTML tags (include tag in output for readability)
-                # Also escape backticks inside the tag to prevent code span interpretation
-              elsif (m = HTML_TAG.match(remaining))
-                escaped_tag = m[0].gsub("`") { "\\`" }
-                result << "\\" << escaped_tag
-                i += m[0].bytesize
-                # Escape HTML-like constructs: processing instructions, SGML declarations,
-                # and potential tag starts (including multi-line and custom elements)
-              elsif HTML_TAG_START.match?(remaining)
-                result << "\\<"
-                i += 1
-              else
-                # Not HTML-like (comparison operator, etc.)
-                result << b
-                i += 1
-              end
-            when AMP # &
-              remaining = content.byteslice(i, len - i)
-              if (m = ENTITY_REF.match(remaining))
-                result << "\\" << m[0]
-                i += m[0].bytesize
-              else
-                result << b
-                i += 1
-              end
-            else
-              # Regular character - handle multi-byte UTF-8
-              if b < 128
-                result << b
-                i += 1
-              else
-                char_len = utf8_char_length(b)
-                end_i = [i + char_len, len].min
-                result << content.byteslice(i, end_i - i)
-                i = end_i
-              end
-            end
+          while pos < @inline_len
+            byte = @inline_content.getbyte(pos)
+            pos = dispatch_inline_byte(byte, pos)
           end
 
-          result
+          @inline_result
+        end
+
+        def dispatch_inline_byte(byte, pos)
+          case byte
+          when BACKSLASH
+            escape_backslash(pos)
+          when DASH
+            escape_consecutive_pair(pos, DASH, "\\-")
+          when TILDE
+            escape_tilde_pair(pos)
+          when STAR
+            escape_char_run(pos, STAR, "\\*")
+          when UNDERSCORE
+            escape_char_run(pos, UNDERSCORE, "\\_")
+          when BACKTICK
+            escape_char_run(pos, BACKTICK, "\\`")
+          when BANG
+            escape_image_open(pos)
+          when BRACKET_OPEN
+            @inline_result << "\\["
+            pos + 1
+          when PIPE
+            @inline_result << "\\|"
+            pos + 1
+          when LT
+            escape_lt(pos)
+          when AMP
+            escape_amp(pos)
+          else
+            escape_regular_char(byte, pos)
+          end
+        end
+
+        # Escape backslash before ASCII punctuation or at end of content.
+        def escape_backslash(pos)
+          next_pos = pos + 1
+          if next_pos >= @inline_len || ascii_punctuation?(@inline_content.getbyte(next_pos))
+            @inline_result << "\\\\"
+          else
+            @inline_result << BACKSLASH
+          end
+          next_pos
+        end
+
+        # Escape consecutive pairs (e.g., -- for ndash prevention) or pass single through.
+        def escape_consecutive_pair(pos, byte_val, escaped)
+          next_pos = pos + 1
+          if next_pos < @inline_len && @inline_content.getbyte(next_pos) == byte_val
+            escape_char_run(pos, byte_val, escaped)
+          else
+            @inline_result << byte_val
+            next_pos
+          end
+        end
+
+        # Escape ~~ pairs, pass single ~ through.
+        def escape_tilde_pair(pos)
+          next_pos = pos + 1
+          if next_pos < @inline_len && @inline_content.getbyte(next_pos) == TILDE
+            @inline_result << "\\~\\~"
+            pos + 2
+          else
+            @inline_result << TILDE
+            next_pos
+          end
+        end
+
+        # Escape all consecutive occurrences of a repeatable character (*, _, `).
+        def escape_char_run(pos, byte_val, escaped)
+          while pos < @inline_len && @inline_content.getbyte(pos) == byte_val
+            @inline_result << escaped
+            pos += 1
+          end
+          pos
+        end
+
+        # Escape ![ image syntax, pass standalone ! through.
+        def escape_image_open(pos)
+          next_pos = pos + 1
+          if next_pos < @inline_len && @inline_content.getbyte(next_pos) == BRACKET_OPEN
+            @inline_result << "\\!\\["
+            pos + 2
+          else
+            @inline_result << BANG
+            next_pos
+          end
+        end
+
+        # Handle < for autolinks (preserved), HTML tags (escaped), and other constructs.
+        def escape_lt(pos)
+          remaining = remaining_content(pos)
+
+          if (match = AUTOLINK.match(remaining))
+            matched = match[0]
+            @inline_result << matched
+            pos + matched.bytesize
+          elsif (match = HTML_TAG.match(remaining))
+            matched = match[0]
+            @inline_result << "\\" << matched.gsub("`") { "\\`" }
+            pos + matched.bytesize
+          elsif HTML_TAG_START.match?(remaining)
+            @inline_result << "\\<"
+            pos + 1
+          else
+            @inline_result << LT
+            pos + 1
+          end
+        end
+
+        # Handle & for entity references.
+        def escape_amp(pos)
+          remaining = remaining_content(pos)
+
+          if (match = ENTITY_REF.match(remaining))
+            matched = match[0]
+            @inline_result << "\\" << matched
+            pos + matched.bytesize
+          else
+            @inline_result << AMP
+            pos + 1
+          end
+        end
+
+        def remaining_content(pos)
+          @inline_content.byteslice(pos, @inline_len - pos)
+        end
+
+        # Handle regular characters including multi-byte UTF-8.
+        def escape_regular_char(byte, pos)
+          if byte < 128
+            @inline_result << byte
+            pos + 1
+          else
+            char_len = utf8_char_length(byte)
+            end_pos = [pos + char_len, @inline_len].min
+            @inline_result << @inline_content.byteslice(pos, end_pos - pos)
+            end_pos
+          end
         end
 
         def ascii_punctuation?(byte)
@@ -424,43 +476,48 @@ module Markbridge
         def paragraph_line?(line)
           return false if line.empty?
 
-          # Quick whitespace-only check
+          line_length = line.length
           first_non_space = 0
-          while first_non_space < line.length && line.getbyte(first_non_space) == SPACE
+          while first_non_space < line_length && line.getbyte(first_non_space) == SPACE
             first_non_space += 1
           end
-          return false if first_non_space >= line.length || line.getbyte(first_non_space) == TAB
+          return false if first_non_space >= line_length || line.getbyte(first_non_space) == TAB
 
-          # Check if this is a block construct
           content = first_non_space <= 3 ? line[first_non_space..] : line
-          return false if content.nil? || content.empty?
 
+          # Lines starting with [ get escaped to \[, which IS paragraph content
+          # So setext headings CAN follow them
+          return true if content.getbyte(0) == BRACKET_OPEN
+
+          !block_construct?(content) && !INDENTED_CODE.match?(line)
+        end
+
+        # Checks whether content starts with a block-level markdown construct.
+        # Used by both escape_block_level (to decide what to escape) and
+        # paragraph_line? (to decide if setext underlines can follow).
+        def block_construct?(content)
           first_byte = content.getbyte(0)
 
           case first_byte
           when HASH
-            return false if ATX_HEADING.match?(content)
+            ATX_HEADING.match?(content)
           when GT
-            return false
+            true
           when DASH, PLUS, STAR
-            return false if BULLET_LIST.match?(content)
-            return false if first_byte == DASH && THEMATIC_BREAK_DASH.match?(content)
-            return false if first_byte == STAR && THEMATIC_BREAK_STAR.match?(content)
+            BULLET_LIST.match?(content) ||
+              (first_byte == DASH && THEMATIC_BREAK_DASH.match?(content)) ||
+              (first_byte == STAR && THEMATIC_BREAK_STAR.match?(content))
           when UNDERSCORE
-            return false if THEMATIC_BREAK_UNDERSCORE.match?(content)
-          when BACKTICK, TILDE
-            if FENCED_CODE_BACKTICK.match?(content) || FENCED_CODE_TILDE.match?(content)
-              return false
-            end
-          when BRACKET_OPEN
-            # Lines starting with [ get escaped to \[, which IS paragraph content
-            # So setext headings CAN follow them
-            return true
+            THEMATIC_BREAK_UNDERSCORE.match?(content)
+          when BACKTICK
+            FENCED_CODE_BACKTICK.match?(content)
+          when TILDE
+            FENCED_CODE_TILDE.match?(content)
           when DIGIT_0..DIGIT_9
-            return false if ORDERED_LIST.match?(content)
+            ORDERED_LIST.match?(content)
+          else
+            false
           end
-
-          !INDENTED_CODE.match?(line)
         end
       end
     end

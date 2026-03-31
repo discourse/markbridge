@@ -20,7 +20,7 @@ class SimpleAttachmentTag < Markbridge::Renderers::Discourse::Tags::AttachmentTa
     @attachment_url_map = attachment_url_map
   end
 
-  def render(element, interface)
+  def render(element, _interface)
     # Look up URL by ID or index
     url = lookup_url(element)
     alt = element.alt || element.filename || ""
@@ -44,7 +44,7 @@ class DatabaseAttachmentTag < Markbridge::Renderers::Discourse::Tags::Attachment
     @repository = attachment_repository
   end
 
-  def render(element, interface)
+  def render(element, _interface)
     attachment = find_attachment(element)
     return "<!-- MISSING ATTACHMENT -->" unless attachment
 
@@ -71,7 +71,7 @@ class ContextAwareAttachmentTag < Markbridge::Renderers::Discourse::Tags::Attach
     @repository = attachment_repository
   end
 
-  def render(element, interface)
+  def render(element, _interface)
     if element.id
       # Absolute ID (vBulletin/XenForo)
       attachment = @repository.find_by_id(element.id)

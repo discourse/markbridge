@@ -50,6 +50,18 @@ module Markbridge
             end
             word
           end
+
+          # Parse key="value" or key='value' attribute pairs from a string
+          # @param attr_string [String, nil] the attribute string to parse
+          # @return [Hash<String, String>] parsed attributes with downcased keys
+          def parse_attributes(attr_string)
+            attrs = {}
+            return attrs if attr_string.nil? || attr_string.empty?
+
+            attr_string.scan(/(\w+)=["']([^"']*)["']/) { |key, value| attrs[key.downcase] = value }
+
+            attrs
+          end
         end
       end
     end

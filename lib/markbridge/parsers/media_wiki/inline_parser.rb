@@ -7,6 +7,14 @@ module Markbridge
       # Handles bold ('''), italic (''), links ([[...]]), external links ([...]),
       # and HTML inline tags (<code>, <nowiki>, <s>, <del>, <u>, <ins>, <sup>, <sub>, <br>).
       class InlineParser
+        def initialize
+          @input = nil
+          @pos = 0
+          @length = 0
+          @parent = nil
+          @text_buffer = +""
+        end
+
         # Parse inline markup and append resulting AST nodes to the parent element.
         #
         # @param text [String] the text to parse for inline markup
@@ -19,19 +27,29 @@ module Markbridge
           @text_buffer = +""
 
           while @pos < @length
-            if @input[@pos] == "'" && @pos + 1 < @length && @input[@pos + 1] == "'"
-              parse_bold_italic
-            elsif @input[@pos] == "[" && @pos + 1 < @length && @input[@pos + 1] == "["
+            char = @input[@pos]
+            next_char = @pos + 1 < @length ? @input[@pos + 1] : nil
+
+            case char
+            when "'"
+              if next_char == "'"
+                parse_bold_italic
+              else
+                @text_buffer << char
+                @pos += 1
+              end
+            when "["
               flush_text
-              parse_internal_link
-            elsif @input[@pos] == "[" && !(@pos + 1 < @length && @input[@pos + 1] == "[")
-              flush_text
-              parse_external_link
-            elsif @input[@pos] == "<"
+              if next_char == "["
+                parse_internal_link
+              else
+                parse_external_link
+              end
+            when "<"
               flush_text
               parse_html_tag
             else
-              @text_buffer << @input[@pos]
+              @text_buffer << char
               @pos += 1
             end
           end
@@ -46,72 +64,59 @@ module Markbridge
           start = @pos
           count = 0
           count += 1 while @pos + count < @length && @input[@pos + count] == "'"
-          count = 5 if count > 5
+          # Clamp: 5 = bold+italic, 3 = bold, 2 = italic
+          count = [count, 5].min
 
-          if count >= 5
-            flush_text
-            @pos += 5
-            parse_bold_italic_combo(start)
-          elsif count >= 3
-            flush_text
-            @pos += 3
-            parse_bold_content(start)
-          elsif count >= 2
-            flush_text
-            @pos += 2
-            parse_italic_content(start)
-          else
+          if count < 2
             @text_buffer << @input[@pos]
             @pos += 1
+          else
+            flush_text
+            @pos += count
+            parse_apostrophe_formatting(count, start)
           end
         end
 
-        # Parse '''''bold italic''''' content.
-        def parse_bold_italic_combo(start)
-          bold = AST::Bold.new
-          italic = AST::Italic.new
-          content = collect_until_apostrophes(5)
+        # Parse apostrophe-delimited formatting (bold, italic, or bold+italic).
+        #
+        # @param apostrophe_count [Integer] number of apostrophes (2, 3, or 5)
+        # @param start [Integer] position before the opening apostrophes
+        def parse_apostrophe_formatting(apostrophe_count, start)
+          content = collect_until_apostrophes(apostrophe_count)
 
-          if content
-            inner_parser = InlineParser.new
-            inner_parser.parse(content, parent: italic)
-            bold << italic
-            @parent << bold
-          else
-            # No closing found - treat as literal text
-            @text_buffer << "'''''"
-            @pos = start + 5
+          unless content
+            @text_buffer << ("'" * apostrophe_count)
+            @pos = start + apostrophe_count
+            return
+          end
+
+          element = build_formatting_element(apostrophe_count)
+          parse_inner_content(content, parent: innermost_element(element))
+          @parent << element
+        end
+
+        # Build the AST element(s) for the given apostrophe count.
+        def build_formatting_element(apostrophe_count)
+          case apostrophe_count
+          when 5
+            bold = AST::Bold.new
+            bold << AST::Italic.new
+            bold
+          when 3
+            AST::Bold.new
+          when 2
+            AST::Italic.new
           end
         end
 
-        # Parse '''bold''' content.
-        def parse_bold_content(start)
-          bold = AST::Bold.new
-          content = collect_until_apostrophes(3)
-
-          if content
-            inner_parser = InlineParser.new
-            inner_parser.parse(content, parent: bold)
-            @parent << bold
-          else
-            @text_buffer << "'''"
-            @pos = start + 3
-          end
+        # Return the innermost element to receive parsed content.
+        def innermost_element(element)
+          element.children.empty? ? element : element.children.last
         end
 
-        # Parse ''italic'' content.
-        def parse_italic_content(start)
-          italic = AST::Italic.new
-          content = collect_until_apostrophes(2)
-
-          if content
-            inner_parser = InlineParser.new
-            inner_parser.parse(content, parent: italic)
-            @parent << italic
-          else
-            @text_buffer << "''"
-            @pos = start + 2
-          end
+        # Parse inner content and append to a parent element.
+        def parse_inner_content(content, parent:)
+          InlineParser.new.parse(content, parent:)
         end
 
         # Collect text until we find n consecutive apostrophes.
@@ -200,75 +205,71 @@ module Markbridge
             return
           end
 
-          closing = !tag_match[1].empty?
-          tag_name = tag_match[2].downcase
-          self_closing = !tag_match[3].empty?
           full_match = tag_match[0]
+          closing = !tag_match[1].empty?
+          self_closing = !tag_match[3].empty?
+          tag_name = tag_match[2].downcase
+
+          # Closing/self-closing tags and unknown tags are treated as literal text
+          if closing || self_closing || !known_html_tag?(tag_name)
+            advance_as_text(full_match)
+            return
+          end
 
           case tag_name
           when "nowiki"
-            handle_nowiki_tag(closing, full_match)
-          when "code"
-            handle_paired_raw_tag(tag_name, closing, full_match, AST::Code)
-          when "pre"
-            handle_paired_raw_tag(tag_name, closing, full_match, AST::Code)
+            handle_nowiki_tag(full_match)
+          when "code", "pre"
+            handle_paired_raw_tag(tag_name, full_match, AST::Code)
           when "br"
             @pos += full_match.length
             @parent << AST::LineBreak.new
           when "s", "del"
-            handle_paired_tag(tag_name, closing, self_closing, full_match, AST::Strikethrough)
+            handle_paired_tag(tag_name, full_match, AST::Strikethrough)
           when "u", "ins"
-            handle_paired_tag(tag_name, closing, self_closing, full_match, AST::Underline)
+            handle_paired_tag(tag_name, full_match, AST::Underline)
           when "sup"
-            handle_paired_tag(tag_name, closing, self_closing, full_match, AST::Superscript)
+            handle_paired_tag(tag_name, full_match, AST::Superscript)
           when "sub"
-            handle_paired_tag(tag_name, closing, self_closing, full_match, AST::Subscript)
-          else
-            # Unknown HTML tag - treat as text
-            @text_buffer << full_match
-            @pos += full_match.length
+            handle_paired_tag(tag_name, full_match, AST::Subscript)
           end
         end
 
-        # Handle <nowiki>...</nowiki> - preserves content as literal text.
-        def handle_nowiki_tag(closing, full_match)
-          if closing
-            @text_buffer << full_match
-            @pos += full_match.length
-            return
-          end
+        KNOWN_HTML_TAGS = %w[nowiki code pre br s del u ins sup sub].freeze
 
+        def known_html_tag?(tag_name)
+          KNOWN_HTML_TAGS.include?(tag_name)
+        end
+
+        # Advance position and buffer the match as literal text.
+        def advance_as_text(full_match)
+          @text_buffer << full_match
           @pos += full_match.length
-          close_tag = "</nowiki>"
-          close_pos = @input.index(close_tag, @pos)
+        end
+
+        # Handle <nowiki>...</nowiki> - preserves content as literal text.
+        def handle_nowiki_tag(full_match)
+          @pos += full_match.length
+          close_pos = @input.index("</nowiki>", @pos)
 
           if close_pos
-            raw_content = @input[@pos...close_pos]
-            @text_buffer << raw_content
-            @pos = close_pos + close_tag.length
+            @text_buffer << @input[@pos...close_pos]
+            @pos = close_pos + "</nowiki>".length
           else
-            # No closing tag found - treat opening tag as text
             @text_buffer << full_match
           end
         end
 
         # Handle paired raw tags like <code>...</code> and <pre>...</pre>.
         # Content inside is not parsed for wiki markup.
-        def handle_paired_raw_tag(tag_name, closing, full_match, element_class)
-          if closing
-            @text_buffer << full_match
-            @pos += full_match.length
-            return
-          end
-
+        def handle_paired_raw_tag(tag_name, full_match, element_class)
           @pos += full_match.length
           close_tag = "</#{tag_name}>"
           close_pos = @input.index(close_tag, @pos)
 
           if close_pos
-            raw_content = @input[@pos...close_pos]
             element = element_class.new
-            element << AST::Text.new(raw_content)
+            element << AST::Text.new(@input[@pos...close_pos])
             @parent << element
             @pos = close_pos + close_tag.length
           else
@@ -278,45 +279,19 @@ module Markbridge
 
         # Handle paired formatting tags like <s>, <u>, <sup>, <sub>.
         # Content inside IS parsed for wiki markup.
-        def handle_paired_tag(tag_name, closing, self_closing, full_match, element_class)
-          if closing || self_closing
-            @text_buffer << full_match
-            @pos += full_match.length
-            return
-          end
-
+        def handle_paired_tag(tag_name, full_match, element_class)
           @pos += full_match.length
-          # Find matching close tag, accounting for the alias tags
-          close_tags = close_tags_for(tag_name)
-          close_pos = nil
-          close_tag_length = 0
-
-          close_tags.each do |ct|
-            pos = @input.index(ct, @pos)
-            if pos && (close_pos.nil? || pos < close_pos)
-              close_pos = pos
-              close_tag_length = ct.length
-            end
-          end
+          close_tag = "</#{tag_name}>"
+          close_pos = @input.index(close_tag, @pos)
 
           if close_pos
-            inner_content = @input[@pos...close_pos]
             element = element_class.new
-            inner_parser = InlineParser.new
-            inner_parser.parse(inner_content, parent: element)
+            parse_inner_content(@input[@pos...close_pos], parent: element)
             @parent << element
-            @pos = close_pos + close_tag_length
+            @pos = close_pos + close_tag.length
           else
             @text_buffer << full_match
           end
-        end
-
-        # Return the possible closing tags for a given tag name.
-        #
-        # @param tag_name [String]
-        # @return [Array<String>]
-        def close_tags_for(tag_name)
-          ["</#{tag_name}>"]
         end
 
         # Flush accumulated text buffer to the parent as a Text node.
