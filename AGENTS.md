@@ -127,16 +127,16 @@ bin/setup
 ### Common Commands
 ```bash
 # ALWAYS use bundle exec for gem commands (except bin/* scripts)
-bundle exec rake              # Fix code + run tests (default)
-bundle exec rake fix          # Auto-fix style (RuboCop + Syntax Tree)
+bundle exec rake              # Run tests (default)
 bundle exec rubocop           # Lint Ruby/RSpec (VerifiedDoubles enabled)
-bundle exec rubocop -A        # Auto-correct RuboCop offenses when appropriate
 bundle exec rspec             # Run all tests
 bundle exec rspec spec/unit/  # Run unit tests
+bin/lint                      # Auto-fix style (RuboCop + Syntax Tree)
+bin/rubycritic                # Run tests with coverage + RubyCritic analysis
 ```
 
 ### Pre-commit
-**CRITICAL**: Run `rake fix` before creating any PR.
+**CRITICAL**: Run `bin/lint` before creating any PR.
 
 Lefthook runs on commit:
 - RuboCop linting
