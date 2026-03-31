@@ -63,6 +63,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -72,3 +75,9 @@ jobs:
           RUBYGEMS_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
           GIT_EMAIL: team@discourse.org
           GIT_NAME: discoursebot
+      - name: Create GitHub Release
+        run: |
+          VERSION=$(ruby -r ./lib/markbridge/version -e 'puts Markbridge::VERSION')
+          gh release create "v${VERSION}" --generate-notes --latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
