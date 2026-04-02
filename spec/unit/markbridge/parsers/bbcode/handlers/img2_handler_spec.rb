@@ -141,7 +141,8 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::Img2Handler do
 
   describe "end-to-end via Markbridge.bbcode_to_markdown" do
     it "converts [IMG2=JSON] with HTTP src to image markdown" do
-      input = '[IMG2=JSON]{"data-align":"none","data-size":"full","src":"http://example.com/image.png"}[/IMG2]'
+      input =
+        '[IMG2=JSON]{"data-align":"none","data-size":"full","src":"http://example.com/image.png"}[/IMG2]'
       result = Markbridge.bbcode_to_markdown(input)
       expect(result).to eq("![](http://example.com/image.png)")
     end
