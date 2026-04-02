@@ -100,6 +100,9 @@ module Markbridge
           # Image handler
           registry.register("img", Handlers::ImageHandler.new)
 
+          # IMG2 handler (vBulletin 5 enhanced image)
+          registry.register("img2", Handlers::Img2Handler.new)
+
           # Attachment handler
           registry.register(%w[attach attachment], Handlers::AttachmentHandler.new)
 
