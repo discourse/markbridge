@@ -1,0 +1,23 @@
+# silo project configuration
+# https://github.com/gschlager/silo#project-configuration
+
+image: fedora/43
+
+setup:
+  - sudo dnf install -y ruby ruby-devel gcc make
+  - bundle install
+  - bundle exec lefthook install
+
+sync:
+  - bundle install
+
+update:
+  - sudo dnf update -y
+
+ports:
+  - 4567:4567
+
+daemons:
+  playground:
+    cmd: bin/playground
+    autostart: false
