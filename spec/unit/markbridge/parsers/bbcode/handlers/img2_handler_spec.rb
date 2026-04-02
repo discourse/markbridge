@@ -135,7 +135,7 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::Img2Handler do
 
       text = document.children.first
       expect(text).to be_a(Markbridge::AST::Text)
-      expect(text.value).to eq("[/IMG2]")
+      expect(text.text).to eq("[/IMG2]")
     end
   end
 

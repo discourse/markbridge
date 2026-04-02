@@ -22,7 +22,7 @@ module Markbridge
             src = extract_src(token, content.strip)
             return if src.nil? || src.empty?
 
-            context.add_child(AST::Image.new(src: src))
+            context.add_child(AST::Image.new(src:))
           end
 
           def on_close(token:, context:, registry:, tokens: nil)
