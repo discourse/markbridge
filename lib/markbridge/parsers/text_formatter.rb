@@ -18,6 +18,7 @@ require_relative "text_formatter/handlers/image_handler"
 require_relative "text_formatter/handlers/list_handler"
 require_relative "text_formatter/handlers/quote_handler"
 require_relative "text_formatter/handlers/url_handler"
+require_relative "text_formatter/handlers/table_cell_handler"
 
 # Parser components
 require_relative "text_formatter/handler_registry"

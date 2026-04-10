@@ -194,4 +194,51 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
       expect(result).to eq("Just plain text")
     end
   end
+
+  describe "tables" do
+    it "renders a simple table as Markdown" do
+      wiki = <<~WIKI.chomp
+        {|
+        ! Name !! Age
+        |-
+        | Alice || 30
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
+    end
+
+    it "handles header and data rows" do
+      wiki = <<~WIKI.chomp
+        {|
+        |-
+        ! A
+        ! B
+        |-
+        | 1
+        | 2
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to eq("| A | B |\n| --- | --- |\n| 1 | 2 |")
+    end
+
+    it "handles inline formatting in cells" do
+      wiki = <<~WIKI.chomp
+        {|
+        ! Name
+        |-
+        | '''Alice'''
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to include("| **Alice** |")
+    end
+  end
 end
