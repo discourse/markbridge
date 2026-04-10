@@ -123,4 +123,23 @@ RSpec.describe "phpBB3 XML to Markdown" do
       expect(result).to eq('<span style="font-size: 20px">big text</span>')
     end
   end
+
+  describe "tables" do
+    it "renders a table as Markdown" do
+      xml =
+        "<r><TABLE><TR><TH>Name</TH><TH>Age</TH></TR><TR><TD>Alice</TD><TD>30</TD></TR></TABLE></r>"
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
+    end
+
+    it "falls back to HTML for uneven rows" do
+      xml = "<r><TABLE><TR><TD>A</TD><TD>B</TD></TR><TR><TD>1</TD></TR></TABLE></r>"
+
+      result = Markbridge.text_formatter_xml_to_markdown(xml)
+
+      expect(result).to include("<table>")
+    end
+  end
 end

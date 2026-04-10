@@ -508,4 +508,39 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result).to eq(expected)
     end
   end
+
+  describe "tables" do
+    it "renders a simple table with headers as Markdown" do
+      bbcode = "[table][tr][th]Name[/th][th]Age[/th][/tr][tr][td]Alice[/td][td]30[/td][/tr][/table]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+
+      expect(result).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
+    end
+
+    it "renders a table without headers using first row as header" do
+      bbcode = "[table][tr][td]A[/td][td]B[/td][/tr][tr][td]1[/td][td]2[/td][/tr][/table]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+
+      expect(result).to eq("| A | B |\n| --- | --- |\n| 1 | 2 |")
+    end
+
+    it "renders formatted content inside table cells" do
+      bbcode = "[table][tr][th]Name[/th][/tr][tr][td][b]Alice[/b][/td][/tr][/table]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+
+      expect(result).to include("| **Alice** |")
+    end
+
+    it "falls back to HTML for uneven rows" do
+      bbcode = "[table][tr][td]A[/td][td]B[/td][/tr][tr][td]1[/td][/tr][/table]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+
+      expect(result).to include("<table>")
+      expect(result).to include("<td>A</td>")
+    end
+  end
 end

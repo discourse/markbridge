@@ -67,6 +67,11 @@ module Markbridge
           registry.register(%w[ul ol], Handlers::ListHandler.new)
           registry.register("li", Handlers::ListItemHandler.new)
 
+          # Table handlers (thead/tbody/tfoot are transparent - unregistered tags pass through)
+          registry.register("table", Handlers::TableHandler.new)
+          registry.register("tr", Handlers::TableRowHandler.new)
+          registry.register(%w[td th], Handlers::TableCellHandler.new)
+
           # Paragraph handler (transparent - doesn't create AST node)
           registry.register("p", Handlers::ParagraphHandler.new)
 
