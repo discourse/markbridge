@@ -21,7 +21,15 @@ module Markbridge
       #   parser = Markbridge::Parsers::MediaWiki::Parser.new
       #   ast = parser.parse("'''bold''' and ''italic''")
       class Parser
-        def initialize
+        # @param inline_tag_registry [InlineTagRegistry, nil] custom registry or use default
+        # @yield [InlineTagRegistry] optional block to customize the default registry
+        def initialize(inline_tag_registry: nil, &block)
+          @inline_tag_registry =
+            if block_given?
+              InlineTagRegistry.build_from_default(&block)
+            else
+              inline_tag_registry || InlineTagRegistry.default
+            end
           @document = nil
           @inline_parser = nil
           @list_stack = []
@@ -36,7 +44,7 @@ module Markbridge
           lines = normalized.split("\n", -1)
 
           @document = AST::Document.new
-          @inline_parser = InlineParser.new
+          @inline_parser = InlineParser.new(inline_tag_registry: @inline_tag_registry)
           @list_stack = []
 
           process_lines(lines)

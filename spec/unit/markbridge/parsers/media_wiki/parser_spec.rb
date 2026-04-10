@@ -255,4 +255,27 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(doc.children).to include(an_instance_of(Markbridge::AST::HorizontalRule))
     end
   end
+
+  describe "constructor customization" do
+    it "accepts a custom inline_tag_registry" do
+      registry = Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
+        r.register("mark", :formatting, Markbridge::AST::Bold)
+      end
+      parser = described_class.new(inline_tag_registry: registry)
+      doc = parser.parse("<mark>highlighted</mark>")
+
+      paragraph = doc.children.first
+      expect(paragraph.children.first).to be_a(Markbridge::AST::Bold)
+    end
+
+    it "accepts a block for registry customization" do
+      parser = described_class.new do |r|
+        r.register("mark", :formatting, Markbridge::AST::Bold)
+      end
+      doc = parser.parse("<mark>highlighted</mark>")
+
+      paragraph = doc.children.first
+      expect(paragraph.children.first).to be_a(Markbridge::AST::Bold)
+    end
+  end
 end

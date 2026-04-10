@@ -1,6 +1,6 @@
 # Parser Comparison and Review
 
-This document provides a comprehensive comparison of the three parsers available in Markbridge: BBCode, HTML, and TextFormatter. It analyzes their APIs, performance characteristics, maintainability, and extensibility.
+This document provides a comprehensive comparison of the four parsers available in Markbridge: BBCode, HTML, TextFormatter, and MediaWiki. It analyzes their APIs, performance characteristics, maintainability, and extensibility.
 
 ## Table of Contents
 
@@ -15,13 +15,14 @@ This document provides a comprehensive comparison of the three parsers available
 
 ## Overview
 
-Markbridge includes three parsers, each designed for different input formats:
+Markbridge includes four parsers, each designed for different input formats:
 
 | Parser | Input Format | Parsing Strategy | Dependencies |
 |--------|-------------|------------------|--------------|
 | **BBCode** | `[b]text[/b]` | Custom tokenizer + stateful parser | None (pure Ruby) |
 | **HTML** | `<b>text</b>` | DOM-based (Nokogiri) | Nokogiri |
 | **TextFormatter** | `<r><B>text</B></r>` | XML-based (Nokogiri) | Nokogiri |
+| **MediaWiki** | `'''bold'''` | Line-based + inline character parser | None (pure Ruby) |
 
 ### BBCode Parser
 
@@ -62,6 +63,19 @@ Markbridge includes three parsers, each designed for different input formats:
 - Ignores markup preservation elements (`<s>`, `<e>`)
 - Case-sensitive element names (uppercase convention)
 - Fallback to plain text for invalid XML
+
+### MediaWiki Parser
+
+**Purpose:** Parse MediaWiki wikitext into AST
+
+**Location:** `Markbridge::Parsers::MediaWiki::Parser`
+
+**Key features:**
+- Two-level architecture: line-based block parser + character-based inline parser
+- Extensible HTML-like tag handling via `InlineTagRegistry`
+- Depth limiting for inline recursion (MAX_INLINE_DEPTH = 20)
+- Zero dependencies (pure Ruby)
+- Handles heterogeneous syntax (apostrophes, line-prefixes, brackets, HTML tags)
 
 ## Architecture Comparison
 
@@ -130,6 +144,28 @@ Input → Nokogiri XML → XML Tree → Handler → AST
 - Special handling for s9e/TextFormatter conventions
 - Uppercase element names (convention)
 - Fallback to plain text on parse errors
+
+### MediaWiki Parser Architecture
+
+```
+Input → Line Splitter → Block Parser → AST
+                            ↓
+                      InlineParser (per line)
+                            ↓
+                      InlineTagRegistry (HTML-like tags)
+```
+
+**Components:**
+- **Parser:** Line-by-line block classification (heading, list, preformatted, etc.)
+- **InlineParser:** Character-by-character inline markup parsing
+- **InlineTagRegistry:** Extensible registry for HTML-like tags (`<code>`, `<s>`, etc.)
+
+**Key characteristics:**
+- Two-level parsing (block + inline)
+- Character-based inline scanning with position tracking
+- Recursive inline parsing with depth limiting (MAX_INLINE_DEPTH = 20)
+- Registry-based HTML tag dispatch
+- Zero dependencies (pure Ruby)
 
 ## API Comparison
 
@@ -772,14 +808,14 @@ end
 
 ### API Differences
 
-| Feature | BBCode | HTML | TextFormatter |
-|---------|--------|------|---------------|
-| Handler method | `on_open`, `on_close` | `process` | `process` |
-| Handler params | `token:, context:, registry:, tokens:` | `element:, parent:, processor:` | `element:, parent:, processor:` |
-| Tag case | Lowercase | Lowercase | Uppercase |
-| Lambda support | ✗ | ✓ | ✓ |
-| State access | ✓ | ✗ | ✗ |
-| Auto-close config | ✓ | ✗ | ✗ |
+| Feature | BBCode | HTML | TextFormatter | MediaWiki |
+|---------|--------|------|---------------|-----------|
+| Handler method | `on_open`, `on_close` | `process` | `process` | `InlineTagRegistry` |
+| Handler params | `token:, context:, registry:, tokens:` | `element:, parent:, processor:` | `element:, parent:, processor:` | `tag_name, type, element_class` |
+| Tag case | Lowercase | Lowercase | Uppercase | Lowercase |
+| Lambda support | ✗ | ✓ | ✓ | ✗ |
+| State access | ✓ | ✗ | ✗ | ✗ |
+| Auto-close config | ✓ | ✗ | ✗ | ✗ |
 
 ### Opportunities for Unification
 
@@ -796,24 +832,25 @@ end
 
 ### Quick Comparison Table
 
-| Criteria | BBCode | HTML | TextFormatter |
-|----------|--------|------|---------------|
-| **Performance** | Fast | Fastest | Fastest |
-| **Memory** | Low | Medium | Medium |
-| **Dependencies** | None | Nokogiri | Nokogiri |
-| **Complexity** | High | Low | Low |
-| **Maintainability** | Medium | High | High |
-| **Extensibility** | Highest | Medium | Medium |
-| **Learning Curve** | Steep | Gentle | Gentle |
-| **Use Case** | BBCode forums | HTML content | phpBB 3.2+ |
+| Criteria | BBCode | HTML | TextFormatter | MediaWiki |
+|----------|--------|------|---------------|-----------|
+| **Performance** | Fast | Fastest | Fastest | Fast |
+| **Memory** | Low | Medium | Medium | Low |
+| **Dependencies** | None | Nokogiri | Nokogiri | None |
+| **Complexity** | High | Low | Low | Medium |
+| **Maintainability** | Medium | High | High | High |
+| **Extensibility** | Highest | Medium | Medium | Medium (inline tags) |
+| **Learning Curve** | Steep | Gentle | Gentle | Gentle |
+| **Use Case** | BBCode forums | HTML content | phpBB 3.2+ | Wiki migrations |
 
 ### Final Recommendations
 
 1. **For new projects:** Start with HTML or TextFormatter (simpler)
 2. **For BBCode forums:** Use BBCode parser (purpose-built)
 3. **For phpBB 3.2+:** Use TextFormatter parser (native format)
-4. **For custom requirements:** BBCode parser offers most flexibility
-5. **For minimal dependencies:** BBCode parser (zero deps)
+4. **For wiki migrations:** Use MediaWiki parser
+5. **For custom requirements:** BBCode parser offers most flexibility
+6. **For minimal dependencies:** BBCode or MediaWiki parser (zero deps)
 
 ### Future Improvements
 
@@ -840,6 +877,7 @@ end
 - **[BBCode Parser Guide](bbcode.md)** - Deep dive into BBCode parser
 - **[HTML Parser Guide](html.md)** - Learn about HTML parser
 - **[TextFormatter Parser Guide](text_formatter.md)** - Learn about TextFormatter parser
+- **[MediaWiki Parser Guide](mediawiki.md)** - Learn about MediaWiki parser
 - **[Architecture Overview](../architecture.md)** - Understand the pipeline
 - **[Extending Markbridge](../extending.md)** - Add custom handlers
 - **[Performance Guide](../performance.md)** - Optimization techniques

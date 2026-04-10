@@ -208,4 +208,38 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(bold.children.first).to be_a(Markbridge::AST::Url)
     end
   end
+
+  describe "custom inline tag registry" do
+    let(:registry) do
+      Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
+        r.register("mark", :formatting, Markbridge::AST::Bold)
+      end
+    end
+    let(:parser) { described_class.new(inline_tag_registry: registry) }
+
+    it "handles custom registered tags" do
+      doc = parse("<mark>highlighted</mark>")
+      expect(doc.children.first).to be_a(Markbridge::AST::Bold)
+      expect(doc.children.first.children.first.text).to eq("highlighted")
+    end
+
+    it "still handles default tags" do
+      doc = parse("<code>some code</code>")
+      expect(doc.children.first).to be_a(Markbridge::AST::Code)
+    end
+  end
+
+  describe "depth limiting" do
+    it "stops recursion at MAX_INLINE_DEPTH and renders content as text" do
+      parser = described_class.new(depth: described_class::MAX_INLINE_DEPTH - 1)
+      parent = Markbridge::AST::Document.new
+      parser.parse("'''bold'''", parent:)
+
+      # At max depth, inner content should be plain text rather than recursed
+      bold = parent.children.first
+      expect(bold).to be_a(Markbridge::AST::Bold)
+      expect(bold.children.first).to be_a(Markbridge::AST::Text)
+      expect(bold.children.first.text).to eq("bold")
+    end
+  end
 end

@@ -5,9 +5,19 @@ module Markbridge
     module MediaWiki
       # Parses inline MediaWiki markup within a line of text.
       # Handles bold ('''), italic (''), links ([[...]]), external links ([...]),
-      # and HTML inline tags (<code>, <nowiki>, <s>, <del>, <u>, <ins>, <sup>, <sub>, <br>).
+      # and HTML inline tags via an InlineTagRegistry.
+      #
+      # @example With custom registry
+      #   registry = InlineTagRegistry.build_from_default do |r|
+      #     r.register("mark", :formatting, AST::Bold)
+      #   end
+      #   parser = InlineParser.new(inline_tag_registry: registry)
       class InlineParser
-        def initialize
+        MAX_INLINE_DEPTH = 20
+
+        def initialize(inline_tag_registry: nil, depth: 0)
+          @registry = inline_tag_registry || InlineTagRegistry.default
+          @depth = depth
           @input = nil
           @pos = 0
           @length = 0
@@ -115,8 +125,14 @@ module Markbridge
         end
 
         # Parse inner content and append to a parent element.
+        # Respects MAX_INLINE_DEPTH to prevent stack overflow from deeply nested markup.
         def parse_inner_content(content, parent:)
-          InlineParser.new.parse(content, parent:)
+          if @depth + 1 >= MAX_INLINE_DEPTH
+            parent << AST::Text.new(content)
+            return
+          end
+
+          InlineParser.new(inline_tag_registry: @registry, depth: @depth + 1).parse(content, parent:)
         end
 
         # Collect text until we find n consecutive apostrophes.
@@ -211,34 +227,30 @@ module Markbridge
           tag_name = tag_match[2].downcase
 
           # Closing/self-closing tags and unknown tags are treated as literal text
-          if closing || self_closing || !known_html_tag?(tag_name)
+          entry = @registry[tag_name]
+          if closing || self_closing || !entry
             advance_as_text(full_match)
             return
           end
 
-          case tag_name
-          when "nowiki"
-            handle_nowiki_tag(full_match)
-          when "code", "pre"
-            handle_paired_raw_tag(tag_name, full_match, AST::Code)
-          when "br"
-            @pos += full_match.length
-            @parent << AST::LineBreak.new
-          when "s", "del"
-            handle_paired_tag(tag_name, full_match, AST::Strikethrough)
-          when "u", "ins"
-            handle_paired_tag(tag_name, full_match, AST::Underline)
-          when "sup"
-            handle_paired_tag(tag_name, full_match, AST::Superscript)
-          when "sub"
-            handle_paired_tag(tag_name, full_match, AST::Subscript)
-          end
+          dispatch_html_tag(entry, tag_name, full_match)
         end
 
-        KNOWN_HTML_TAGS = %w[nowiki code pre br s del u ins sup sub].freeze
-
-        def known_html_tag?(tag_name)
-          KNOWN_HTML_TAGS.include?(tag_name)
+        # Dispatch an HTML-like tag based on its registry entry type.
+        def dispatch_html_tag(entry, tag_name, full_match)
+          case entry.type
+          when :raw
+            if entry.element_class.nil?
+              handle_nowiki_tag(full_match)
+            else
+              handle_paired_raw_tag(tag_name, full_match, entry.element_class)
+            end
+          when :formatting
+            handle_paired_tag(tag_name, full_match, entry.element_class)
+          when :self_closing
+            @pos += full_match.length
+            @parent << entry.element_class.new
+          end
         end
 
         # Advance position and buffer the match as literal text.
