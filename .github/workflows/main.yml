@@ -78,6 +78,11 @@ jobs:
       - name: Create GitHub Release
         run: |
           VERSION=$(ruby -r ./lib/markbridge/version -e 'puts Markbridge::VERSION')
-          gh release create "v${VERSION}" --generate-notes --latest
+          TAG="v${VERSION}"
+          if ! gh release view "${TAG}" > /dev/null 2>&1; then
+            gh release create "${TAG}" --generate-notes --latest
+          else
+            echo "Release ${TAG} already exists, skipping."
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
