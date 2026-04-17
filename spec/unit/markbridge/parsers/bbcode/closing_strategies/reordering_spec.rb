@@ -23,7 +23,7 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Reordering do
   end
 
   context "when reordering is possible" do
-    it "triggers reordering" do
+    it "triggers reordering and consumes the matched closing token" do
       context.push(Markbridge::AST::Bold.new)
       context.push(Markbridge::AST::Italic.new)
 
@@ -38,6 +38,10 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Reordering do
 
       expect(context.current).to eq(root)
       expect(context.auto_closed_count).to eq(2)
+      # Reordering must consume the upcoming [/i] (auto-close fallback would not)
+      expect(tokens.peek).to be_nil
+      # Reordering must short-circuit; otherwise super re-runs and appends [/b] as text
+      expect(root.children).to contain_exactly(an_instance_of(Markbridge::AST::Bold))
     end
   end
 
@@ -51,6 +55,18 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Reordering do
       strategy.handle_close(token:, context:, registry:, tokens: nil)
 
       # Should fall back to auto-close
+      expect(context.current).to eq(root)
+      expect(context.auto_closed_count).to eq(2)
+    end
+
+    it "treats an omitted tokens kwarg the same as tokens: nil" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "b", pos: 0, source: "[/b]")
+
+      strategy.handle_close(token:, context:, registry:)
+
       expect(context.current).to eq(root)
       expect(context.auto_closed_count).to eq(2)
     end

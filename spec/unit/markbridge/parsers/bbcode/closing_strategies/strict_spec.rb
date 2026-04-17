@@ -8,7 +8,7 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Strict do
   let(:strategy) { described_class.new(reconciler) }
 
   context "when current matches closing tag" do
-    it "pops the element" do
+    it "pops the element directly without auto-closing" do
       bold = Markbridge::AST::Bold.new
       context.push(bold)
 
@@ -17,6 +17,7 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Strict do
       strategy.handle_close(token:, context:, registry:)
 
       expect(context.current).to eq(root)
+      expect(context.auto_closed_count).to eq(0)
     end
   end
 

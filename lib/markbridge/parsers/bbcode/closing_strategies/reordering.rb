@@ -4,11 +4,11 @@ module Markbridge
     module BBCode
       module ClosingStrategies
         class Reordering < Base
-          private
+          def handle_close(token:, context:, registry:, tokens: nil)
+            closing_handler = registry[token.tag]
+            return if tokens && @reconciler.try_reorder(handler: closing_handler, tokens:, context:)
 
-          def try_reorder(context:, tokens:, closing_handler:)
-            return false unless tokens
-            @reconciler.try_reorder(handler: closing_handler, tokens:, context:)
+            super
           end
         end
       end

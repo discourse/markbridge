@@ -12,10 +12,9 @@ module Markbridge
       private
 
       def missing_message(gem, feature)
-        gem_name = gem.to_s
         [
-          "#{gem_name.capitalize} is required for #{feature}.",
-          "Add 'gem \"#{gem_name}\"' to your Gemfile or install it with 'gem install #{gem_name}'.",
+          "#{gem.capitalize} is required for #{feature}.",
+          "Add 'gem \"#{gem}\"' to your Gemfile or install it with 'gem install #{gem}'.",
         ].join(" ")
       end
     end

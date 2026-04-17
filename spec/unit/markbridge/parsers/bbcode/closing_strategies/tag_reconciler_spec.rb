@@ -12,6 +12,75 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
     Markbridge::Parsers::BBCode::PeekableEnumerator.new(scanner)
   end
 
+  describe "#try_auto_close" do
+    let(:bold_handler) { registry["b"] }
+    let(:italic_handler) { registry["i"] }
+
+    it "closes the current element when its handler matches the closing handler" do
+      context.push(Markbridge::AST::Bold.new)
+
+      result = reconciler.try_auto_close(handler: bold_handler, context:)
+
+      expect(result).to be true
+      expect(context.current).to eq(root)
+      expect(context.auto_closed_count).to eq(1)
+    end
+
+    it "auto-closes intervening elements when the match is deeper in the stack" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+      context.push(Markbridge::AST::Underline.new)
+
+      result = reconciler.try_auto_close(handler: bold_handler, context:)
+
+      expect(result).to be true
+      expect(context.current).to eq(root)
+      expect(context.auto_closed_count).to eq(3)
+    end
+
+    it "returns false when no element on the stack matches" do
+      context.push(Markbridge::AST::Bold.new)
+
+      result = reconciler.try_auto_close(handler: italic_handler, context:)
+
+      expect(result).to be false
+      expect(context.current).to be_a(Markbridge::AST::Bold)
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "returns false when the matching element is at MAX_AUTO_CLOSE_DEPTH or deeper" do
+      context.push(Markbridge::AST::Bold.new)
+      described_class::MAX_AUTO_CLOSE_DEPTH.times { context.push(Markbridge::AST::Italic.new) }
+
+      result = reconciler.try_auto_close(handler: bold_handler, context:)
+
+      expect(result).to be false
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "returns false when an intervening element is not auto-closeable" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::List.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      result = reconciler.try_auto_close(handler: bold_handler, context:)
+
+      expect(result).to be false
+      expect(context.current).to be_a(Markbridge::AST::Italic)
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "does not modify state when returning false" do
+      context.push(Markbridge::AST::Italic.new)
+      original_current = context.current
+
+      result = reconciler.try_auto_close(handler: bold_handler, context:)
+
+      expect(result).to be false
+      expect(context.current).to eq(original_current)
+    end
+  end
+
   describe "#try_reorder" do
     let(:bold_handler) { registry["b"] }
     let(:italic_handler) { registry["i"] }

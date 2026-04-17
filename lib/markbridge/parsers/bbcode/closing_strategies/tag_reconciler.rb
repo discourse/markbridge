@@ -20,7 +20,7 @@ module Markbridge
           def try_auto_close(handler:, context:)
             match_depth = find_matching_handler_depth(handler, context)
 
-            return false if match_depth.nil? || match_depth >= MAX_AUTO_CLOSE_DEPTH
+            return false if match_depth.nil?
             return false unless all_auto_closeable?(context, match_depth)
 
             count = match_depth + 1
@@ -38,7 +38,7 @@ module Markbridge
           # @return [Boolean] true if successful, false otherwise
           def try_reorder(handler:, tokens:, context:)
             match_depth = find_matching_handler_depth(handler, context)
-            return false if match_depth.nil? || match_depth >= MAX_AUTO_CLOSE_DEPTH
+            return false if match_depth.nil?
 
             opening_handlers = collect_auto_closeable_handlers(context, match_depth)
             return false if opening_handlers.empty?
@@ -66,7 +66,7 @@ module Markbridge
           private
 
           def find_matching_handler_depth(handler, context)
-            elements = context.elements_from_current(MAX_AUTO_CLOSE_DEPTH)
+            elements = context.elements_from_current(MAX_AUTO_CLOSE_DEPTH - 1)
 
             elements.each_with_index do |element, depth|
               next unless element.is_a?(AST::Element)
