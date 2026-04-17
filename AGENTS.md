@@ -163,6 +163,51 @@ expect(token).to match_tag_end("b")
 - Keep tests independent (random order execution)
 - Use `expect`, never `should`
 
+## Mutation Testing
+
+Markbridge uses [mutant](https://github.com/mbj/mutant) for mutation testing.
+
+### Goal
+
+Drive mutation coverage up over time. Verify with:
+
+```
+bin/mutant run
+```
+
+When iterating, prefer `--fail-fast` so you address one surviving mutant at a time:
+
+```
+bin/mutant run --fail-fast
+```
+
+Scope runs with a subject pattern when working on one area:
+
+```
+bin/mutant run -- 'Markbridge::AST::Bold*'
+```
+
+### When you find an alive mutation
+
+Decide which bucket it falls into:
+
+- **A) The code does too much** for what the tests ask for. The surviving mutation reveals behavior that no test requires. The fix is to simplify the implementation.
+- **B) A test is missing.** The behavior is intentional but no test observes it. The fix is to add a test.
+
+Decide between A) and B) before changing anything. If unsure, ask the user.
+
+### What you may change
+
+- Files under `lib/markbridge/` — the implementation. Multiple designs are valid.
+- Files under `spec/unit/` (mirroring `lib/markbridge/`) — the tests. Some existing tests may be bad and can be rewritten or replaced.
+
+### Constraints
+
+- Line coverage must not regress. Capture a baseline before your changes with `COVERAGE=1 bin/rspec` and re-run after to compare.
+- You may not skip mutants by configuring mutant to ignore them. No `expressions:` filters, no `coverage_criteria:` tweaks in `mutant.yml`.
+- You may not use `send` or `__send__` to invoke private methods in tests just to satisfy mutant.
+- You may not stub or mock the system under test (the class currently being mutated).
+
 ## Performance Notes
 
 **Scanner** (performance-critical):
