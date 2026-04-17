@@ -41,7 +41,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
     it "converts underline text" do
       result = Markbridge.text_formatter_xml_to_markdown("<r><U>underlined</U></r>")
-      expect(result).to eq("<u>underlined</u>")
+      expect(result).to eq("[u]underlined[/u]")
     end
 
     it "converts strikethrough text" do

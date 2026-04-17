@@ -366,9 +366,9 @@ RSpec.describe "BBCode to Markdown Conversion" do
   end
 
   describe "underline" do
-    it "converts underline to HTML" do
+    it "passes underline through as BBCode (Discourse renders [u] natively)" do
       result = Markbridge.bbcode_to_markdown("[u]underlined[/u]")
-      expect(result).to eq("<u>underlined</u>")
+      expect(result).to eq("[u]underlined[/u]")
     end
   end
 
@@ -443,7 +443,7 @@ RSpec.describe "BBCode to Markdown Conversion" do
 
     it "handles deeply nested formatting" do
       result = Markbridge.bbcode_to_markdown("[b][i][u]deep[/u][/i][/b]")
-      expect(result).to eq("***<u>deep</u>***")
+      expect(result).to eq("***[u]deep[/u]***")
     end
 
     it "handles unclosed tags gracefully" do

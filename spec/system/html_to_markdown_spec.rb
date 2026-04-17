@@ -214,9 +214,9 @@ RSpec.describe "HTML to Markdown Conversion" do
   end
 
   describe "underline" do
-    it "converts underline to HTML" do
+    it "converts underline to [u] BBCode" do
       result = Markbridge.html_to_markdown("<u>underlined text</u>")
-      expect(result).to eq("<u>underlined text</u>")
+      expect(result).to eq("[u]underlined text[/u]")
     end
   end
 
@@ -250,7 +250,7 @@ RSpec.describe "HTML to Markdown Conversion" do
 
     it "handles deeply nested formatting" do
       result = Markbridge.html_to_markdown("<b><i><u>deep</u></i></b>")
-      expect(result).to eq("***<u>deep</u>***")
+      expect(result).to eq("***[u]deep[/u]***")
     end
   end
 

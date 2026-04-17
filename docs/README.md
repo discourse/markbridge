@@ -73,7 +73,7 @@ markdown = renderer.render(ast)
 | `[b]...[/b]` | `**...**` | `AST::Bold` |
 | `[i]...[/i]` | `*...*` | `AST::Italic` |
 | `[s]...[/s]` | `~~...~~` | `AST::Strikethrough` |
-| `[u]...[/u]` | `<u>...</u>` | `AST::Underline` |
+| `[u]...[/u]` | `[u]...[/u]` | `AST::Underline` |
 | `[code]...[/code]` | `` `...` `` or ` ```...``` ` | `AST::Code` |
 | `[url=...]...[/url]` | `[...](...)` | `AST::Url` |
 | `[list]...[/list]` | `- ...` or `1. ...` | `AST::List` |
