@@ -51,6 +51,39 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       result = renderer.render_children(document, context:)
       expect(result).to eq("")
     end
+
+    it "inserts a comment boundary when sibling emphasis delimiters would merge" do
+      # Two adjacent Bold siblings would render as **x****y** (four stars),
+      # which CommonMark parses ambiguously. The renderer inserts an HTML
+      # comment to force the delimiter runs to stay separate.
+      document = Markbridge::AST::Document.new
+      first = Markbridge::AST::Bold.new
+      first << Markbridge::AST::Text.new("x")
+      second = Markbridge::AST::Bold.new
+      second << Markbridge::AST::Text.new("y")
+      document << first
+      document << second
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      result = renderer.render_children(document, context:)
+
+      expect(result).to eq("**x**<!---->**y**")
+    end
+
+    it "does not insert a boundary when delimiters differ" do
+      document = Markbridge::AST::Document.new
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("x")
+      strike = Markbridge::AST::Strikethrough.new
+      strike << Markbridge::AST::Text.new("y")
+      document << bold
+      document << strike
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      result = renderer.render_children(document, context:)
+
+      expect(result).to eq("**x**~~y~~")
+    end
   end
 
   describe "RenderingInterface helpers" do

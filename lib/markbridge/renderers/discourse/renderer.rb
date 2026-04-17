@@ -50,10 +50,33 @@ module Markbridge
         # @param context [RenderContext] rendering context
         # @return [String]
         def render_children(node, context:)
-          node.children.map { |child| render(child, context:) }.join
+          result = +""
+          node.children.each do |child|
+            part = render(child, context:)
+            next if part.empty?
+
+            if !result.empty? && emphasis_delimiter_clash?(result[-1], part[0])
+              result << EMPHASIS_BOUNDARY
+            end
+            result << part
+          end
+          result
         end
 
         private
+
+        # Inserted between sibling outputs when their adjacent characters
+        # would merge into a longer Markdown emphasis delimiter run (e.g.
+        # `***` + `*...` becoming `****...`). The HTML comment is invisible
+        # in rendered output but breaks the delimiter run during Markdown
+        # parsing.
+        EMPHASIS_BOUNDARY = "<!---->"
+        EMPHASIS_DELIMITERS = %w[* _ ~].freeze
+        private_constant :EMPHASIS_BOUNDARY, :EMPHASIS_DELIMITERS
+
+        def emphasis_delimiter_clash?(last_char, first_char)
+          last_char == first_char && EMPHASIS_DELIMITERS.include?(last_char)
+        end
 
         def interface_for(context)
           @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)
