@@ -18,4 +18,12 @@ RSpec.describe Markbridge::AST::Email do
 
     expect(element.address).to be_nil
   end
+
+  it "can have children" do
+    element = described_class.new
+    text = Markbridge::AST::Text.new("Contact us")
+    element << text
+
+    expect(element.children).to eq([text])
+  end
 end

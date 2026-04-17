@@ -20,7 +20,7 @@ module Markbridge
       # @param children [Array<Node>] optional array of initial child nodes
       def initialize(children = [])
         super()
-        Array(children).each { |c| self << c }
+        children.each { |c| self << c }
       end
     end
   end

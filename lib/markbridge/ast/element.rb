@@ -31,10 +31,10 @@ module Markbridge
       def <<(child)
         unless child.is_a?(Node)
           actual = child.nil? ? "nil" : child.class
-          raise TypeError, "child must be a #{Markbridge::AST::Node} (got #{actual})"
+          raise TypeError, "child must be a #{Node} (got #{actual})"
         end
 
-        if child.is_a?(Text) && children.last.is_a?(Text)
+        if child.instance_of?(Text) && children.last.instance_of?(Text)
           @children.last.merge(child)
         else
           @children << child

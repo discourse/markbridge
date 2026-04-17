@@ -18,4 +18,12 @@ RSpec.describe Markbridge::AST::Color do
 
     expect(element.color).to be_nil
   end
+
+  it "can have children" do
+    element = described_class.new
+    text = Markbridge::AST::Text.new("colored text")
+    element << text
+
+    expect(element.children).to eq([text])
+  end
 end

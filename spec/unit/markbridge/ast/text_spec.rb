@@ -6,6 +6,12 @@ RSpec.describe Markbridge::AST::Text do
       node = described_class.new("hello")
       expect(node.text).to eq("hello")
     end
+
+    it "stores a mutable copy even when given a frozen string" do
+      node = described_class.new("hello".freeze)
+
+      expect(node.text).not_to be_frozen
+    end
   end
 
   describe "#merge" do

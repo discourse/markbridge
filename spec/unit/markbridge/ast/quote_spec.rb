@@ -24,4 +24,12 @@ RSpec.describe Markbridge::AST::Quote do
     expect(element.topic).to be_nil
     expect(element.username).to be_nil
   end
+
+  it "can have children" do
+    element = described_class.new
+    text = Markbridge::AST::Text.new("quoted text")
+    element << text
+
+    expect(element.children).to eq([text])
+  end
 end
