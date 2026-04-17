@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+RSpec.describe Markbridge::Renderers::Discourse::Tags::LineBreakTag do
+  let(:tag) { described_class.new }
+  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
+  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
+  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
+
+  describe "#render" do
+    it "returns a single newline" do
+      expect(tag.render(Markbridge::AST::LineBreak.new, interface)).to eq("\n")
+    end
+  end
+end
