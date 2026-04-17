@@ -1,0 +1,18 @@
+usage: opensource
+
+integration:
+  name: rspec
+
+requires:
+  - markbridge
+
+includes:
+  - lib
+
+matcher:
+  subjects:
+    - "Markbridge*"
+
+coverage_criteria:
+  timeout: true
+  process_abort: true

@@ -17,3 +17,6 @@ gem "rubycritic"
 gem "simplecov"
 gem "sinatra"
 gem "syntax_tree"
+
+gem "mutant", "~> 0.16"
+gem "mutant-rspec", "~> 0.16"
