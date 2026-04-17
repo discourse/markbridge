@@ -18,12 +18,9 @@ module Markbridge
           # @param context [ParserState]
           # @return [Boolean] true if successful, false if auto-close not possible
           def try_auto_close(handler:, context:)
-            match_depth = find_matching_handler_depth(handler, context)
+            count = auto_close_count(handler, context)
+            return false if count.nil?
 
-            return false if match_depth.nil?
-            return false unless all_auto_closeable?(context, match_depth)
-
-            count = match_depth + 1
             count.times { context.pop }
             context.auto_close!(count)
 
@@ -35,12 +32,21 @@ module Markbridge
           # formatting context. Used when closing tags are not adjacent
           # (e.g. "[b][i]x[/b] more[/i]").
           #
+          # Reopening only makes sense when there is upcoming content that
+          # would benefit from the reopened context. If the next token is a
+          # closing tag (or nothing), plain auto-close is correct.
+          #
           # @param handler [BaseHandler] the handler for the closing tag
           # @param context [ParserState]
           # @param tokens [Object, nil] the token stream (used to check that content follows)
           # @return [Boolean] true if successful, false otherwise
           def try_reopen(handler:, context:, tokens:)
-            return false unless reopen_justified?(tokens)
+            case tokens&.peek
+            when TextToken, TagStartToken
+              nil # content follows -> reopening is justified
+            else
+              return false
+            end
 
             match_depth = find_matching_handler_depth(handler, context)
             return false if match_depth.nil? || match_depth.zero?
@@ -92,14 +98,19 @@ module Markbridge
 
           private
 
-          # Reopening only makes sense when there is upcoming content that
-          # would benefit from the reopened context. If the next token is a
-          # closing tag (or nothing), plain auto-close is correct.
-          JUSTIFYING_NEXT_TOKENS = Set[TextToken, TagStartToken].freeze
-          private_constant :JUSTIFYING_NEXT_TOKENS
+          # Number of stack elements to pop in order to close `handler`, or nil
+          # when the handler is not on the stack within MAX_AUTO_CLOSE_DEPTH or
+          # any intervening element is not auto-closeable.
+          def auto_close_count(handler, context)
+            context
+              .elements_from_current(MAX_AUTO_CLOSE_DEPTH - 1)
+              .each_with_index do |element, depth|
+                next unless element.is_a?(AST::Element)
+                return nil unless @registry.auto_closeable?(element.class)
+                return depth + 1 if @registry.handler_for_element(element) == handler
+              end
 
-          def reopen_justified?(tokens)
-            JUSTIFYING_NEXT_TOKENS.member?(tokens&.peek&.class)
+            nil
           end
 
           def find_matching_handler_depth(handler, context)
