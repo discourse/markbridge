@@ -78,12 +78,10 @@ module Markbridge
               return false
             end
 
-            # Consume the extra closing tags
-            (opening_handlers.size - 1).times do
-              peeked = tokens.peek
-              break unless peeked.is_a?(TagEndToken)
-              tokens.next
-            end
+            # Consume the extra closing tags. We've already verified via
+            # peek_closing_handlers that the next opening_handlers.size - 1
+            # tokens are TagEndTokens with handlers we accept.
+            (opening_handlers.size - 1).times { tokens.next }
 
             opening_handlers.each { context.pop }
             context.auto_close!(opening_handlers.size)

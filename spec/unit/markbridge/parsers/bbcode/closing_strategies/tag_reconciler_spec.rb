@@ -339,6 +339,20 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
         # All matched closing tokens must be consumed.
         expect(tokens.peek).to be_nil
       end
+
+      it "leaves extra closing tags after the matched sequence in the token stream" do
+        # Bold contains italic. Reordering should consume the [/i] paired with
+        # italic but leave the trailing [/u] alone for the parser to handle.
+        context.push(Markbridge::AST::Bold.new)
+        context.push(Markbridge::AST::Italic.new)
+
+        tokens = tokens_for("[/i][/u]")
+
+        reconciler.try_reorder(handler: bold_handler, tokens:, context:)
+
+        expect(tokens.peek).to be_a(Markbridge::Parsers::BBCode::TagEndToken)
+        expect(tokens.peek.tag).to eq("u")
+      end
     end
   end
 end
