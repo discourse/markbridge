@@ -4,7 +4,7 @@ integration:
   name: rspec
 
 requires:
-  - markbridge
+  - markbridge/all
 
 includes:
   - lib
@@ -12,7 +12,3 @@ includes:
 matcher:
   subjects:
     - "Markbridge*"
-
-coverage_criteria:
-  timeout: true
-  process_abort: true
