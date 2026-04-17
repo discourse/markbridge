@@ -126,34 +126,17 @@ module Markbridge
           end
 
           def collect_auto_closeable_handlers(context, target_depth)
-            handlers = []
-
             context
               .elements_from_current(target_depth)
-              .each do |element|
-                return [] unless @registry.auto_closeable?(element.class)
-
-                handler = @registry.handler_for_element(element)
-                handlers << handler if handler
-              end
-
-            handlers
+              .take_while { |element| @registry.auto_closeable?(element.class) }
+              .map { |element| @registry.handler_for_element(element) }
           end
 
           def peek_closing_handlers(tokens, max_count)
-            handlers = []
-            peeked_tokens = tokens.peek_ahead(max_count)
-
-            peeked_tokens.each do |token|
-              break unless token.is_a?(TagEndToken)
-
-              handler = @registry[token.tag]
-              break unless handler
-
-              handlers << handler
-            end
-
-            handlers
+            tokens
+              .peek_ahead(max_count)
+              .take_while { |token| token.instance_of?(TagEndToken) }
+              .map { |token| @registry[token.tag] }
           end
         end
       end
