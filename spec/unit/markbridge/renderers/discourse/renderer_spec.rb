@@ -70,6 +70,22 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("**x**<!---->**y**")
     end
 
+    it "inserts a boundary between adjacent code spans so backtick runs don't merge" do
+      # "`a``b`" would parse as ONE code span containing a``b, not two.
+      document = Markbridge::AST::Document.new
+      first = Markbridge::AST::Code.new
+      first << Markbridge::AST::Text.new("a")
+      second = Markbridge::AST::Code.new
+      second << Markbridge::AST::Text.new("b")
+      document << first
+      document << second
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      result = renderer.render_children(document, context:)
+
+      expect(result).to eq("`a`<!---->`b`")
+    end
+
     it "does not insert a boundary when delimiters differ" do
       document = Markbridge::AST::Document.new
       bold = Markbridge::AST::Bold.new

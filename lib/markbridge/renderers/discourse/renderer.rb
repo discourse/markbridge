@@ -71,7 +71,9 @@ module Markbridge
         # in rendered output but breaks the delimiter run during Markdown
         # parsing.
         EMPHASIS_BOUNDARY = "<!---->"
-        EMPHASIS_DELIMITERS = %w[* _ ~].freeze
+        # Characters where adjacent runs merge into a single longer run during
+        # Markdown parsing: emphasis (* _), strikethrough (~), code spans (`).
+        EMPHASIS_DELIMITERS = %w[* _ ~ `].freeze
         private_constant :EMPHASIS_BOUNDARY, :EMPHASIS_DELIMITERS
 
         def emphasis_delimiter_clash?(last_char, first_char)
