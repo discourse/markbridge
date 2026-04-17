@@ -26,19 +26,14 @@ module Markbridge
 
           def render_block(content, language)
             fence = calculate_fence(content)
-            lang = language || ""
 
-            "#{fence}#{lang}\n#{content}\n#{fence}"
+            "#{fence}#{language}\n#{content}\n#{fence}"
           end
 
           def calculate_fence(content)
-            # Find longest sequence of backticks and tildes
-            max_backticks = content.scan(/`+/).map(&:length).max || 0
-            max_tildes = content.scan(/~+/).map(&:length).max || 0
-
             # Need fence longer than any sequence in content (minimum 3)
-            required_backticks = [3, max_backticks + 1].max
-            required_tildes = [3, max_tildes + 1].max
+            required_backticks = (content.scan(/`+/).map { |run| run.length + 1 } + [3]).max
+            required_tildes = (content.scan(/~+/).map { |run| run.length + 1 } + [3]).max
 
             # Choose whichever requires fewer characters
             if required_backticks <= required_tildes

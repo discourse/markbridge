@@ -8,7 +8,7 @@ module Markbridge
         # Renders to Markdown image syntax with optional Discourse sizing
         class ImageTag < Tag
           def render(element, _interface)
-            src = element.src || ""
+            src = element.src
             width = element.width
             height = element.height
 

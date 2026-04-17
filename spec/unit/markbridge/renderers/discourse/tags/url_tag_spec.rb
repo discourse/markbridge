@@ -54,5 +54,46 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       result = tag.render(element, interface)
       expect(result).to eq("No Link")
     end
+
+    it "renders ftp URLs" do
+      element = Markbridge::AST::Url.new(href: "ftp://files.example.com")
+      element << Markbridge::AST::Text.new("Files")
+
+      expect(tag.render(element, interface)).to eq("[Files](ftp://files.example.com)")
+    end
+
+    it "renders ftps URLs" do
+      element = Markbridge::AST::Url.new(href: "ftps://files.example.com")
+      element << Markbridge::AST::Text.new("Files")
+
+      expect(tag.render(element, interface)).to eq("[Files](ftps://files.example.com)")
+    end
+
+    it "renders uppercase scheme URLs (case-insensitive matching)" do
+      element = Markbridge::AST::Url.new(href: "HTTPS://Example.COM")
+      element << Markbridge::AST::Text.new("Example")
+
+      expect(tag.render(element, interface)).to eq("[Example](HTTPS://Example.COM)")
+    end
+
+    it "rejects hrefs that contain a valid scheme but do not start with one" do
+      element = Markbridge::AST::Url.new(href: "javascript:https://hidden.example.com")
+      element << Markbridge::AST::Text.new("Bad Link")
+
+      expect(tag.render(element, interface)).to eq("Bad Link")
+    end
+
+    it "rejects hrefs whose valid scheme appears only after a newline (\\A vs ^)" do
+      # Defends against a multi-line href like "javascript:x\nhttps://attacker"
+      # slipping past the scheme check.
+      element = Markbridge::AST::Url.new(href: "javascript:foo\nhttps://attacker.example.com")
+      element << Markbridge::AST::Text.new("Bad Link")
+
+      expect(tag.render(element, interface)).to eq("Bad Link")
+    end
+
+    let(:element_class) { Markbridge::AST::Url }
+    let(:element_factory) { Markbridge::AST::Url.new(href: "https://example.com") }
+    it_behaves_like "a tag that propagates parent context"
   end
 end

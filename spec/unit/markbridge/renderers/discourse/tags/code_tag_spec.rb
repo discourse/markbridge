@@ -82,5 +82,43 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to start_with("````\n")
       expect(result).to end_with("\n````")
     end
+
+    it "uses the maximum (not first or last) backtick run length to size the fence" do
+      element = Markbridge::AST::Code.new
+      # Runs: 1 (first), 6 (middle), 1 (last). Only `max` produces 6.
+      element << Markbridge::AST::Text.new("`a\n``````\nb`")
+
+      result = tag.render(element, interface)
+      expect(result).to start_with("~~~\n") # 7 backticks needed; tildes shorter
+      expect(result).to end_with("\n~~~")
+    end
+
+    it "uses the maximum (not first or last) tilde run length to size the fence" do
+      element = Markbridge::AST::Code.new
+      # Runs: 1 (first), 6 (middle), 1 (last). Only `max` produces 6.
+      element << Markbridge::AST::Text.new("~a\n~~~~~~\nb~")
+
+      result = tag.render(element, interface)
+      expect(result).to start_with("```\n") # 7 tildes needed; backticks shorter
+      expect(result).to end_with("\n```")
+    end
+
+    it "uses an empty language tag when language is nil" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("a\nb")
+
+      result = tag.render(element, interface)
+      expect(result).to start_with("```\n") # No language between fence and newline
+    end
+
+    it "needs only run-length+1 tildes when tildes are shorter than backticks" do
+      element = Markbridge::AST::Code.new
+      # 3 backticks (need 4) and 2 tildes (need 3). 3-tilde fence wins (shorter).
+      element << Markbridge::AST::Text.new("```\nand\n~~")
+
+      result = tag.render(element, interface)
+      expect(result).to start_with("~~~\n")
+      expect(result).to end_with("\n~~~")
+    end
   end
 end

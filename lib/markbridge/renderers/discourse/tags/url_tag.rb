@@ -11,7 +11,7 @@ module Markbridge
             text = interface.render_children(element, context: child_context)
             href = element.href
 
-            if href&.match?(/^(https?|ftps?|mailto):/i)
+            if href&.match?(/\A(?:https?|ftps?|mailto):/i)
               "[#{text}](#{href})"
             else
               text
