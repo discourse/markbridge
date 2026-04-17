@@ -238,6 +238,8 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
         expect(result).to be true
         expect(context.current).to eq(root)
         expect(context.auto_closed_count).to eq(2)
+        # The trailing [/i] must be consumed so the parser doesn't re-process it.
+        expect(tokens.peek).to be_nil
       end
     end
 
@@ -334,6 +336,8 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
         expect(result).to be true
         expect(context.current).to eq(root)
         expect(context.auto_closed_count).to eq(3)
+        # All matched closing tokens must be consumed.
+        expect(tokens.peek).to be_nil
       end
     end
   end

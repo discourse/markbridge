@@ -71,14 +71,9 @@ module Markbridge
           # @return [Boolean] true if successful, false otherwise
           def try_reorder(handler:, tokens:, context:)
             match_depth = find_matching_handler_depth(handler, context)
-            return false if match_depth.nil?
-
             opening_handlers = collect_auto_closeable_handlers(context, match_depth)
-            return false if opening_handlers.empty?
 
-            closing_handlers = [handler]
-            closing_handlers.concat(peek_closing_handlers(tokens, opening_handlers.size - 1))
-            return false if closing_handlers.size != opening_handlers.size
+            closing_handlers = [handler, *peek_closing_handlers(tokens, opening_handlers.size - 1)]
             unless opening_handlers.sort_by(&:object_id) == closing_handlers.sort_by(&:object_id)
               return false
             end
