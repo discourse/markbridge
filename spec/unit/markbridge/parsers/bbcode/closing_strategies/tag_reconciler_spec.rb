@@ -81,6 +81,130 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
     end
   end
 
+  describe "#try_reopen" do
+    let(:bold_handler) { registry["b"] }
+    let(:italic_handler) { registry["i"] }
+
+    it "closes target and reopens intervening tags when content follows" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+      context.push(Markbridge::AST::Underline.new)
+
+      tokens = tokens_for(" more text")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be true
+      expect(context.auto_closed_count).to eq(3)
+      expect(context.current).to be_a(Markbridge::AST::Underline)
+      expect(context.elements_from_current.map(&:class)).to eq(
+        [Markbridge::AST::Underline, Markbridge::AST::Italic, Markbridge::AST::Document],
+      )
+    end
+
+    it "reopens every intervening tag, not just the immediately innermost" do
+      # 3 levels of intervening tags before the target
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+      context.push(Markbridge::AST::Underline.new)
+      context.push(Markbridge::AST::Strikethrough.new)
+
+      tokens = tokens_for(" more text")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be true
+      # Stack from current: [strikethrough, underline, italic, document]
+      expect(context.elements_from_current.map(&:class)).to eq(
+        [
+          Markbridge::AST::Strikethrough,
+          Markbridge::AST::Underline,
+          Markbridge::AST::Italic,
+          Markbridge::AST::Document,
+        ],
+      )
+    end
+
+    it "reopens when next token is an opening tag" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      tokens = tokens_for("[u]x[/u]")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be true
+      expect(context.current).to be_a(Markbridge::AST::Italic)
+    end
+
+    it "returns false when the next token is a closing tag (plain auto-close is correct)" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      tokens = tokens_for("[/i]")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be false
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "returns false when there are no more tokens" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      tokens = tokens_for("")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be false
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "returns false when the target isn't on the stack" do
+      context.push(Markbridge::AST::Italic.new)
+
+      tokens = tokens_for("text")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be false
+    end
+
+    it "returns false when current matches the target (nothing to reopen)" do
+      context.push(Markbridge::AST::Bold.new)
+
+      tokens = tokens_for("text")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be false
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "returns false when an intervening element is not auto-closeable" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::List.new(ordered: false))
+      context.push(Markbridge::AST::Italic.new)
+
+      tokens = tokens_for("text")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be false
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "returns false when tokens is nil" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens: nil)
+
+      expect(result).to be false
+    end
+  end
+
   describe "#try_reorder" do
     let(:bold_handler) { registry["b"] }
     let(:italic_handler) { registry["i"] }

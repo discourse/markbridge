@@ -72,6 +72,25 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Reordering do
     end
   end
 
+  context "when closing tags are not adjacent but content follows" do
+    it "reopens intervening tags so content stays in the same context" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "b", pos: 0, source: "[/b]")
+
+      # Text follows [/b], so reorder fails and reopen should kick in
+      scanner = Markbridge::Parsers::BBCode::Scanner.new(" more[/i]")
+      tokens = Markbridge::Parsers::BBCode::PeekableEnumerator.new(scanner)
+
+      strategy.handle_close(token:, context:, registry:, tokens:)
+
+      expect(context.current).to be_a(Markbridge::AST::Italic)
+      expect(context.auto_closed_count).to eq(2)
+      expect(root.children.map(&:class)).to eq([Markbridge::AST::Bold, Markbridge::AST::Italic])
+    end
+  end
+
   context "when reordering not possible but auto-close succeeds" do
     it "auto-closes" do
       context.push(Markbridge::AST::Bold.new)

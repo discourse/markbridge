@@ -30,6 +30,33 @@ module Markbridge
             true
           end
 
+          # Attempt to close the target tag and reopen any intervening
+          # auto-closeable tags so subsequent content continues in the same
+          # formatting context. Used when closing tags are not adjacent
+          # (e.g. "[b][i]x[/b] more[/i]").
+          #
+          # @param handler [BaseHandler] the handler for the closing tag
+          # @param context [ParserState]
+          # @param tokens [Object, nil] the token stream (used to check that content follows)
+          # @return [Boolean] true if successful, false otherwise
+          def try_reopen(handler:, context:, tokens:)
+            return false unless reopen_justified?(tokens)
+
+            match_depth = find_matching_handler_depth(handler, context)
+            return false if match_depth.nil? || match_depth.zero?
+            return false unless all_auto_closeable?(context, match_depth)
+
+            intervening = context.elements_from_current(match_depth - 1).map(&:class)
+
+            count = match_depth + 1
+            count.times { context.pop }
+            context.auto_close!(count)
+
+            intervening.reverse_each { |klass| context.push(klass.new) }
+
+            true
+          end
+
           # Attempt to reorder closing tags
           #
           # @param handler [BaseHandler] the handler for the closing tag
@@ -64,6 +91,16 @@ module Markbridge
           end
 
           private
+
+          # Reopening only makes sense when there is upcoming content that
+          # would benefit from the reopened context. If the next token is a
+          # closing tag (or nothing), plain auto-close is correct.
+          JUSTIFYING_NEXT_TOKENS = Set[TextToken, TagStartToken].freeze
+          private_constant :JUSTIFYING_NEXT_TOKENS
+
+          def reopen_justified?(tokens)
+            JUSTIFYING_NEXT_TOKENS.member?(tokens&.peek&.class)
+          end
 
           def find_matching_handler_depth(handler, context)
             elements = context.elements_from_current(MAX_AUTO_CLOSE_DEPTH - 1)
