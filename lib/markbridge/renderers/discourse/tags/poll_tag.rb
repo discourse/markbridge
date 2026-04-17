@@ -34,9 +34,14 @@ module Markbridge
             "[poll#{attrs}]\n#{options}\n[/poll]"
           end
 
+          NAMES_WITHOUT_ATTRIBUTE = Set[nil, "poll"].freeze
+          private_constant :NAMES_WITHOUT_ATTRIBUTE
+
           def build_attributes(element)
             parts = []
-            parts << %( name="#{element.name}") if element.name && element.name != "poll"
+            unless NAMES_WITHOUT_ATTRIBUTE.include?(element.name)
+              parts << %( name="#{element.name}")
+            end
             parts << %( type="#{element.type}") if element.type
             parts << %( results="#{element.results}") if element.results
             parts << %( public="true") if element.public

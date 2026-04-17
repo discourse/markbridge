@@ -56,7 +56,7 @@ module Markbridge
           def build_attachment_markdown(element)
             filename = element.filename || "attachment"
             url = build_upload_url(element)
-            size_part = element.size ? " (#{element.size})" : ""
+            size_part = " (#{element.size})" if element.size
 
             "[#{filename}|attachment](#{url})#{size_part}"
           end
