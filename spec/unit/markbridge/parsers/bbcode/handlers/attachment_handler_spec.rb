@@ -54,6 +54,59 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::AttachmentHandler do
     it "exposes AST::Attachment as the element_class" do
       expect(described_class.new.element_class).to eq(Markbridge::AST::Attachment)
     end
+
+    it "uses a default RawContentCollector instance (so #collect works with token streams)" do
+      tokens =
+        tokens_for(
+          Markbridge::Parsers::BBCode::TextToken.new(text: "body-content", pos: 0),
+          Markbridge::Parsers::BBCode::TagEndToken.new(
+            tag: "attachment",
+            pos: 12,
+            source: "[/attachment]",
+          ),
+        )
+
+      described_class.new.on_open(
+        token: tag_start(attrs: { option: "0" }),
+        context:,
+        registry:,
+        tokens:,
+      )
+
+      expect(document.children.first.filename).to eq("body-content")
+    end
+
+    it "accepts a custom collector for dependency injection" do
+      custom =
+        Class
+          .new do
+            def collect(_tag, _tokens)
+              Markbridge::Parsers::BBCode::RawContentResult.new(
+                content: "CUSTOM CONTENT",
+                closed: true,
+              )
+            end
+          end
+          .new
+
+      tokens =
+        tokens_for(
+          Markbridge::Parsers::BBCode::TagEndToken.new(
+            tag: "attachment",
+            pos: 0,
+            source: "[/attachment]",
+          ),
+        )
+
+      described_class.new(collector: custom).on_open(
+        token: tag_start(attrs: { option: "0" }),
+        context:,
+        registry:,
+        tokens:,
+      )
+
+      expect(document.children.first.filename).to eq("CUSTOM CONTENT")
+    end
   end
 
   describe "#on_open" do
@@ -180,6 +233,47 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::AttachmentHandler do
       expect(att.id).to eq("9876")
       expect(att.index).to be_nil
     end
+
+    it "normalizes whitespace-only :filename and :alt to nil (not passed verbatim)" do
+      handler.on_open(
+        token: tag_start(attrs: { id: "42", filename: "   ", alt: "\t " }),
+        context:,
+        registry:,
+        tokens: nil,
+      )
+
+      att = document.children.first
+      expect(att.filename).to be_nil
+      expect(att.alt).to be_nil
+    end
+
+    it "preserves an explicit :filename attribute when id is also set" do
+      handler.on_open(
+        token: tag_start(attrs: { id: "42", filename: "doc.pdf" }),
+        context:,
+        registry:,
+        tokens: nil,
+      )
+
+      expect(document.children.first.filename).to eq("doc.pdf")
+    end
+
+    it "treats a whitespace-only body as nil (not as an empty filename)" do
+      tokens =
+        tokens_for(
+          Markbridge::Parsers::BBCode::TextToken.new(text: "   ", pos: 0),
+          Markbridge::Parsers::BBCode::TagEndToken.new(
+            tag: "attachment",
+            pos: 3,
+            source: "[/attachment]",
+          ),
+        )
+
+      handler.on_open(token: tag_start(attrs: { option: "0" }), context:, registry:, tokens:)
+
+      att = document.children.first
+      expect(att.filename).to be_nil
+    end
   end
 
   describe "#on_close" do
@@ -289,6 +383,10 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::AttachmentHandler do
     it "returns nil when both are missing" do
       expect(exposed_handler.preferred_id({})).to be_nil
     end
+
+    it "treats a whitespace-only :id as absent (falls through to nil)" do
+      expect(exposed_handler.preferred_id(msg: nil, id: "   ")).to be_nil
+    end
   end
 
   describe "#preferred_index" do
@@ -307,6 +405,26 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::AttachmentHandler do
     it "returns nil when no relevant attribute is present" do
       expect(exposed_handler.preferred_index({})).to be_nil
     end
+
+    it "treats a whitespace-only :index as absent (falls through to :msg-based :id)" do
+      expect(exposed_handler.preferred_index(index: "   ", id: "2", msg: "99")).to eq("2")
+    end
+
+    it "treats a whitespace-only :id as absent when computing the SMF-style fallback" do
+      expect(exposed_handler.preferred_index(id: "   ", msg: "99")).to be_nil
+    end
+
+    it "does not use :id as index when :msg key exists but its value is nil" do
+      # After normalize_attrs, a blank :msg becomes nil. The branch should
+      # treat this as "no SMF pairing".
+      expect(exposed_handler.preferred_index(msg: nil, id: "2")).to be_nil
+    end
+
+    it "returns nil when :msg is present but :id key is not in the hash at all" do
+      # attrs[:id] returns nil for a missing key; the branch must tolerate
+      # that rather than raising (e.g. via .fetch).
+      expect(exposed_handler.preferred_index(msg: "99")).to be_nil
+    end
   end
 
   describe "#apply_body_content" do
@@ -318,11 +436,21 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::AttachmentHandler do
       expect(filename).to eq("x")
     end
 
-    it "uses body as id when id and index are both nil" do
+    it "uses body as id when id and index are both nil (numeric body)" do
       id, filename =
         exposed_handler.apply_body_content(body: "1234", id: nil, index: nil, filename: nil)
 
       expect(id).to eq("1234")
+      expect(filename).to be_nil
+    end
+
+    it "uses body as id when id and index are both nil (non-numeric body)" do
+      # `id` takes the body even when it doesn't look numeric, because
+      # without any other anchor the body is the best guess for a handle.
+      id, filename =
+        exposed_handler.apply_body_content(body: "image.jpg", id: nil, index: nil, filename: nil)
+
+      expect(id).to eq("image.jpg")
       expect(filename).to be_nil
     end
 

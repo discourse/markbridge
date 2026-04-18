@@ -50,14 +50,14 @@ module Markbridge
           def build_attachment(token:, content:)
             attrs = normalize_attrs(token.attrs)
             option = attrs[:option]
-            body = presence(content&.strip)
+            body = presence(content)
 
             id = preferred_id(attrs)
             index = preferred_index(attrs)
             filename = attrs[:filename]
             alt = attrs[:alt]
 
-            index ||= option if option && numeric?(option)
+            index ||= option if numeric?(option)
             id, filename = apply_body_content(body:, id:, index:, filename:)
 
             AST::Attachment.new(id:, index:, filename:, alt:)
@@ -68,8 +68,6 @@ module Markbridge
           end
 
           def apply_body_content(body:, id:, index:, filename:)
-            return id, filename unless body
-
             if id.nil?
               return body, filename if index.nil?
               return body, filename if numeric?(body)
@@ -92,7 +90,6 @@ module Markbridge
           end
 
           def presence(value)
-            return if value.nil?
             return value unless value.instance_of?(String)
 
             stripped = value.strip
