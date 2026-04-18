@@ -38,29 +38,22 @@ module Markbridge
             !prev_char.match?(/\w/)
           end
 
+          WORD_PATTERN = /\A[\w\-]*/
+          private_constant :WORD_PATTERN
+
           # Helper to extract a word starting at position
           # @param input [String] the input string
           # @param pos [Integer] starting position
           # @return [String] the word (may be empty)
           def extract_word(input, pos)
-            word = +""
-            while pos < input.length && input[pos].match?(/[\w\-]/)
-              word << input[pos]
-              pos += 1
-            end
-            word
+            input[pos..].to_s.match(WORD_PATTERN)[0]
           end
 
           # Parse key="value" or key='value' attribute pairs from a string
           # @param attr_string [String, nil] the attribute string to parse
           # @return [Hash<String, String>] parsed attributes with downcased keys
           def parse_attributes(attr_string)
-            attrs = {}
-            return attrs if attr_string.nil? || attr_string.empty?
-
-            attr_string.scan(/(\w+)=["']([^"']*)["']/) { |key, value| attrs[key.downcase] = value }
-
-            attrs
+            attr_string.to_s.scan(/(\w+)=["']([^"']*)["']/).to_h.transform_keys(&:downcase)
           end
         end
       end
