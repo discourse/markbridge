@@ -7,14 +7,6 @@ module Markbridge
       # Handles bold ('''), italic (''), links ([[...]]), external links ([...]),
       # and HTML inline tags (<code>, <nowiki>, <s>, <del>, <u>, <ins>, <sup>, <sub>, <br>).
       class InlineParser
-        def initialize
-          @input = nil
-          @pos = 0
-          @length = 0
-          @parent = nil
-          @text_buffer = +""
-        end
-
         # Parse inline markup and append resulting AST nodes to the parent element.
         #
         # @param text [String] the text to parse for inline markup
@@ -28,29 +20,18 @@ module Markbridge
 
           while @pos < @length
             char = @input[@pos]
-            next_char = @pos + 1 < @length ? @input[@pos + 1] : nil
 
             case char
             when "'"
-              if next_char == "'"
-                parse_bold_italic
-              else
-                @text_buffer << char
-                @pos += 1
-              end
+              consecutive_apostrophes_at(@pos) >= 2 ? parse_bold_italic : append_literal(char)
             when "["
               flush_text
-              if next_char == "["
-                parse_internal_link
-              else
-                parse_external_link
-              end
+              @input[@pos + 1] == "[" ? parse_internal_link : parse_external_link
             when "<"
               flush_text
               parse_html_tag
             else
-              @text_buffer << char
-              @pos += 1
+              append_literal(char)
             end
           end
 
@@ -59,22 +40,19 @@ module Markbridge
 
         private
 
+        def append_literal(char)
+          @text_buffer << char
+          @pos += 1
+        end
+
         # Count consecutive apostrophes and dispatch to bold/italic parsing.
+        # Precondition: caller has verified @input[@pos..@pos+1] is "''".
         def parse_bold_italic
           start = @pos
-          count = 0
-          count += 1 while @pos + count < @length && @input[@pos + count] == "'"
-          # Clamp: 5 = bold+italic, 3 = bold, 2 = italic
-          count = [count, 5].min
-
-          if count < 2
-            @text_buffer << @input[@pos]
-            @pos += 1
-          else
-            flush_text
-            @pos += count
-            parse_apostrophe_formatting(count, start)
-          end
+          count = [consecutive_apostrophes_at(@pos), 5].min
+          flush_text
+          @pos += count
+          parse_apostrophe_formatting(count, start)
         end
 
         # Parse apostrophe-delimited formatting (bold, italic, or bold+italic).
@@ -99,9 +77,7 @@ module Markbridge
         def build_formatting_element(apostrophe_count)
           case apostrophe_count
           when 5
-            bold = AST::Bold.new
-            bold << AST::Italic.new
-            bold
+            AST::Bold.new << AST::Italic.new
           when 3
             AST::Bold.new
           when 2
@@ -127,14 +103,13 @@ module Markbridge
         def collect_until_apostrophes(count)
           start = @pos
           while @pos < @length
-            if @input[@pos] == "'" && consecutive_apostrophes_at(@pos) >= count
+            if consecutive_apostrophes_at(@pos) >= count
               content = @input[start...@pos]
               @pos += count
               return content
             end
             @pos += 1
           end
-          nil
         end
 
         # Count consecutive apostrophes starting at position.
@@ -142,9 +117,7 @@ module Markbridge
         # @param pos [Integer]
         # @return [Integer]
         def consecutive_apostrophes_at(pos)
-          count = 0
-          count += 1 while pos + count < @length && @input[pos + count] == "'"
-          count
+          @input[pos..].each_char.take_while { |c| c == "'" }.length
         end
 
         # Parse [[internal link]] or [[target|display text]].

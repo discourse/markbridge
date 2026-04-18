@@ -21,6 +21,18 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       doc = parse("")
       expect(doc.children).to be_empty
     end
+
+    it "keeps a single apostrophe followed by a letter as plain text" do
+      doc = parse("won't be bold")
+
+      expect(doc.children.first.text).to eq("won't be bold")
+    end
+
+    it "keeps multiple stray single apostrophes as plain text (does not treat as formatting)" do
+      doc = parse("isn't 'it' now")
+
+      expect(doc.children.first.text).to eq("isn't 'it' now")
+    end
   end
 
   describe "bold" do
@@ -45,6 +57,12 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.first).to be_a(Markbridge::AST::Text)
       expect(doc.children.first.text).to eq("'''unclosed")
     end
+
+    it "treats unclosed bold mid-input as literal apostrophes at the correct position" do
+      doc = parse("x'''unclosed")
+
+      expect(doc.children.first.text).to eq("x'''unclosed")
+    end
   end
 
   describe "italic" do
@@ -60,6 +78,16 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.size).to eq(1)
       expect(doc.children.first.text).to eq("''unclosed")
     end
+
+    it "closes italic even when more apostrophes follow than required" do
+      # ''italic''' - close on first 2 apostrophes, treat remaining ' as text
+      doc = parse("''italic'''")
+
+      italic = doc.children.first
+      expect(italic).to be_a(Markbridge::AST::Italic)
+      expect(italic.children.first.text).to eq("italic")
+      expect(doc.children[1].text).to eq("'")
+    end
   end
 
   describe "bold italic" do
@@ -73,6 +101,13 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       italic = bold.children.first
       expect(italic).to be_a(Markbridge::AST::Italic)
       expect(italic.children.first.text).to eq("bold italic")
+    end
+
+    it "clamps 6+ consecutive apostrophes to bold+italic and treats the overflow as literal" do
+      # 6 opening apostrophes: 5 form the bold+italic marker, the leftover ' is literal text
+      doc = parse("''''''content''''''")
+
+      expect(doc.children.first).to be_a(Markbridge::AST::Bold)
     end
   end
 
@@ -95,9 +130,65 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(url.children.first.text).to eq("display text")
     end
 
+    it "preserves pipes after the first in the display text" do
+      doc = parse("[[Page|a|b]]")
+
+      url = doc.children.first
+      expect(url.href).to eq("Page")
+      expect(url.children.first.text).to eq("a|b")
+    end
+
+    it "strips whitespace around the target" do
+      doc = parse("[[  Page  ]]")
+
+      expect(doc.children.first.href).to eq("Page")
+    end
+
+    it "strips whitespace around the display text" do
+      doc = parse("[[Page|  display  ]]")
+
+      expect(doc.children.first.children.first.text).to eq("display")
+    end
+
     it "treats unclosed [[ as text" do
       doc = parse("[[unclosed link")
       expect(doc.children.first.text).to eq("[[unclosed link")
+    end
+
+    it "flushes preceding text before an internal link (preserves order)" do
+      doc = parse("before [[Page]]")
+
+      expect(doc.children[0]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[0].text).to eq("before ")
+      expect(doc.children[1]).to be_a(Markbridge::AST::Url)
+    end
+
+    it "continues parsing the character immediately after the `]]` close" do
+      doc = parse("[[Page]]x")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Text])
+      expect(doc.children.last.text).to eq("x")
+    end
+
+    it "searches for ]] starting from the current position, not from the start" do
+      # The leading ]] is not a valid close for a link that starts after it.
+      doc = parse("]] [[Page]]")
+
+      url = doc.children.find { |c| c.is_a?(Markbridge::AST::Url) }
+      expect(url).not_to be_nil
+      expect(url.href).to eq("Page")
+    end
+
+    it "dispatches on the character at `@pos + 1`, not at index 1" do
+      # External link first, then an internal link later in the string.
+      # The second `[` opens at @pos=6; its next char must be read at @pos+1,
+      # not at a fixed input[1].
+      doc = parse("[x y] [[Page]]")
+
+      expect(doc.children.map(&:class)).to include(Markbridge::AST::Url)
+      internal = doc.children.last
+      expect(internal).to be_a(Markbridge::AST::Url)
+      expect(internal.href).to eq("Page")
     end
   end
 
@@ -121,6 +212,35 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
     it "treats unclosed [ as text" do
       doc = parse("[unclosed")
       expect(doc.children.first.text).to eq("[unclosed")
+    end
+
+    it "searches for ] starting from the current position, not from the start" do
+      doc = parse("] [https://example.com Example]")
+
+      url = doc.children.find { |c| c.is_a?(Markbridge::AST::Url) }
+      expect(url).not_to be_nil
+      expect(url.href).to eq("https://example.com")
+    end
+
+    it "continues parsing the character immediately after the ] close" do
+      doc = parse("[https://example.com Example]x")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Text])
+      expect(doc.children.last.text).to eq("x")
+    end
+
+    it "preserves additional spaces in display text (only splits on first)" do
+      doc = parse("[https://example.com A B C]")
+
+      expect(doc.children.first.children.first.text).to eq("A B C")
+    end
+
+    it "preserves a leading space in the display text (splits on the literal space char only)" do
+      # split is on " " (the literal), not nil — so extra leading whitespace on the display
+      # stays on the display side.
+      doc = parse("[https://example.com  spaced]")
+
+      expect(doc.children.first.children.first.text).to eq(" spaced")
     end
   end
 
