@@ -25,6 +25,7 @@ require_relative "bbcode/handlers/raw_handler"
 # Handlers
 require_relative "bbcode/handlers/align_handler"
 require_relative "bbcode/handlers/attachment_handler"
+require_relative "bbcode/handlers/code_handler"
 require_relative "bbcode/handlers/color_handler"
 require_relative "bbcode/handlers/email_handler"
 require_relative "bbcode/handlers/image_handler"

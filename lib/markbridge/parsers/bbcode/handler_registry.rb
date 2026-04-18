@@ -95,7 +95,7 @@ module Markbridge
           )
 
           # Code handlers (raw content)
-          registry.register(%w[code pre tt], Handlers::RawHandler.new(AST::Code))
+          registry.register(%w[code pre tt], Handlers::CodeHandler.new)
 
           # Image handler
           registry.register("img", Handlers::ImageHandler.new)
