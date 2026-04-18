@@ -18,14 +18,6 @@ module Markbridge
       #     r.register("CUSTOM", MyCustomHandler.new)
       #     r.register("B", SimpleHandler.new(AST::Bold))  # Override default
       #   end
-      #
-      # @example Using lambdas for simple mappings
-      #   registry = HandlerRegistry.new
-      #   registry.register("CUSTOM", ->(element:, parent:) {
-      #     node = AST::Custom.new
-      #     parent << node
-      #     node  # Return node to process children
-      #   })
       class HandlerRegistry
         # Create a new registry with default mappings
         # @return [HandlerRegistry]
@@ -46,11 +38,7 @@ module Markbridge
 
         # Register a handler for an element
         # @param element_name [String] XML element name (case-insensitive)
-        # @param handler [#process, #call] Handler object or lambda
-        # @example With handler object
-        #   registry.register("CUSTOM", MyCustomHandler.new)
-        # @example With lambda
-        #   registry.register("CUSTOM", ->(element:, parent:) { ... })
+        # @param handler [#process] Handler object responding to `process(element:, parent:)`
         def register(element_name, handler)
           @mappings[element_name.upcase] = handler
         end
@@ -69,16 +57,7 @@ module Markbridge
         def process_element(element, parent)
           tag_name = element.name.upcase
           handler = @mappings[tag_name]
-          return nil unless handler
-
-          # Call handler and return its result (element or nil)
-          if handler.respond_to?(:process)
-            handler.process(element:, parent:)
-          elsif handler.respond_to?(:call)
-            handler.call(element:, parent:)
-          else
-            raise ArgumentError, "Handler must respond to :process or :call"
-          end
+          handler&.process(element:, parent:)
         end
 
         # Register all default s9e/TextFormatter element mappings
@@ -96,22 +75,13 @@ module Markbridge
           register("QUOTE", Handlers::QuoteHandler.new)
           register("IMG", Handlers::ImageHandler.new)
           register("LIST", Handlers::ListHandler.new)
-          register(
-            "COLOR",
-            Handlers::AttributeHandler.new(AST::Color, attribute: :color, param: :color),
-          )
-          register(
-            "SIZE",
-            Handlers::AttributeHandler.new(AST::Size, attribute: :size, param: :size),
-          )
+          register("COLOR", Handlers::AttributeHandler.new(AST::Color, attribute: :color))
+          register("SIZE", Handlers::AttributeHandler.new(AST::Size, attribute: :size))
           register(
             "ALIGN",
             Handlers::AttributeHandler.new(AST::Align, attribute: :align, param: :alignment),
           )
-          register(
-            "SPOILER",
-            Handlers::AttributeHandler.new(AST::Spoiler, attribute: :title, param: :title),
-          )
+          register("SPOILER", Handlers::AttributeHandler.new(AST::Spoiler, attribute: :title))
           register("ATTACHMENT", Handlers::AttachmentHandler.new)
           register("ATTACH", Handlers::AttachmentHandler.new)
 
@@ -121,8 +91,6 @@ module Markbridge
 
           # Paragraphs
           register("P", Handlers::SimpleHandler.new(AST::Paragraph))
-
-          self
         end
       end
     end
