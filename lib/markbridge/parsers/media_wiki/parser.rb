@@ -130,20 +130,18 @@ module Markbridge
           !line.match?(/\S/)
         end
 
+        HEADING_LEVEL_PREFIX = /\A={1,6}/
+        HEADING_LEVEL_SUFFIX = /\s*={1,6}\s*\z/
+        private_constant :HEADING_LEVEL_PREFIX, :HEADING_LEVEL_SUFFIX
+
         # Process a heading line and add it to the document.
         #
         # @param line [String]
         def process_heading(line)
-          stripped = line.strip
-          # Count leading = signs for level
-          level = 0
-          level += 1 while level < stripped.length && stripped[level] == "="
-          level = [level, 6].min
+          leading = line[HEADING_LEVEL_PREFIX]
+          content = line[leading.length..].sub(HEADING_LEVEL_SUFFIX, "").strip
 
-          # Remove leading/trailing = signs and whitespace
-          content = stripped[level..].sub(/\s*={1,6}\s*\z/, "").strip
-
-          heading = AST::Heading.new(level:)
+          heading = AST::Heading.new(level: leading.length)
           @inline_parser.parse(content, parent: heading)
           @document << heading
         end
@@ -186,8 +184,7 @@ module Markbridge
           if depth.zero?
             @document << list
           else
-            # Nest inside the last item of the parent list
-            parent_list = @list_stack.last[:list]
+            parent_list = @list_stack.last.fetch(:list)
             parent_list << AST::ListItem.new if parent_list.children.empty?
             parent_list.children.last << list
           end
@@ -206,20 +203,20 @@ module Markbridge
         # @param start_index [Integer]
         # @return [Integer] the last index consumed (will be incremented by caller)
         def process_preformatted_block(lines, start_index)
-          content_lines = []
-          i = start_index
-
-          while i < lines.length && lines[i].start_with?(" ")
-            content_lines << lines[i][1..] # Remove leading space
-            i += 1
-          end
+          consumed = lines[start_index..].take_while { |line| line.start_with?(" ") }
+          content = consumed.map { |line| line[1..] }.join("\n")
 
           code = AST::Code.new
-          code << AST::Text.new(content_lines.join("\n"))
+          code << AST::Text.new(content)
           @document << code
 
-          i - 1 # Return last consumed index
+          start_index + consumed.length - 1
         end
+
+        PRE_TAG_OPEN = /\A\s*<pre\b[^>]*>/i
+        PRE_TAG_CLOSE = %r{</pre\s*>}i
+        PRE_TAG_CLOSE_TRAILING = %r{</pre\s*>\s*\z}i
+        private_constant :PRE_TAG_OPEN, :PRE_TAG_CLOSE, :PRE_TAG_CLOSE_TRAILING
 
         # Process a <pre>...</pre> block that may span multiple lines.
         #
@@ -227,24 +224,18 @@ module Markbridge
         # @param start_index [Integer]
         # @return [Integer] the last index consumed
         def process_pre_tag_block(lines, start_index)
-          combined = +""
-          i = start_index
+          consumed = lines[start_index..].take_while { |line| !line.match?(PRE_TAG_CLOSE) }
+          terminated = consumed.length < lines.length - start_index
+          consumed << lines.fetch(start_index + consumed.length) if terminated
 
-          while i < lines.length
-            combined << lines[i]
-            break if lines[i].match?(%r{</pre\s*>}i)
-            combined << "\n"
-            i += 1
-          end
-
-          # Extract content between <pre> and </pre>
-          content = combined.sub(/\A\s*<pre\b[^>]*>/i, "").sub(%r{</pre\s*>\s*\z}i, "")
+          combined = consumed.join("\n")
+          content = combined.sub(PRE_TAG_OPEN, "").sub(PRE_TAG_CLOSE_TRAILING, "")
 
           code = AST::Code.new
           code << AST::Text.new(content)
           @document << code
 
-          i
+          start_index + consumed.length - 1
         end
 
         # Process a line as inline content wrapped in a paragraph.

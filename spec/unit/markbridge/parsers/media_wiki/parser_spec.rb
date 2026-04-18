@@ -127,6 +127,11 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(doc.children.first).to be_a(Markbridge::AST::Heading)
     end
 
+    it "strips trailing whitespace from unbalanced heading content" do
+      doc = parse("= foo   ")
+      expect(doc.children.first.children.first.text).to eq("foo")
+    end
+
     it "parses =a= without surrounding spaces as a heading" do
       doc = parse("=a=")
       expect(doc.children.first).to be_a(Markbridge::AST::Heading)
@@ -300,6 +305,41 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
     it "recognises case-insensitive <PRE>" do
       doc = parse("<PRE>code</PRE>")
       expect(doc.children.first).to be_a(Markbridge::AST::Code)
+    end
+
+    it "falls back to consuming to end of input when no </pre> is found" do
+      doc = parse("<pre>unterminated\nmore content\nand more")
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children.first).to be_a(Markbridge::AST::Code)
+      expect(doc.children.first.children.first.text).to eq("unterminated\nmore content\nand more")
+    end
+
+    it "resumes normal parsing on the line after </pre> when there is trailing content" do
+      doc = parse("<pre>code</pre>\nafter")
+
+      expect(doc.children.size).to eq(2)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Code)
+      expect(doc.children[1]).to be_a(Markbridge::AST::Paragraph)
+      expect(doc.children[1].children.first.text).to eq("after")
+    end
+
+    it "handles a <pre> block that starts after other content" do
+      doc = parse("before\n<pre>code</pre>")
+
+      expect(doc.children.size).to eq(2)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
+      expect(doc.children[1]).to be_a(Markbridge::AST::Code)
+      expect(doc.children[1].children.first.text).to eq("code")
+    end
+
+    it "handles an unterminated <pre> block that starts after other content" do
+      doc = parse("before\n<pre>code")
+
+      expect(doc.children.size).to eq(2)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
+      expect(doc.children[1]).to be_a(Markbridge::AST::Code)
+      expect(doc.children[1].children.first.text).to eq("code")
     end
   end
 
