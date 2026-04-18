@@ -47,21 +47,9 @@ module Markbridge
           # Blockquote handler
           registry.register("blockquote", Handlers::QuoteHandler.new)
 
-          # Void elements - use simple inline handlers
-          registry.register(
-            "br",
-            lambda do |element:, parent:|
-              parent << AST::LineBreak.new
-              nil # Return nil - void element, no children
-            end,
-          )
-          registry.register(
-            "hr",
-            lambda do |element:, parent:|
-              parent << AST::HorizontalRule.new
-              nil # Return nil - void element, no children
-            end,
-          )
+          # Void elements - no children
+          registry.register("br", Handlers::VoidHandler.new(AST::LineBreak))
+          registry.register("hr", Handlers::VoidHandler.new(AST::HorizontalRule))
 
           # List handlers
           registry.register(%w[ul ol], Handlers::ListHandler.new)
@@ -69,8 +57,6 @@ module Markbridge
 
           # Paragraph handler (transparent - doesn't create AST node)
           registry.register("p", Handlers::ParagraphHandler.new)
-
-          registry
         end
 
         # Build a registry from the default configuration with optional customization

@@ -63,27 +63,18 @@ module Markbridge
         # @param node [Nokogiri::XML::Text]
         # @param parent [AST::Element]
         def process_text_node(node, parent)
-          text = node.text
-          parent << AST::Text.new(text) unless text.empty?
+          parent << AST::Text.new(node.text)
         end
 
         # Process an element node
         # @param node [Nokogiri::XML::Element]
         # @param parent [AST::Element]
         def process_element_node(node, parent)
-          tag_name = node.name.downcase
+          tag_name = node.name
           handler = @handlers[tag_name]
 
           if handler
-            # Handler returns element if children should be processed, nil otherwise
-            ast_element =
-              if handler.respond_to?(:process)
-                handler.process(element: node, parent:)
-              else
-                handler.call(element: node, parent:)
-              end
-
-            # Automatically process children if handler returned element
+            ast_element = handler.process(element: node, parent:)
             process_children(node, ast_element) if ast_element
           else
             handle_unknown_tag(node, parent)
@@ -95,17 +86,8 @@ module Markbridge
         # @param node [Nokogiri::XML::Element]
         # @param parent [AST::Element]
         def handle_unknown_tag(node, parent)
-          @unknown_tags[node.name.downcase] += 1
+          @unknown_tags[node.name] += 1
           process_children(node, parent)
-        end
-
-        # Check if an element is a void element (self-closing)
-        # @param tag_name [String]
-        # @return [Boolean]
-        def void_element?(tag_name)
-          %w[area base br col embed hr img input link meta param source track wbr].include?(
-            tag_name.downcase,
-          )
         end
       end
     end
