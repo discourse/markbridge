@@ -38,8 +38,13 @@ module Markbridge
             @collector.collect(token.tag, tokens).content
           end
 
+          CLOSING_TAG_PEEK_DEPTH = 100
+          private_constant :CLOSING_TAG_PEEK_DEPTH
+
           def closing_tag_ahead?(tag, tokens)
-            tokens.peek_ahead(100).any? { |token| token.is_a?(TagEndToken) && token.tag == tag }
+            tokens
+              .peek_ahead(CLOSING_TAG_PEEK_DEPTH)
+              .any? { |token| token.instance_of?(TagEndToken) && token.tag == tag }
           end
 
           def build_attachment(token:, content:)
@@ -88,14 +93,14 @@ module Markbridge
 
           def presence(value)
             return if value.nil?
-            return value unless value.is_a?(String)
+            return value unless value.instance_of?(String)
 
             stripped = value.strip
             stripped unless stripped.empty?
           end
 
           def numeric?(value)
-            value.is_a?(String) && value.match?(/\A\d+\z/)
+            value.instance_of?(String) && value.match?(/\A\d+\z/)
           end
         end
       end
