@@ -22,29 +22,23 @@ module Markbridge
             AST::Image.new(src: content, width:, height:)
           end
 
+          OPTION_DIMENSIONS_PATTERN = /\A(?<width>\d+)(?:x(?<height>\d+))?\z/i
+          private_constant :OPTION_DIMENSIONS_PATTERN
+
           def extract_dimensions(token)
-            width = sanitize_dimension(token.attrs[:width])
-            height = sanitize_dimension(token.attrs[:height])
+            option_match = OPTION_DIMENSIONS_PATTERN.match(token.attrs[:option])
 
-            option = token.attrs[:option]
-            if option&.match?(/^\d+x\d+$/i)
-              parts = option.split("x", 2)
-              width = sanitize_dimension(parts[0])
-              height = sanitize_dimension(parts[1])
-            elsif option&.match?(/^\d+$/)
-              width = sanitize_dimension(option)
-            end
-
-            [width, height]
+            [
+              sanitize_dimension(option_match&.[](:width) || token.attrs[:width]),
+              sanitize_dimension(option_match&.[](:height) || token.attrs[:height]),
+            ]
           end
 
-          # Convert dimension to positive integer or nil
-          # Handles string input from BBCode attributes
+          # Convert dimension to positive integer, or nil when absent or invalid.
+          # Handles string input from BBCode attributes.
           def sanitize_dimension(value)
-            return nil if value.nil?
-
             dim = value.to_i
-            dim.positive? ? dim : nil
+            dim if dim.positive?
           end
         end
       end
