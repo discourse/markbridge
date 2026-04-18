@@ -63,14 +63,12 @@ module Markbridge
         # @param input [String] Discourse Markdown input
         # @return [ScanResult] result containing processed markdown and extracted nodes
         def scan(input)
-          return ScanResult.new(markdown: "", nodes: []) if input.nil? || input.empty?
-
           @code_tracker = CodeBlockTracker.new
           @result = +""
           @nodes = []
           @node_index = 0
           @pos = 0
-          @input = input
+          @input = input.to_s
           @line_start = true
 
           scan_input
@@ -192,8 +190,6 @@ module Markbridge
             "<<EVENT:#{@node_index}:#{node.name}>>"
           when AST::Upload
             "<<UPLOAD:#{@node_index}:#{node.sha1}>>"
-          else
-            "<<UNKNOWN:#{@node_index}>>"
           end
         end
       end

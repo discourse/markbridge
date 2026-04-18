@@ -26,6 +26,28 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Scanner do
       expect(result.nodes).to be_empty
     end
 
+    it "resets per-scan state between calls on the same instance" do
+      scanner.scan("@alice and @bob")
+      result = scanner.scan("@carol")
+
+      # Placeholder indexes restart at 0 on each scan
+      expect(result.markdown).to eq("<<MENTION:0:carol>>")
+      expect(result.nodes.size).to eq(1)
+    end
+
+    it "produces the same result for repeated scans as for a fresh scanner" do
+      input = "```\n@gerhard\n```"
+
+      # Prime the scanner with unrelated input that leaves internal state dirty
+      scanner.scan("text without newline")
+      primed_result = scanner.scan(input)
+
+      fresh_result = described_class.new.scan(input)
+
+      expect(primed_result.markdown).to eq(fresh_result.markdown)
+      expect(primed_result.nodes).to eq(fresh_result.nodes)
+    end
+
     it "preserves text without constructs" do
       input = "Hello, this is plain text."
       result = scanner.scan(input)
@@ -259,6 +281,46 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Scanner do
 
         expect(result.nodes.size).to eq(1)
         expect(result.nodes.first.name).to eq("gerhard")
+      end
+    end
+
+    context "with a custom tag_library" do
+      it "renders detected nodes via the library's tag when one is registered" do
+        library = Markbridge::Renderers::Discourse::TagLibrary.new
+        fixed_tag =
+          Class.new(Markbridge::Renderers::Discourse::Tag) do
+            def render(element, _interface, **_kwargs)
+              "CUSTOM(#{element.name})"
+            end
+          end
+        library.register(Markbridge::AST::Mention, fixed_tag.new)
+
+        scanner = described_class.new(tag_library: library)
+        result = scanner.scan("Hi @gerhard!")
+
+        expect(result.markdown).to eq("Hi CUSTOM(gerhard)!")
+      end
+
+      it "falls back to the default placeholder when the library has no tag for the node class" do
+        # Library present but no registration for Mention
+        library = Markbridge::Renderers::Discourse::TagLibrary.new
+
+        scanner = described_class.new(tag_library: library)
+        result = scanner.scan("Hi @gerhard!")
+
+        expect(result.markdown).to eq("Hi <<MENTION:0:gerhard>>!")
+      end
+    end
+
+    context "when a construct is followed by a fenced code block on the next line" do
+      it "still detects the fenced block (line_start tracked across handle_match)" do
+        input = "@gerhard\n```\n@bob\n```"
+        result = scanner.scan(input)
+
+        # Only the first mention is detected; the one inside ``` is left as text
+        expect(result.nodes.size).to eq(1)
+        expect(result.nodes.first.name).to eq("gerhard")
+        expect(result.markdown).to eq("<<MENTION:0:gerhard>>\n```\n@bob\n```")
       end
     end
   end
