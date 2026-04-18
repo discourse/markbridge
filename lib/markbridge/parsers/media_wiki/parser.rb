@@ -20,26 +20,19 @@ module Markbridge
       #   parser = Markbridge::Parsers::MediaWiki::Parser.new
       #   ast = parser.parse("'''bold''' and ''italic''")
       class Parser
-        def initialize
-          @document = nil
-          @inline_parser = nil
-          @list_stack = []
-        end
-
         # Parse MediaWiki wikitext into an AST Document.
         #
         # @param input [String] MediaWiki source
         # @return [AST::Document]
         def parse(input)
           normalized = normalize_line_endings(input)
-          lines = normalized.split("\n", -1)
+          lines = normalized.split("\n")
 
           @document = AST::Document.new
           @inline_parser = InlineParser.new
           @list_stack = []
 
           process_lines(lines)
-          close_open_lists
           @document
         end
 
@@ -59,7 +52,7 @@ module Markbridge
         def process_lines(lines)
           i = 0
           while i < lines.length
-            line = lines[i]
+            line = lines.fetch(i)
 
             if heading_line?(line)
               close_open_lists
@@ -86,12 +79,15 @@ module Markbridge
           end
         end
 
+        HEADING_LINE = /\A={1,6}(?:[^=].*[^=]={1,6}|[^=]+=*)\s*\z/
+        private_constant :HEADING_LINE
+
         # Check if a line is a heading (starts and ends with = signs).
         #
         # @param line [String]
         # @return [Boolean]
         def heading_line?(line)
-          line.match?(/\A={1,6}[^=].*[^=]={1,6}\s*\z/) || line.match?(/\A={1,6}[^=]+=*\s*\z/)
+          line.match?(HEADING_LINE)
         end
 
         # Check if a line is a horizontal rule (4+ dashes).
@@ -131,7 +127,7 @@ module Markbridge
         # @param line [String]
         # @return [Boolean]
         def blank_line?(line)
-          line.strip.empty?
+          !line.match?(/\S/)
         end
 
         # Process a heading line and add it to the document.
@@ -156,48 +152,28 @@ module Markbridge
         #
         # @param line [String]
         def process_list_item(line)
-          # Count prefix characters to determine depth and type
-          prefix = +""
-          i = 0
-          while i < line.length && (line[i] == "*" || line[i] == "#")
-            prefix << line[i]
-            i += 1
-          end
+          prefix = line[/\A[*#]+/]
+          content = line[prefix.length..].strip
 
-          content = line[i..].strip
-          desired_depth = prefix.length
+          reconcile_list_stack(prefix)
 
-          # Adjust list stack to match desired depth
-          reconcile_list_stack(prefix, desired_depth)
-
-          # Create list item and add content
           item = AST::ListItem.new
           @inline_parser.parse(content, parent: item)
-          @list_stack.last[:list] << item
+          @list_stack.last.fetch(:list) << item
         end
 
         # Reconcile the list stack with the desired prefix.
         # Opens new lists or closes existing ones as needed.
         #
         # @param prefix [String] the list prefix characters (e.g., "**#")
-        # @param desired_depth [Integer]
-        def reconcile_list_stack(prefix, desired_depth)
-          # Close lists that no longer match
-          @list_stack.pop while @list_stack.length > desired_depth
+        def reconcile_list_stack(prefix)
+          keep = matching_prefix_depth(prefix)
+          @list_stack.pop while @list_stack.length > keep
+          prefix[keep..].each_char { |char| open_new_list(char == "#", @list_stack.length) }
+        end
 
-          # Check if existing stack entries match the type at each level
-          prefix.chars.each_with_index do |char, idx|
-            ordered = char == "#"
-            if idx < @list_stack.length
-              # If type changed at this level, close from here and reopen
-              if @list_stack[idx][:ordered] != ordered
-                @list_stack.pop while @list_stack.length > idx
-                open_new_list(ordered, idx)
-              end
-            else
-              open_new_list(ordered, idx)
-            end
-          end
+        def matching_prefix_depth(prefix)
+          @list_stack.take_while.with_index { |entry, i| entry.fetch(:char) == prefix[i] }.length
         end
 
         # Open a new list at the given depth.
@@ -216,7 +192,7 @@ module Markbridge
             parent_list.children.last << list
           end
 
-          @list_stack << { list:, ordered: }
+          @list_stack << { list:, char: ordered ? "#" : "*" }
         end
 
         # Close all open lists.

@@ -21,6 +21,17 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       doc = parse("")
       expect(doc.children).to be_empty
     end
+
+    it "treats a single word with no whitespace as non-blank content" do
+      doc = parse("hello")
+      expect(doc.children.first).to be_a(Markbridge::AST::Paragraph)
+    end
+
+    it "treats a tab-only line (no leading space) as blank: closes lists but emits nothing" do
+      doc = parse("* item\n\t")
+      # List is closed, tab line emits no paragraph
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::List])
+    end
   end
 
   describe "line ending normalization" do
@@ -32,6 +43,28 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
     it "normalizes CR line endings" do
       doc = parse("== Heading ==\rtext")
       expect(doc.children.first).to be_a(Markbridge::AST::Heading)
+    end
+
+    it "normalizes every Unicode line separator in the input, not just the first" do
+      doc = parse("== H1 ==\u2028== H2 ==\u2028== H3 ==")
+
+      headings = doc.children.select { |c| c.is_a?(Markbridge::AST::Heading) }
+      expect(headings.size).to eq(3)
+    end
+
+    it "normalizes Unicode line/paragraph separators" do
+      doc = parse("== H1 ==\u2028text")
+      expect(doc.children.first).to be_a(Markbridge::AST::Heading)
+    end
+
+    it "collapses consecutive Unicode line separators into a single newline" do
+      doc = parse("* item1\u2028\u2028* item2")
+
+      # With the `+` quantifier, the pair collapses to one \n so items stay in one list.
+      # Without it, they become a blank line and split the list into two.
+      lists = doc.children.select { |c| c.is_a?(Markbridge::AST::List) }
+      expect(lists.size).to eq(1)
+      expect(lists[0].children.size).to eq(2)
     end
   end
 
@@ -88,6 +121,41 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       heading = doc.children.first
       expect(heading.children.first).to be_a(Markbridge::AST::Bold)
     end
+
+    it "parses unbalanced =foo (no closing =) as a heading" do
+      doc = parse("= foo")
+      expect(doc.children.first).to be_a(Markbridge::AST::Heading)
+    end
+
+    it "parses =a= without surrounding spaces as a heading" do
+      doc = parse("=a=")
+      expect(doc.children.first).to be_a(Markbridge::AST::Heading)
+    end
+
+    it "parses a heading whose content contains inner = signs" do
+      doc = parse("== a=b ==")
+      expect(doc.children.first).to be_a(Markbridge::AST::Heading)
+    end
+
+    it "parses a heading of `= = =` (only whitespace and equals)" do
+      doc = parse("= = =")
+      expect(doc.children.first).to be_a(Markbridge::AST::Heading)
+    end
+
+    it "does not treat 7 or more leading = as a heading" do
+      doc = parse("======= foo =======")
+      expect(doc.children.first).not_to be_a(Markbridge::AST::Heading)
+    end
+
+    it "does not treat a line of only = signs as a heading" do
+      doc = parse("==")
+      expect(doc.children.first).not_to be_a(Markbridge::AST::Heading)
+    end
+
+    it "does not treat `=foo=bar` (inner = without proper close) as a heading" do
+      doc = parse("=foo=bar")
+      expect(doc.children.first).not_to be_a(Markbridge::AST::Heading)
+    end
   end
 
   describe "horizontal rules" do
@@ -108,6 +176,13 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
   end
 
   describe "unordered lists" do
+    it "strips trailing whitespace from list-item content" do
+      doc = parse("* item   ")
+
+      item = doc.children.first.children.first
+      expect(item.children.first.text).to eq("item")
+    end
+
     it "parses single-level list" do
       doc = parse("* Item 1\n* Item 2\n* Item 3")
       list = doc.children.first
@@ -117,6 +192,27 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(list.children[0].children.first.text).to eq("Item 1")
       expect(list.children[1].children.first.text).to eq("Item 2")
       expect(list.children[2].children.first.text).to eq("Item 3")
+    end
+
+    it "keeps consecutive items at the same depth in the same list" do
+      doc = parse("* Item 1\n** Sub 1\n** Sub 2")
+
+      nested_list = doc.children.first.children[0].children.last
+      expect(nested_list).to be_a(Markbridge::AST::List)
+      expect(nested_list.children.size).to eq(2)
+    end
+
+    it "opens a fresh stack of nested lists when an item starts deep without a parent at that depth" do
+      doc = parse("** Sub 1")
+
+      # One outer list at the document level; one nested list inside its auto-created item.
+      expect(doc.children.size).to eq(1)
+      outer = doc.children.first
+      expect(outer).to be_a(Markbridge::AST::List)
+      expect(outer.children.size).to eq(1)
+      nested = outer.children[0].children.last
+      expect(nested).to be_a(Markbridge::AST::List)
+      expect(nested.children.size).to eq(1)
     end
 
     it "parses nested list" do
@@ -195,6 +291,16 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(code).to be_a(Markbridge::AST::Code)
       expect(code.children.first.text).to eq("\nline 1\nline 2\n")
     end
+
+    it "recognises <pre> even when preceded by whitespace" do
+      doc = parse("\t<pre>code</pre>")
+      expect(doc.children.first).to be_a(Markbridge::AST::Code)
+    end
+
+    it "recognises case-insensitive <PRE>" do
+      doc = parse("<PRE>code</PRE>")
+      expect(doc.children.first).to be_a(Markbridge::AST::Code)
+    end
   end
 
   describe "inline formatting in text lines" do
@@ -217,6 +323,59 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       paragraph = doc.children.first
       expect(paragraph).to be_a(Markbridge::AST::Paragraph)
       expect(paragraph.children[1]).to be_a(Markbridge::AST::Url)
+    end
+  end
+
+  describe "list reset" do
+    it "starts a fresh list after a paragraph interrupts the list" do
+      doc = parse("* item1\n\ntext\n* item2")
+
+      lists = doc.children.select { |c| c.is_a?(Markbridge::AST::List) }
+      expect(lists.size).to eq(2)
+      expect(lists[0].children.size).to eq(1)
+      expect(lists[1].children.size).to eq(1)
+    end
+
+    it "starts a fresh list after a blank line" do
+      doc = parse("* item1\n\n* item2")
+
+      lists = doc.children.select { |c| c.is_a?(Markbridge::AST::List) }
+      expect(lists.size).to eq(2)
+    end
+
+    it "starts a fresh list after a heading" do
+      doc = parse("* item1\n== heading ==\n* item2")
+
+      lists = doc.children.select { |c| c.is_a?(Markbridge::AST::List) }
+      expect(lists.size).to eq(2)
+    end
+
+    it "starts a fresh list after a horizontal rule" do
+      doc = parse("* item1\n----\n* item2")
+
+      lists = doc.children.select { |c| c.is_a?(Markbridge::AST::List) }
+      expect(lists.size).to eq(2)
+    end
+
+    it "starts a fresh list after a preformatted block" do
+      doc = parse("* item1\n preformatted\n* item2")
+
+      lists = doc.children.select { |c| c.is_a?(Markbridge::AST::List) }
+      expect(lists.size).to eq(2)
+    end
+
+    it "starts a fresh list after a <pre> block" do
+      doc = parse("* item1\n<pre>code</pre>\n* item2")
+
+      lists = doc.children.select { |c| c.is_a?(Markbridge::AST::List) }
+      expect(lists.size).to eq(2)
+    end
+
+    it "starts a fresh list after an inline paragraph with no blank line between" do
+      doc = parse("* item1\ntext\n* item2")
+
+      lists = doc.children.select { |c| c.is_a?(Markbridge::AST::List) }
+      expect(lists.size).to eq(2)
     end
   end
 
