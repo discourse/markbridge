@@ -15,3 +15,7 @@
 
 /.claude
 /.mutant
+
+# IDE and silo-local state
+/.idea/
+/.silo.local.yml
