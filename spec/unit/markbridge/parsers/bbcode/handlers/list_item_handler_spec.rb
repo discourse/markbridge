@@ -7,48 +7,81 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ListItemHandler do
   let(:registry) do
     reg = Markbridge::Parsers::BBCode::HandlerRegistry.new
     reconciler = Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler.new(registry: reg)
-    closing_strategy = Markbridge::Parsers::BBCode::ClosingStrategies::Reordering.new(reconciler)
-    reg.instance_variable_set(:@closing_strategy, closing_strategy)
+    reg.closing_strategy =
+      Markbridge::Parsers::BBCode::ClosingStrategies::Reordering.new(reconciler)
+    reg.register("li", handler)
     reg
   end
 
-  describe "#on_open" do
-    it "creates a list item and pushes to context" do
-      token =
-        Markbridge::Parsers::BBCode::TagStartToken.new(tag: "li", attrs: {}, pos: 0, source: "[li]")
+  def tag_start(source: "[li]")
+    Markbridge::Parsers::BBCode::TagStartToken.new(tag: "li", attrs: {}, pos: 0, source:)
+  end
 
-      handler.on_open(token:, context:, registry:)
+  describe "#initialize" do
+    it "exposes AST::ListItem as the element_class" do
+      expect(described_class.new.element_class).to eq(Markbridge::AST::ListItem)
+    end
+  end
+
+  describe "#on_open" do
+    it "pushes a ListItem as a child of the current element" do
+      handler.on_open(token: tag_start, context:, registry:)
 
       expect(context.current).to be_a(Markbridge::AST::ListItem)
+      expect(document.children.first).to eq(context.current)
     end
 
-    it "pushes list item onto context stack" do
-      token =
-        Markbridge::Parsers::BBCode::TagStartToken.new(tag: "li", attrs: {}, pos: 0, source: "[li]")
+    it "auto-closes a previous ListItem when opening a new one" do
+      first = Markbridge::AST::ListItem.new
+      context.push(first)
 
-      expect { handler.on_open(token:, context:, registry:) }.to(
-        change { context.current.class }.from(Markbridge::AST::Document).to(
-          Markbridge::AST::ListItem,
-        ),
-      )
+      handler.on_open(token: tag_start, context:, registry:)
+
+      # The new ListItem is a sibling of the first, not a child
+      expect(context.current).to be_a(Markbridge::AST::ListItem)
+      expect(context.current).not_to eq(first)
+      expect(first.children).not_to include(context.current)
+    end
+
+    it "nests inside a List when current is a List (does not pop the List)" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(context.current).to be_a(Markbridge::AST::ListItem)
+      # The list is the parent
+      expect(list.children).to include(context.current)
+    end
+
+    it "nests directly under Document when current is Document (does not pop Document)" do
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(document.children).to include(context.current)
+    end
+
+    it "forwards the token to context.push for graceful-degradation bookkeeping" do
+      max = Markbridge::Parsers::BBCode::ParserState::MAX_DEPTH
+      max.times { context.push(Markbridge::AST::Italic.new) }
+
+      expect { handler.on_open(token: tag_start, context:, registry:) }.to change(
+        context,
+        :depth_exceeded_count,
+      ).by(1)
     end
   end
 
   describe "#on_close" do
-    it "uses default closing behavior from BaseHandler" do
-      open_token =
-        Markbridge::Parsers::BBCode::TagStartToken.new(tag: "li", attrs: {}, pos: 0, source: "[li]")
-      close_token =
-        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "li", pos: 10, source: "[/li]")
-
-      # Register handler so the element can be closed properly
-      registry.register("li", handler)
-
-      handler.on_open(token: open_token, context:, registry:)
+    it "uses the default closing behavior (pops matching element)" do
+      handler.on_open(token: tag_start, context:, registry:)
       list_item = context.current
-      expect(list_item).to be_a(Markbridge::AST::ListItem)
 
-      handler.on_close(token: close_token, context:, registry:)
+      handler.on_close(
+        token: Markbridge::Parsers::BBCode::TagEndToken.new(tag: "li", pos: 10, source: "[/li]"),
+        context:,
+        registry:,
+      )
+
       expect(context.current).to eq(document)
       expect(document.children).to include(list_item)
     end

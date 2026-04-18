@@ -22,7 +22,7 @@ module Markbridge
 
           def on_close(token:, context:, registry:, tokens: nil)
             # Auto-close open list item before closing list
-            context.pop if context.current.is_a?(AST::ListItem)
+            context.pop if context.current.instance_of?(AST::ListItem)
 
             # Then use default closing behavior
             super
