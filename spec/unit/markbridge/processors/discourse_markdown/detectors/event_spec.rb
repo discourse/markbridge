@@ -104,5 +104,23 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Detectors::Event do
       expect(match).not_to be_nil
       expect(match.end_pos).to eq(input.length)
     end
+
+    it "detects an event at a non-zero position" do
+      input = 'prefix [event name="Meeting" start="2025-12-15"][/event] suffix'
+      match = detector.detect(input, 7)
+
+      expect(match).not_to be_nil
+      expect(match.start_pos).to eq(7)
+      expect(match.end_pos).to eq(input.length - " suffix".length)
+      expect(match.node.name).to eq("Meeting")
+      # raw must be exactly the event, not the surrounding input
+      expect(match.node.raw).to eq('[event name="Meeting" start="2025-12-15"][/event]')
+    end
+
+    it "returns nil when pos points past the start of an event tag" do
+      input = '[event name="x" start="y"][/event]'
+
+      expect(detector.detect(input, 1)).to be_nil
+    end
   end
 end

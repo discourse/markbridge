@@ -122,5 +122,33 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Detectors::Poll do
 
       expect(match).not_to be_nil
     end
+
+    it "detects a poll at a non-zero position" do
+      input = "prefix [poll]\n* A\n[/poll] suffix"
+      match = detector.detect(input, 7)
+
+      expect(match).not_to be_nil
+      expect(match.start_pos).to eq(7)
+      expect(match.end_pos).to eq(input.length - " suffix".length)
+      expect(match.node.raw).to eq("[poll]\n* A\n[/poll]")
+    end
+
+    it "returns nil when pos points past the start of the poll tag" do
+      expect(detector.detect("[poll][/poll]", 1)).to be_nil
+    end
+
+    it "extracts options whose lines have leading whitespace" do
+      input = "[poll]\n  * A\n  - B\n  1. C\n[/poll]"
+      match = detector.detect(input, 0)
+
+      expect(match.node.options).to eq(%w[A B C])
+    end
+
+    it "does not pick up option-shaped lines outside the poll tags" do
+      input = "[poll]\n* real A\n[/poll]\n* not an option\n* neither\n"
+      match = detector.detect(input, 0)
+
+      expect(match.node.options).to eq(["real A"])
+    end
   end
 end
