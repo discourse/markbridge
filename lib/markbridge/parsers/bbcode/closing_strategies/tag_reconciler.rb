@@ -98,7 +98,6 @@ module Markbridge
             context
               .elements_from_current(MAX_AUTO_CLOSE_DEPTH - 1)
               .each_with_index do |element, depth|
-                next unless element.is_a?(AST::Element)
                 return nil unless @registry.auto_closeable?(element.class)
                 return depth + 1 if @registry.handler_for_element(element) == handler
               end
@@ -107,14 +106,11 @@ module Markbridge
           end
 
           def find_matching_handler_depth(handler, context)
-            elements = context.elements_from_current(MAX_AUTO_CLOSE_DEPTH - 1)
-
-            elements.each_with_index do |element, depth|
-              next unless element.is_a?(AST::Element)
-
-              element_handler = @registry.handler_for_element(element)
-              return depth if element_handler == handler
-            end
+            context
+              .elements_from_current(MAX_AUTO_CLOSE_DEPTH - 1)
+              .each_with_index do |element, depth|
+                return depth if @registry.handler_for_element(element) == handler
+              end
 
             nil
           end
@@ -125,10 +121,10 @@ module Markbridge
               .all? { |element| @registry.auto_closeable?(element.class) }
           end
 
+          # Caller must have verified all_auto_closeable?(context, target_depth) first.
           def collect_auto_closeable_handlers(context, target_depth)
             context
               .elements_from_current(target_depth)
-              .take_while { |element| @registry.auto_closeable?(element.class) }
               .map { |element| @registry.handler_for_element(element) }
           end
 

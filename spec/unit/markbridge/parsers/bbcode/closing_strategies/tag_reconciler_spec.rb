@@ -58,6 +58,18 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
       expect(context.auto_closed_count).to eq(0)
     end
 
+    it "succeeds when the matching element is at exactly MAX_AUTO_CLOSE_DEPTH - 1 (still in window)" do
+      context.push(Markbridge::AST::Bold.new)
+      (described_class::MAX_AUTO_CLOSE_DEPTH - 1).times do
+        context.push(Markbridge::AST::Italic.new)
+      end
+
+      result = reconciler.try_auto_close(handler: bold_handler, context:)
+
+      expect(result).to be true
+      expect(context.current).to be_a(Markbridge::AST::Document)
+    end
+
     it "returns false when an intervening element is not auto-closeable" do
       context.push(Markbridge::AST::Bold.new)
       context.push(Markbridge::AST::List.new)
@@ -169,6 +181,30 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
       result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
 
       expect(result).to be false
+    end
+
+    it "returns false when the target is beyond MAX_AUTO_CLOSE_DEPTH on the stack" do
+      context.push(Markbridge::AST::Bold.new)
+      described_class::MAX_AUTO_CLOSE_DEPTH.times { context.push(Markbridge::AST::Italic.new) }
+
+      tokens = tokens_for("text")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be false
+    end
+
+    it "succeeds when the target is at exactly MAX_AUTO_CLOSE_DEPTH - 1 (still in window)" do
+      context.push(Markbridge::AST::Bold.new)
+      (described_class::MAX_AUTO_CLOSE_DEPTH - 1).times do
+        context.push(Markbridge::AST::Italic.new)
+      end
+
+      tokens = tokens_for("text")
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens:)
+
+      expect(result).to be true
     end
 
     it "returns false when current matches the target (nothing to reopen)" do

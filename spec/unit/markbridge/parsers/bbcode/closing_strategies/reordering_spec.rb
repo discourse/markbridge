@@ -88,6 +88,9 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Reordering do
       expect(context.current).to be_a(Markbridge::AST::Italic)
       expect(context.auto_closed_count).to eq(2)
       expect(root.children.map(&:class)).to eq([Markbridge::AST::Bold, Markbridge::AST::Italic])
+      # Reopen returning early prevents super from appending the [/b] source as text into the
+      # reopened Italic.
+      expect(context.current.children).to be_empty
     end
   end
 
