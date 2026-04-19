@@ -48,6 +48,17 @@ RSpec.describe Markbridge::Parsers::BBCode::PeekableEnumerator do
     it "returns empty array when peeking zero items" do
       expect(enum.peek_ahead(0)).to eq([])
     end
+
+    it "clamps negative counts to zero (returns empty array)" do
+      expect(enum.peek_ahead(-3)).to eq([])
+    end
+
+    it "truncates the buffered tokens to count even when more were already buffered" do
+      # Force the buffer to fill to 4 by peeking ahead first
+      enum.peek_ahead(4)
+
+      expect(enum.peek_ahead(2)).to eq([1, 2])
+    end
   end
 
   describe "#next" do
@@ -60,6 +71,28 @@ RSpec.describe Markbridge::Parsers::BBCode::PeekableEnumerator do
     it "returns nil when exhausted" do
       5.times { enum.next }
       expect(enum.next).to be_nil
+    end
+
+    it "fetches at most one token from the scanner per call" do
+      enum.next
+
+      expect(scanner).to have_received(:next_token).once
+    end
+
+    it "drains the buffer in FIFO order after a peek_ahead" do
+      enum.peek_ahead(3) # buffers [1, 2, 3]
+
+      expect(enum.next).to eq(1)
+      expect(enum.next).to eq(2)
+      expect(enum.next).to eq(3)
+    end
+  end
+
+  describe "#peek" do
+    it "fetches at most one token from the scanner per call" do
+      enum.peek
+
+      expect(scanner).to have_received(:next_token).once
     end
   end
 
@@ -74,6 +107,12 @@ RSpec.describe Markbridge::Parsers::BBCode::PeekableEnumerator do
         enum.next
       end
       expect(enum.has_next?).to be false
+    end
+
+    it "fetches at most one token from the scanner per call" do
+      enum.has_next?
+
+      expect(scanner).to have_received(:next_token).once
     end
   end
 

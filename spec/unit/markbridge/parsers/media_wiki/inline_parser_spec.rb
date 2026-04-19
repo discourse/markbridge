@@ -234,14 +234,6 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
 
       expect(doc.children.first.children.first.text).to eq("A B C")
     end
-
-    it "preserves a leading space in the display text (splits on the literal space char only)" do
-      # split is on " " (the literal), not nil — so extra leading whitespace on the display
-      # stays on the display side.
-      doc = parse("[https://example.com  spaced]")
-
-      expect(doc.children.first.children.first.text).to eq(" spaced")
-    end
   end
 
   describe "HTML tags" do

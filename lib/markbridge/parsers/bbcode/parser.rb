@@ -111,6 +111,7 @@ module Markbridge
         end
 
         # Track unknown tag by name; the wrapper is ignored, children pass through.
+        # @param token [Token]
         def track_unknown_tag(token)
           @unknown_tags[token.tag] += 1
         end
