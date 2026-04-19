@@ -4,12 +4,20 @@
 image: fedora/43
 
 setup:
-  - sudo dnf install -y ruby ruby-devel gcc make libyaml-devel
-  - bundle install
-  - bundle exec lefthook install
+  - sudo dnf install -y gcc make libyaml-devel java-latest-openjdk-headless
+  - sudo dnf copr enable -y gschlager/ruby
+  - sudo dnf install -y ruby-install
+  - curl -LsSf https://rv.dev/install | sh
+  - export PATH="$HOME/.cargo/bin:$PATH" && rv ruby install 3.3
+  - export PATH="$HOME/.cargo/bin:$PATH" && rv ruby install 3.4
+  - export PATH="$HOME/.cargo/bin:$PATH" && rv ruby install 4.0
+  - export PATH="$HOME/.cargo/bin:$PATH" && rv ruby pin 3.4
+  - ruby-install jruby
+  - export PATH="$HOME/.cargo/bin:$PATH" && rv run bundle install
+  - export PATH="$HOME/.cargo/bin:$PATH" && rv run bundle exec lefthook install
 
 sync:
-  - bundle install
+  - export PATH="$HOME/.cargo/bin:$PATH" && rv run bundle install
 
 update:
   - sudo dnf update -y

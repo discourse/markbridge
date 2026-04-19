@@ -14,10 +14,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tag do
       expect(result).to eq("rendered: Markbridge::AST::Bold")
     end
 
-    it "raises NotImplementedError when no block provided" do
-      tag = described_class.new
+    it "raises NotImplementedError naming the subclass when no block provided" do
+      subclass = Class.new(described_class)
+      tag = subclass.new
 
-      expect { tag.render(element, interface) }.to raise_error(NotImplementedError)
+      expect { tag.render(element, interface) }.to raise_error(
+        NotImplementedError,
+        "#{subclass} must implement #render or provide a block",
+      )
     end
 
     it "passes element and interface to block" do
