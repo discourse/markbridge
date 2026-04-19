@@ -28,16 +28,13 @@ module Markbridge
         # @return [Boolean] true if pushed successfully, false if depth exceeded
         # @raise [MaxDepthExceededError] when pushing would exceed MAX_DEPTH and no token provided
         def push(element, token: nil)
-          if @depth >= MAX_DEPTH
-            if token
-              # Graceful degradation: treat as text
-              @current << AST::Text.new(token.source)
-              @depth_exceeded_count += 1
-              return false
-            else
-              # Legacy behavior: raise error
-              raise MaxDepthExceededError, MAX_DEPTH
-            end
+          if @depth == MAX_DEPTH
+            raise MaxDepthExceededError, MAX_DEPTH unless token
+
+            # Graceful degradation: treat as text
+            @current << AST::Text.new(token.source)
+            @depth_exceeded_count += 1
+            return false
           end
 
           @current << element
@@ -50,10 +47,10 @@ module Markbridge
         # Pop current element and return to parent
         # @return [AST::Element] the parent node
         def pop
-          return @root if @node_stack.size <= 1
+          return @root if @node_stack.size == 1
 
           @node_stack.pop
-          @current = @node_stack.last
+          @current = @node_stack.fetch(-1)
           @depth -= 1
           @current
         end
@@ -80,12 +77,9 @@ module Markbridge
         # @param limit [Integer, nil] number of elements to include from the top
         # @return [Array<AST::Node>]
         def elements_from_current(limit = nil)
-          return [] if @node_stack.empty?
-
-          limit = (@node_stack.size - 1) if limit.nil?
-          limit = [limit, @node_stack.size - 1].min
-
-          (0..limit).map { |offset| @node_stack[@node_stack.size - 1 - offset] }
+          max_offset = @node_stack.size - 1
+          limit = [limit || max_offset, max_offset].min
+          (0..limit).map { |offset| @node_stack.fetch(max_offset - offset) }
         end
       end
     end
