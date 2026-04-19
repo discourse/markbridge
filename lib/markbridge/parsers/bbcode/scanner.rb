@@ -53,35 +53,25 @@ module Markbridge
                          :WHITESPACE_CHAR,
                          :UNQUOTED_VALUE_STOP
 
+        # @return [Token, nil] tag token or nil if not a valid tag (caller rolls back)
+        # Precondition: caller has verified current_char == "[".
         def parse_tag_at_cursor
-          return nil if current_char != "["
-
           tag_start_pos = @current_pos
           @current_pos += 1 # skip '['
-
-          # Check for closing tag
-          closing = current_char == "/"
-          @current_pos += 1 if closing
-
-          # Parse tag name
+          closing = consume("/")
           tag_name = scan_tag_name
-          return rollback(tag_start_pos) unless tag_name
+          attrs = closing || tag_name.nil? ? {} : scan_attributes
+          return rollback(tag_start_pos) unless tag_name && consume("]")
 
-          # Parse attributes (only for opening tags)
-          attrs = closing ? {} : scan_attributes
-          return rollback(tag_start_pos) if current_char != "]"
-
-          @current_pos += 1 # skip ']'
-
-          # Capture original source text
           source = @input[tag_start_pos...@current_pos]
+          build_token(closing:, tag: tag_name.downcase, attrs:, pos: tag_start_pos, source:)
+        end
 
-          normalized_tag_name = tag_name.downcase
-
+        def build_token(closing:, tag:, attrs:, pos:, source:)
           if closing
-            TagEndToken.new(tag: normalized_tag_name, pos: tag_start_pos, source:)
+            TagEndToken.new(tag:, pos:, source:)
           else
-            TagStartToken.new(tag: normalized_tag_name, attrs:, pos: tag_start_pos, source:)
+            TagStartToken.new(tag:, attrs:, pos:, source:)
           end
         end
 
@@ -90,25 +80,17 @@ module Markbridge
           nil
         end
 
-        # Scan a tag name: [a-z*.][a-z0-9]*(:uid)?
+        TAG_NAME = /\A[a-z*][a-z0-9]*(?::[0-9a-f]*)?/i
+        private_constant :TAG_NAME
+
+        # Scan a tag name: [a-z*][a-z0-9]*(:hex*)?
         # @return [String, nil]
         def scan_tag_name
-          start = @current_pos
+          match = @input[@current_pos..].match(TAG_NAME)
+          return nil unless match
 
-          # First character: letter, *, or .
-          return nil unless current_char&.match?(TAG_INITIAL_CHAR)
-          @current_pos += 1
-
-          # Remaining characters: letters or digits
-          @current_pos += 1 while current_char&.match?(TAG_NAME_CHAR)
-
-          # Optional :uid suffix (e.g., [quote:abc123])
-          if current_char == ":"
-            @current_pos += 1
-            @current_pos += 1 while current_char&.match?(UID_HEX_CHAR)
-          end
-
-          @input[start...@current_pos]
+          @current_pos += match[0].length
+          match[0]
         end
 
         # Scan tag attributes
@@ -119,7 +101,6 @@ module Markbridge
           attrs = {}
           skip_whitespace
 
-          # First attribute might be option: [tag=value]
           if current_char == "="
             @current_pos += 1
             skip_whitespace
@@ -129,23 +110,24 @@ module Markbridge
             skip_whitespace
           end
 
-          # Named attributes: [tag key=value key=value ...]
-          while (char = current_char) && char != "]"
-            name = scan_while(ATTR_NAME_CHAR)
-            break if name.nil?
+          while (name = scan_while(ATTR_NAME_CHAR))
+            skip_whitespace
+            break unless consume("=")
 
             skip_whitespace
-            break if current_char != "="
-
-            @current_pos += 1
-            skip_whitespace
-
             value = scan_attribute_value
             attrs[name.downcase.to_sym] = value if value
             skip_whitespace
           end
 
           attrs
+        end
+
+        def consume(char)
+          return false if current_char != char
+
+          @current_pos += 1
+          true
         end
 
         def scan_attribute_value
@@ -171,22 +153,15 @@ module Markbridge
         # Workaround: Use single quotes if you need double quotes in the value:
         #   [url='has "quotes" inside']    → option: "has \"quotes\" inside" ✓
         #
-        # @return [String] the unescaped attribute value
+        # @return [String, nil] the unescaped attribute value, or nil if unterminated
         def scan_quoted_string
           quote_char = current_char
           start = (@current_pos += 1) # skip opening quote
-
           closing_index = @input.index(quote_char, start)
+          return nil unless closing_index
 
-          if closing_index
-            value = @input[start...closing_index]
-            @current_pos = closing_index + 1 # position after closing quote
-          else
-            value = @input[start..] || ""
-            @current_pos = @length
-          end
-
-          value
+          @current_pos = closing_index + 1
+          @input[start...closing_index]
         end
 
         def scan_unquoted_value
@@ -195,18 +170,18 @@ module Markbridge
 
         # Consumes characters matching +pattern+; returns substring or nil if empty
         def scan_while(pattern)
-          start = @current_pos
-          while (char = current_char) && char.match?(pattern)
-            @current_pos += 1
-          end
-
-          return nil if @current_pos == start
-          @input[start...@current_pos]
+          stop_index = @current_pos
+          stop_index += 1 while @input[stop_index]&.match?(pattern)
+          consume_range(stop_index)
         end
 
-        # Consumes characters until +pattern+ matches; returns substring or nil if empty
+        # Consumes characters until +pattern+ matches (or end of input); returns substring or nil if empty
         def scan_until(pattern)
-          stop_index = @input.index(pattern, @current_pos) || @length
+          consume_range(@input.index(pattern, @current_pos) || @length)
+        end
+
+        # Slice [@current_pos, stop_index), advance the cursor, or return nil for empty.
+        def consume_range(stop_index)
           return nil if stop_index == @current_pos
 
           value = @input[@current_pos...stop_index]
