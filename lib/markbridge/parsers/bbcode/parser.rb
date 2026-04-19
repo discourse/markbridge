@@ -94,7 +94,7 @@ module Markbridge
           if (handler = @handlers[token.tag])
             handler.on_open(token:, context:, registry: @handlers, tokens:)
           else
-            handle_unknown_tag(token, context)
+            track_unknown_tag(token)
           end
         end
 
@@ -106,15 +106,12 @@ module Markbridge
           if (handler = @handlers[token.tag])
             handler.on_close(token:, context:, registry: @handlers, tokens:)
           else
-            handle_unknown_tag(token, context)
+            track_unknown_tag(token)
           end
         end
 
-        # Handle unknown tag by tracking it and ignoring the wrapper
-        # while still processing its children
-        # @param token [Token]
-        # @param context [ParserState]
-        def handle_unknown_tag(token, _context)
+        # Track unknown tag by name; the wrapper is ignored, children pass through.
+        def track_unknown_tag(token)
           @unknown_tags[token.tag] += 1
         end
       end

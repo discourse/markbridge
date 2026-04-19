@@ -15,9 +15,9 @@ module Markbridge
           closed = false
 
           while (token = scanner.next_token)
-            if token.is_a?(TagStartToken) && token.tag == tag_name
+            if token.instance_of?(TagStartToken) && token.tag == tag_name
               depth += 1
-            elsif token.is_a?(TagEndToken) && token.tag == tag_name
+            elsif token.instance_of?(TagEndToken) && token.tag == tag_name
               if (depth -= 1) == 0
                 closed = true
                 break
