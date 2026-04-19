@@ -3,6 +3,46 @@
 RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   let(:renderer) { described_class.new }
 
+  describe "#initialize" do
+    it "uses an explicit tag_library when one is provided" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.new
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new { |_e, _i| "BOLD" },
+      )
+
+      result = described_class.new(tag_library: library).render(Markbridge::AST::Bold.new)
+
+      expect(result).to eq("BOLD")
+    end
+
+    it "uses an explicit escaper when one is provided" do
+      escaper = instance_double(Markbridge::Renderers::Discourse::MarkdownEscaper)
+      allow(escaper).to receive(:escape).and_return("ESCAPED")
+
+      result = described_class.new(escaper:).render(Markbridge::AST::Text.new("hi"))
+
+      expect(result).to eq("ESCAPED")
+      expect(escaper).to have_received(:escape).with("hi")
+    end
+
+    it "falls back to TagLibrary.default when no tag_library is provided" do
+      result =
+        described_class.new.render(
+          Markbridge::AST::Bold.new.tap { |b| b << Markbridge::AST::Text.new("x") },
+        )
+
+      expect(result).to eq("**x**")
+    end
+
+    it "falls back to MarkdownEscaper.new when no escaper is provided" do
+      # The default escaper must escape Markdown-significant characters in plain text.
+      result = described_class.new.render(Markbridge::AST::Text.new("a*b"))
+
+      expect(result).to eq('a\*b')
+    end
+  end
+
   describe "#render" do
     it "renders a document by rendering its children" do
       document = Markbridge::AST::Document.new
@@ -32,6 +72,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       result = renderer.render(unknown)
       expect(result).to eq("")
     end
+
+    it "passes through MarkdownText.text without escaping" do
+      node = Markbridge::AST::MarkdownText.new("**already** *bold*")
+
+      expect(renderer.render(node)).to eq("**already** *bold*")
+    end
+
+    it "does not escape Text content when an ancestor is Code" do
+      code = Markbridge::AST::Code.new
+      code << Markbridge::AST::Text.new("a*b")
+
+      # Code formatter wraps in backticks; the inner text must NOT be \-escaped.
+      expect(renderer.render(code)).to include("a*b")
+    end
+
+    it "escapes Text content when no ancestor is Code" do
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("a*b")
+
+      expect(renderer.render(bold)).to include('a\*b')
+    end
   end
 
   describe "#render_children" do
@@ -50,6 +111,50 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       context = Markbridge::Renderers::Discourse::RenderContext.new
       result = renderer.render_children(document, context:)
       expect(result).to eq("")
+    end
+
+    it "checks against the part's FIRST char when deciding boundary insertion" do
+      # Custom tag whose output starts with `*` but ends with non-delimiter `Z`.
+      # Combined with a previous sibling ending in `*`, the boundary must be
+      # inserted: result[-1] == "*" matches part[0] == "*", regardless of part[-1].
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      asym_class = Class.new(Markbridge::AST::Element)
+      library.register(asym_class, Markbridge::Renderers::Discourse::Tag.new { |_e, _i| "*xyzZ" })
+      r = described_class.new(tag_library: library)
+
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("ab*")
+      document << asym_class.new
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+
+      expect(r.render_children(document, context:)).to eq("ab*<!---->*xyzZ")
+    end
+
+    it "checks against the result's LAST char when deciding boundary insertion" do
+      # Three siblings: text "ab", text "*", Bold "x" → "**x**".
+      # The boundary check must look at result[-1] ("*"), not result[0] ("a").
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("ab")
+      document << Markbridge::AST::MarkdownText.new("*")
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("x")
+      document << bold
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+
+      expect(renderer.render_children(document, context:)).to eq("ab*<!---->**x**")
+    end
+
+    it "forwards the context to each child render call" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("a*b")
+      # Context with Code parent suppresses Text escaping; without forwarding it,
+      # the child render would default to a fresh context and escape the *.
+      code = Markbridge::AST::Code.new
+      context = Markbridge::Renderers::Discourse::RenderContext.new.with_parent(code)
+
+      expect(renderer.render_children(document, context:)).to eq("a*b")
     end
 
     it "inserts a comment boundary when sibling emphasis delimiters would merge" do
@@ -84,6 +189,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       result = renderer.render_children(document, context:)
 
       expect(result).to eq("`a`<!---->`b`")
+    end
+
+    it "does not insert a boundary when adjacent characters are equal but non-delimiter" do
+      # Two MarkdownText siblings (no auto-merge) ending/starting with the same letter.
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("a")
+      document << Markbridge::AST::MarkdownText.new("a")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      result = renderer.render_children(document, context:)
+
+      expect(result).to eq("aa")
     end
 
     it "does not insert a boundary when delimiters differ" do
