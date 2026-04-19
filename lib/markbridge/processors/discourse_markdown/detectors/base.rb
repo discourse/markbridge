@@ -41,19 +41,20 @@ module Markbridge
           WORD_PATTERN = /\A[\w\-]*/
           private_constant :WORD_PATTERN
 
-          # Helper to extract a word starting at position
+          # Helper to extract a word starting at position. Caller must ensure
+          # pos is within input bounds (`pos <= input.length`).
           # @param input [String] the input string
           # @param pos [Integer] starting position
           # @return [String] the word (may be empty)
           def extract_word(input, pos)
-            input[pos..].to_s.match(WORD_PATTERN)[0]
+            input[pos..].match(WORD_PATTERN)[0]
           end
 
-          # Parse key="value" or key='value' attribute pairs from a string
-          # @param attr_string [String, nil] the attribute string to parse
+          # Parse key="value" or key='value' attribute pairs from a string.
+          # @param attr_string [String] the attribute string to parse
           # @return [Hash<String, String>] parsed attributes with downcased keys
           def parse_attributes(attr_string)
-            attr_string.to_s.scan(/(\w+)=["']([^"']*)["']/).to_h.transform_keys(&:downcase)
+            attr_string.scan(/(\w+)=["']([^"']*)["']/).to_h.transform_keys(&:downcase)
           end
         end
       end

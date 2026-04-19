@@ -33,7 +33,11 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::AttachmentHandler d
       expect(attachment.alt).to be_nil
     end
 
-    it "normalizes uppercase attribute names to lowercase symbol keys" do
+    it "normalizes uppercase attribute names to lowercase symbol keys",
+       mutant_expression: %w[
+         Markbridge::Parsers::TextFormatter::Handlers::AttachmentHandler#process
+         Markbridge::Parsers::TextFormatter::Handlers::BaseHandler#extract_attributes
+       ] do
       handler.process(element: build_element('<ATTACHMENT ID="X" FILENAME="f"/>'), parent:)
 
       expect(parent.children[0].id).to eq("X")

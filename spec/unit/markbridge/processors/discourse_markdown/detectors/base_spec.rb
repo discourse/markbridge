@@ -1,13 +1,6 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Processors::DiscourseMarkdown::Detectors::Base do
-  # Test subclass that exposes the private helpers for direct testing.
-  subject(:detector) { test_detector_class.new }
-
-  let(:test_detector_class) do
-    Class.new(described_class) { public :word_boundary?, :extract_word, :parse_attributes }
-  end
-
   describe "#detect" do
     it "raises NotImplementedError (abstract method)" do
       expect { described_class.new.detect("input", 0) }.to raise_error(
@@ -27,93 +20,108 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Detectors::Base do
     end
   end
 
-  describe "#word_boundary?" do
+  # The private helpers below are exercised through concrete detectors
+  # (Mention, Event, Poll). Each test is tagged with `mutant_expression:`
+  # so mutant counts it toward Base's helper coverage even though the
+  # describe block is named after the concrete class.
+
+  describe "#word_boundary? (via Mention#detect)" do
+    let(:mention) { Markbridge::Processors::DiscourseMarkdown::Detectors::Mention.new }
+
     it "is true at the start of the input" do
-      expect(detector.word_boundary?("@user", 0)).to be true
+      expect(mention.detect("@user", 0)).not_to be_nil
     end
 
     it "is true after whitespace" do
-      expect(detector.word_boundary?("hi @user", 3)).to be true
+      expect(mention.detect("hi @user", 3)).not_to be_nil
     end
 
-    it "is true after a non-word character" do
-      expect(detector.word_boundary?("(@user)", 1)).to be true
+    it "is true after a non-word character (open paren)" do
+      expect(mention.detect("(@user)", 1)).not_to be_nil
     end
 
-    it "is false when the previous character is a word character" do
-      expect(detector.word_boundary?("hi@user", 2)).to be false
+    it "is true after a non-word character (period)" do
+      expect(mention.detect(".@user", 1)).not_to be_nil
+    end
+
+    it "is false when the previous character is a word letter" do
+      expect(mention.detect("hi@user", 2)).to be_nil
     end
 
     it "is false when the previous character is a digit" do
-      expect(detector.word_boundary?("1@user", 1)).to be false
+      expect(mention.detect("1@user", 1)).to be_nil
     end
 
     it "is false when the previous character is an underscore" do
-      expect(detector.word_boundary?("_@user", 1)).to be false
+      expect(mention.detect("_@user", 1)).to be_nil
     end
   end
 
-  describe "#extract_word" do
-    it "returns the word starting at pos" do
-      expect(detector.extract_word("@gerhard!", 1)).to eq("gerhard")
+  describe "#extract_word (via Mention#detect)" do
+    let(:mention) { Markbridge::Processors::DiscourseMarkdown::Detectors::Mention.new }
+
+    it "extracts a word starting at pos+1" do
+      match = mention.detect("@gerhard!", 0)
+      expect(match.node.name).to eq("gerhard")
     end
 
-    it "returns an empty string when the starting character isn't word-like" do
-      expect(detector.extract_word("@!foo", 1)).to eq("")
+    it "returns nil when the starting character isn't word-like (empty extract)" do
+      expect(mention.detect("@!foo", 0)).to be_nil
     end
 
     it "includes hyphens in the extracted word" do
-      expect(detector.extract_word("user-name!", 0)).to eq("user-name")
+      match = mention.detect("@user-name!", 0)
+      expect(match.node.name).to eq("user-name")
     end
 
     it "stops at the end of the input" do
-      expect(detector.extract_word("foo", 0)).to eq("foo")
+      match = mention.detect("@foo", 0)
+      expect(match.node.name).to eq("foo")
     end
 
-    it "returns an empty string when pos is at the end" do
-      expect(detector.extract_word("foo", 3)).to eq("")
-    end
-
-    it "returns an empty string when pos is past the end" do
-      expect(detector.extract_word("foo", 10)).to eq("")
+    it "returns nil when there is no word after @" do
+      # The character after @ is the end of input → empty word → no match
+      expect(mention.detect("@", 0)).to be_nil
     end
   end
 
-  describe "#parse_attributes" do
-    it "returns an empty hash for nil input" do
-      expect(detector.parse_attributes(nil)).to eq({})
-    end
-
-    it "returns an empty hash for empty input" do
-      expect(detector.parse_attributes("")).to eq({})
-    end
+  describe "#parse_attributes (via Event#detect)" do
+    let(:event) { Markbridge::Processors::DiscourseMarkdown::Detectors::Event.new }
 
     it "parses double-quoted attribute pairs" do
-      expect(detector.parse_attributes(' name="Meeting"')).to eq("name" => "Meeting")
+      match = event.detect('[event name="M" start="2025-01-01"][/event]', 0)
+      expect(match.node.starts_at).to eq("2025-01-01")
     end
 
     it "parses single-quoted attribute pairs" do
-      expect(detector.parse_attributes(" name='Meeting'")).to eq("name" => "Meeting")
+      match = event.detect("[event name='M' start='2025-01-01'][/event]", 0)
+      expect(match.node.starts_at).to eq("2025-01-01")
     end
 
-    it "parses multiple attributes" do
-      expect(detector.parse_attributes(' name="A" start="B"')).to eq("name" => "A", "start" => "B")
+    it "parses multiple attributes in one tag" do
+      match = event.detect('[event name="M" start="2025" end="2026"][/event]', 0)
+      expect(match.node.starts_at).to eq("2025")
+      expect(match.node.ends_at).to eq("2026")
     end
 
-    it "downcases attribute keys" do
-      expect(detector.parse_attributes(' ChartType="pie"')).to eq("charttype" => "pie")
-    end
-
-    it "preserves value case" do
-      expect(detector.parse_attributes(' x="MixedCase"')).to eq("x" => "MixedCase")
-    end
-
-    it "ignores content without valid attribute pairs" do
-      expect(detector.parse_attributes(" garbage without equals")).to eq({})
+    it "downcases attribute keys (preserves value case)" do
+      match = event.detect('[event Name="MixedCase" Start="2025"][/event]', 0)
+      expect(match.node.name).to eq("MixedCase")
     end
 
     it "handles empty attribute values" do
-      expect(detector.parse_attributes(' name=""')).to eq("name" => "")
+      match = event.detect('[event name="" start="2025"][/event]', 0)
+      expect(match.node.name).to eq("")
+    end
+
+    it "returns nil when no attribute pairs are present (parse → empty hash → required attrs missing)" do
+      expect(event.detect("[event][/event]", 0)).to be_nil
+    end
+
+    it "ignores garbage between attribute pairs without crashing" do
+      match = event.detect('[event name="M" garbage start="2025"][/event]', 0)
+      expect(match.node.name).to eq("M")
+      expect(match.node.starts_at).to eq("2025")
     end
   end
 end

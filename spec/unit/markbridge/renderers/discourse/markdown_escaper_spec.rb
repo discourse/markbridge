@@ -290,6 +290,86 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(result).to include("\u{1D573}")
         expect(result).to include("\\*")
       end
+
+      # Exercises the private `ascii_punctuation?` predicate at every
+      # range boundary by escaping a `\X` pair. When X is ASCII punctuation
+      # the backslash gets doubled (`\\X`); otherwise it stays single.
+      describe "#ascii_punctuation? boundaries (via #escape backslash handling)" do
+        # `escape_backslash` doubles `\` when next char is ASCII punctuation.
+        # We use chars without their own inline-escape (so the result has
+        # exactly 1 leading `\` for non-punctuation, 2 for punctuation).
+        # Skipped chars (own inline handling): `[`, `\`, `_`, `` ` ``, `*`, `~`, `<`, `&`, `!`, `|`.
+        {
+          0x20 => false, # space — below 33
+          0x22 => true, # " — at 34 (just above 33)
+          0x2F => true, # / — at 47 (upper of range 33..47)
+          0x30 => false, # 0 — at 48 (just above first range)
+          0x39 => false, # 9 — at 57 (just below 58)
+          0x3A => true, # : — at 58 (lower of range 58..64)
+          0x40 => true, # @ — at 64 (upper of range 58..64)
+          0x41 => false, # A — at 65 (just above second range)
+          0x5A => false, # Z — at 90 (just below 91)
+          0x5D => true, # ] — at 93 (mid range 91..96, no own escape)
+          0x5E => true, # ^ — at 94 (mid range 91..96, no own escape)
+          0x61 => false, # a — at 97 (just above third range)
+          0x62 => false, # b — at 98 (further above third range)
+          0x7A => false, # z — at 122 (just below 123)
+          0x7B => true, # { — at 123 (lower of range 123..126)
+          0x7D => true, # } — at 125 (mid range, no own escape)
+          0x7E => true, # ~ — at 126 (upper of range 123..126)
+          0x7F => false, # DEL — at 127 (just above fourth range)
+        }.each do |byte, is_punct|
+          char = byte.chr
+          expected = is_punct ? 2 : 1
+          it "byte 0x#{byte.to_s(16).upcase} (#{char.inspect}): #{is_punct ? "doubles `\\`" : "single `\\`"}" do
+            result = escaper.escape("\\#{char}")
+            leading_backslashes = result.bytes.take_while { |b| b == 92 }.count
+            expect(leading_backslashes).to eq(expected),
+            "byte 0x#{byte.to_s(16).upcase} (#{char.inspect}): expected #{expected} leading `\\`; got #{leading_backslashes} (#{result.inspect})"
+          end
+        end
+
+        # Boundary `byte >= 91` requires the byte 91 case (`[`). `[` has its own
+        # inline-escape, so the result has 3 leading `\`s when 91 IS punctuation
+        # vs 2 when it isn't.
+        it "byte 0x5B ([): treats as punctuation (3 leading `\\`s including the bracket's own escape)" do
+          result = escaper.escape("\\[")
+          expect(result.bytes.take_while { |b| b == 92 }.count).to eq(3)
+        end
+
+        # Boundary `byte <= 96` requires the byte 96 case (`` ` ``).
+        it "byte 0x60 (`): treats as punctuation (3 leading `\\`s including the backtick's own escape)" do
+          result = escaper.escape("\\`")
+          expect(result.bytes.take_while { |b| b == 92 }.count).to eq(3)
+        end
+
+        # Boundary `byte >= 33` requires byte 33 (`!`). `!` has its own escape
+        # only when followed by `[`; standalone `!` passes through.
+        it "byte 0x21 (!): treats as punctuation (2 leading `\\`s)" do
+          result = escaper.escape("\\!")
+          expect(result.bytes.take_while { |b| b == 92 }.count).to eq(2)
+        end
+      end
+
+      # Exercises the private `utf8_char_length` byte-length lookup at every
+      # lead-byte boundary. Each input combines a multi-byte char with `*` so
+      # the inline byte loop runs and dispatches the multi-byte char.
+      describe "#utf8_char_length boundaries (via #escape with various UTF-8 lead bytes)" do
+        {
+          "1-byte ASCII" => "a",
+          "2-byte lead 0xC3 (just above 0xC0)" => "Â",
+          "2-byte lead 0xDF (last 2-byte lead)" => "\u{07FF}",
+          "3-byte lead 0xE0 (first 3-byte lead)" => "\u{0800}",
+          "3-byte lead 0xEF (last 3-byte lead)" => "\u{FFFF}",
+          "4-byte lead 0xF0 (first 4-byte lead)" => "\u{10000}",
+          "4-byte lead 0xF4 (max valid 4-byte lead)" => "\u{10FFFF}",
+        }.each do |label, char|
+          it "preserves #{label} adjacent to inline-special char" do
+            result = escaper.escape("#{char}*")
+            expect(result).to eq("#{char}\\*")
+          end
+        end
+      end
     end
 
     describe "encoding preservation" do

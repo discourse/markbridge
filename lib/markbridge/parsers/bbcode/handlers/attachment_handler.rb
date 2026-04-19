@@ -78,15 +78,14 @@ module Markbridge
             [id, filename]
           end
 
+          # Caller must have applied normalize_attrs first (whitespace already stripped).
           def preferred_id(attrs)
-            presence(attrs[:msg]) || presence(attrs[:id])
+            attrs[:msg] || attrs[:id]
           end
 
+          # Caller must have applied normalize_attrs first.
           def preferred_index(attrs)
-            explicit_index = presence(attrs[:index])
-            smf_index = presence(attrs[:id]) if attrs[:msg]
-
-            explicit_index || smf_index
+            attrs[:index] || (attrs[:id] if attrs[:msg])
           end
 
           def presence(value)
