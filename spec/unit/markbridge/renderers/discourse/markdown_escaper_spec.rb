@@ -560,6 +560,105 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
     # the CommonMark rule that 2+ trailing spaces before \n produce a <br/>.
     # With the option on, #escape rewrites "  \n" (or any 2+ trailing spaces +
     # newline) to plain "\n" before escaping. The default-false path leaves it.
+    # The #escape fast-path returns `text` unchanged (same object, no
+    # allocation) when the input has no special characters and no indented
+    # code. The slow path through escape_text always allocates a new String
+    # (via split + escape_line). Object identity is the observable difference
+    # — the `return text` keyword can't be dropped without allocation.
+    describe "#escape fast-path allocation contract" do
+      it "returns the input String (same object) when no special characters are present" do
+        input = "The quick brown fox jumps over the lazy dog"
+        expect(escaper.escape(input)).to equal(input)
+      end
+
+      it "returns a NEW string when the input contains any special character" do
+        input = "hello *world*"
+        expect(escaper.escape(input)).not_to equal(input)
+      end
+
+      it "returns a NEW string when the input contains indented code" do
+        # Tab at line start triggers MAYBE_INDENTED_CODE even with no
+        # MAYBE_SPECIAL chars elsewhere.
+        input = "foo\n\tbar"
+        expect(escaper.escape(input)).not_to equal(input)
+      end
+
+      it "returns empty string for nil input (allocation fresh)" do
+        expect(escaper.escape(nil)).to eq("")
+      end
+
+      # Same identity trick for the hard-line-break guard. When the option
+      # is on but the text has no "  \n" sequence, the gsub is skipped and
+      # text stays the same object. Mutations that drop the include? guard
+      # would force gsub (which always allocates, even with no matches).
+      it "with escape_hard_line_breaks=true, returns input unchanged when no '  \\n' sequence exists" do
+        escaper_hlb = described_class.new(escape_hard_line_breaks: true)
+        input = "nothing needs escaping here"
+        expect(escaper_hlb.escape(input)).to equal(input)
+      end
+    end
+
+    # escape_inline has its own fast-path: `return content unless
+    # INLINE_SPECIAL.match?(content)`. Mutations that drop the guard would
+    # force the byte-walk loop to run and always allocate @inline_result.
+    # The object-identity observation distinguishes the paths cleanly.
+    describe "#escape_inline fast-path allocation contract" do
+      let(:exposed_class) { Class.new(described_class) { public :escape_inline } }
+      let(:escaper) { exposed_class.new }
+
+      it "returns content (same object) when no INLINE_SPECIAL chars are present" do
+        input = "hello world 123"
+        expect(escaper.escape_inline(input)).to equal(input)
+      end
+
+      it "returns a NEW string when INLINE_SPECIAL chars are present" do
+        input = "hello *world*"
+        expect(escaper.escape_inline(input)).not_to equal(input)
+      end
+    end
+
+    # escape_block_star (and _dash) return [content, false] as a pass-through
+    # when the content matches neither the thematic-break nor the bullet-list
+    # pattern. Under mutations that force-enter a block branch (e.g. `if true`
+    # on the thematic match), escape_all_chars would allocate a new string.
+    # Tests that observe identity on the public `#escape` can't see this
+    # because inline escaping wraps the same characters anyway; direct tests
+    # on the private helper with identity matchers do.
+    describe "#escape_block_star / #escape_block_dash pass-through identity" do
+      let(:exposed_class) do
+        Class.new(described_class) { public :escape_block_star, :escape_block_dash }
+      end
+      let(:escaper) { exposed_class.new }
+
+      it "escape_block_star returns [content, false] with same-object content for `*foo`" do
+        input = "*foo"
+        result, skip_inline = escaper.escape_block_star(input)
+        expect(result).to equal(input)
+        expect(skip_inline).to be false
+      end
+
+      it "escape_block_star allocates a new string for thematic `***`" do
+        input = "***"
+        result, skip_inline = escaper.escape_block_star(input)
+        expect(result).not_to equal(input)
+        expect(skip_inline).to be true
+      end
+
+      it "escape_block_dash returns [content, false] with same-object content for `-foo`" do
+        input = "-foo"
+        result, skip_inline = escaper.escape_block_dash(input, false)
+        expect(result).to equal(input)
+        expect(skip_inline).to be false
+      end
+
+      it "escape_block_dash allocates a new string for thematic `---`" do
+        input = "---"
+        result, skip_inline = escaper.escape_block_dash(input, false)
+        expect(result).not_to equal(input)
+        expect(skip_inline).to be true
+      end
+    end
+
     # Kills `ENTITY_REF.match(remaining)` → `remaining` mutation. The public
     # entity_refs spec tolerates either-or behavior for non-entity `&`; this
     # locks in the current implementation (standalone & passes through, only
