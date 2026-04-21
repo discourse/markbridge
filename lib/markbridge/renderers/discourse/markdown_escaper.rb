@@ -162,8 +162,17 @@ module Markbridge
 
           # After INDENTED_CODE, line has at most 3 leading spaces, so the
           # `< 3` bound keeps this a tight YJIT-friendly hot loop.
+          #
+          # Split into `while <bound>` + `break if` rather than the natural
+          # `while <bound> && <byte-check>` to avoid a Ruby 3.4.8 PRISM VM
+          # bug: mutant generates `while nil && <expr>` mutations which
+          # segfault (https://bugs.ruby-lang.org/issues/22002, fixed in
+          # 3.4.10). Revisit once 3.4.10 is our minimum.
           indent_len = 0
-          indent_len += 1 while indent_len < 3 && line.getbyte(indent_len) == SPACE
+          while indent_len < 3
+            break if line.getbyte(indent_len) != SPACE
+            indent_len += 1
+          end
 
           # Whitespace-only line (1-3 spaces) — getbyte past end is nil.
           return line if line.getbyte(indent_len).nil?
@@ -375,8 +384,13 @@ module Markbridge
         end
 
         # Escape all consecutive occurrences of a repeatable character (*, _, `).
+        #
+        # Split into `while <bound>` + `break if` rather than the natural
+        # `while <bound> && <byte-check>` to avoid a Ruby 3.4.8 PRISM VM bug
+        # (https://bugs.ruby-lang.org/issues/22002, fixed in 3.4.10).
         def escape_char_run(pos, byte_val, escaped)
-          while pos < @inline_len && @inline_content.getbyte(pos) == byte_val
+          while pos < @inline_len
+            break if @inline_content.getbyte(pos) != byte_val
             @inline_result << escaped
             pos += 1
           end
