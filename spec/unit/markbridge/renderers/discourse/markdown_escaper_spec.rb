@@ -597,6 +597,35 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       it "does not apply the thematic-break escape to a single star before text" do
         expect(escaper.escape("*foo")).to eq("\\*foo")
       end
+
+      # Kills `prev_was_paragraph && SETEXT_UNDERLINE_EQUALS.match?` mutations
+      # (drop regex / `&& true` / `&& content`). Input: paragraph + "=foo"
+      # ⇒ prev_was_paragraph=true, regex fails. Under the mutation the
+      # `=foo` line would be force-escaped as a setext heading underline
+      # (`\=foo`). `=` is not in INLINE_SPECIAL so original output is bare.
+      it "does not setext-escape a =-prefixed paragraph line (regex must still apply)" do
+        expect(escaper.escape("text\n=foo")).to eq("text\n=foo")
+      end
+    end
+
+    # Locks in the "fall through to inline path" behavior for block-level
+    # markers that are not valid block constructs. The public specs allow
+    # either-or here; these strict tests kill mutations that unconditionally
+    # apply the block escape (`if true`, dropped guards, unconditional
+    # `return escape_first_char_inline`).
+    describe "#escape_block_level non-construct fall-through (via #escape)" do
+      # `#notheading` — # not followed by space/tab/end-of-line is NOT an
+      # ATX heading. Original falls through; inline doesn't escape # (not in
+      # INLINE_SPECIAL). Output is bare.
+      it "does not escape # without following space" do
+        expect(escaper.escape("#notheading")).to eq("#notheading")
+      end
+
+      # `+foo` — + not followed by space is NOT a bullet list marker.
+      # Original falls through; + is not in INLINE_SPECIAL. Output is bare.
+      it "does not escape + without following space" do
+        expect(escaper.escape("+foo")).to eq("+foo")
+      end
     end
 
     # Exercises the three escape_lt branches (autolink / HTML tag / bare <)
