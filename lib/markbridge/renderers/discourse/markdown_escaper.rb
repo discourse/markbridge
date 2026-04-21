@@ -157,7 +157,10 @@ module Markbridge
         end
 
         def escape_line(line, prev_was_paragraph)
-          return line if line.empty?
+          # No `line.empty?` early-return: it's redundant with the
+          # `line.getbyte(indent_len).nil?` guard below, which catches both
+          # empty and whitespace-only lines while also preserving object
+          # identity (returns `line`).
           return escape_indented_code(line) if INDENTED_CODE.match?(line)
 
           # After INDENTED_CODE, line has at most 3 leading spaces, so the

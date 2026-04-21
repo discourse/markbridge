@@ -598,6 +598,41 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       end
     end
 
+    # escape_line has multiple same-object returns: `return line if
+    # line.empty?`, `return line if line.getbyte(indent_len).nil?` (whitespace-
+    # only lines), and for non-indented content with no specials the final
+    # `escaped.force_encoding(line.encoding)` returns self (line itself).
+    # Mutations that drop any of these guards force an allocation path.
+    describe "#escape_line fast-path allocation contract" do
+      let(:exposed_class) { Class.new(described_class) { public :escape_line } }
+      let(:escaper) { exposed_class.new }
+
+      it "returns line (same object) for an empty line" do
+        input = +""
+        expect(escaper.escape_line(input, false)).to equal(input)
+      end
+
+      it "returns line (same object) for a whitespace-only line (1-3 spaces)" do
+        input = +"   "
+        expect(escaper.escape_line(input, false)).to equal(input)
+      end
+
+      it "returns line (same object) for non-indented non-special content" do
+        input = +"hello world"
+        expect(escaper.escape_line(input, false)).to equal(input)
+      end
+
+      it "allocates a new string for indented (1-3 space) content" do
+        input = "  foo"
+        expect(escaper.escape_line(input, false)).not_to equal(input)
+      end
+
+      it "allocates a new string for content containing inline specials" do
+        input = "hello *world*"
+        expect(escaper.escape_line(input, false)).not_to equal(input)
+      end
+    end
+
     # escape_inline has its own fast-path: `return content unless
     # INLINE_SPECIAL.match?(content)`. Mutations that drop the guard would
     # force the byte-walk loop to run and always allocate @inline_result.
