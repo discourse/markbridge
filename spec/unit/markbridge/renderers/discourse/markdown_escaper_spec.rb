@@ -560,6 +560,46 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
     # the CommonMark rule that 2+ trailing spaces before \n produce a <br/>.
     # With the option on, #escape rewrites "  \n" (or any 2+ trailing spaces +
     # newline) to plain "\n" before escaping. The default-false path leaves it.
+    # Kills `ENTITY_REF.match(remaining)` → `remaining` mutation. The public
+    # entity_refs spec tolerates either-or behavior for non-entity `&`; this
+    # locks in the current implementation (standalone & passes through, only
+    # valid entities get the leading backslash).
+    describe "#escape_amp branches (via #escape)" do
+      it "passes standalone & through unchanged (no entity follows)" do
+        expect(escaper.escape("AT&T")).to eq("AT&T")
+      end
+    end
+
+    # Exercises the three escape_lt branches (autolink / HTML tag / bare <)
+    # and the pos-advance math. The html_spec covers simple inputs; these
+    # add cases where a mutation would only change output for specific
+    # content (inline specials inside autolink, surrounding content, or
+    # multiple backticks inside an HTML tag).
+    describe "#escape_lt branches (via #escape)" do
+      # `AUTOLINK.match(remaining)` → `nil`: autolink check fails, falls to
+      # else. If autolink contains inline specials, those would be escaped
+      # in the mutated version but preserved in the original.
+      it "preserves inline specials inside an autolink URL" do
+        expect(escaper.escape("<http://example.com/path*with*stars>")).to eq(
+          "<http://example.com/path*with*stars>",
+        )
+      end
+
+      # `pos + matched.bytesize` → `matched.bytesize`: the return value
+      # advances to match length instead of past the match, causing main
+      # loop to re-process bytes. Tests with content before the autolink
+      # expose the wrong advance.
+      it "advances past autolink without re-processing matched bytes" do
+        expect(escaper.escape("foo<http://x>bar")).to eq("foo<http://x>bar")
+      end
+
+      # `gsub` → `sub` in the HTML-tag backtick escape: only first backtick
+      # is escaped under mutation. Need ≥2 backticks in the tag attribute.
+      it "escapes every backtick in an HTML tag attribute (gsub not sub)" do
+        expect(escaper.escape('<a title="`a` `b`">')).to eq('\\<a title="\\`a\\` \\`b\\`">')
+      end
+    end
+
     # Exercises the private escape_image_open branches directly. The public
     # links spec uses "MAY escape" tolerance; these tests lock in the
     # current implementation (standalone ! passes through; ![ escapes to \!\[
