@@ -158,36 +158,28 @@ module Markbridge
 
         def escape_line(line, prev_was_paragraph)
           return line if line.empty?
-
-          # Handle indented code blocks first
           return escape_indented_code(line) if INDENTED_CODE.match?(line)
 
-          # Extract 0-3 space indent
-          line_length = line.length
+          # After INDENTED_CODE, line has at most 3 leading spaces, so the
+          # `< 3` bound keeps this a tight YJIT-friendly hot loop.
           indent_len = 0
-          while indent_len < 3 && indent_len < line_length && line.getbyte(indent_len) == SPACE
-            indent_len += 1
-          end
+          indent_len += 1 while indent_len < 3 && line.getbyte(indent_len) == SPACE
 
-          return line if indent_len >= line_length
+          # Whitespace-only line (1-3 spaces) — getbyte past end is nil.
+          return line if line.getbyte(indent_len).nil?
 
           has_indent = indent_len > 0
           content = has_indent ? line[indent_len..] : line
 
-          # Apply block-level escaping (which may also do inline escaping)
           escaped, skip_inline = escape_block_level(content, prev_was_paragraph)
-
-          # Apply inline escaping if block-level didn't handle it
           escaped = escape_inline(escaped) unless skip_inline
 
-          # Prepend indent if present, preserve encoding
           if has_indent
-            encoding = line.encoding
-            result = String.new(encoding:)
+            result = String.new(encoding: line.encoding)
             result << line[0, indent_len] << escaped
             result
           else
-            escaped.is_a?(String) ? escaped.force_encoding(line.encoding) : escaped
+            escaped.force_encoding(line.encoding)
           end
         end
 
