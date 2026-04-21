@@ -570,6 +570,35 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       end
     end
 
+    # Locks in the "fall through to inline path" behavior for block-level
+    # dashes/stars that are neither thematic breaks nor bullet lists.
+    # The public bullet_lists/thematic_breaks specs tolerate either-or here;
+    # these tests kill `if true` / dropped-guard mutations on the thematic
+    # branch that would otherwise force the thematic escape for non-thematic
+    # content.
+    describe "#escape_block_dash and #escape_block_star fall-through (via #escape)" do
+      it "does not apply the thematic-break escape to a single dash before text" do
+        # "-foo" — not a bullet (no space after), not a thematic break.
+        # Falls through to inline; DASH at line start with non-DASH next is
+        # passed through as a bare `-`.
+        expect(escaper.escape("-foo")).to eq("-foo")
+      end
+
+      # Kills `prev_was_paragraph && SETEXT_UNDERLINE_DASH.match?` mutations
+      # that reduce to just `prev_was_paragraph` (drop regex / `&& true`).
+      # Input: paragraph + "-foo" ⇒ prev_was_paragraph=true, but SETEXT
+      # regex fails (SETEXT_UNDERLINE_DASH matches dashes+whitespace only).
+      # Under the mutation the `-foo` line would be force-escaped as a
+      # thematic break (`\-foo`) instead of the bare `-foo` passthrough.
+      it "does not setext-escape a dash-prefixed paragraph line (regex must still apply)" do
+        expect(escaper.escape("text\n-foo")).to eq("text\n-foo")
+      end
+
+      it "does not apply the thematic-break escape to a single star before text" do
+        expect(escaper.escape("*foo")).to eq("\\*foo")
+      end
+    end
+
     # Exercises the three escape_lt branches (autolink / HTML tag / bare <)
     # and the pos-advance math. The html_spec covers simple inputs; these
     # add cases where a mutation would only change output for specific
