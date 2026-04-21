@@ -587,6 +587,14 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(escaper.escape(nil)).to eq("")
       end
 
+      # Kills the `escape_line(lines[0], false)` → `escape_line(lines[0], true)`
+      # mutation in escape_text. With prev_was_paragraph=true, a lone `=` is
+      # treated as a setext heading underline and gets escaped; original (false)
+      # leaves it bare because there's no previous paragraph.
+      it "treats first-line `=` as not-a-setext-underline (prev_was_paragraph=false)" do
+        expect(escaper.escape("=")).to eq("=")
+      end
+
       # Same identity trick for the hard-line-break guard. When the option
       # is on but the text has no "  \n" sequence, the gsub is skipped and
       # text stays the same object. Mutations that drop the include? guard
@@ -649,6 +657,52 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       it "returns a NEW string when INLINE_SPECIAL chars are present" do
         input = "hello *world*"
         expect(escaper.escape_inline(input)).not_to equal(input)
+      end
+
+      # Kills mutations that drop the `encoding: content.encoding` kwarg on
+      # @inline_result = String.new(...). Without it, the buffer defaults to
+      # ASCII-8BIT. The downstream `escape_line#force_encoding` masks this
+      # at the public #escape level, but direct tests here can observe it.
+      it "allocates @inline_result with content.encoding (UTF-8 in / UTF-8 out)" do
+        input = "hello *world*".encode(Encoding::UTF_8)
+        expect(escaper.escape_inline(input).encoding).to eq(Encoding::UTF_8)
+      end
+    end
+
+    # escape_block_level dispatches to the right case arm by first-byte. For
+    # block constructs that allocate (thematic/fenced/setext/ordered list),
+    # identity on the returned tuple distinguishes the dispatched branch
+    # from the fall-through `[content, false]` that mutations `when nil`
+    # produce. Skip flag completes the contract.
+    describe "#escape_block_level case-arm identity" do
+      let(:exposed_class) { Class.new(described_class) { public :escape_block_level } }
+      let(:escaper) { exposed_class.new }
+
+      {
+        "fenced code backtick" => ["```", true],
+        "fenced code tilde" => ["~~~", true],
+        "thematic underscore" => ["___", true],
+        "ordered list" => ["1. item", true],
+      }.each do |label, (input, skip)|
+        it "dispatches #{label} to the block branch (allocates, skip_inline=#{skip})" do
+          result, skip_inline = escaper.escape_block_level(input, false)
+          expect(result).not_to equal(input)
+          expect(skip_inline).to be skip
+        end
+      end
+
+      it "dispatches setext-equals (with prev paragraph) to block branch" do
+        input = "=="
+        result, skip_inline = escaper.escape_block_level(input, true)
+        expect(result).not_to equal(input)
+        expect(skip_inline).to be true
+      end
+
+      it "falls through for non-block first-byte (identity preserves input)" do
+        input = "hello"
+        result, skip_inline = escaper.escape_block_level(input, false)
+        expect(result).to equal(input)
+        expect(skip_inline).to be false
       end
     end
 
