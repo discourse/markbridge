@@ -122,8 +122,7 @@ module Markbridge
         # @return [String] the escaped text, or empty string if input is nil
         # @note Multi-line HTML tags and blocks are handled by escaping the opening <
         def escape(text)
-          return "".freeze if text.nil?
-          return text if text.empty?
+          return "" if text.nil?
 
           # Neutralize hard line breaks (trailing 2+ spaces before newline)
           text = text.gsub(/  +\n/, "\n") if @escape_hard_line_breaks && text.include?("  \n")
@@ -474,39 +473,40 @@ module Markbridge
         end
 
         def paragraph_line?(line)
-          return false if line.empty?
-
-          line_length = line.length
           first_non_space = 0
-          while first_non_space < line_length && line.getbyte(first_non_space) == SPACE
-            first_non_space += 1
-          end
-          return false if first_non_space >= line_length || line.getbyte(first_non_space) == TAB
+          first_non_space += 1 while line.getbyte(first_non_space) == SPACE
 
-          content = first_non_space <= 3 ? line[first_non_space..] : line
+          # Empty or whitespace-only lines: getbyte past the end returns nil.
+          return false if line.getbyte(first_non_space).nil?
 
-          # Lines starting with [ get escaped to \[, which IS paragraph content
-          # So setext headings CAN follow them
-          return true if content.getbyte(0) == BRACKET_OPEN
+          # Indented code (4+ spaces or any leading \t) is not a paragraph.
+          # INDENTED_CODE also catches lines where first_non_space > 3, so no
+          # separate numeric boundary check is needed.
+          return false if INDENTED_CODE.match?(line)
 
-          !block_construct?(content) && !INDENTED_CODE.match?(line)
+          content = first_non_space == 0 ? line : line[first_non_space..]
+
+          # Lines starting with [ are paragraph content (the escaper rewrites [
+          # to \[). block_construct? has no BRACKET_OPEN case arm, so such
+          # lines naturally fall through and !block_construct?(content) == true.
+          !block_construct?(content)
         end
 
         # Checks whether content starts with a block-level markdown construct.
         # Used by both escape_block_level (to decide what to escape) and
         # paragraph_line? (to decide if setext underlines can follow).
         def block_construct?(content)
-          first_byte = content.getbyte(0)
-
-          case first_byte
+          case content.getbyte(0)
           when HASH
             ATX_HEADING.match?(content)
           when GT
             true
-          when DASH, PLUS, STAR
-            BULLET_LIST.match?(content) ||
-              (first_byte == DASH && THEMATIC_BREAK_DASH.match?(content)) ||
-              (first_byte == STAR && THEMATIC_BREAK_STAR.match?(content))
+          when DASH
+            BULLET_LIST.match?(content) || THEMATIC_BREAK_DASH.match?(content)
+          when STAR
+            BULLET_LIST.match?(content) || THEMATIC_BREAK_STAR.match?(content)
+          when PLUS
+            BULLET_LIST.match?(content)
           when UNDERSCORE
             THEMATIC_BREAK_UNDERSCORE.match?(content)
           when BACKTICK

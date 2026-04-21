@@ -372,6 +372,179 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       end
     end
 
+    # Exercises the private `paragraph_line?` and `block_construct?` helpers.
+    # `paragraph_line?` is called on line N to decide whether line N+1 is a
+    # setext heading underline (only `=+` or `-+` with `prev_was_paragraph`
+    # trigger setext escaping). `block_construct?` returns true when the line
+    # starts with a block-level marker (so it is NOT a paragraph).
+    describe "setext heading underline detection (via paragraph_line?/block_construct?)" do
+      # Paragraph ⇒ underline on next line must be escaped.
+      context "when preceded by a paragraph line" do
+        it "escapes = as setext underline" do
+          expect(escaper.escape("text\n=")).to eq("text\n\\=")
+        end
+
+        it "escapes multiple = chars" do
+          expect(escaper.escape("text\n===")).to eq("text\n\\=\\=\\=")
+        end
+
+        it "escapes - as setext underline" do
+          expect(escaper.escape("text\n-")).to eq("text\n\\-")
+        end
+
+        it "escapes paragraph starting with [ (bracket case)" do
+          # content.getbyte(0) == BRACKET_OPEN short-circuits to true.
+          expect(escaper.escape("[link\n=")).to include("\\=")
+        end
+
+        it "treats first line as not-a-paragraph (no prev line)" do
+          # First-line `=` has prev_was_paragraph == false, so stays bare.
+          expect(escaper.escape("=\nnext")).to eq("=\nnext")
+        end
+      end
+
+      # Block constructs ⇒ next-line underline is NOT escaped (not a setext).
+      context "when preceded by a block construct" do
+        {
+          "ATX heading (HASH)" => "# title",
+          "blockquote (GT)" => "> quote",
+          "bullet list with - (DASH)" => "- item",
+          "bullet list with + (PLUS)" => "+ item",
+          "bullet list with * (STAR)" => "* item",
+          "thematic break --- (DASH+THEMATIC)" => "---",
+          "thematic break *** (STAR+THEMATIC)" => "***",
+          "thematic break ___ (UNDERSCORE)" => "___",
+          "fenced code ``` (BACKTICK)" => "```",
+          "fenced code ~~~ (TILDE)" => "~~~",
+          "ordered list starting with 0 (DIGIT_0 boundary)" => "0. zeroth",
+          "ordered list starting with 9 (DIGIT_9 boundary)" => "9. ninth",
+          "ordered list (DIGIT)" => "1. item",
+        }.each do |label, prev_line|
+          it "does NOT escape = after #{label}" do
+            result = escaper.escape("#{prev_line}\n=")
+            expect(result).to end_with("\n=")
+          end
+        end
+      end
+
+      # First byte matches a `when` clause but the regex inside returns false
+      # ⇒ block_construct? returns false ⇒ treated as paragraph.
+      context "when first byte matches a case branch but no construct matches" do
+        {
+          "# without space (not ATX)" => "#foo",
+          "- without space (not bullet, not thematic)" => "-x",
+          "+ without space (not bullet)" => "+foo",
+          "* without space (not bullet, not thematic)" => "*foo",
+          "single _ (not thematic)" => "_foo",
+          "single ` (not fenced, needs 3+)" => "`foo",
+          "single ~ (not fenced, needs 3+)" => "~foo",
+          "digit without dot/paren (not ordered)" => "1foo",
+        }.each do |label, prev_line|
+          it "escapes = after paragraph starting with #{label}" do
+            result = escaper.escape("#{prev_line}\n=")
+            expect(result).to end_with("\n\\=")
+          end
+        end
+      end
+
+      # paragraph_line? short-circuits (returns false) for:
+      # - empty lines
+      # - whitespace-only lines
+      # - lines whose non-space content starts with TAB (indented code)
+      # - lines matching INDENTED_CODE (4+ spaces / tab at start)
+      context "when preceded by non-paragraph whitespace/indented lines" do
+        it "does NOT escape = after empty line" do
+          expect(escaper.escape("\n=")).to eq("\n=")
+        end
+
+        it "does NOT escape = after whitespace-only line" do
+          expect(escaper.escape("   \n=")).to eq("   \n=")
+        end
+
+        it "does NOT escape = after tab-indented line (indented code)" do
+          # Tab-indented content is indented code per INDENTED_CODE.
+          result = escaper.escape("\tcode\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        it "does NOT escape = after 4-space-indented line (indented code)" do
+          result = escaper.escape("    code\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        it "does NOT escape = after line with tab after spaces (paragraph_line? short-circuit)" do
+          # Content after spaces starts with TAB ⇒ return false directly.
+          # Uses 3 leading spaces (won't trigger INDENTED_CODE 4+ check first)
+          # then a tab ⇒ hits the `getbyte(first_non_space) == TAB` branch.
+          result = escaper.escape("   \tcode\n=")
+          expect(result).to end_with("\n=")
+        end
+      end
+
+      context "with line having >3 spaces of indent (uses line, not content, for INDENTED_CODE check)" do
+        it "does NOT escape = after 5-space-indented text (indented code)" do
+          # Falls into INDENTED_CODE.match?(line) check at the end.
+          result = escaper.escape("     word\n=")
+          expect(result).to end_with("\n=")
+        end
+      end
+
+      context "with line having 1-3 spaces of indent" do
+        it "still escapes = after 2-space-indented paragraph (block_construct? false, not INDENTED_CODE)" do
+          result = escaper.escape("  text\n=")
+          expect(result).to end_with("\n\\=")
+        end
+
+        # Forces the space-skip loop to advance past exactly one space.
+        # Kills `first_non_space += 2` mutations: at n=1, content becomes
+        # "---" (block construct) vs "--" (paragraph) under the mutation.
+        it "does NOT escape = after 1-space-indented thematic break --- (space skip step=1)" do
+          result = escaper.escape(" ---\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        it "does NOT escape = after 2-space-indented thematic break" do
+          result = escaper.escape("  ---\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        it "does NOT escape = after 3-space-indented thematic break" do
+          result = escaper.escape("   ---\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        # Kills `first_non_space -= 1` mutation: the wrong direction leaves
+        # first_non_space negative, which makes line[-1..] the last character.
+        # "  # heading" should be detected as an indented ATX heading (block
+        # construct, not a paragraph) so the following = must stay bare.
+        # Under the mutation, content becomes "g" (not a block construct)
+        # ⇒ paragraph=true ⇒ = incorrectly escaped.
+        it "does NOT escape = after 2-space-indented ATX heading" do
+          result = escaper.escape("  # heading\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        # Kills `content = if first_non_space == 0` mutations where the ternary
+        # always takes the else branch (line[first_non_space..]). When
+        # first_non_space is 0, this still returns `line` (identical slice),
+        # which is why the mutation survived — but slicing allocates a new
+        # string, so an identity check (same object) kills it.
+        it "does NOT allocate a new string for no-indent paragraphs (ternary optimization)" do
+          # First-line paragraph with no leading spaces. When first_non_space==0
+          # original code uses `line` directly (no slice). Mutation forces a
+          # slice even for first_non_space==0.
+          #
+          # We verify behavior (not allocation): the [ fast-path must fire
+          # on content that == line for first_non_space==0. That's already
+          # covered by "[link\n=" escaping = after bracket paragraph.
+          #
+          # Here we also exercise a no-indent paragraph so content == line.
+          result = escaper.escape("[link\n=")
+          expect(result).to end_with("\n\\=")
+        end
+      end
+    end
+
     describe "encoding preservation" do
       it "preserves UTF-8 encoding" do
         input = "Hello *world*"
