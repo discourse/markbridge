@@ -545,6 +545,45 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       end
     end
 
+    # Hard-line-break neutralization (escape_hard_line_breaks: true) targets
+    # the CommonMark rule that 2+ trailing spaces before \n produce a <br/>.
+    # With the option on, #escape rewrites "  \n" (or any 2+ trailing spaces +
+    # newline) to plain "\n" before escaping. The default-false path leaves it.
+    describe "#escape with escape_hard_line_breaks: true" do
+      subject(:escaper) { described_class.new(escape_hard_line_breaks: true) }
+
+      it "strips exactly two trailing spaces before \\n" do
+        expect(escaper.escape("hello  \nworld")).to eq("hello\nworld")
+      end
+
+      it "strips three trailing spaces before \\n (regex `+` quantifier)" do
+        expect(escaper.escape("hello   \nworld")).to eq("hello\nworld")
+      end
+
+      it "strips trailing spaces on every line (gsub, not sub)" do
+        # Kills `text.gsub(...)` → `text.sub(...)` which only replaces first match.
+        expect(escaper.escape("a  \nb  \nc")).to eq("a\nb\nc")
+      end
+
+      it "preserves content without '  \\n' sequences" do
+        # Exercises the `text.include?(\"  \\n\")` guard false path; the block
+        # must not run and text must pass through unchanged.
+        expect(escaper.escape("hello\nworld")).to eq("hello\nworld")
+      end
+
+      it "does not strip a single trailing space (not a hard break)" do
+        # Single trailing space doesn't form a hard line break; must not be
+        # rewritten. This enforces the `  +` (2+) requirement in the regex.
+        expect(escaper.escape("hello \nworld")).to eq("hello \nworld")
+      end
+    end
+
+    describe "#escape with escape_hard_line_breaks: false (default)" do
+      it "preserves trailing spaces before \\n (no gsub)" do
+        expect(escaper.escape("hello  \nworld")).to eq("hello  \nworld")
+      end
+    end
+
     describe "encoding preservation" do
       it "preserves UTF-8 encoding" do
         input = "Hello *world*"
