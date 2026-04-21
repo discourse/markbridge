@@ -252,6 +252,17 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(result).to eq("\n\n\n")
       end
 
+      # Kills `text.split("\n", -1)` → `text.split("\n", 0)` mutation.
+      # split(0) drops trailing empty strings, so "# h\n" becomes ["# h"]
+      # instead of ["# h", ""] and the trailing newline is lost.
+      it "preserves a single trailing newline on escaped content" do
+        expect(escaper.escape("# h\n")).to eq("\\# h\n")
+      end
+
+      it "preserves multiple trailing newlines on escaped content" do
+        expect(escaper.escape("# h\n\n\n")).to eq("\\# h\n\n\n")
+      end
+
       it "handles mixed indentation (4+ spaces converted to NBSP)" do
         nbsp = "\u00A0"
         input = "  text\n    more\n\tindented"
@@ -549,6 +560,30 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
     # the CommonMark rule that 2+ trailing spaces before \n produce a <br/>.
     # With the option on, #escape rewrites "  \n" (or any 2+ trailing spaces +
     # newline) to plain "\n" before escaping. The default-false path leaves it.
+    # Exercises the private escape_image_open branches directly. The public
+    # links spec uses "MAY escape" tolerance; these tests lock in the
+    # current implementation (standalone ! passes through; ![ escapes to \!\[
+    # with a 2-byte advance so the bracket isn't re-processed).
+    describe "#escape_image_open branches (via #escape)" do
+      it "passes standalone ! through unchanged at end of string" do
+        expect(escaper.escape("hi!")).to eq("hi!")
+      end
+
+      it "passes ! followed by non-[ through unchanged" do
+        expect(escaper.escape("hi!foo")).to eq("hi!foo")
+      end
+
+      # `![` → `\!\[`. Advance MUST be +2 (past both bytes). A +1 advance
+      # would re-dispatch [ and double-escape it to `\!\[\[`.
+      it "advances past ![ together (not +1 which would re-dispatch [)" do
+        expect(escaper.escape("![")).to eq("\\!\\[")
+      end
+
+      it "advances past ![ without re-escaping the [ when more follows" do
+        expect(escaper.escape("![a")).to eq("\\!\\[a")
+      end
+    end
+
     describe "#escape with escape_hard_line_breaks: true" do
       subject(:escaper) { described_class.new(escape_hard_line_breaks: true) }
 

@@ -203,6 +203,8 @@ module Markbridge
           # - Content doesn't start at valid block position (no lists, headings, etc.)
           # - Visual indentation is preserved (NBSP renders as space)
           # We still escape inline content since it's no longer protected.
+          # Caller (escape_line) guarantees INDENTED_CODE matched, so line
+          # starts with at least one SPACE or TAB; ws_end is always ≥ 1.
           line_length = line.length
           ws_end = 0
           while ws_end < line_length
@@ -211,7 +213,6 @@ module Markbridge
             ws_end += 1
           end
 
-          return line if ws_end == 0 # No leading whitespace (shouldn't happen, but safe)
           return line if ws_end >= line_length # Whitespace-only line
 
           # Convert leading whitespace to NBSP (tab = 4 NBSP for visual consistency)
