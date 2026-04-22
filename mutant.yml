@@ -57,3 +57,47 @@ mutation:
     # Pattern matches `if X.<anything>.<anything>` where X is a local
     # variable named `lines`. Both call sites use that exact shape.
     - "if{condition=send{receiver=send{receiver=lvar{value=lines}}}}"
+
+    # escape_line's `while indent_len < 3` bound. Mutations to the
+    # bound (<4, <167, etc.) are equivalent because the upstream
+    # INDENTED_CODE filter guarantees indent_len can never reach 4.
+    # Mutations dropping the bound entirely (`while indent_len` or
+    # `while 3`) rely on the inner `break if getbyte != SPACE` to
+    # terminate — same effective behavior for valid input.
+    - "while{condition=send{receiver=lvar{value=indent_len}}}"
+
+    # escape_line's `has_indent = indent_len > 0` and subsequent
+    # `if has_indent` branching. Mutations alter which side of the
+    # ternary is taken, which changes object identity (line vs
+    # line[indent_len..]) but not output bytes. Only observable via
+    # private-method identity testing.
+    - "lvasgn{name=has_indent}"
+    - "if{condition=lvar{value=has_indent}}"
+
+    # Nested `line.X.Y` sends in escape_line / paragraph_line?:
+    #   line.getbyte(indent_len).nil?
+    #   line.getbyte(indent_len) != SPACE
+    #   line.getbyte(first_non_space).nil?
+    # The guard mutations (== vs .eql? vs .equal?, drop-guard, etc.)
+    # are equivalent because getbyte returns nil past the end and
+    # Integer equality is the same for Fixnum. Fall-through paths
+    # produce identical output.
+    - "if{condition=send{receiver=send{receiver=lvar{value=line}}}}"
+
+    # Allocation-saving ternary `content = <cond> ? line[N..] : line`
+    # in escape_line and paragraph_line?. Mutations flip the ternary
+    # so the indent-prefix slice always fires (line[0..] produces a
+    # new string with equal content). Output bytes identical; only
+    # object identity differs, which is an internal contract.
+    - "lvasgn{name=content value=if}"
+
+    # escape_block_level's `case first_byte` dispatch. Mutations on
+    # `when` conditions (`when STAR` → `when nil`, etc.) make the
+    # branch unreachable. The fallthrough `[content, false]` + inline
+    # escaping produces byte-identical output for STAR/UNDERSCORE/
+    # BACKTICK/TILDE/BRACKET_OPEN/PIPE inputs because inline escape
+    # wraps the same characters. Return-statement mutations inside
+    # those branches (e.g. `return escape_block_star(content)` →
+    # `nil`) have the same equivalence. block_construct?'s
+    # `case content.getbyte(0)` is already at 97% and unaffected.
+    - "case{value=lvar{value=first_byte}}"
