@@ -163,23 +163,18 @@ expect(token).to match_tag_end("b")
 - Keep tests independent (random order execution)
 - Use `expect`, never `should`
 
-## Mutation Testing
-
-Workflow, report-reading conventions, decision heuristics ("add test"
-vs "simplify code" vs "unkillable"), BLUF reporting format, and the
-"ignore with rationale comment" pattern live in the vendored mutant
-skill at `.claude/skills/mutant/SKILL.md` (pinned upstream commit).
-Claude Code auto-loads it via its triggers — read it first when
-working on mutation coverage.
-
-**Markbridge-specific (in addition to the skill):**
+## Mutation Testing — markbridge-specific
 
 - Project wrapper is `bin/mutant`, not `bundle exec mutant`.
 - Line coverage must not regress. Capture baseline with
   `COVERAGE=1 bin/rspec` before changes; re-run after to compare.
-- No `send`/`__send__` for private methods in tests just to satisfy
-  mutant. Publicize via a test-only subclass (`Class.new(described_class) { public :helper }`)
-  — see `spec/unit/markbridge/renderers/discourse/markdown_escaper/utf8_char_length_spec.rb`.
+- Test through the public API only. No `send`/`__send__` to reach
+  private methods, and no test-only subclasses that publicize them
+  (`Class.new(described_class) { public :helper }`). Both couple the
+  tests to internal structure and defeat the point of `private`. If a
+  mutation is only observable by calling a private method directly,
+  add it to the `mutant.yml` ignore list (with the required comment
+  from the skill) — don't reach behind the curtain.
 - No stubbing or mocking the SUT (the class currently being mutated).
 - `MarkdownEscaper` is a hot path. Benchmark (`bundle exec ruby --yjit /tmp/bench_escaper.rb`)
   before/after any change to `lib/markbridge/renderers/discourse/markdown_escaper.rb`.
