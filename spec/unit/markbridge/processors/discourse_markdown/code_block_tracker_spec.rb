@@ -104,6 +104,35 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_fenced_block).to be false
     end
 
+    # Kills mutations that drop `fence_length >= @fence_length` from
+    # try_close_fence's guard. A candidate closing fence with FEWER
+    # chars than the opening must not close it.
+    it "rejects closing fence with fewer characters than opening" do
+      input = "````\ncode\n```\ncontent"
+      # Open with 4 backticks
+      tracker.check_fenced_boundary(input, 0, line_start: true)
+      expect(tracker.in_fenced_block).to be true
+
+      # "```" (3 backticks) should NOT close the 4-backtick fence
+      new_pos = tracker.check_fenced_boundary(input, 10, line_start: true)
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be true
+    end
+
+    # Kills mutations that drop `input[scan_pos] == "\n"` from the
+    # trailing-whitespace guard. After a closing fence with non-newline
+    # non-space trailing content (e.g. "```XYZ"), it must NOT close.
+    it "rejects closing fence followed by non-space non-newline content" do
+      input = "```\ncode\n```XYZ"
+      tracker.check_fenced_boundary(input, 0, line_start: true)
+      expect(tracker.in_fenced_block).to be true
+
+      # "```XYZ" has trailing "XYZ" — not spaces-then-newline/EOF
+      new_pos = tracker.check_fenced_boundary(input, 9, line_start: true)
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be true
+    end
+
     it "handles fence with language identifier" do
       input = "```ruby\ncode\n```"
       new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
