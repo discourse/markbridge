@@ -150,9 +150,17 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
     it "handles malformed HTML gracefully" do
       doc = parser.parse("<b>bold <i>italic</b></i>")
 
-      # Nokogiri fixes the nesting
-      expect(doc.children.size).to eq(1)
-      expect(doc.children[0]).to be_a(Markbridge::AST::Bold)
+      # Nokogiri recovers from the mismatched tags. The exact tree shape is
+      # parser-dependent (libxml2 reparents into <b><i>…</i></b>; JRuby's
+      # NekoHTML leaves <b> and <i> as siblings), but the content survives
+      # and the top-level node is always the <b>.
+      expect(doc.children.first).to be_a(Markbridge::AST::Bold)
+
+      collect_text = ->(node) do
+        return node.text if node.is_a?(Markbridge::AST::Text)
+        node.respond_to?(:children) ? node.children.map(&collect_text).join : ""
+      end
+      expect(collect_text.call(doc)).to include("bold", "italic")
     end
 
     it "handles empty input" do
