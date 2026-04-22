@@ -5,6 +5,11 @@ module Markbridge
     module HTML
       # Parses HTML into an AST using Nokogiri
       class Parser
+        # Tags whose contents should be dropped entirely (not emitted as text).
+        # These are raw-text/metadata elements whose children are either CSS,
+        # JavaScript, or document metadata that shouldn't appear in output.
+        IGNORED_TAGS = %w[style script head title noscript template].freeze
+
         attr_reader :unknown_tags
 
         # Create a new parser with optional custom handlers
@@ -76,6 +81,8 @@ module Markbridge
         # @param parent [AST::Element]
         def process_element_node(node, parent)
           tag_name = node.name.downcase
+          return if IGNORED_TAGS.include?(tag_name)
+
           handler = @handlers[tag_name]
 
           if handler
