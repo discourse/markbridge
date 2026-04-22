@@ -31,11 +31,12 @@ module Markbridge
 
         def initialize
           @in_fenced_block = false
-          @fence_char = nil
-          @fence_length = 0
           @in_indented_block = false
           @in_inline_code = false
-          @inline_delimiter = nil
+          # @fence_char / @fence_length / @inline_delimiter are set by
+          # open_fence / open_inline before any helper reads them;
+          # they're only consulted when the corresponding in_X flag is
+          # true, which requires a prior open_* call.
         end
 
         # Check if currently inside any code context
