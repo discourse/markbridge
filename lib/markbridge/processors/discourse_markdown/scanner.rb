@@ -49,13 +49,8 @@ module Markbridge
         def initialize(detectors: DEFAULT_DETECTORS, tag_library: nil, mention_resolver: nil)
           @detector_instances = build_detectors(detectors, mention_resolver)
           @tag_library = tag_library
-          @code_tracker = nil
-          @result = nil
-          @nodes = nil
-          @node_index = 0
-          @pos = 0
-          @input = nil
-          @line_start = true
+          # @code_tracker / @result / @nodes / @node_index / @pos / @input /
+          # @line_start are set by #scan before use; no defensive init needed.
         end
 
         # Scan input and extract constructs.
