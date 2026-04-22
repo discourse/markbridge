@@ -29,65 +29,48 @@ mutation:
     # public #escape API. The only observable difference is allocation
     # count on the fast-path (identity preservation), which we could
     # only test by reaching into private methods. Tried and rejected
-    # per project policy. The pattern ignores the surrounding `if` when
-    # its condition is a send to the named regex constant.
-    - "if{condition=send{receiver=const{name=INLINE_SPECIAL}}}"
-    - "if{condition=send{receiver=const{name=THEMATIC_BREAK_STAR}}}"
-    - "if{condition=send{receiver=const{name=THEMATIC_BREAK_UNDERSCORE}}}"
-    - "if{condition=send{receiver=const{name=FENCED_CODE_BACKTICK}}}"
-    - "if{condition=send{receiver=const{name=FENCED_CODE_TILDE}}}"
-    - "if{condition=send{receiver=const{name=BULLET_LIST}}}"
+    # per project policy.
+    - "if{condition=send{receiver=const{name=INLINE_SPECIAL} selector=match?}}"
+    - "if{condition=send{receiver=const{name=THEMATIC_BREAK_STAR} selector=match?}}"
+    - "if{condition=send{receiver=const{name=THEMATIC_BREAK_UNDERSCORE} selector=match?}}"
+    - "if{condition=send{receiver=const{name=FENCED_CODE_BACKTICK} selector=match?}}"
+    - "if{condition=send{receiver=const{name=FENCED_CODE_TILDE} selector=match?}}"
+    - "if{condition=send{receiver=const{name=BULLET_LIST} selector=match?}}"
 
     # escape_block_dash's thematic-or-setext check uses a compound
     # `|| (prev && setext.match?)` condition. Same equivalence as the
     # single-regex fast-paths above (inline escapes dashes identically
     # when the block fallthrough fires).
-    - "if{condition=or{left=send{receiver=const{name=THEMATIC_BREAK_DASH}}}}"
+    - "if{condition=or{left=send{receiver=const{name=THEMATIC_BREAK_DASH} selector=match?}}}"
 
     # Single-line fast-paths: `return ... if lines.size == 1` appears in
     # both MarkdownEscaper#escape_text and ListItemBuilder#build. In both
     # cases the main-loop path produces byte-identical output for single-
-    # line input, so mutations on the guard / the `lines[0]` arg / the
-    # split limit all survive. Tried: identity tests through #escape —
-    # fails because split + result-buffer always allocate anyway, so
-    # fast-path-taken vs main-loop-run-once outputs differ only by
-    # object identity *inside* escape_text, which isn't observable from
-    # outside without reaching a private method.
-    #
-    # Pattern matches `if X.<anything>.<anything>` where X is a local
-    # variable named `lines`. Both call sites use that exact shape.
-    - "if{condition=send{receiver=send{receiver=lvar{value=lines}}}}"
+    # line input, so mutations on the `lines.size == 1` guard survive
+    # (the fast-path allocation-identity isn't observable through the
+    # public API because split + result-buffer allocate regardless).
+    - "if{condition=send{receiver=send{receiver=lvar{value=lines} selector=size} selector=(==)}}"
 
     # escape_line's `while indent_len < 3` bound. Mutations to the
     # bound (<4, <167, etc.) are equivalent because the upstream
     # INDENTED_CODE filter guarantees indent_len can never reach 4.
-    # Mutations dropping the bound entirely (`while indent_len` or
-    # `while 3`) rely on the inner `break if getbyte != SPACE` to
-    # terminate — same effective behavior for valid input.
-    - "while{condition=send{receiver=lvar{value=indent_len}}}"
+    - "while{condition=send{receiver=lvar{value=indent_len} selector=<}}"
 
     # escape_line's `has_indent = indent_len > 0` and subsequent
     # `if has_indent` branching. Mutations alter which side of the
     # ternary is taken, which changes object identity (line vs
-    # line[indent_len..]) but not output bytes. Only observable via
-    # private-method identity testing.
+    # line[indent_len..]) but not output bytes.
     - "lvasgn{name=has_indent}"
     - "if{condition=lvar{value=has_indent}}"
 
-    # Nested `line.X.Y` sends in escape_line / paragraph_line?:
-    #   line.getbyte(indent_len).nil?
-    #   line.getbyte(indent_len) != SPACE
-    #   line.getbyte(first_non_space).nil?
-    # The guard mutations (== vs .eql? vs .equal?, drop-guard, etc.)
-    # are equivalent because getbyte returns nil past the end and
-    # Integer equality is the same for Fixnum. Fall-through paths
-    # produce identical output.
-    - "if{condition=send{receiver=send{receiver=lvar{value=line}}}}"
+    # Nested `line.getbyte(i).<selector>` guards in escape_line and
+    # paragraph_line? (`.nil?` / `!=`). Mutations on selector equality
+    # variants and drop-guard are equivalent because getbyte returns
+    # nil past the end and Integer equality is the same for Fixnum.
+    - "if{condition=send{receiver=send{receiver=lvar{value=line} selector=getbyte} selector=(nil?,!=)}}"
 
     # Allocation-saving ternary `content = <cond> ? line[N..] : line`
-    # in escape_line and paragraph_line?. Mutations flip the ternary
-    # so the indent-prefix slice always fires (line[0..] produces a
-    # new string with equal content). Output bytes identical; only
+    # in escape_line and paragraph_line?. Output bytes identical; only
     # object identity differs, which is an internal contract.
     - "lvasgn{name=content value=if}"
 
@@ -96,57 +79,39 @@ mutation:
     # branch unreachable. The fallthrough `[content, false]` + inline
     # escaping produces byte-identical output for STAR/UNDERSCORE/
     # BACKTICK/TILDE/BRACKET_OPEN/PIPE inputs because inline escape
-    # wraps the same characters. Return-statement mutations inside
-    # those branches (e.g. `return escape_block_star(content)` →
-    # `nil`) have the same equivalence. block_construct?'s
-    # `case content.getbyte(0)` (different value shape) unaffected.
+    # wraps the same characters. block_construct?'s different value
+    # shape (`case content.getbyte(0)`) is unaffected.
     - "case{value=lvar{value=first_byte}}"
 
-    # escape_regular_char's `if byte < 128` ASCII fast-path. The ASCII
-    # path appends a raw byte; the UTF-8 path does byteslice(1) for
-    # single-byte char_len. For valid UTF-8 input both produce
-    # identical bytes, so mutations (< 129, < 0, drop-bound, etc.)
-    # are equivalent. Also covers `if byte == byte_val` in
-    # escape_all_chars — those mutations are already killed by
-    # existing tests; ignoring here just removes them from the
-    # mutation generation budget. Not observable through public
-    # #escape in either direction.
-    - "if{condition=send{receiver=lvar{value=byte}}}"
+    # escape_regular_char's `if byte < 128` ASCII fast-path. ASCII
+    # path appends raw byte; UTF-8 path does byteslice(1) for
+    # single-byte char_len. Identical output bytes for valid UTF-8.
+    - "if{condition=send{receiver=lvar{value=byte} selector=<}}"
 
-    # escape_indented_code's `while ws_end < line_length` bound,
-    # `ws_end = 0` init, and `if ws_end >= line_length` whitespace-
-    # only check. Bound mutations drop or change the limit; getbyte
-    # returns nil past end, so the inner `break if byte != SPACE &&
-    # byte != TAB` always fires — equivalent. Init mutations
-    # (ws_end = 1) are equivalent because the scan loop starts one
-    # step later but INDENTED_CODE always guarantees ≥ 1 leading
-    # whitespace char, so the final ws_end is the same. Integer
-    # equality variants on the `>=` check (== / .eql? / .equal?)
-    # are equivalent for Fixnums.
-    - "while{condition=send{receiver=lvar{value=ws_end}}}"
+    # escape_indented_code's scan-loop and whitespace-only guard.
+    # Bound mutations drop the limit; getbyte returns nil past end
+    # and the inner break fires. Init value (0→1) equivalent because
+    # INDENTED_CODE guarantees ≥1 leading whitespace char so final
+    # ws_end is unchanged. Integer equality variants on `>=` check
+    # (== / .eql? / .equal?) equivalent for Fixnums.
+    - "while{condition=send{receiver=lvar{value=ws_end} selector=<}}"
     - "lvasgn{name=ws_end}"
-    - "if{condition=send{receiver=lvar{value=ws_end}}}"
+    - "if{condition=send{receiver=lvar{value=ws_end} selector=>=}}"
 
     # Bound-check compound conditions in inline-dispatch helpers:
     #   escape_backslash:       `next_pos >= @inline_len || ascii_punctuation?(...)`
     #   escape_consecutive_pair: `next_pos < @inline_len && getbyte(next_pos) == X`
     #   escape_tilde_pair:       same shape
     #   escape_image_open:       same shape
-    # Mutations drop the bound check or swap equality operators.
-    # getbyte returns nil past the end, so `nil == X` is always
-    # false — the else branch fires either way. Integer equality
-    # variants (==, .eql?, .equal?) are equivalent for Fixnums.
-    - "if{condition=or{left=send{receiver=lvar{value=next_pos}}}}"
-    - "if{condition=and{left=send{receiver=lvar{value=next_pos}}}}"
+    # getbyte returns nil past end; nil != X, so else branch fires.
+    - "if{condition=or{left=send{receiver=lvar{value=next_pos} selector=>=}}}"
+    - "if{condition=and{left=send{receiver=lvar{value=next_pos} selector=<}}}"
 
-    # escape_char_run's `while pos < @inline_len` + inner
-    # `break if getbyte(pos) != byte_val`. Both loop-bound and
-    # equality mutations equivalent (same reasoning as above).
-    - "while{condition=send{receiver=lvar{value=pos}}}"
+    # escape_char_run's `while pos < @inline_len` loop bound.
+    - "while{condition=send{receiver=lvar{value=pos} selector=<}}"
 
     # byteslice length-arg mutations in remaining_content and
-    # escape_regular_char. `@inline_content.byteslice(pos, N)` is
-    # safe to any N >= remaining-bytes because byteslice clamps to
-    # the string's bounds. So `@inline_len - pos` / `@inline_len` /
+    # escape_regular_char. `String#byteslice(pos, N)` clamps N to
+    # the string's bounds, so `@inline_len - pos` / `@inline_len` /
     # `@inline_len + pos` all return the same bytes for valid pos.
     - "send{selector=byteslice}"
