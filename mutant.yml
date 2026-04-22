@@ -12,3 +12,34 @@ includes:
 matcher:
   subjects:
     - "Markbridge*"
+
+mutation:
+  ignore_patterns:
+    # String.new(capacity:, encoding:) calls are preallocation hints —
+    # capacity is a tuning knob with no observable effect on output, and
+    # encoding is restored downstream via force_encoding. Mutations on
+    # the kwargs (e.g. /4 → *4, drop encoding) are perf-only equivalents.
+    # Survived after removing test-only-subclass publicize specs.
+    - "send{selector=new receiver=const{name=String}}"
+
+    # Fast-path / pass-through guards in MarkdownEscaper private helpers.
+    # Each of these is an `if REGEX.match?(content)` whose fallthrough
+    # path (inline escaping) produces byte-identical output for the same
+    # inputs, so mutations on the guard can't be killed through the
+    # public #escape API. The only observable difference is allocation
+    # count on the fast-path (identity preservation), which we could
+    # only test by reaching into private methods. Tried and rejected
+    # per project policy. The pattern ignores the surrounding `if` when
+    # its condition is a send to the named regex constant.
+    - "if{condition=send{receiver=const{name=INLINE_SPECIAL}}}"
+    - "if{condition=send{receiver=const{name=THEMATIC_BREAK_STAR}}}"
+    - "if{condition=send{receiver=const{name=THEMATIC_BREAK_UNDERSCORE}}}"
+    - "if{condition=send{receiver=const{name=FENCED_CODE_BACKTICK}}}"
+    - "if{condition=send{receiver=const{name=FENCED_CODE_TILDE}}}"
+    - "if{condition=send{receiver=const{name=BULLET_LIST}}}"
+
+    # escape_block_dash's thematic-or-setext check uses a compound
+    # `|| (prev && setext.match?)` condition. Same equivalence as the
+    # single-regex fast-paths above (inline escapes dashes identically
+    # when the block fallthrough fires).
+    - "if{condition=or{left=send{receiver=const{name=THEMATIC_BREAK_DASH}}}}"
