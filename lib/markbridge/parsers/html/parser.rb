@@ -26,8 +26,12 @@ module Markbridge
         def parse(input)
           @unknown_tags.clear
 
-          # Parse HTML with Nokogiri
-          doc = Nokogiri::HTML5.fragment(input)
+          # Parse HTML with Nokogiri. Using the generic HTML (HTML4) parser rather
+          # than HTML5 because Nokogiri::HTML5 is not available on JRuby
+          # (see sparklemotion/nokogiri#2227). Table support treats thead/tbody/tfoot
+          # as transparent, so the parse-tree difference (HTML5 auto-inserts tbody,
+          # HTML4 does not) has no effect on the AST.
+          doc = Nokogiri::HTML.fragment(input)
 
           # Create root AST document
           document = AST::Document.new

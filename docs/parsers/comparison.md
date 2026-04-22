@@ -44,7 +44,7 @@ Markbridge includes three parsers, each designed for different input formats:
 **Location:** `Markbridge::Parsers::HTML::Parser`
 
 **Key features:**
-- Leverages Nokogiri's HTML5 parser
+- Leverages Nokogiri's HTML parser
 - DOM tree traversal
 - Handles malformed HTML gracefully
 - Void element support (self-closing tags)
@@ -91,14 +91,14 @@ Input → Scanner → Tokens → Handler (via Registry) → AST
 ### HTML Parser Architecture
 
 ```
-Input → Nokogiri HTML5 → DOM Tree → Handler → AST
+Input → Nokogiri HTML → DOM Tree → Handler → AST
                            ↓         ↓
                       Element Nodes  process()
                       Text Nodes    (stateless)
 ```
 
 **Components:**
-- **Nokogiri::HTML5:** External HTML parser
+- **Nokogiri::HTML:** External HTML parser
 - **HandlerRegistry:** Simple tag-to-handler mapping
 - **Handlers:** Stateless, receive entire element at once
 - **Parser:** Walks DOM tree, dispatches to handlers
@@ -369,7 +369,7 @@ All three parsers have linear complexity, but differ in implementation:
 ### HTML Performance Characteristics
 
 **Advantages:**
-- ✓ Mature HTML5 parser (Nokogiri)
+- ✓ Mature HTML parser (Nokogiri)
 - ✓ Handles malformed input well
 - ✓ Simple handler API (no state)
 - ✓ Battle-tested parsing
@@ -413,7 +413,7 @@ Memory Usage (10 KB input):
 
 CPU Time (10 KB input):
   BBCode:        3-5 ms   (custom scanner + state)
-  HTML:          2-4 ms   (Nokogiri HTML5)
+  HTML:          2-4 ms   (Nokogiri HTML)
   TextFormatter: 2-4 ms   (Nokogiri XML)
 
 Dependencies:
@@ -678,7 +678,7 @@ end
 - ✓ Web scraping → Markdown conversion
 - ✓ HTML email → Markdown
 - ✓ Handling malformed HTML
-- ✓ Leveraging HTML5 standards
+- ✓ Leveraging standard HTML parsing
 - ✓ Simple handler requirements
 
 **Examples:**

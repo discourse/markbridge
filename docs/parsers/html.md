@@ -1,6 +1,6 @@
 # HTML Parser Guide
 
-This guide explains how the HTML parser converts standard HTML into the Markbridge AST using Nokogiri's HTML5 parser.
+This guide explains how the HTML parser converts standard HTML into the Markbridge AST using Nokogiri's HTML parser.
 
 ## Table of Contents
 
@@ -14,10 +14,10 @@ This guide explains how the HTML parser converts standard HTML into the Markbrid
 
 ## Overview
 
-The HTML parser (`Markbridge::Parsers::HTML::Parser`) uses Nokogiri's HTML5 parser to convert HTML markup into AST. It provides a simpler alternative to the BBCode parser when working with HTML content.
+The HTML parser (`Markbridge::Parsers::HTML::Parser`) uses Nokogiri to convert HTML markup into AST. It provides a simpler alternative to the BBCode parser when working with HTML content.
 
 **Key Features:**
-- Leverages Nokogiri's battle-tested HTML5 parser
+- Leverages Nokogiri's battle-tested HTML parser (libxml2 on MRI/TruffleRuby, Xerces/NekoHTML on JRuby)
 - Handles malformed HTML gracefully
 - Stateless handler API (simpler than BBCode)
 - Lambda handler support for quick customization
@@ -121,7 +121,7 @@ parser.process_children(nokogiri_element, ast_parent)
 ```
 
 **Parsing Flow:**
-1. Parse HTML with Nokogiri::HTML5.fragment
+1. Parse HTML with Nokogiri::HTML.fragment
 2. Walk DOM tree
 3. Dispatch each element to registered handlers
 4. Return completed AST::Document
