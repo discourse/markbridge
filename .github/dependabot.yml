@@ -18,6 +18,8 @@ updates:
     commit-message:
       prefix: "DEPS"
     versioning-strategy: lockfile-only
+    allow:
+      - dependency-type: "all"
     groups:
       gems:
         patterns:
