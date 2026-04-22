@@ -143,3 +143,10 @@ mutation:
     # `break if getbyte(pos) != byte_val`. Both loop-bound and
     # equality mutations equivalent (same reasoning as above).
     - "while{condition=send{receiver=lvar{value=pos}}}"
+
+    # byteslice length-arg mutations in remaining_content and
+    # escape_regular_char. `@inline_content.byteslice(pos, N)` is
+    # safe to any N >= remaining-bytes because byteslice clamps to
+    # the string's bounds. So `@inline_len - pos` / `@inline_len` /
+    # `@inline_len + pos` all return the same bytes for valid pos.
+    - "send{selector=byteslice}"
