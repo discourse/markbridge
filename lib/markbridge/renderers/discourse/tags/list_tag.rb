@@ -10,14 +10,11 @@ module Markbridge
             # Create new context with this list as parent
             child_context = interface.with_parent(element)
 
-            # Render children with updated context, dropping empty items
-            rendered_items =
-              element.children.filter_map do |child|
-                rendered = interface.render_node(child, context: child_context)
-                rendered unless rendered.strip.empty?
-              end
-
-            content = rendered_items.join
+            content =
+              element
+                .children
+                .map { |child| interface.render_node(child, context: child_context) }
+                .join
 
             # Check if we're nested - either inside another List OR inside a ListItem
             has_list_parent = interface.has_parent?(AST::List)
