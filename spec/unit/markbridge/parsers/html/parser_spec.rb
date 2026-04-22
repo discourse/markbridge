@@ -132,6 +132,39 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(doc.children[1].children[0].text).to eq("Two")
     end
 
+    it "drops style tag contents entirely" do
+      doc = parser.parse("<style>.foo { color: red; }</style>hello")
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[0].text).to eq("hello")
+    end
+
+    it "drops script tag contents entirely" do
+      doc = parser.parse("<script>alert('xss')</script>hello")
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[0].text).to eq("hello")
+    end
+
+    it "drops head subtree including nested style/title/meta" do
+      html =
+        "<html><head><title>T</title><style>.a{}</style></head>" \
+          "<body>body text</body></html>"
+      doc = parser.parse(html)
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[0].text).to eq("body text")
+    end
+
+    it "does not count ignored tags as unknown" do
+      parser.parse("<style>.a{}</style><script>x</script>")
+
+      expect(parser.unknown_tags).to be_empty
+    end
+
     it "tracks unknown tags" do
       parser.parse("<unknown>text</unknown>")
 
