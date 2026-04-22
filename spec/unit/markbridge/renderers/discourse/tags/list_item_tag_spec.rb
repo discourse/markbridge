@@ -124,5 +124,45 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListItemTag do
       # 0 lists → no indent
       expect(result).to eq("- orphan item\n")
     end
+
+    # Kills mutations that drop the `if content.empty?` guard or the
+    # early `return ""`. An empty ListItem has no children, so
+    # render_children produces ""; without the guard the builder
+    # would emit `"- \n"`.
+    it "returns empty string for a ListItem with no content" do
+      list = Markbridge::AST::List.new(ordered: false)
+      context = Markbridge::Renderers::Discourse::RenderContext.new([list])
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+      item = Markbridge::AST::ListItem.new
+
+      expect(tag.render(item, interface)).to eq("")
+    end
+
+    # Kills the `interface.with_parent(element)` → `interface` /
+    # `interface.with_parent(nil)` mutations. A nested list inside a
+    # list item must see the outer ListItem in its parent chain so
+    # ListTag#render treats it as a nested list (single \n wrapping
+    # vs double \n\n). Pre-existing tests only nest via the
+    # RenderContext, not via a real ListItem child.
+    it "adds the current ListItem to the parent chain for children" do
+      outer_list = Markbridge::AST::List.new(ordered: false)
+      context = Markbridge::Renderers::Discourse::RenderContext.new([outer_list])
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+      item = Markbridge::AST::ListItem.new
+      nested_list = Markbridge::AST::List.new(ordered: false)
+      nested_item = Markbridge::AST::ListItem.new
+      nested_item << Markbridge::AST::Text.new("nested")
+      nested_list << nested_item
+      item << nested_list
+
+      result = tag.render(item, interface)
+
+      # The nested list, seeing ListItem in its parent chain, must
+      # render with nested-style single-\n wrapping, not top-level \n\n.
+      expect(result).not_to include("\n\n")
+      expect(result).to include("- nested")
+    end
   end
 end

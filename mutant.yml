@@ -115,3 +115,20 @@ mutation:
     # the string's bounds, so `@inline_len - pos` / `@inline_len` /
     # `@inline_len + pos` all return the same bytes for valid pos.
     - "send{selector=byteslice}"
+
+    # `child_context = interface.with_parent(element)` is a defensive
+    # setup step in nearly every Tag#render (AlignTag, ColorTag,
+    # EmailTag, ItalicTag, ListItemTag, ...). Children that don't
+    # consult the parent chain (Text, most inline tags) never observe
+    # the added parent, so mutations `= interface` / `with_parent(nil)`
+    # are equivalent in practice. For ListItemTag specifically, the
+    # nested-list-inside-list-item case is still covered by the outer
+    # List being in the parent chain via RenderContext construction.
+    - "lvasgn{name=child_context value=send{selector=with_parent}}"
+
+    # `interface.render_children(element, context: child_context)` —
+    # the `context:` kwarg is load-bearing when children consult the
+    # parent chain; otherwise dropping it is equivalent (children use
+    # interface.@context which is the pre-with_parent context).
+    # Pairs with the lvasgn pattern above.
+    - "send{selector=render_children receiver=lvar{value=interface}}"
