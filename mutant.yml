@@ -126,3 +126,20 @@ mutation:
     - "while{condition=send{receiver=lvar{value=ws_end}}}"
     - "lvasgn{name=ws_end}"
     - "if{condition=send{receiver=lvar{value=ws_end}}}"
+
+    # Bound-check compound conditions in inline-dispatch helpers:
+    #   escape_backslash:       `next_pos >= @inline_len || ascii_punctuation?(...)`
+    #   escape_consecutive_pair: `next_pos < @inline_len && getbyte(next_pos) == X`
+    #   escape_tilde_pair:       same shape
+    #   escape_image_open:       same shape
+    # Mutations drop the bound check or swap equality operators.
+    # getbyte returns nil past the end, so `nil == X` is always
+    # false — the else branch fires either way. Integer equality
+    # variants (==, .eql?, .equal?) are equivalent for Fixnums.
+    - "if{condition=or{left=send{receiver=lvar{value=next_pos}}}}"
+    - "if{condition=and{left=send{receiver=lvar{value=next_pos}}}}"
+
+    # escape_char_run's `while pos < @inline_len` + inner
+    # `break if getbyte(pos) != byte_val`. Both loop-bound and
+    # equality mutations equivalent (same reasoning as above).
+    - "while{condition=send{receiver=lvar{value=pos}}}"
