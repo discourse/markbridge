@@ -99,5 +99,30 @@ mutation:
     # wraps the same characters. Return-statement mutations inside
     # those branches (e.g. `return escape_block_star(content)` →
     # `nil`) have the same equivalence. block_construct?'s
-    # `case content.getbyte(0)` is already at 97% and unaffected.
+    # `case content.getbyte(0)` (different value shape) unaffected.
     - "case{value=lvar{value=first_byte}}"
+
+    # escape_regular_char's `if byte < 128` ASCII fast-path. The ASCII
+    # path appends a raw byte; the UTF-8 path does byteslice(1) for
+    # single-byte char_len. For valid UTF-8 input both produce
+    # identical bytes, so mutations (< 129, < 0, drop-bound, etc.)
+    # are equivalent. Also covers `if byte == byte_val` in
+    # escape_all_chars — those mutations are already killed by
+    # existing tests; ignoring here just removes them from the
+    # mutation generation budget. Not observable through public
+    # #escape in either direction.
+    - "if{condition=send{receiver=lvar{value=byte}}}"
+
+    # escape_indented_code's `while ws_end < line_length` bound,
+    # `ws_end = 0` init, and `if ws_end >= line_length` whitespace-
+    # only check. Bound mutations drop or change the limit; getbyte
+    # returns nil past end, so the inner `break if byte != SPACE &&
+    # byte != TAB` always fires — equivalent. Init mutations
+    # (ws_end = 1) are equivalent because the scan loop starts one
+    # step later but INDENTED_CODE always guarantees ≥ 1 leading
+    # whitespace char, so the final ws_end is the same. Integer
+    # equality variants on the `>=` check (== / .eql? / .equal?)
+    # are equivalent for Fixnums.
+    - "while{condition=send{receiver=lvar{value=ws_end}}}"
+    - "lvasgn{name=ws_end}"
+    - "if{condition=send{receiver=lvar{value=ws_end}}}"
