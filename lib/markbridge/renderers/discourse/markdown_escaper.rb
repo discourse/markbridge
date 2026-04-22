@@ -36,9 +36,9 @@ module Markbridge
         #   breaks disabled by default.
         def initialize(escape_hard_line_breaks: false)
           @escape_hard_line_breaks = escape_hard_line_breaks
-          @inline_content = nil
-          @inline_result = nil
-          @inline_len = 0
+          # @inline_content / @inline_result / @inline_len are set by
+          # escape_inline on every call before any helper reads them;
+          # no defensive init needed.
         end
 
         # Fast-path check: any character that might need escaping
