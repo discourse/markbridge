@@ -165,48 +165,32 @@ expect(token).to match_tag_end("b")
 
 ## Mutation Testing
 
-Markbridge uses [mutant](https://github.com/mbj/mutant) for mutation testing.
+Workflow, report-reading conventions, decision heuristics ("add test"
+vs "simplify code" vs "unkillable"), BLUF reporting format, and the
+"ignore with rationale comment" pattern live in the vendored mutant
+skill at `.claude/skills/mutant/SKILL.md` (pinned upstream commit).
+Claude Code auto-loads it via its triggers — read it first when
+working on mutation coverage.
 
-### Goal
+**Markbridge-specific (in addition to the skill):**
 
-Drive mutation coverage up over time. Verify with:
+- Project wrapper is `bin/mutant`, not `bundle exec mutant`.
+- Line coverage must not regress. Capture baseline with
+  `COVERAGE=1 bin/rspec` before changes; re-run after to compare.
+- No `send`/`__send__` for private methods in tests just to satisfy
+  mutant. Publicize via a test-only subclass (`Class.new(described_class) { public :helper }`)
+  — see `spec/unit/markbridge/renderers/discourse/markdown_escaper/utf8_char_length_spec.rb`.
+- No stubbing or mocking the SUT (the class currently being mutated).
+- `MarkdownEscaper` is a hot path. Benchmark (`bundle exec ruby --yjit /tmp/bench_escaper.rb`)
+  before/after any change to `lib/markbridge/renderers/discourse/markdown_escaper.rb`.
+  Tests over refactors when behavior is equivalent.
+- When writing a `mutant.yml` `ignore` entry per the skill's
+  "Unkillable" flow, the inline comment must name the specific
+  mutation that survived and summarize what was tried.
 
-```
-bin/mutant run
-```
-
-When iterating, prefer `--fail-fast` so you address one surviving mutant at a time:
-
-```
-bin/mutant run --fail-fast
-```
-
-Scope runs with a subject pattern when working on one area:
-
-```
-bin/mutant run -- 'Markbridge::AST::Bold*'
-```
-
-### When you find an alive mutation
-
-Decide which bucket it falls into:
-
-- **A) The code does too much** for what the tests ask for. The surviving mutation reveals behavior that no test requires. The fix is to simplify the implementation.
-- **B) A test is missing.** The behavior is intentional but no test observes it. The fix is to add a test.
-
-Decide between A) and B) before changing anything. If unsure, ask the user.
-
-### What you may change
-
-- Files under `lib/markbridge/` — the implementation. Multiple designs are valid.
-- Files under `spec/unit/` (mirroring `lib/markbridge/`) — the tests. Some existing tests may be bad and can be rewritten or replaced.
-
-### Constraints
-
-- Line coverage must not regress. Capture a baseline before your changes with `COVERAGE=1 bin/rspec` and re-run after to compare.
-- You may not skip mutants by configuring mutant to ignore them. No `expressions:` filters, no `coverage_criteria:` tweaks in `mutant.yml`.
-- You may not use `send` or `__send__` to invoke private methods in tests just to satisfy mutant.
-- You may not stub or mock the system under test (the class currently being mutated).
+**Commit flow (per the skill): code changes and test changes go in
+separate commits — test first, code-simplification second. Don't mix.
+Tests-only changes can be one commit.**
 
 ## Performance Notes
 
