@@ -88,6 +88,21 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Scanner do
         expect(result.nodes).to be_empty
       end
 
+      # Kills `build_detectors(detectors, mention_resolver)` →
+      # `build_detectors(detectors, nil)` mutation. Without the
+      # resolver, all mentions resolve to :user; the resolver's
+      # return value (here :group for "Staff") must flow through.
+      it "honors mention_resolver for type classification" do
+        resolver = ->(name) { name == "Staff" ? :group : :user }
+        scanner_with_resolver = described_class.new(mention_resolver: resolver)
+
+        result = scanner_with_resolver.scan("@Staff and @alice")
+
+        expect(result.nodes.size).to eq(2)
+        expect(result.nodes[0].type).to eq(:group)
+        expect(result.nodes[1].type).to eq(:user)
+      end
+
       it "requires word boundary before @" do
         result = scanner.scan("email@example.com")
 
