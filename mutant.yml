@@ -43,3 +43,17 @@ mutation:
     # single-regex fast-paths above (inline escapes dashes identically
     # when the block fallthrough fires).
     - "if{condition=or{left=send{receiver=const{name=THEMATIC_BREAK_DASH}}}}"
+
+    # Single-line fast-paths: `return ... if lines.size == 1` appears in
+    # both MarkdownEscaper#escape_text and ListItemBuilder#build. In both
+    # cases the main-loop path produces byte-identical output for single-
+    # line input, so mutations on the guard / the `lines[0]` arg / the
+    # split limit all survive. Tried: identity tests through #escape —
+    # fails because split + result-buffer always allocate anyway, so
+    # fast-path-taken vs main-loop-run-once outputs differ only by
+    # object identity *inside* escape_text, which isn't observable from
+    # outside without reaching a private method.
+    #
+    # Pattern matches `if X.<anything>.<anything>` where X is a local
+    # variable named `lines`. Both call sites use that exact shape.
+    - "if{condition=send{receiver=send{receiver=lvar{value=lines}}}}"
