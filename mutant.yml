@@ -110,6 +110,15 @@ mutation:
     # escape_char_run's `while pos < @inline_len` loop bound.
     - "while{condition=send{receiver=lvar{value=pos} selector=<}}"
 
+    # CodeBlockTracker's `while scan_pos < input_length` loop bounds
+    # in check_fenced_boundary, try_close_fence, open_fence,
+    # count_fence_chars, skip_leading_spaces. Same Bucket-A
+    # equivalence as indent_len / ws_end / pos: input[scan_pos]
+    # returns nil past end, nil != SPACE/char, so the inner
+    # `break if input[scan_pos] != X` fires and terminates. Integer
+    # equality variants (== / .eql? / .equal?) equivalent for Fixnums.
+    - "while{condition=send{receiver=lvar{value=scan_pos} selector=<}}"
+
     # byteslice length-arg mutations in remaining_content and
     # escape_regular_char. `String#byteslice(pos, N)` clamps N to
     # the string's bounds, so `@inline_len - pos` / `@inline_len` /
