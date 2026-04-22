@@ -114,6 +114,71 @@ RSpec.describe Markbridge::Renderers::Discourse::Builders::ListItemBuilder do
       end
     end
 
+    context "with blank lines around nested list items" do
+      # Kills `[idx + 1]` → `[idx - 1]` / `[1]` / `[-1]` mutations in
+      # handle_empty_line. Requires a blank line whose PREVIOUS line
+      # is a nested list marker but whose NEXT line is plain text.
+      # Under `[idx - 1]` the mutation would look backward at the
+      # nested marker and skip the blank; original looks forward at
+      # plain text and preserves the paragraph-break indent.
+      it "preserves blank line after nested list when followed by plain text" do
+        content = "parent\n  - nested\n\nafter"
+        result = builder.build(content, marker: "- ", indent: "")
+        expect(result).to eq("- parent\n  - nested\n  \n  after\n")
+      end
+
+      # Kills `\d+\.` → `\d\.` mutation on the nested-list regex in
+      # format_continuation_line / handle_empty_line. Multi-digit
+      # ordered marker (`10.`) only matches with `\d+`, not `\d`.
+      it "detects multi-digit ordered-list markers as nested" do
+        content = "parent\n  10. tenth"
+        result = builder.build(content, marker: "- ", indent: "")
+        expect(result).to eq("- parent\n  10. tenth\n")
+      end
+
+      # Kills `\A\s*` → `\A\s+` mutation on the nested-list regex.
+      # An unindented marker as a continuation line is atypical but
+      # the regex was written to allow zero leading whitespace; the
+      # mutation requires at least one.
+      it "treats unindented list marker in continuation as nested (zero leading space)" do
+        content = "text\n- unindented"
+        result = builder.build(content, marker: "- ", indent: "")
+        # Under \A\s+ the line would get continuation_indent prepended
+        # instead of being kept as-is.
+        expect(result).to eq("- text\n- unindented\n")
+      end
+
+      # Kills `continuation_lines[idx + 1]` → `continuation_lines[1]`
+      # mutation. Requires the blank line at idx > 0 where `[1]` gives
+      # a different element than `[idx + 1]`. With blank at idx=1,
+      # `[1]` would be the blank itself (no match → preserve indent),
+      # while `[idx + 1]` points to the nested marker (match → skip).
+      it "skips blank line at idx>0 when followed by nested marker (forward lookup)" do
+        content = "a\nb\n\n  - nested\nc"
+        result = builder.build(content, marker: "- ", indent: "")
+        expect(result).to eq("- a\n  b\n  - nested\n  c\n")
+      end
+
+      # Kills `\A\s*` → `\A\s+` mutation on handle_empty_line's regex.
+      # Next line is an unindented nested marker (zero leading space);
+      # `\s+` would require at least one space and fail to match.
+      it "skips blank line before unindented nested marker" do
+        content = "a\n\n- nested"
+        result = builder.build(content, marker: "- ", indent: "")
+        expect(result).to eq("- a\n- nested\n")
+      end
+
+      # Kills `(?:-|\d+\.)` → `(?:-)` / `\d\.` / `\D+\.` mutations.
+      # Blank line before a multi-digit ordered-marker nested item.
+      # `\d` (single) would fail to match `10.`. `\D+` would require
+      # non-digits. `(?:-)` drops ordered entirely.
+      it "skips blank line before multi-digit ordered nested marker" do
+        content = "a\n\n  10. nested"
+        result = builder.build(content, marker: "- ", indent: "")
+        expect(result).to eq("- a\n  10. nested\n")
+      end
+    end
+
     context "with edge cases" do
       it "handles empty content" do
         result = builder.build("", marker: "- ", indent: "")
