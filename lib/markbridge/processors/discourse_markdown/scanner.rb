@@ -75,14 +75,10 @@ module Markbridge
 
         def build_detectors(detectors, mention_resolver)
           detectors.map do |klass|
-            if klass.is_a?(Class)
-              if klass == Detectors::Mention && mention_resolver
-                klass.new(type_resolver: mention_resolver)
-              else
-                klass.new
-              end
+            if klass == Detectors::Mention
+              klass.new(type_resolver: mention_resolver)
             else
-              klass
+              klass.new
             end
           end
         end
