@@ -240,5 +240,32 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
 
       expect(result).to include("| **Alice** |")
     end
+
+    it "preserves pipes inside internal links within cells" do
+      wiki = <<~WIKI.chomp
+        {|
+        ! Page !! Status
+        |-
+        | [[Main Page|Home]] || Ready
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to eq("| Page | Status |\n| --- | --- |\n| Home | Ready |")
+    end
+
+    it "preserves pipes inside internal links on per-line cells" do
+      wiki = <<~WIKI.chomp
+        {|
+        |-
+        | [[Main Page|Home]]
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to eq("| Home |\n| --- |")
+    end
   end
 end
