@@ -194,4 +194,78 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
       expect(result).to eq("Just plain text")
     end
   end
+
+  describe "tables" do
+    it "renders a simple table as Markdown" do
+      wiki = <<~WIKI.chomp
+        {|
+        ! Name !! Age
+        |-
+        | Alice || 30
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
+    end
+
+    it "handles header and data rows" do
+      wiki = <<~WIKI.chomp
+        {|
+        |-
+        ! A
+        ! B
+        |-
+        | 1
+        | 2
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to eq("| A | B |\n| --- | --- |\n| 1 | 2 |")
+    end
+
+    it "handles inline formatting in cells" do
+      wiki = <<~WIKI.chomp
+        {|
+        ! Name
+        |-
+        | '''Alice'''
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to include("| **Alice** |")
+    end
+
+    it "preserves pipes inside internal links within cells" do
+      wiki = <<~WIKI.chomp
+        {|
+        ! Page !! Status
+        |-
+        | [[Main Page|Home]] || Ready
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to eq("| Page | Status |\n| --- | --- |\n| Home | Ready |")
+    end
+
+    it "preserves pipes inside internal links on per-line cells" do
+      wiki = <<~WIKI.chomp
+        {|
+        |-
+        | [[Main Page|Home]]
+        |}
+      WIKI
+
+      result = Markbridge.mediawiki_to_markdown(wiki)
+
+      expect(result).to eq("| Home |\n| --- |")
+    end
+  end
 end

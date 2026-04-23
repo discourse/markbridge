@@ -35,6 +35,9 @@ require_relative "bbcode/handlers/self_closing_handler"
 require_relative "bbcode/handlers/simple_handler"
 require_relative "bbcode/handlers/size_handler"
 require_relative "bbcode/handlers/spoiler_handler"
+require_relative "bbcode/handlers/table_handler"
+require_relative "bbcode/handlers/table_row_handler"
+require_relative "bbcode/handlers/table_cell_handler"
 require_relative "bbcode/handlers/url_handler"
 
 # Parser components
