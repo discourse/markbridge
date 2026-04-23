@@ -88,15 +88,19 @@ module Markbridge
             attrs[:index] || (attrs[:id] if attrs[:msg])
           end
 
+          # Callers only ever pass String or nil (via #normalize_attrs
+          # over token.attrs, which the BBCode scanner populates with
+          # String values exclusively), so no defensive non-String
+          # passthrough is needed here or in #numeric?.
           def presence(value)
-            return value unless value.instance_of?(String)
+            return if value.nil?
 
             stripped = value.strip
             stripped unless stripped.empty?
           end
 
           def numeric?(value)
-            value.instance_of?(String) && value.match?(/\A\d+\z/)
+            value&.match?(/\A\d+\z/)
           end
         end
       end
