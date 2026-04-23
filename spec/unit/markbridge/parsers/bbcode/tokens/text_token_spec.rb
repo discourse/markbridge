@@ -12,9 +12,24 @@ RSpec.describe Markbridge::Parsers::BBCode::TextToken do
     expect(token.pos).to eq(0)
   end
 
-  it "shows readable representation" do
+  # Kills the `super(pos:, source: text)` → `super(pos:, source: nil)`
+  # mutation: source is forwarded from text so both accessors return
+  # the same value.
+  it "forwards text to source for the base-class accessor" do
+    token = described_class.new(text: "hello", pos: 0)
+
+    expect(token.source).to eq("hello")
+  end
+
+  it "freezes text so it can't be mutated in place" do
+    token = described_class.new(text: +"hello", pos: 0)
+
+    expect(token.text).to be_frozen
+  end
+
+  it "renders a custom one-line representation" do
     token = described_class.new(text: "test", pos: 0)
-    expect(token.inspect).to include("TextToken")
-    expect(token.inspect).to include('"test"')
+
+    expect(token.inspect).to eq('#<TextToken "test">')
   end
 end

@@ -22,10 +22,21 @@ RSpec.describe Markbridge::Parsers::BBCode::TagStartToken do
       expect(token.pos).to eq(10)
       expect(token.source).to eq("[url href=\"https://example.com\"]")
     end
+
+    # Kills the `.freeze` drop on `@tag` and `@attrs`. Pass deliberately-
+    # mutable inputs (the `+""` form is guaranteed unfrozen); without
+    # `.freeze`, the stored ivars would stay mutable and the frozen?
+    # assertions would fail.
+    it "freezes tag and attrs so they can't be mutated in place" do
+      token = described_class.new(tag: +"b", attrs: { cls: +"foo" }, pos: 0, source: "[b]")
+
+      expect(token.tag).to be_frozen
+      expect(token.attrs).to be_frozen
+    end
   end
 
   describe "#inspect" do
-    it "shows readable representation" do
+    it "shows readable representation with attrs" do
       token =
         described_class.new(
           tag: "url",
@@ -35,10 +46,16 @@ RSpec.describe Markbridge::Parsers::BBCode::TagStartToken do
           pos: 0,
           source: "[url href=\"test\"]",
         )
-      expect(token.inspect).to include("TagStartToken")
-      expect(token.inspect).to include("[url]")
-      expect(token.inspect).to include("href")
-      expect(token.inspect).to include("test")
+
+      expect(token.inspect).to eq('#<TagStartToken [url] {href: "test"}>')
+    end
+
+    # Kills `attrs.empty? ? "" : " #{attrs.inspect}"` ternary branch
+    # mutations (branch collapse, `nil` → empty, `if false`).
+    it "omits the attrs section when attrs is empty" do
+      token = described_class.new(tag: "b", attrs: {}, pos: 0, source: "[b]")
+
+      expect(token.inspect).to eq("#<TagStartToken [b]>")
     end
   end
 end
