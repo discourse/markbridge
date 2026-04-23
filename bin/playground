@@ -1,6 +1,32 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+def find_watchexec
+  ENV["PATH"].to_s.split(File::PATH_SEPARATOR).each do |dir|
+    path = File.join(dir, "watchexec")
+    return path if File.executable?(path) && !File.directory?(path)
+  end
+  nil
+end
+
+watchexec = find_watchexec
+
+if !ENV["MARKBRIDGE_PLAYGROUND_WATCHED"] && watchexec
+  ENV["MARKBRIDGE_PLAYGROUND_WATCHED"] = "1"
+  exec(
+    watchexec,
+    "--restart",
+    "--watch", "lib",
+    "--watch", "playground",
+    "--watch", "Gemfile.lock",
+    "--",
+    __FILE__,
+  )
+elsif !ENV["MARKBRIDGE_PLAYGROUND_WATCHED"]
+  warn "watchexec not found — running without auto-reload."
+  warn "Install: https://github.com/watchexec/watchexec#install"
+end
+
 require "bundler/setup"
 require_relative "../playground/app"
 

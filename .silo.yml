@@ -4,7 +4,7 @@
 image: fedora/43
 
 setup:
-  - sudo dnf install -y ruby ruby-devel gcc make
+  - sudo dnf install -y ruby ruby-devel gcc make watchexec
   - bundle install
   - bundle exec lefthook install
 
