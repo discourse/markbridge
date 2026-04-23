@@ -398,6 +398,52 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.first).to be_a(Markbridge::AST::Text)
       expect(doc.children.first.text).to eq("<nowiki>never closed")
     end
+
+    # Kills handle_nowiki_tag's `@pos = close_pos + "</nowiki>".length`
+    # mutations: drop the advance (stays on "</nowiki>"), or replace
+    # with "</nowiki>".length (sets @pos = 9 regardless), etc.
+    it "advances past </nowiki> when trailing content follows" do
+      doc = parse("<nowiki>raw text</nowiki>after")
+
+      # "raw text" and "after" concatenate into a single Text node
+      # (adjacent-text merging in InlineParser).
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[0].text).to eq("raw textafter")
+    end
+
+    # Same `@input.index(close_tag, @pos)` → `@input.index(close_tag)`
+    # kill, but for handle_paired_raw_tag (<code>, <pre>).
+    it "searches for </code> starting from the current position" do
+      doc = parse("</code> <code>raw</code>")
+
+      code = doc.children.find { |c| c.is_a?(Markbridge::AST::Code) }
+      expect(code).not_to be_nil
+      expect(code.children.first.text).to eq("raw")
+    end
+
+    # Same kill for handle_paired_tag (<s>, <u>, <sup>, etc.).
+    it "searches for </s> starting from the current position" do
+      doc = parse("</s> <s>text</s>")
+
+      strike = doc.children.find { |c| c.is_a?(Markbridge::AST::Strikethrough) }
+      expect(strike).not_to be_nil
+      expect(strike.children.first.text).to eq("text")
+    end
+
+    # Kills `@input.index("</nowiki>", @pos)` → `@input.index("</nowiki>")`.
+    # Without the start-position arg, the lookup finds the FIRST "</nowiki>"
+    # in the whole input, which here is the stray closing tag at the
+    # start — producing a negative-length slice and backward @pos
+    # advance. The spec shape (two Text nodes with no backwards
+    # scanning) only holds with the start-pos arg.
+    it "searches for </nowiki> starting from the current position" do
+      doc = parse("</nowiki> <nowiki>raw</nowiki>")
+
+      text = doc.children.first.text
+      expect(text).to include("</nowiki>") # the stray opening-as-text
+      expect(text).to include("raw")
+    end
   end
 
   describe "nested inline markup" do

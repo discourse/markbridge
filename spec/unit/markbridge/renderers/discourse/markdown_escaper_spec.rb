@@ -763,6 +763,20 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       end
     end
 
+    describe "ordered-list inline escaping" do
+      # Kills `escape_inline(rest)` → `rest` in escape_block_ordered_list.
+      # The rest of the line after the marker still contains inline
+      # specials which must be escaped before the tuple returns
+      # skip_inline=true.
+      it "escapes inline specials after an ordered-list marker" do
+        expect(escaper.escape("1. *bold*")).to eq("1\\. \\*bold\\*")
+      end
+
+      it "escapes inline specials after a paren-style ordered marker" do
+        expect(escaper.escape("2) text_with_emphasis")).to eq("2\\) text\\_with\\_emphasis")
+      end
+    end
+
     describe "encoding preservation" do
       it "preserves UTF-8 encoding" do
         input = "Hello *world*"
