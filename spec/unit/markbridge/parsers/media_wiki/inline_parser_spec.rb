@@ -339,5 +339,17 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
         /stuck at position 0/,
       )
     end
+
+    it "resets guard state between successive parses on the same instance" do
+      parser = described_class.new
+      first_parent = Markbridge::AST::Paragraph.new
+      parser.parse("hello world", parent: first_parent)
+
+      # Without reset, @last_progress_pos from the prior parse would
+      # cause the first progressed!(0) of the second parse to raise.
+      second_parent = Markbridge::AST::Paragraph.new
+      expect { parser.parse("second run", parent: second_parent) }.not_to raise_error
+      expect(second_parent.children.first).to be_a(Markbridge::AST::Text)
+    end
   end
 end

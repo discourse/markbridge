@@ -338,5 +338,32 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Scanner do
         expect(result.markdown).to eq("<<MENTION:0:gerhard>>\n```\n@bob\n```")
       end
     end
+
+    # Loop-progress guard: scan_input must advance @pos every
+    # iteration. A regression where a dispatch path fails to move
+    # @pos would spin forever; the guard raises ParserStuckError.
+    describe "loop-progress guard" do
+      it "raises ParserStuckError when a subclass override stalls the loop" do
+        buggy =
+          Class.new(described_class) do
+            # Override handle_match to skip the @pos advance while
+            # still consuming the match node; any detected construct
+            # then re-enters the loop at the same position.
+            define_method(:handle_match) { |_match| }
+            private :handle_match
+          end
+
+        expect { buggy.new.scan("@gerhard") }.to raise_error(Markbridge::ParserStuckError)
+      end
+
+      it "resets guard state between successive scans on the same instance" do
+        instance = described_class.new
+        instance.scan("first pass")
+
+        # Without reset, @last_progress_pos from the prior scan would
+        # cause the first progressed!(0) of the second scan to raise.
+        expect { instance.scan("second pass") }.not_to raise_error
+      end
+    end
   end
 end

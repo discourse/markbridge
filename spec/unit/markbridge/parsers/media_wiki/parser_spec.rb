@@ -472,5 +472,14 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
 
       expect { buggy.new.parse("<pre>stuck</pre>") }.to raise_error(Markbridge::ParserStuckError)
     end
+
+    it "resets guard state between successive parses on the same instance" do
+      parser = described_class.new
+      parser.parse("first document")
+
+      # Without reset, @last_progress_pos from the prior parse would
+      # cause the first progressed!(0) of the second parse to raise.
+      expect { parser.parse("second document") }.not_to raise_error
+    end
   end
 end
