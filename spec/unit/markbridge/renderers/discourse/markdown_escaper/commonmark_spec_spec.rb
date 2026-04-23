@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 require "json"
-require "commonmarker"
+
+# commonmarker's Rust/Magnus native extension only builds on MRI.
+require "commonmarker" if RUBY_ENGINE == "ruby"
 
 # Validates the MarkdownEscaper against all CommonMark Spec 0.31.2 examples.
 #
@@ -15,8 +17,10 @@ require "commonmarker"
 # 2. **Content preservation** — every word that appears in the spec's expected
 #    HTML output must still appear after escaping and re-rendering. This catches
 #    bugs where the escaper silently drops or corrupts text.
+skip_reason = "commonmarker not available on #{RUBY_ENGINE}" unless RUBY_ENGINE == "ruby"
+
 RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
-  context "with CommonMark Spec 0.31.2 examples" do
+  context "with CommonMark Spec 0.31.2 examples", skip: skip_reason do
     let(:escaper) { described_class.new(escape_hard_line_breaks: true) }
 
     SPEC_EXAMPLES = JSON.parse(SPEC_ROOT.join("fixtures/commonmark_spec_0.31.2.json").read)

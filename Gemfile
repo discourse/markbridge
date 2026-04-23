@@ -4,7 +4,7 @@ source "https://rubygems.org"
 
 gemspec
 
-gem "commonmarker"
+gem "commonmarker", install_if: -> { RUBY_ENGINE == "ruby" }
 gem "lefthook"
 gem "nokogiri"
 gem "puma"
