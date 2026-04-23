@@ -52,6 +52,7 @@ module Markbridge
         def process_lines(lines)
           i = 0
           while i < lines.length
+            last_i = i
             line = lines.fetch(i)
 
             if heading_line?(line)
@@ -76,6 +77,7 @@ module Markbridge
             end
 
             i += 1
+            raise ParserStuckError.new(parser: self.class, pos: i) if i <= last_i
           end
         end
 

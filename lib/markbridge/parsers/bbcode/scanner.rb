@@ -17,24 +17,26 @@ module Markbridge
           start_pos = @current_pos
           bracket_index = @input.index("[", @current_pos)
 
-          if bracket_index.nil?
-            text = @input[@current_pos..]
-            @current_pos = @length
-            return TextToken.new(text:, pos: start_pos)
-          end
+          token =
+            if bracket_index.nil?
+              text = @input[@current_pos..]
+              @current_pos = @length
+              TextToken.new(text:, pos: start_pos)
+            elsif bracket_index > @current_pos
+              text = @input[@current_pos...bracket_index]
+              @current_pos = bracket_index
+              TextToken.new(text:, pos: start_pos)
+            elsif (tag_token = parse_tag_at_cursor)
+              tag_token
+            else
+              @current_pos += 1
+              TextToken.new(text: "[", pos: start_pos)
+            end
 
-          if bracket_index > @current_pos
-            text = @input[@current_pos...bracket_index]
-            @current_pos = bracket_index
-            return TextToken.new(text:, pos: start_pos)
+          if @current_pos == start_pos
+            raise ParserStuckError.new(parser: self.class, pos: @current_pos)
           end
-
-          if (tag_token = parse_tag_at_cursor)
-            tag_token
-          else
-            @current_pos += 1
-            TextToken.new(text: "[", pos: start_pos)
-          end
+          token
         end
 
         private

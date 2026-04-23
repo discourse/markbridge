@@ -84,7 +84,11 @@ module Markbridge
         end
 
         def scan_input
+          prev_pos = nil
           while @pos < @input.length
+            raise ParserStuckError.new(parser: self.class, pos: @pos) if prev_pos == @pos
+            prev_pos = @pos
+
             # Check for fenced code block boundary at line start
             if @line_start
               next if advance_code_boundary(:check_fenced_boundary)

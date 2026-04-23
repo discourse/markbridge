@@ -454,4 +454,23 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(doc.children).to include(an_instance_of(Markbridge::AST::HorizontalRule))
     end
   end
+
+  # Loop-progress guard: process_lines must advance `i` every
+  # iteration. The block-reassigning branches (process_preformatted_block,
+  # process_pre_tag_block) must return an index ≥ the current one,
+  # otherwise the `i += 1` at the end leaves us at the same position.
+  describe "loop-progress guard" do
+    it "raises ParserStuckError if a block handler returns an index that doesn't advance" do
+      buggy =
+        Class.new(described_class) do
+          # Stub process_pre_tag_block to always return start_index - 2,
+          # simulating a regression where the return value would stall
+          # the process_lines loop.
+          define_method(:process_pre_tag_block) { |_lines, start_index| start_index - 2 }
+          private :process_pre_tag_block
+        end
+
+      expect { buggy.new.parse("<pre>stuck</pre>") }.to raise_error(Markbridge::ParserStuckError)
+    end
+  end
 end
