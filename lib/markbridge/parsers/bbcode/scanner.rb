@@ -172,7 +172,8 @@ module Markbridge
         def scan_while(pattern)
           stop_index = @current_pos
           guard_last_pos = -1
-          while @input[stop_index]&.match?(pattern)
+          while stop_index < @length
+            break unless @input[stop_index].match?(pattern)
             if stop_index <= guard_last_pos
               raise ParserStuckError.new(parser: self.class, pos: stop_index)
             end
@@ -203,7 +204,8 @@ module Markbridge
 
         def skip_whitespace
           guard_last_pos = -1
-          while current_char&.match?(WHITESPACE_CHAR)
+          while @current_pos < @length
+            break unless @input[@current_pos].match?(WHITESPACE_CHAR)
             pos = @current_pos
             raise ParserStuckError.new(parser: self.class, pos:) if pos <= guard_last_pos
 

@@ -128,9 +128,15 @@ module Markbridge
         def skip_leading_spaces(input, pos, input_length)
           scan_pos = pos
           spaces = 0
+          guard_last_pos = -1
           while spaces < 3
             break if scan_pos >= input_length
             break if input[scan_pos] != " "
+            if scan_pos <= guard_last_pos
+              raise ParserStuckError.new(parser: self.class, pos: scan_pos)
+            end
+
+            guard_last_pos = scan_pos
             spaces += 1
             scan_pos += 1
           end

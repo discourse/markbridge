@@ -106,13 +106,18 @@ module Markbridge
         # @return [String, nil]
         def collect_until_apostrophes(count)
           start = @pos
+          guard_last_pos = -1
           while @pos < @length
-            if consecutive_apostrophes_at(@pos) >= count
-              content = @input[start...@pos]
-              @pos += count
+            pos = @pos
+            raise ParserStuckError.new(parser: self.class, pos:) if pos <= guard_last_pos
+
+            guard_last_pos = pos
+            if consecutive_apostrophes_at(pos) >= count
+              content = @input[start...pos]
+              @pos = pos + count
               return content
             end
-            @pos += 1
+            @pos = pos + 1
           end
         end
 

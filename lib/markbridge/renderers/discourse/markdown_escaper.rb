@@ -487,8 +487,17 @@ module Markbridge
         end
 
         def paragraph_line?(line)
-          first_non_space = 0
-          first_non_space += 1 while line.getbyte(first_non_space) == SPACE
+          pos = 0
+          guard_last_pos = -1
+          line_len = line.bytesize
+          while pos < line_len
+            break if line.getbyte(pos) != SPACE
+            raise ParserStuckError.new(parser: self.class, pos:) if pos <= guard_last_pos
+
+            guard_last_pos = pos
+            pos += 1
+          end
+          first_non_space = pos
 
           # Empty or whitespace-only lines: getbyte past the end returns nil.
           return false if line.getbyte(first_non_space).nil?

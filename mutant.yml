@@ -44,8 +44,21 @@ mutation:
     - "op_asgn{target=lvasgn{name=guard_iter}}"
     - "if{condition=send{receiver=lvar{value=stop_index} selector=(<=)}}"
     - "if{condition=send{receiver=lvar{value=pos} selector=(<=)}}"
+    - "if{condition=send{receiver=lvar{value=scan_pos} selector=(<=)}}"
     - "if{condition=send{receiver=lvar{value=guard_iter} selector=(>=)}}"
     - "if{condition=send{receiver=lvar{value=len_after} selector=(>=)}}"
+
+    # The `progressed!(pos)` call site is the Bucket-A application of
+    # the ProgressGuard mixin: every mutation either disables the
+    # guard (`→ nil`, drop) or corrupts its argument (`@pos` → `nil`,
+    # integer mutations). Every one of those effects manifests only
+    # as "the guard stops catching stalls", which each parser's stall
+    # spec exercises via timeout — currently counted as a kill, but
+    # exposing as timeout rather than a test-fail kill. The helper
+    # itself is already in matcher.ignore; ignoring the call matches
+    # the same equivalence class.
+    - "send{selector=progressed!}"
+    - "send{selector=reset_progress_guard}"
 
     # String.new(capacity:, encoding:) calls are preallocation hints —
     # capacity is a tuning knob with no observable effect on output, and
