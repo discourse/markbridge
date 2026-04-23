@@ -7,7 +7,7 @@ module Markbridge
       class TagEndToken < Token
         attr_reader :tag
 
-        def initialize(tag:, pos: 0, source: nil)
+        def initialize(tag:, pos:, source:)
           super(pos:, source:)
           @tag = tag.freeze
         end

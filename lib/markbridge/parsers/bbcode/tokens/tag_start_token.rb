@@ -7,7 +7,7 @@ module Markbridge
       class TagStartToken < Token
         attr_reader :tag, :attrs
 
-        def initialize(tag:, attrs: {}, pos: 0, source: nil)
+        def initialize(tag:, attrs:, pos:, source:)
           super(pos:, source:)
           @tag = tag.freeze
           @attrs = attrs.freeze

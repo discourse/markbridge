@@ -7,7 +7,7 @@ module Markbridge
       class TextToken < Token
         attr_reader :text
 
-        def initialize(text:, pos: 0)
+        def initialize(text:, pos:)
           super(pos:, source: text)
           @text = text.freeze
         end
