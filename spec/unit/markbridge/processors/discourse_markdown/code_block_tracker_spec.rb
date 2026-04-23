@@ -397,5 +397,15 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
 
       expect(tracker.in_indented_block).to be false
     end
+
+    it "resets inline code state" do
+      input = "`code"
+      tracker.check_inline_boundary(input, 0)
+      expect(tracker.in_inline_code).to be true
+
+      tracker.reset!
+
+      expect(tracker.in_inline_code).to be false
+    end
   end
 end

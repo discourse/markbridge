@@ -225,14 +225,15 @@ module Markbridge
 
         public
 
-        # Reset the tracker state
+        # Reset the tracker state. The @fence_char / @fence_length /
+        # @inline_delimiter companions are not cleared: they're only
+        # consulted while the corresponding in_* flag is true, and
+        # open_fence / open_inline overwrites them on the next
+        # opening (same pattern as try_close_fence / try_close_inline).
         def reset!
           @in_fenced_block = false
-          @fence_char = nil
-          @fence_length = 0
           @in_indented_block = false
           @in_inline_code = false
-          @inline_delimiter = nil
         end
       end
     end
