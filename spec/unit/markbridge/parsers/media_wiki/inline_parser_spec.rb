@@ -355,6 +355,49 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.first).to be_a(Markbridge::AST::Code)
       expect(doc.children.first.children.first.text).to eq("puts")
     end
+
+    # Kills handle_paired_raw_tag mutations that leave @pos on top of
+    # the `</code>` token after parsing the code content. Without the
+    # `+ close_tag.length` advance, the main loop re-enters
+    # parse_html_tag at `</code>` and emits the raw close tag as text.
+    it "advances past </code> when trailing content follows" do
+      doc = parse("<code>X</code>after")
+      expect(doc.children.size).to eq(2)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Code)
+      expect(doc.children[0].children.first.text).to eq("X")
+      expect(doc.children[1]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[1].text).to eq("after")
+    end
+
+    # Same guard for handle_paired_tag (the parse-children variant
+    # used by <s>, <u>, <sup>, <sub>, <del>, <ins>).
+    it "advances past </s> when trailing content follows" do
+      doc = parse("<s>X</s>rest")
+      expect(doc.children.size).to eq(2)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Strikethrough)
+      expect(doc.children[1].text).to eq("rest")
+    end
+
+    # Kills the `@text_buffer << full_match` drop in the no-closing-tag
+    # branches of handle_paired_raw_tag and handle_paired_tag.
+    it "treats an unclosed <code> as literal text" do
+      doc = parse("<code>never closed")
+      expect(doc.children.first).to be_a(Markbridge::AST::Text)
+      expect(doc.children.first.text).to eq("<code>never closed")
+    end
+
+    it "treats an unclosed <s> as literal text" do
+      doc = parse("<s>never closed")
+      expect(doc.children.first).to be_a(Markbridge::AST::Text)
+      expect(doc.children.first.text).to eq("<s>never closed")
+    end
+
+    # Kills <nowiki>... unclosed drop-buffer mutation.
+    it "treats an unclosed <nowiki> as literal text" do
+      doc = parse("<nowiki>never closed")
+      expect(doc.children.first).to be_a(Markbridge::AST::Text)
+      expect(doc.children.first.text).to eq("<nowiki>never closed")
+    end
   end
 
   describe "nested inline markup" do
