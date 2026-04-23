@@ -302,6 +302,59 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       doc = parse("<span>text</span>")
       expect(doc.children.first.text).to eq("<span>text</span>")
     end
+
+    # Kills `.downcase` drop on `tag_match[2].downcase`. The opening
+    # regex has the `/i` flag so <CODE> matches it and dispatches to
+    # handle_paired_raw_tag. That helper builds the closing tag as
+    # "</" + tag_name + ">" — with downcase the lookup is case-sensitive
+    # against "</code>" which doesn't match "</CODE>", so the whole
+    # region falls through to literal text. Without downcase, tag_name
+    # stays "CODE" and the closing tag DOES match, producing an
+    # AST::Code node. Asserting the literal-text outcome pins the
+    # downcase behaviour.
+    it "treats uppercase <CODE>...</CODE> as literal text" do
+      doc = parse("<CODE>X</CODE>")
+      expect(doc.children.first).to be_a(Markbridge::AST::Text)
+      expect(doc.children.first.text).to eq("<CODE>X</CODE>")
+    end
+
+    # Kills mutations on `!tag_match[1].empty?` (closing-slash detection).
+    # A `</code>` at start of input must be treated as literal text, not
+    # as an opening tag that would run into missing-content errors.
+    it "treats a stray closing tag as literal text" do
+      doc = parse("</code>leftover")
+      expect(doc.children.first).to be_a(Markbridge::AST::Text)
+      expect(doc.children.first.text).to eq("</code>leftover")
+    end
+
+    # Kills mutations on `!tag_match[3].empty?` (self-closing-slash
+    # detection). A `<code />` self-closer is NOT a valid code tag;
+    # current code treats it as literal text.
+    it "treats a self-closing <code /> as literal text" do
+      doc = parse("<code />text")
+      expect(doc.children.first).to be_a(Markbridge::AST::Text)
+      expect(doc.children.first.text).to eq("<code />text")
+    end
+
+    # Kills mutations that drop `self_closing` from the branch-early
+    # guard. The <br/> form (no space before slash) is captured as
+    # self-closing by the regex; with self_closing dropped from the
+    # guard the method would route to the `when "br"` arm and emit
+    # a LineBreak. Assert the all-text outcome to pin the original
+    # behaviour.
+    it "treats <br/> (no leading space before slash) as literal text" do
+      doc = parse("<br/>text")
+      expect(doc.children).to all(be_a(Markbridge::AST::Text))
+    end
+
+    # Kills mutations that drop attribute support from the regex
+    # (`(?: [^>]*)?` → `(?: [^>])?` or similar). Code tags must still
+    # be recognised when attributes are present.
+    it "parses <code> with attributes" do
+      doc = parse('<code class="ruby">puts</code>')
+      expect(doc.children.first).to be_a(Markbridge::AST::Code)
+      expect(doc.children.first.children.first.text).to eq("puts")
+    end
   end
 
   describe "nested inline markup" do
