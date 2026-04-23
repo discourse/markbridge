@@ -137,9 +137,13 @@ module Markbridge
           new_pos = @code_tracker.public_send(method, @input, @pos, line_start: true)
           return false unless new_pos
 
+          # `new_pos` always ≥ 1: check_fenced_boundary / check_indented_boundary
+          # only return non-nil after consuming at least one character
+          # starting at the line-start @pos, so @input[new_pos - 1] is
+          # always a valid index into the consumed region.
           @result << @input[@pos...new_pos]
           @pos = new_pos
-          @line_start = new_pos > 0 && @input[new_pos - 1] == "\n"
+          @line_start = @input[new_pos - 1] == "\n"
           true
         end
 
