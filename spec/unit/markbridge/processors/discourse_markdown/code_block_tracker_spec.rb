@@ -256,8 +256,12 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(new_pos).to eq(2)
       expect(tracker.in_inline_code).to be true
 
-      # Single ` inside should not close
-      new_pos = tracker.check_inline_boundary(input, 13)
+      # Single ` at pos 12 (one backtick not matching the `` delimiter)
+      # must NOT close the inline. Kills try_close_inline mutations
+      # that drop the `input[pos, delim_length] == @inline_delimiter`
+      # guard — without it, a lone `` ` `` would satisfy the
+      # "no trailing backtick" check and spuriously close the span.
+      new_pos = tracker.check_inline_boundary(input, 12)
       expect(new_pos).to be_nil
       expect(tracker.in_inline_code).to be true
 

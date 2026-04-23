@@ -181,6 +181,19 @@ RSpec.describe Markbridge::Parsers::BBCode::Scanner do
         expect(tokens[0]).to be_a(Markbridge::Parsers::BBCode::TextToken)
       end
 
+      # Kills `scan_until`'s `|| @length` fallback drop. With unquoted
+      # attribute values at end of input (no closing `]`, no trailing
+      # whitespace), the UNQUOTED_VALUE_STOP regex never matches so
+      # `@input.index(...)` returns nil; the fallback to `@length` is
+      # what keeps `@current_pos` an Integer.
+      it "handles an unquoted attribute value running to end of input without a closing bracket" do
+        tokens = scan("[img alt=value")
+
+        # Tag is malformed (no `]`) → scanner rolls back and emits text.
+        expect(tokens[0]).to be_a(Markbridge::Parsers::BBCode::TextToken)
+        expect(tokens[0].text).to eq("[")
+      end
+
       it "tolerates whitespace between the tag name and the option `=`" do
         tokens = scan("[url   =value]")
 

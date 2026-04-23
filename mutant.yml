@@ -49,6 +49,36 @@ matcher:
     - Markbridge::Processors::DiscourseMarkdown::Scanner#scan_input
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_html_tag
 
+    # parse_tag_at_cursor: mutations on the `attrs = closing ||
+    # tag_name.nil? ? {} : scan_attributes` ternary. The `tag_name.nil?`
+    # short-circuit is load-bearing for input like `[/url=ignored]`
+    # (prevents scan_attributes from advancing @current_pos past the
+    # `=`, so the subsequent `consume("]")` fails and rolls back).
+    # Other permutations (`if closing`, `if closing || nil`,
+    # `if closing || false`, `if closing || self.nil?`, `attrs = nil`
+    # on the non-taken branch) are observably equivalent because
+    # the result either goes to a rolled-back path or to a
+    # TagStartToken whose stored attrs aren't consulted on the
+    # equivalence-inputs.
+    - Markbridge::Parsers::BBCode::Scanner#parse_tag_at_cursor
+
+    # parse_external_link mutations are all Bucket A: `split(" ", 2)`
+    # vs `split(nil, 2)` (Ruby's awk-style behaviour on " " is
+    # identical to default whitespace for realistic URLs);
+    # `parts[0]` vs `parts.fetch(0)` / `parts.at(0)` (equivalent for
+    # non-empty arrays, which `String#split` always returns).
+    - Markbridge::Parsers::MediaWiki::InlineParser#parse_external_link
+
+    # advance_code_boundary mutations are all Bucket A equivalents
+    # that flow through to inline-code detection: `unless new_pos`
+    # flipped to `unless nil` / `unless false` / `return false` early
+    # all simply return false earlier, bypassing the fence/indent
+    # advance. The downstream `if @input[@pos] == "`"` branch then
+    # opens inline code on the same bytes (matching delimiter length)
+    # and the `if @code_tracker.in_code?` branch passes the same
+    # content through. Output is byte-identical.
+    - Markbridge::Processors::DiscourseMarkdown::Scanner#advance_code_boundary
+
 mutation:
   ignore_patterns:
     # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,
@@ -74,10 +104,6 @@ mutation:
     # same final index.
     - "send{receiver=send{selector=select} selector=([])}"
 
-    # `parts[0]` vs `parts.fetch(0)` vs `parts.at(0)` — equivalent
-    # for arrays with at least one element, which `String#split`
-    # always returns (empty-string split still produces `[""]`).
-    - "send{receiver=lvar{value=parts} selector=([])}"
 
     # Inline loop-progress guards in Scanner#scan_while / #skip_whitespace /
     # Parser#parse_tokens / MediaWiki::Parser#reconcile_list_stack.

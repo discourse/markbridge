@@ -215,7 +215,11 @@ module Markbridge
         end
 
         def end_of_input?
-          @current_pos >= @length
+          # All callers maintain @current_pos <= @length (scan_while
+          # bounds on @length; scan_until uses `index || @length`;
+          # consume is a no-op at EOF); `==` and `>=` are observably
+          # identical here.
+          @current_pos == @length
         end
       end
     end
