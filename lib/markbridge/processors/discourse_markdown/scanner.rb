@@ -96,9 +96,10 @@ module Markbridge
               next if advance_code_boundary(:check_indented_boundary)
             end
 
-            # Check for inline code boundary
-            if @input[@pos] == "`" && !@code_tracker.in_fenced_block &&
-                 !@code_tracker.in_indented_block
+            # Check for inline code boundary. check_inline_boundary's
+            # own fenced/indented guard means we don't need to pre-check
+            # here — it'll just return nil in those cases.
+            if @input[@pos] == "`"
               new_pos = @code_tracker.check_inline_boundary(@input, @pos)
               if new_pos
                 @result << @input[@pos...new_pos]
