@@ -63,10 +63,22 @@ module Markbridge
         # Parse tokens using scanner
         # @param scanner [Scanner]
         # @param context [ParserState]
+        # Upper bound on tokens produced by a single parse. Every token
+        # consumes ≥1 char of input, so 10M tokens ≈ 10MB of BBCode —
+        # far beyond any legitimate use. Purely an infinite-loop fuse.
+        GUARD_TOKEN_LIMIT = 10_000_000
+        private_constant :GUARD_TOKEN_LIMIT
+
         def parse_tokens(scanner, context)
           tokens = PeekableEnumerator.new(scanner)
+          guard_iter = 0
 
           while tokens.has_next?
+            if guard_iter >= GUARD_TOKEN_LIMIT
+              raise ParserStuckError.new(parser: self.class, pos: guard_iter)
+            end
+
+            guard_iter += 1
             token = tokens.next
             case token
             when TextToken

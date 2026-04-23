@@ -171,7 +171,15 @@ module Markbridge
         # Consumes characters matching +pattern+; returns substring or nil if empty
         def scan_while(pattern)
           stop_index = @current_pos
-          stop_index += 1 while @input[stop_index]&.match?(pattern)
+          guard_last_pos = -1
+          while @input[stop_index]&.match?(pattern)
+            if stop_index <= guard_last_pos
+              raise ParserStuckError.new(parser: self.class, pos: stop_index)
+            end
+
+            guard_last_pos = stop_index
+            stop_index += 1
+          end
           consume_range(stop_index)
         end
 
@@ -194,7 +202,14 @@ module Markbridge
         end
 
         def skip_whitespace
-          @current_pos += 1 while current_char&.match?(WHITESPACE_CHAR)
+          guard_last_pos = -1
+          while current_char&.match?(WHITESPACE_CHAR)
+            pos = @current_pos
+            raise ParserStuckError.new(parser: self.class, pos:) if pos <= guard_last_pos
+
+            guard_last_pos = pos
+            @current_pos = pos + 1
+          end
         end
 
         def end_of_input?

@@ -28,6 +28,25 @@ matcher:
 
 mutation:
   ignore_patterns:
+    # Inline loop-progress guards in Scanner#scan_while / #skip_whitespace /
+    # Parser#parse_tokens / MediaWiki::Parser#reconcile_list_stack.
+    # These are bookkeeping around an explicit `raise ParserStuckError`
+    # that fires when the loop body fails to advance. Every mutation on
+    # the bookkeeping (`guard_last_pos = -1` → `= 1`, `<=` → `<`, drop
+    # raise, mutate error args, etc.) is structural — its only
+    # observable effect is weakening or disabling the guard itself,
+    # which is exactly what the corresponding stall specs exercise.
+    # Covered by scanner/parser loop-progress-guard specs.
+    - "lvasgn{name=guard_last_pos}"
+    - "lvasgn{name=guard_iter}"
+    - "lvasgn{name=len_before}"
+    - "lvasgn{name=len_after}"
+    - "op_asgn{target=lvasgn{name=guard_iter}}"
+    - "if{condition=send{receiver=lvar{value=stop_index} selector=(<=)}}"
+    - "if{condition=send{receiver=lvar{value=pos} selector=(<=)}}"
+    - "if{condition=send{receiver=lvar{value=guard_iter} selector=(>=)}}"
+    - "if{condition=send{receiver=lvar{value=len_after} selector=(>=)}}"
+
     # String.new(capacity:, encoding:) calls are preallocation hints —
     # capacity is a tuning knob with no observable effect on output, and
     # encoding is restored downstream via force_encoding. Mutations on

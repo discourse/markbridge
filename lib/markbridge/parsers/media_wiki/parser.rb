@@ -170,7 +170,14 @@ module Markbridge
         # @param prefix [String] the list prefix characters (e.g., "**#")
         def reconcile_list_stack(prefix)
           keep = matching_prefix_depth(prefix)
-          @list_stack.pop while @list_stack.length > keep
+          while @list_stack.length > keep
+            len_before = @list_stack.length
+            @list_stack.pop
+            len_after = @list_stack.length
+            if len_after >= len_before
+              raise ParserStuckError.new(parser: self.class, pos: len_after)
+            end
+          end
           prefix[keep..].each_char { |char| open_new_list(char == "#", @list_stack.length) }
         end
 
