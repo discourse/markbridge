@@ -339,6 +339,22 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Scanner do
       end
     end
 
+    # Kills mutations on `@line_start = @input[@pos - 1] == "\n"` in
+    # handle_match. A mid-line mention must leave @line_start = false
+    # so that 4+ spaces following it are NOT treated as indented code
+    # (which would swallow a trailing @mention).
+    context "when a construct is followed by 4+ spaces and another mention" do
+      it "does not trigger indented-code detection after a mid-line match" do
+        input = "@bob    @alice"
+        result = scanner.scan(input)
+
+        # Both mentions are detected because the 4 spaces after @bob
+        # don't start an indented code block (prev char is "b", not "\n").
+        expect(result.nodes.size).to eq(2)
+        expect(result.nodes.map(&:name)).to eq(%w[bob alice])
+      end
+    end
+
     # Loop-progress guard: scan_input must advance @pos every
     # iteration. A regression where a dispatch path fails to move
     # @pos would spin forever; the guard raises ParserStuckError.
