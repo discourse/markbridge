@@ -12,8 +12,6 @@ module Markbridge
           @text = text.freeze
         end
 
-        alias source text
-
         def inspect
           "#<TextToken #{text.inspect}>"
         end

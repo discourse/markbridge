@@ -26,6 +26,13 @@ matcher:
     - Markbridge::ProgressGuard#progressed!
     - Markbridge::ProgressGuard#reset_progress_guard
 
+    # Token #inspect methods are debug-only output. Their mutations are
+    # Bucket A equivalents: `""` vs `nil` (identical in string
+    # interpolation), `attrs.inspect` vs `attrs` (identical for normal
+    # Hashes), `super` dispatch (observable but semantically the same
+    # debug representation). Not worth pinning exact format over.
+    - Markbridge::Parsers::BBCode::TagStartToken#inspect
+
 mutation:
   ignore_patterns:
     # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,
