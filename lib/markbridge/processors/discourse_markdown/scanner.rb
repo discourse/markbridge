@@ -137,13 +137,15 @@ module Markbridge
           new_pos = @code_tracker.public_send(method, @input, @pos, line_start: true)
           return false unless new_pos
 
-          # `new_pos` always ≥ 1: check_fenced_boundary / check_indented_boundary
-          # only return non-nil after consuming at least one character
-          # starting at the line-start @pos, so @input[new_pos - 1] is
-          # always a valid index into the consumed region.
+          # check_fenced_boundary / check_indented_boundary always stop
+          # at pos_after_line, which is either after a "\n" or at EOF.
+          # After-newline → @line_start should be true; at EOF the
+          # outer `while @pos < @input.length` exits and @line_start
+          # is unobservable. Setting true unconditionally drops the
+          # `@input[new_pos - 1] == "\n"` dance.
           @result << @input[@pos...new_pos]
           @pos = new_pos
-          @line_start = @input[new_pos - 1] == "\n"
+          @line_start = true
           true
         end
 
@@ -163,10 +165,13 @@ module Markbridge
           placeholder = render_placeholder(node)
           @result << placeholder
 
-          # Detectors always produce end_pos > start_pos >= 0, so @pos
-          # is ≥ 1 here and `@pos - 1` is always a valid index.
+          # Every detector shipped today matches content that ends on a
+          # non-newline byte (`]`, `)`, `_`, alphanumeric), so @line_start
+          # is always false after a successful match. If a future custom
+          # detector produces a match whose end_pos sits right after
+          # "\n", re-introduce the `@input[@pos - 1] == "\n"` check.
           @pos = match.end_pos
-          @line_start = @input[@pos - 1] == "\n"
+          @line_start = false
           @node_index += 1
         end
 
