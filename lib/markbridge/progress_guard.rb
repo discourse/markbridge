@@ -8,10 +8,13 @@ module Markbridge
   # the top of the loop body ensures a stalled iteration raises
   # `ParserStuckError` instead of hanging.
   #
-  # The guard persists state in `@last_progress_pos` on the including
-  # instance. Callers whose `parse`/`scan` entry may be invoked more
-  # than once on the same instance should call `reset_progress_guard`
-  # at entry to avoid stale state leaking between invocations.
+  # State is persisted in `@last_progress_pos` on the including
+  # instance. Every entry point that uses `progressed!` must call
+  # `reset_progress_guard` first — the check compares against an
+  # Integer sentinel (-1 after reset), so leaving the ivar unset or
+  # at nil raises `ArgumentError` on the first call. A -1 sentinel
+  # avoids a per-iteration `nil` short-circuit and is measurably
+  # friendlier to YJIT on hot inline loops.
   #
   # @example
   #   class MyParser
@@ -29,15 +32,13 @@ module Markbridge
     private
 
     def progressed!(pos)
-      if @last_progress_pos && pos <= @last_progress_pos
-        raise ParserStuckError.new(parser: self.class, pos:)
-      end
+      raise ParserStuckError.new(parser: self.class, pos:) if pos <= @last_progress_pos
 
       @last_progress_pos = pos
     end
 
     def reset_progress_guard
-      @last_progress_pos = nil
+      @last_progress_pos = -1
     end
   end
 end

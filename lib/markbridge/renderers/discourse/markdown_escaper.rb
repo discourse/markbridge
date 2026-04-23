@@ -30,6 +30,8 @@ module Markbridge
       #   escaper.escape("<?php echo 1; ?>")    # => "\\<?php echo 1; ?>"
       #
       class MarkdownEscaper
+        include Markbridge::ProgressGuard
+
         # @param escape_hard_line_breaks [Boolean] when true, strip trailing spaces
         #   before newlines to prevent CommonMark hard line breaks (<br/>).
         #   Defaults to false because Discourse has trailing-space hard line
@@ -313,8 +315,10 @@ module Markbridge
           @inline_result = String.new(capacity: bytesize + bytesize / 4, encoding: content.encoding)
           @inline_len = bytesize
           pos = 0
+          reset_progress_guard
 
           while pos < @inline_len
+            progressed!(pos)
             byte = @inline_content.getbyte(pos)
             pos = dispatch_inline_byte(byte, pos)
           end

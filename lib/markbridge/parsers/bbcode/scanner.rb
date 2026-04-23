@@ -12,6 +12,7 @@ module Markbridge
           @input = input
           @length = input.length
           @current_pos = 0
+          reset_progress_guard
         end
 
         def next_token
