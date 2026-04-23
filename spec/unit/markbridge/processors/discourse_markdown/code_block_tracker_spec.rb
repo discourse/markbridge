@@ -128,6 +128,28 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_fenced_block).to be false
     end
 
+    # Kills mutations on the `scan_pos >= input_length || input[scan_pos]
+    # == "\n"` branch. With more content after the closing fence + \n,
+    # the \n arm is what closes the fence (the `>= input_length` arm
+    # only fires at actual EOF).
+    it "detects closing fence followed by a newline and more content" do
+      input = "```\ncode\n```\ntrailing"
+      tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      new_pos = tracker.check_fenced_boundary(input, 9, line_start: true)
+      expect(new_pos).to eq(13) # Position after "```\n"
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    it "rejects a closing fence followed by non-whitespace content" do
+      input = "```\ncode\n``` text"
+      tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      new_pos = tracker.check_fenced_boundary(input, 9, line_start: true)
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be true
+    end
+
     it "requires matching fence character for close" do
       input = "```\ncode\n~~~"
       # Open with backticks
@@ -195,6 +217,27 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
 
       expect(new_pos).to eq(1)
       expect(tracker.in_inline_code).to be true
+    end
+
+    # Kills mutations on the `input[pos] != "`"` guard. At a non-backtick
+    # position the method must return nil without touching in_inline_code
+    # or @inline_delimiter; otherwise mutations to `if nil` / `if false`
+    # / `if input[pos].eql?("`")` etc. would fall through to open_inline
+    # and return a non-nil position.
+    it "returns nil at non-backtick positions" do
+      input = "hello `code`"
+      new_pos = tracker.check_inline_boundary(input, 0)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_inline_code).to be false
+    end
+
+    it "returns nil past end of input" do
+      input = "abc"
+      new_pos = tracker.check_inline_boundary(input, 3)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_inline_code).to be false
     end
 
     it "detects closing backtick" do
