@@ -54,7 +54,7 @@ module Markbridge
           return nil unless line_start
 
           input_length = input.length
-          scan_pos = skip_leading_spaces(input, pos, input_length)
+          scan_pos = skip_leading_spaces(input, pos)
           # No `scan_pos >= input_length` guard: `input[input_length]` is
           # nil, and `nil == "`"` / `nil == "~"` are both false so the
           # next check returns nil anyway.
@@ -127,12 +127,13 @@ module Markbridge
         # All five compound `while A && B` loops in this file are split into
         # `while <bound>` + `break if …` to dodge a Ruby 3.4.8 PRISM VM bug
         # (https://bugs.ruby-lang.org/issues/22002, fixed in 3.4.10).
-        def skip_leading_spaces(input, pos, input_length)
+        def skip_leading_spaces(input, pos)
           scan_pos = pos
           spaces = 0
           guard_last_pos = -1
           while spaces < 3
-            break if scan_pos >= input_length
+            # input[scan_pos] returns nil past end of string, and
+            # `nil != " "` is true — no separate bounds check needed.
             break if input[scan_pos] != " "
             if scan_pos <= guard_last_pos
               raise ParserStuckError.new(parser: self.class, pos: scan_pos)
@@ -197,8 +198,10 @@ module Markbridge
           next_pos = pos + delimiter_length
           return nil if next_pos < input_length && input[next_pos] == "`"
 
+          # @inline_delimiter is not reset here: it is only consulted
+          # while @in_inline_code is true, and open_inline overwrites it
+          # on the next opening.
           @in_inline_code = false
-          @inline_delimiter = nil
           next_pos
         end
 
