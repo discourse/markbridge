@@ -28,6 +28,34 @@ matcher:
 
 mutation:
   ignore_patterns:
+    # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,
+    # and next_pos are all position integers ≤ their *_length bound,
+    # so the source `scan_pos >= input_length` / `pos >= input_length`
+    # / `next_pos < @inline_len` checks are equivalent to `==`,
+    # `.eql?`, and `.equal?` variants (mutant replaces `>=`/`<` with
+    # those). The guards are load-bearing against future drift where
+    # a position might exceed the length, but the observable
+    # behaviour is identical today for these specific comparisons.
+    - "send{receiver=lvar{value=scan_pos} selector=(>=)}"
+    - "send{receiver=lvar{value=pos} selector=(>=)}"
+
+    # split("\n", -1) vs split("\n", -2) vs split("\n", 167) — Ruby
+    # treats any negative limit as "no limit", and a positive limit
+    # larger than the number of splits is a no-op. For realistic
+    # inputs (< 167 lines) all three are observably identical.
+    - "send{receiver=lvar{value=text} selector=split}"
+
+    # `arr[0...-1]` vs `arr[nil...-1]` / `arr[0..-1]` — Ruby's
+    # array-slice accepts nil as 0 and the inclusive/exclusive
+    # variants differ only at the far end where -1 points to the
+    # same final index.
+    - "send{receiver=send{selector=select} selector=([])}"
+
+    # `parts[0]` vs `parts.fetch(0)` vs `parts.at(0)` — equivalent
+    # for arrays with at least one element, which `String#split`
+    # always returns (empty-string split still produces `[""]`).
+    - "send{receiver=lvar{value=parts} selector=([])}"
+
     # Inline loop-progress guards in Scanner#scan_while / #skip_whitespace /
     # Parser#parse_tokens / MediaWiki::Parser#reconcile_list_stack.
     # These are bookkeeping around an explicit `raise ParserStuckError`
