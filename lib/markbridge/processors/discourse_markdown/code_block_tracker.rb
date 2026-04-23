@@ -55,8 +55,9 @@ module Markbridge
 
           input_length = input.length
           scan_pos = skip_leading_spaces(input, pos, input_length)
-          return nil if scan_pos >= input_length
-
+          # No `scan_pos >= input_length` guard: `input[input_length]` is
+          # nil, and `nil == "`"` / `nil == "~"` are both false so the
+          # next check returns nil anyway.
           fence_char = input[scan_pos]
           return nil unless fence_char == "`" || fence_char == "~"
 

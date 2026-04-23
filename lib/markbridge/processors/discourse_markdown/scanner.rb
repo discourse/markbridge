@@ -158,8 +158,10 @@ module Markbridge
           placeholder = render_placeholder(node)
           @result << placeholder
 
+          # Detectors always produce end_pos > start_pos >= 0, so @pos
+          # is ≥ 1 here and `@pos - 1` is always a valid index.
           @pos = match.end_pos
-          @line_start = @pos > 0 && @input[@pos - 1] == "\n"
+          @line_start = @input[@pos - 1] == "\n"
           @node_index += 1
         end
 
