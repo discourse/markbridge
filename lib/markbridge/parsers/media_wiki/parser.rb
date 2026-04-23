@@ -20,6 +20,8 @@ module Markbridge
       #   parser = Markbridge::Parsers::MediaWiki::Parser.new
       #   ast = parser.parse("'''bold''' and ''italic''")
       class Parser
+        include Markbridge::ProgressGuard
+
         # Parse MediaWiki wikitext into an AST Document.
         #
         # @param input [String] MediaWiki source
@@ -31,6 +33,7 @@ module Markbridge
           @document = AST::Document.new
           @inline_parser = InlineParser.new
           @list_stack = []
+          reset_progress_guard
 
           process_lines(lines)
           @document
@@ -52,7 +55,7 @@ module Markbridge
         def process_lines(lines)
           i = 0
           while i < lines.length
-            last_i = i
+            progressed!(i)
             line = lines.fetch(i)
 
             if heading_line?(line)
@@ -77,7 +80,6 @@ module Markbridge
             end
 
             i += 1
-            raise ParserStuckError.new(parser: self.class, pos: i) if i <= last_i
           end
         end
 

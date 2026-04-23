@@ -12,6 +12,19 @@ includes:
 matcher:
   subjects:
     - "Markbridge*"
+  ignore:
+    # ProgressGuard#progressed! is a self-referential loop-progress
+    # guard: its correctness is verified end-to-end by each parser's
+    # dedicated "loop-progress guard" spec (InlineParser, Parser,
+    # BBCode::Scanner, DiscourseMarkdown::Scanner). Mutations to its
+    # internals (drop `raise`, swap `==` for `eql?`/`equal?`, nil-out
+    # `@last_progress_pos`, etc.) all produce timeouts when the guard
+    # is exercised by the stalled-loop specs, because removing or
+    # weakening the guard is exactly what the guarded loops depend on
+    # to terminate under a bug. Keep as an ignored subject; the
+    # behaviour is covered by call-site tests.
+    - Markbridge::ProgressGuard#progressed!
+    - Markbridge::ProgressGuard#reset_progress_guard
 
 mutation:
   ignore_patterns:

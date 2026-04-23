@@ -6,6 +6,8 @@ module Markbridge
       # High-performance character-by-character BBCode scanner
       # Tokenizes BBCode in O(n) time with minimal allocations and bounded backtracking
       class Scanner
+        include Markbridge::ProgressGuard
+
         def initialize(input)
           @input = input
           @length = input.length
@@ -14,29 +16,24 @@ module Markbridge
 
         def next_token
           return nil if end_of_input?
+          progressed!(@current_pos)
           start_pos = @current_pos
           bracket_index = @input.index("[", @current_pos)
 
-          token =
-            if bracket_index.nil?
-              text = @input[@current_pos..]
-              @current_pos = @length
-              TextToken.new(text:, pos: start_pos)
-            elsif bracket_index > @current_pos
-              text = @input[@current_pos...bracket_index]
-              @current_pos = bracket_index
-              TextToken.new(text:, pos: start_pos)
-            elsif (tag_token = parse_tag_at_cursor)
-              tag_token
-            else
-              @current_pos += 1
-              TextToken.new(text: "[", pos: start_pos)
-            end
-
-          if @current_pos == start_pos
-            raise ParserStuckError.new(parser: self.class, pos: @current_pos)
+          if bracket_index.nil?
+            text = @input[@current_pos..]
+            @current_pos = @length
+            TextToken.new(text:, pos: start_pos)
+          elsif bracket_index > @current_pos
+            text = @input[@current_pos...bracket_index]
+            @current_pos = bracket_index
+            TextToken.new(text:, pos: start_pos)
+          elsif (tag_token = parse_tag_at_cursor)
+            tag_token
+          else
+            @current_pos += 1
+            TextToken.new(text: "[", pos: start_pos)
           end
-          token
         end
 
         private
