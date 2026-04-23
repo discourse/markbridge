@@ -47,6 +47,52 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_fenced_block).to be true
     end
 
+    # Kills mutations that drop or loosen the `fence_char == "`" ||
+    # fence_char == "~"` guard. Without that guard, any repeated
+    # non-fence character at line start (e.g. "aaa") would be counted
+    # by count_fence_chars and mis-identified as an opening fence.
+    it "does not open a fence with non-backtick/tilde characters" do
+      input = "aaaaaa not a fence\n"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    it "does not open a fence with repeated hash characters" do
+      input = "#### heading-like\n"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    # Kills mutations on the `fence_length < 3` guard (< 2, < 1, < 0).
+    # 1 and 2 backtick / tilde sequences must NOT open a fence.
+    it "does not open a fence with fewer than 3 backticks" do
+      input = "``not a fence\n"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    it "does not open a fence with a single backtick at line start" do
+      input = "`inline`"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    it "does not open a fence with fewer than 3 tildes" do
+      input = "~~not a fence\n"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
     it "allows up to 3 spaces of indentation" do
       input = "   ```\ncode\n```"
       new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
