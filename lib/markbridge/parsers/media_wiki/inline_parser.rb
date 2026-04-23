@@ -19,6 +19,7 @@ module Markbridge
           @text_buffer = +""
 
           while @pos < @length
+            last_pos = @pos
             char = @input[@pos]
 
             case char
@@ -33,6 +34,8 @@ module Markbridge
             else
               append_literal(char)
             end
+
+            raise ParserStuckError.new(parser: self.class, pos: @pos) if @pos == last_pos
           end
 
           flush_text

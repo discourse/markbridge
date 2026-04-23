@@ -320,4 +320,24 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(bold.children.first).to be_a(Markbridge::AST::Url)
     end
   end
+
+  # Loop-progress guard: every iteration of the main dispatch loop
+  # must advance @pos. If a bug in a `parse_*` helper leaves @pos
+  # unchanged, we raise ParserStuckError instead of hanging.
+  describe "loop-progress guard" do
+    it "raises ParserStuckError if a subclass override stalls the loop" do
+      buggy =
+        Class.new(described_class) do
+          # Override append_literal so it doesn't advance @pos. Any plain
+          # text would trigger the guard on the first iteration.
+          define_method(:append_literal) { |_char| }
+          private :append_literal
+        end
+
+      expect { buggy.new.parse("abc", parent:) }.to raise_error(
+        Markbridge::ParserStuckError,
+        /stuck at position 0/,
+      )
+    end
+  end
 end
