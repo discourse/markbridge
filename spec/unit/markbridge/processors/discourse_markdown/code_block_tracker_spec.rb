@@ -219,6 +219,22 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_inline_code).to be true
     end
 
+    # Kills `@inline_delimiter = input[delimiter_start...pos]` →
+    # `@inline_delimiter = input[nil...pos]`. With nil-start the
+    # slice starts at 0, swallowing any prefix before the delimiter.
+    it "detects opening backticks at a mid-string position" do
+      input = "xx``code``"
+      new_pos = tracker.check_inline_boundary(input, 2)
+
+      expect(new_pos).to eq(4)
+      # `close at pos 8 only succeeds if @inline_delimiter was set
+      # to exactly "``" (2 backticks starting at pos 2) — the mutation
+      # would produce "xx``" (4 chars) and close wouldn't match.
+      close_pos = tracker.check_inline_boundary(input, 8)
+      expect(close_pos).to eq(10)
+      expect(tracker.in_inline_code).to be false
+    end
+
     # Kills mutations on the `input[pos] != "`"` guard. At a non-backtick
     # position the method must return nil without touching in_inline_code
     # or @inline_delimiter; otherwise mutations to `if nil` / `if false`
