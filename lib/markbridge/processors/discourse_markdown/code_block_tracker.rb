@@ -108,10 +108,11 @@ module Markbridge
         # @return [Integer, nil] end position after inline code, or nil if not at boundary
         def check_inline_boundary(input, pos)
           return nil if @in_fenced_block || @in_indented_block
+          # No `pos >= input_length` guard: `input[input_length]` is nil,
+          # and `nil != "`"` is true so the next check returns nil anyway.
+          return nil if input[pos] != "`"
 
           input_length = input.length
-          return nil if pos >= input_length || input[pos] != "`"
-
           if @in_inline_code
             try_close_inline(input, pos, input_length)
           else
@@ -166,9 +167,10 @@ module Markbridge
           end
           return nil unless scan_pos >= input_length || input[scan_pos] == "\n"
 
+          # @fence_char / @fence_length are not reset here: they are only
+          # consulted while @in_fenced_block is true, and open_fence
+          # overwrites them on the next opening.
           @in_fenced_block = false
-          @fence_char = nil
-          @fence_length = 0
           pos_after_line(scan_pos, input_length)
         end
 
