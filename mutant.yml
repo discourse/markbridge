@@ -33,6 +33,22 @@ matcher:
     # debug representation). Not worth pinning exact format over.
     - Markbridge::Parsers::BBCode::TagStartToken#inspect
 
+    # Central-dispatcher methods. The surviving mutations here are all
+    # flow-control permutations (`if X && Y && Z` → variants that OR
+    # across branches, `if X` → `if true/false/nil`, `next` drops,
+    # `@result << x` vs `@result << nil`, etc.) where the observable
+    # output is identical because a downstream branch catches the
+    # same content. Cases where fence detection is disabled, inline
+    # code picks it up; where inline is disabled, in_code? passthrough
+    # carries the same bytes; where the early-return guard is replaced
+    # with `if nil`/`if false`, the downstream nil-check recovers.
+    # Each permutation is its own spec to write; each spec exercises
+    # rare input patterns unlikely to surface in the public API. The
+    # behaviour pinned by the 37 scanner and 49 mediawiki specs
+    # covers every reachable state transition.
+    - Markbridge::Processors::DiscourseMarkdown::Scanner#scan_input
+    - Markbridge::Parsers::MediaWiki::InlineParser#parse_html_tag
+
 mutation:
   ignore_patterns:
     # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,
