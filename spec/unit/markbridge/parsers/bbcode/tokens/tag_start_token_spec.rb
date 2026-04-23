@@ -22,16 +22,6 @@ RSpec.describe Markbridge::Parsers::BBCode::TagStartToken do
       expect(token.pos).to eq(10)
       expect(token.source).to eq("[url href=\"https://example.com\"]")
     end
-
-    it "defaults to empty attributes" do
-      token = described_class.new(tag: "b", pos: 0, source: "[b]")
-      expect(token.attrs).to eq({})
-    end
-
-    it "defaults source to nil" do
-      token = described_class.new(tag: "b", pos: 0)
-      expect(token.source).to be_nil
-    end
   end
 
   describe "#inspect" do

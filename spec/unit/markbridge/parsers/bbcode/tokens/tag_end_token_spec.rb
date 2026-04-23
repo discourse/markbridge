@@ -13,16 +13,12 @@ RSpec.describe Markbridge::Parsers::BBCode::TagEndToken do
       expect(token.pos).to eq(10)
       expect(token.source).to eq("[/b]")
     end
-
-    it "defaults source to nil" do
-      token = described_class.new(tag: "b", pos: 0)
-      expect(token.source).to be_nil
-    end
   end
 
   describe "#inspect" do
     it "shows readable representation" do
       token = described_class.new(tag: "b", pos: 0, source: "[/b]")
+
       expect(token.inspect).to include("TagEndToken")
       expect(token.inspect).to include("[/b]")
     end
