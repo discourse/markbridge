@@ -6,7 +6,7 @@ image: fedora/43
 setup:
   - sudo dnf update
   - sudo dnf copr enable -y gschlager/ruby
-  - sudo dnf install -y gcc make libyaml-devel java-latest-openjdk-headless ruby-install
+  - sudo dnf install -y gcc make libyaml-devel java-latest-openjdk-headless ruby-install nodejs pnpm
   - ruby-install jruby
   - curl -LsSf https://rv.dev/install | sh
   - . "$HOME/.cargo/env"
@@ -16,12 +16,14 @@ setup:
   - rv ruby pin 4.0
   - rv run bundle install
   - rv run bundle exec lefthook install
+  - (cd docs && pnpm install)
   - echo '. "$HOME/.cargo/env"' >> ~/.zshenv
   - echo 'eval "$(rv shell init zsh)"' >> ~/.zshenv
   - echo 'eval "$(rv shell completions zsh)"' >> ~/.zshrc
 
 sync:
   - bundle install
+  - (cd docs && pnpm install)
 
 update:
   - sudo dnf update -y
@@ -29,8 +31,12 @@ update:
 
 ports:
   - 4567:4567
+  - 4321:4321
 
 daemons:
   playground:
     cmd: bin/playground
+    autostart: true
+  docs:
+    cmd: bin/docs
     autostart: true
