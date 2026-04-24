@@ -83,7 +83,8 @@ jobs:
           VERSION=$(ruby -r ./lib/markbridge/version -e 'puts Markbridge::VERSION')
           TAG="v${VERSION}"
           if ! gh release view "${TAG}" > /dev/null 2>&1; then
-            gh release create "${TAG}" --generate-notes --latest
+            NOTES=$(bin/generate-release-notes)
+            gh release create "${TAG}" --notes "${NOTES}" --latest
           else
             echo "Release ${TAG} already exists, skipping."
           fi
