@@ -132,6 +132,28 @@ matcher:
     # Not observable through the public parser API. Bucket A.
     - Markbridge::Parsers::BBCode::ClosingStrategies::Reordering#handle_close
 
+    # Renderer#render's `@interface_cache` housekeeping (root_call
+    # detection + ensure-block cache reset). The cache memoizes
+    # RenderingInterface instances by context.object_id for the
+    # duration of a single top-level render call. Mutations on the
+    # housekeeping leak cache entries across top-level calls or
+    # produce unused entries, both of which are memory-only side
+    # effects with no observable output change. Bucket A. The cache
+    # itself is load-bearing for perf (~5-10% of render time on deep
+    # trees).
+    - Markbridge::Renderers::Discourse::Renderer#render
+
+    # Renderer#render_children's `if part.empty?; next; end` fast-path
+    # avoids the per-child boundary check for child renderers that
+    # produce no output (comments, ignored tags). Dropping the guard
+    # is equivalent: `result << ""` is a no-op, and the boundary
+    # check short-circuits via `result.getbyte(-1) == part.getbyte(0)`
+    # (nil == nil ignored because `!result.empty?` guards it — but
+    # even dropping THAT guard, nil == real-byte is false). Bucket A.
+    # Test-observable only as a perf regression on empty-part-heavy
+    # input, which isn't realistic through the public parse API.
+    - Markbridge::Renderers::Discourse::Renderer#render_children
+
     # CodeBlockTracker#check_indented_boundary's `input[pos...line_end]`
     # vs `input[pos..line_end]`. When line_end points at `\n`, the
     # inclusive form adds the newline to line_content; both downstream

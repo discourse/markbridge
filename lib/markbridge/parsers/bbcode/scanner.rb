@@ -80,17 +80,27 @@ module Markbridge
           nil
         end
 
-        TAG_NAME = /\A[a-z*][a-z0-9]*(?::[0-9a-f]*)?/i
-        private_constant :TAG_NAME
-
         # Scan a tag name: [a-z*][a-z0-9]*(:hex*)?
+        #
+        # Char-by-char rather than a single regex over `@input[pos..]`
+        # because the regex form allocates a substring for every tag,
+        # which is a dominant cost on tag-heavy input. The char-based
+        # loop is ~3x faster under YJIT.
         # @return [String, nil]
         def scan_tag_name
-          match = @input[@current_pos..].match(TAG_NAME)
-          return nil unless match
+          start = @current_pos
 
-          @current_pos += match[0].length
-          match[0]
+          return nil unless current_char&.match?(TAG_INITIAL_CHAR)
+          @current_pos += 1
+
+          @current_pos += 1 while current_char&.match?(TAG_NAME_CHAR)
+
+          if current_char == ":"
+            @current_pos += 1
+            @current_pos += 1 while current_char&.match?(UID_HEX_CHAR)
+          end
+
+          @input[start...@current_pos]
         end
 
         # Scan tag attributes

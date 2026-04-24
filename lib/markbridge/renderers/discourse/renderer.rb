@@ -8,6 +8,9 @@ module Markbridge
         def initialize(tag_library: nil, escaper: nil)
           @tag_library = tag_library || TagLibrary.default
           @escaper = escaper || MarkdownEscaper.new
+          # @interface_cache is lazily initialized in #render's top-level
+          # call and reset to nil after the call completes. No init
+          # needed here — unset ivar returns nil under `.nil?` check.
         end
 
         # Render a node to Markdown
@@ -15,6 +18,9 @@ module Markbridge
         # @param context [RenderContext] rendering context with parent chain
         # @return [String]
         def render(node, context: RenderContext.new)
+          root_call = @interface_cache.nil?
+          @interface_cache ||= {}
+
           tag = @tag_library[node.class]
           return tag.render(node, interface_for(context)) if tag
 
@@ -22,14 +28,14 @@ module Markbridge
           when AST::Element # Document is an Element subclass
             render_children(node, context:)
           when AST::MarkdownText
-            # Pass through markdown text as-is (already formatted)
             node.text
           when AST::Text
-            # Escape plain text unless we're inside a code block
             context.has_parent?(AST::Code) ? node.text : @escaper.escape(node.text)
           else
             ""
           end
+        ensure
+          @interface_cache = nil if root_call
         end
 
         # Render all children of a node
@@ -40,7 +46,15 @@ module Markbridge
           result = +""
           node.children.each do |child|
             part = render(child, context:)
-            result << EMPHASIS_BOUNDARY if emphasis_delimiter_clash?(result[-1], part[0])
+            next if part.empty?
+
+            # Integer-byte check avoids allocating substrings for the
+            # per-child adjacency probe. EMPHASIS_DELIMITER_BYTES.include?
+            # over a 4-element Set is O(1).
+            if !result.empty? && (last_byte = result.getbyte(-1)) == part.getbyte(0) &&
+                 EMPHASIS_DELIMITER_BYTES.include?(last_byte)
+              result << EMPHASIS_BOUNDARY
+            end
             result << part
           end
           result
@@ -54,17 +68,13 @@ module Markbridge
         # in rendered output but breaks the delimiter run during Markdown
         # parsing.
         EMPHASIS_BOUNDARY = "<!---->"
-        # Characters where adjacent runs merge into a single longer run during
+        # Bytes where adjacent runs merge into a single longer run during
         # Markdown parsing: emphasis (* _), strikethrough (~), code spans (`).
-        EMPHASIS_DELIMITERS = %w[* _ ~ `].freeze
-        private_constant :EMPHASIS_BOUNDARY, :EMPHASIS_DELIMITERS
-
-        def emphasis_delimiter_clash?(last_char, first_char)
-          last_char == first_char && EMPHASIS_DELIMITERS.include?(last_char)
-        end
+        EMPHASIS_DELIMITER_BYTES = Set[42, 95, 126, 96].freeze
+        private_constant :EMPHASIS_BOUNDARY, :EMPHASIS_DELIMITER_BYTES
 
         def interface_for(context)
-          RenderingInterface.new(self, context)
+          @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)
         end
       end
     end

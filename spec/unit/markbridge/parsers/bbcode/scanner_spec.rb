@@ -287,6 +287,32 @@ RSpec.describe Markbridge::Parsers::BBCode::Scanner do
                Markbridge::Parsers::BBCode::TagStartToken,
              )
       end
+
+      it "advances by exactly one char past the `:` with empty UID suffix" do
+        # Kills `@current_pos += 1` → `+= 2` on the post-colon step.
+        # With `+= 2`, the scanner would jump past the closing `]`
+        # and fail to consume it, rolling the tag back to text.
+        tokens = scan("[quote:]")
+
+        expect(tokens[0]).to match_tag_start("quote:")
+      end
+
+      it "advances by exactly one char per UID hex char consumed" do
+        # Kills `@current_pos += 1` → `+= 2` inside the UID hex loop.
+        # Single-hex-char UID: with `+= 2`, the scanner would skip the
+        # closing `]` and roll back.
+        tokens = scan("[quote:a]")
+
+        expect(tokens[0]).to match_tag_start("quote:a")
+      end
+
+      it "does not raise when input ends mid-UID suffix" do
+        # Kills `current_char&.match?(UID_HEX_CHAR)` → `.match?(UID_HEX_CHAR)`
+        # (drop safe-nav). At end-of-input current_char is nil;
+        # `nil.match?` would raise NoMethodError, while `nil&.match?`
+        # exits the loop cleanly and the unterminated tag rolls back.
+        expect { scan("[quote:a") }.not_to raise_error
+      end
     end
 
     context "with nested tags" do
