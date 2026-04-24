@@ -19,10 +19,8 @@ module Markbridge
         #   end
         class PollTag < Tag
           def render(element, _interface)
-            # Return raw BBCode if available, otherwise reconstruct
-            return element.raw if element.raw
-
-            build_poll_bbcode(element)
+            body = element.raw || build_poll_bbcode(element)
+            "#{body}\n\n"
           end
 
           private
