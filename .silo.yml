@@ -4,15 +4,27 @@
 image: fedora/43
 
 setup:
-  - sudo dnf install -y ruby ruby-devel gcc make watchexec
-  - bundle install
-  - bundle exec lefthook install
+  - sudo dnf update
+  - sudo dnf copr enable -y gschlager/ruby
+  - sudo dnf install -y gcc make libyaml-devel java-latest-openjdk-headless ruby-install
+  - ruby-install jruby
+  - curl -LsSf https://rv.dev/install | sh
+  - . "$HOME/.cargo/env"
+  - rv ruby install 3.3
+  - rv ruby install 3.4
+  - rv ruby install 4.0
+  - rv run bundle install
+  - rv run bundle exec lefthook install
+  - echo '. "$HOME/.cargo/env"' >> ~/.zshenv
+  - echo 'eval "$(rv shell init zsh)"' >> ~/.zshenv
+  - echo 'eval "$(rv shell completions zsh)"' >> ~/.zshrc
 
 sync:
   - bundle install
 
 update:
   - sudo dnf update -y
+  - rv selfupdate
 
 ports:
   - 4567:4567
@@ -20,4 +32,4 @@ ports:
 daemons:
   playground:
     cmd: bin/playground
-    autostart: false
+    autostart: true

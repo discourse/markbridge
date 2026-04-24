@@ -57,6 +57,10 @@ Configuration applies to all `*_to_markdown` convenience methods (`bbcode_to_mar
 * Browse integration and unit coverage under `spec/` to understand supported tags and edge cases.
 * Use `bin/console` during development for interactive exploration.
 
+## Development
+
+This repository is set up to run inside [silo](https://github.com/gschlager/silo), a lightweight dev-environment tool. The `.silo.yml` file provisions a Fedora container with JRuby and multiple CRuby versions (via [rv](https://rv.dev)), installs dependencies, and starts the playground daemon. If you prefer your own setup, `bin/setup` and `bundle install` are all you need.
+
 ## Playground
 
 A local web UI for exploring parsers interactively:
