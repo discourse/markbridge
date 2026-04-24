@@ -93,6 +93,20 @@ matcher:
     # String comparison is a Bucket-A Fixnum/String equivalence.
     - Markbridge::Parsers::BBCode::Scanner#consume
 
+    # MarkdownEscaper#escape_char_run's `while pos < @inline_len &&
+    # @inline_content.getbyte(pos) == byte_val` compound loop. The
+    # `while <bound>` half is redundant with the `getbyte` check —
+    # getbyte past end returns nil, which never equals a byte_val,
+    # so the loop exits identically without the bound. Mutations
+    # that drop either half of the compound produce equivalent
+    # behavior. This loop is on the inline-escape hot path and was
+    # previously split into `while <bound>; break if <check>` form
+    # to avoid Ruby 3.4.8 PRISM bug #22002; the split form cost
+    # ~5% on escape-heavy text. Reverted to compound form plus
+    # ignore since the PRISM bug surfaces as timeouts (accepted)
+    # rather than process crashes on 3.4.9+.
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_char_run
+
     # CodeBlockTracker helpers `check_inline_boundary` /
     # `skip_leading_spaces`: `input[pos] != " "` / `!= "`"` vs
     # `!input[pos].eql?(" ")` / `!.eql?("`")`. `!=` and `!eql?` are

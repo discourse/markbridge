@@ -395,13 +395,8 @@ module Markbridge
         end
 
         # Escape all consecutive occurrences of a repeatable character (*, _, `).
-        #
-        # Split into `while <bound>` + `break if` rather than the natural
-        # `while <bound> && <byte-check>` to avoid a Ruby 3.4.8 PRISM VM bug
-        # (https://bugs.ruby-lang.org/issues/22002, fixed in 3.4.10).
         def escape_char_run(pos, byte_val, escaped)
-          while pos < @inline_len
-            break if @inline_content.getbyte(pos) != byte_val
+          while pos < @inline_len && @inline_content.getbyte(pos) == byte_val
             @inline_result << escaped
             pos += 1
           end
