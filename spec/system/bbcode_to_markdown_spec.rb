@@ -351,6 +351,26 @@ RSpec.describe "BBCode to Markdown Conversion" do
         Markbridge.bbcode_to_markdown('[quote="alice, post:123, topic:456"]Quoted text[/quote]')
       expect(result).to eq("[quote=\"alice, post:123, topic:456\"]\nQuoted text\n[/quote]")
     end
+
+    it "separates two consecutive plain quotes with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[quote]first[/quote][quote]second[/quote]")
+      expect(result).to eq("> first\n\n> second")
+    end
+
+    it "separates two consecutive named quotes with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[quote=A]first[/quote][quote=B]second[/quote]")
+      expect(result).to eq("[quote=\"A\"]\nfirst\n[/quote]\n\n[quote=\"B\"]\nsecond\n[/quote]")
+    end
+
+    it "separates a plain quote from trailing text with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[quote]quoted[/quote]after paragraph")
+      expect(result).to eq("> quoted\n\nafter paragraph")
+    end
+
+    it "separates a named quote from trailing text with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[quote=A]quoted[/quote]after paragraph")
+      expect(result).to eq("[quote=\"A\"]\nquoted\n[/quote]\n\nafter paragraph")
+    end
   end
 
   describe "strikethrough" do
