@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Generate categorized release notes for the current version to stdout.
+# Groups commits by prefix: FEATURE: -> Features, FIX: -> Bug Fixes.
+# DEV:/DEPS: and other prefixes are dropped as not user-facing.
+#
+# Usage: bin/generate-release-notes [<previous-tag>]
+# Requires: gh, git, ruby
+set -euo pipefail
+
+VERSION=$(ruby -r ./lib/markbridge/version -e 'puts Markbridge::VERSION')
+TAG="v${VERSION}"
+
+PREV_TAG="${1:-$(git tag --list 'v*' --sort=-v:refname | grep -v "^${TAG}$" | head -1)}"
+
+if [ -z "${PREV_TAG}" ]; then
+  echo "error: no previous v* tag found" >&2
+  exit 1
+fi
+
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+
+features=""
+fixes=""
+
+while IFS=$'\t' read -r sha subject; do
+  case "${subject}" in
+    FEATURE:*) bucket="features" ;;
+    FIX:*)     bucket="fixes" ;;
+    *)         continue ;;
+  esac
+
+  title=${subject#*: }
+  pr=$(gh api "repos/${REPO}/commits/${sha}/pulls" -q '.[0].number' 2>/dev/null || true)
+  if [ -n "${pr}" ]; then
+    ref="#${pr}"
+  else
+    ref=$(git rev-parse --short "${sha}")
+  fi
+  entry="* ${title} (${ref})"$'\n'
+
+  case "${bucket}" in
+    features) features+="${entry}" ;;
+    fixes)    fixes+="${entry}" ;;
+  esac
+done < <(git log --format='%H%x09%s' "${PREV_TAG}..HEAD")
+
+{
+  echo "## What's Changed"
+  echo
+  if [ -n "${features}" ]; then
+    echo "### ✨ Features"
+    printf '%s' "${features}"
+    echo
+  fi
+  if [ -n "${fixes}" ]; then
+    echo "### 🐛 Bug Fixes"
+    printf '%s' "${fixes}"
+    echo
+  fi
+  echo "**Full Changelog**: https://github.com/${REPO}/compare/${PREV_TAG}...${TAG}"
+}
