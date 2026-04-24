@@ -118,23 +118,27 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
     # br and hr are inline lambdas, not handler instances
     it "registers a lambda for <br> that emits a LineBreak and returns nil" do
       parent = Markbridge::AST::Paragraph.new
-      default_registry["br"].call(element: nil, parent:)
+      result = default_registry["br"].call(element: nil, parent:)
 
-      expect(parent.children).to all(be_a(Markbridge::AST::LineBreak))
-      # Returns nil so the parser does NOT descend into children
-      expect(
-        default_registry["br"].call(element: nil, parent: Markbridge::AST::Paragraph.new),
-      ).to be_nil
+      # Assert exactly one child of the right type — `all(be_a(...))`
+      # passes vacuously on empty arrays, so mutations that drop the
+      # `parent << AST::LineBreak.new` would slip through.
+      expect(parent.children.size).to eq(1)
+      expect(parent.children.first).to be_a(Markbridge::AST::LineBreak)
+      # Not a HorizontalRule — kills cross-lambda `.new` swaps.
+      expect(parent.children.first).not_to be_a(Markbridge::AST::HorizontalRule)
+      # Returns nil so the parser does NOT descend into children.
+      expect(result).to be_nil
     end
 
     it "registers a lambda for <hr> that emits a HorizontalRule and returns nil" do
       parent = Markbridge::AST::Paragraph.new
-      default_registry["hr"].call(element: nil, parent:)
+      result = default_registry["hr"].call(element: nil, parent:)
 
-      expect(parent.children).to all(be_a(Markbridge::AST::HorizontalRule))
-      expect(
-        default_registry["hr"].call(element: nil, parent: Markbridge::AST::Paragraph.new),
-      ).to be_nil
+      expect(parent.children.size).to eq(1)
+      expect(parent.children.first).to be_a(Markbridge::AST::HorizontalRule)
+      expect(parent.children.first).not_to be_a(Markbridge::AST::LineBreak)
+      expect(result).to be_nil
     end
   end
 
