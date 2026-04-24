@@ -11,7 +11,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::AlignTag do
       element = Markbridge::AST::Align.new(alignment: "center")
       element << Markbridge::AST::Text.new("hi")
 
-      expect(tag.render(element, interface)).to eq('<div align="center">hi</div>')
+      expect(tag.render(element, interface)).to eq("<div align=\"center\">hi</div>\n\n")
     end
 
     it "returns just the content when no alignment is set" do

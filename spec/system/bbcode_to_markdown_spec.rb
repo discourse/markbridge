@@ -351,6 +351,26 @@ RSpec.describe "BBCode to Markdown Conversion" do
         Markbridge.bbcode_to_markdown('[quote="alice, post:123, topic:456"]Quoted text[/quote]')
       expect(result).to eq("[quote=\"alice, post:123, topic:456\"]\nQuoted text\n[/quote]")
     end
+
+    it "separates two consecutive plain quotes with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[quote]first[/quote][quote]second[/quote]")
+      expect(result).to eq("> first\n\n> second")
+    end
+
+    it "separates two consecutive named quotes with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[quote=A]first[/quote][quote=B]second[/quote]")
+      expect(result).to eq("[quote=\"A\"]\nfirst\n[/quote]\n\n[quote=\"B\"]\nsecond\n[/quote]")
+    end
+
+    it "separates a plain quote from trailing text with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[quote]quoted[/quote]after paragraph")
+      expect(result).to eq("> quoted\n\nafter paragraph")
+    end
+
+    it "separates a named quote from trailing text with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[quote=A]quoted[/quote]after paragraph")
+      expect(result).to eq("[quote=\"A\"]\nquoted\n[/quote]\n\nafter paragraph")
+    end
   end
 
   describe "strikethrough" do
@@ -427,6 +447,28 @@ RSpec.describe "BBCode to Markdown Conversion" do
     it "converts right alignment" do
       result = Markbridge.bbcode_to_markdown("[right]right-aligned[/right]")
       expect(result).to eq('<div align="right">right-aligned</div>')
+    end
+
+    it "separates two consecutive aligned blocks with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[left]a[/left][right]b[/right]")
+      expect(result).to eq(%(<div align="left">a</div>\n\n<div align="right">b</div>))
+    end
+
+    it "separates an aligned block from trailing text with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[center]a[/center]after")
+      expect(result).to eq(%(<div align="center">a</div>\n\nafter))
+    end
+  end
+
+  describe "block code separation" do
+    it "separates two consecutive block code fences with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[code]line1\nline2[/code][code]line3\nline4[/code]")
+      expect(result).to eq("```\nline1\nline2\n```\n\n```\nline3\nline4\n```")
+    end
+
+    it "separates a block code fence from trailing text with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[code]line1\nline2[/code]after")
+      expect(result).to eq("```\nline1\nline2\n```\n\nafter")
     end
   end
 
@@ -515,6 +557,41 @@ RSpec.describe "BBCode to Markdown Conversion" do
 
       result = Markbridge.bbcode_to_markdown(bbcode)
       expect(result).to eq(expected)
+    end
+  end
+
+  describe "tables" do
+    it "renders a simple table with headers as Markdown" do
+      bbcode = "[table][tr][th]Name[/th][th]Age[/th][/tr][tr][td]Alice[/td][td]30[/td][/tr][/table]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+
+      expect(result).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
+    end
+
+    it "renders a table without headers using first row as header" do
+      bbcode = "[table][tr][td]A[/td][td]B[/td][/tr][tr][td]1[/td][td]2[/td][/tr][/table]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+
+      expect(result).to eq("| A | B |\n| --- | --- |\n| 1 | 2 |")
+    end
+
+    it "renders formatted content inside table cells" do
+      bbcode = "[table][tr][th]Name[/th][/tr][tr][td][b]Alice[/b][/td][/tr][/table]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+
+      expect(result).to include("| **Alice** |")
+    end
+
+    it "falls back to HTML for uneven rows" do
+      bbcode = "[table][tr][td]A[/td][td]B[/td][/tr][tr][td]1[/td][/tr][/table]"
+
+      result = Markbridge.bbcode_to_markdown(bbcode)
+
+      expect(result).to include("<table>")
+      expect(result).to include("<td>A</td>")
     end
   end
 end

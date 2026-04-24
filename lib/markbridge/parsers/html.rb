@@ -17,7 +17,9 @@ require_relative "html/handlers/list_handler"
 require_relative "html/handlers/list_item_handler"
 require_relative "html/handlers/quote_handler"
 require_relative "html/handlers/paragraph_handler"
-require_relative "html/handlers/void_handler"
+require_relative "html/handlers/table_handler"
+require_relative "html/handlers/table_row_handler"
+require_relative "html/handlers/table_cell_handler"
 
 # Parser components
 require_relative "html/handler_registry"

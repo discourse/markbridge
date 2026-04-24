@@ -305,4 +305,31 @@ RSpec.describe "HTML to Markdown Conversion" do
       expect(result).to eq(expected)
     end
   end
+
+  describe "tables" do
+    it "renders a simple HTML table as Markdown" do
+      html = "<table><tr><th>Name</th><th>Age</th></tr><tr><td>Alice</td><td>30</td></tr></table>"
+
+      result = Markbridge.html_to_markdown(html)
+
+      expect(result).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
+    end
+
+    it "handles thead and tbody" do
+      html =
+        "<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
+
+      result = Markbridge.html_to_markdown(html)
+
+      expect(result).to eq("| A | B |\n| --- | --- |\n| 1 | 2 |")
+    end
+
+    it "falls back to HTML for uneven rows" do
+      html = "<table><tr><td>A</td><td>B</td></tr><tr><td>1</td></tr></table>"
+
+      result = Markbridge.html_to_markdown(html)
+
+      expect(result).to include("<table>")
+    end
+  end
 end

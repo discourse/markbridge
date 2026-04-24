@@ -10,13 +10,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
     it "returns the raw BBCode verbatim when present" do
       element = Markbridge::AST::Poll.new(raw: "[poll]ORIGINAL[/poll]")
 
-      expect(tag.render(element, interface)).to eq("[poll]ORIGINAL[/poll]")
+      expect(tag.render(element, interface)).to eq("[poll]ORIGINAL[/poll]\n\n")
     end
 
     it "reconstructs BBCode with options when raw is missing" do
       element = Markbridge::AST::Poll.new(options: %w[A B])
 
-      expect(tag.render(element, interface)).to eq("[poll]\n* A\n* B\n[/poll]")
+      expect(tag.render(element, interface)).to eq("[poll]\n* A\n* B\n[/poll]\n\n")
     end
 
     it "omits the name attribute when it equals the default 'poll'" do
@@ -70,7 +70,19 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
     it "produces an empty options block when there are no options" do
       element = Markbridge::AST::Poll.new
 
-      expect(tag.render(element, interface)).to eq("[poll]\n\n[/poll]")
+      expect(tag.render(element, interface)).to eq("[poll]\n\n[/poll]\n\n")
+    end
+
+    it "emits a trailing blank line after a reconstructed poll" do
+      element = Markbridge::AST::Poll.new(name: "fav", type: "regular", options: %w[A B])
+
+      expect(tag.render(element, interface)).to end_with("[/poll]\n\n")
+    end
+
+    it "emits a trailing blank line after a raw-passthrough poll" do
+      element = Markbridge::AST::Poll.new(raw: "[poll]\n* A\n* B\n[/poll]")
+
+      expect(tag.render(element, interface)).to eq("[poll]\n* A\n* B\n[/poll]\n\n")
     end
   end
 end

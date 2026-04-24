@@ -12,7 +12,7 @@ module Markbridge
             content = interface.render_children(element, context: child_context)
 
             if element.alignment
-              "<div align=\"#{element.alignment}\">#{content}</div>"
+              "<div align=\"#{element.alignment}\">#{content}</div>\n\n"
             else
               content
             end

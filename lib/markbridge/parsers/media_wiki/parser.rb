@@ -14,6 +14,7 @@ module Markbridge
       # - Internal links ([[target]] / [[target|display]])
       # - External links ([url text])
       # - Preformatted text (lines starting with a space)
+      # - Tables ({| ... |})
       # - HTML tags: <nowiki>, <code>, <pre>, <br>, <s>, <del>, <u>, <ins>, <sup>, <sub>
       #
       # @example Basic usage
@@ -64,6 +65,9 @@ module Markbridge
             elsif horizontal_rule_line?(line)
               close_open_lists
               @document << AST::HorizontalRule.new
+            elsif table_start_line?(line)
+              close_open_lists
+              i = process_table(lines, i)
             elsif list_line?(line)
               process_list_item(line)
             elsif preformatted_line?(line)
@@ -137,6 +141,124 @@ module Markbridge
         HEADING_LEVEL_PREFIX = /\A={1,6}/
         HEADING_LEVEL_SUFFIX = /\s*={1,6}\s*\z/
         private_constant :HEADING_LEVEL_PREFIX, :HEADING_LEVEL_SUFFIX
+
+        # Check if a line starts a table ({|).
+        #
+        # @param line [String]
+        # @return [Boolean]
+        def table_start_line?(line)
+          line.match?(/\A\s*\{\|/)
+        end
+
+        # Process a table block from {| to |}.
+        # Consumes lines until the closing |} is found.
+        #
+        # @param lines [Array<String>]
+        # @param start_index [Integer]
+        # @return [Integer] the last index consumed
+        def process_table(lines, start_index)
+          table = AST::Table.new
+          current_row = nil
+          i = start_index + 1 # Skip the {| line
+
+          while i < lines.length
+            stripped = lines[i].strip
+
+            if stripped.start_with?("|}")
+              break
+            elsif stripped.start_with?("|-")
+              # Row separator - next cells will go in a new row
+              current_row = nil
+            elsif stripped.start_with?("!")
+              # Header cells
+              current_row = ensure_table_row(table, current_row)
+              parse_table_cells(stripped[1..], header: true, row: current_row)
+            elsif stripped.start_with?("|")
+              # Data cells
+              current_row = ensure_table_row(table, current_row)
+              parse_table_cells(stripped[1..], header: false, row: current_row)
+            end
+
+            i += 1
+          end
+
+          @document << table
+          i
+        end
+
+        # Ensure a row exists for the table, creating one if needed.
+        #
+        # @param table [AST::Table]
+        # @param current_row [AST::TableRow, nil]
+        # @return [AST::TableRow]
+        def ensure_table_row(table, current_row)
+          return current_row if current_row
+
+          row = AST::TableRow.new
+          table << row
+          row
+        end
+
+        # Parse cell content from a line and add cells to the row.
+        # Cells are separated by !! (headers) or || (data cells).
+        # Separators inside [[...]] internal links are preserved so that
+        # pipes like [[Target|Display]] survive cell splitting.
+        #
+        # @param content [String] the line content after the leading ! or |
+        # @param header [Boolean] whether these are header cells
+        # @param row [AST::TableRow]
+        def parse_table_cells(content, header:, row:)
+          separator = header ? "!!" : "||"
+          cells = split_outside_brackets(content, separator)
+
+          cells.each do |raw_cell|
+            # A single | in a cell separates attributes from content
+            parts = split_outside_brackets(raw_cell, "|", limit: 2)
+            cell_text = parts.last
+
+            cell = AST::TableCell.new(header:)
+            @inline_parser.parse(cell_text.strip, parent: cell)
+            row << cell
+          end
+        end
+
+        # Split content on separator, ignoring occurrences inside [[...]] pairs.
+        # With limit: n, stops after n-1 splits (matching String#split semantics).
+        #
+        # @param content [String]
+        # @param separator [String]
+        # @param limit [Integer, nil]
+        # @return [Array<String>]
+        def split_outside_brackets(content, separator, limit: nil)
+          parts = []
+          buffer = +""
+          depth = 0
+          i = 0
+          sep_len = separator.length
+
+          while i < content.length
+            if content[i, 2] == "[["
+              depth += 1
+              buffer << "[["
+              i += 2
+            elsif content[i, 2] == "]]" && depth.positive?
+              depth -= 1
+              buffer << "]]"
+              i += 2
+            elsif depth.zero? && content[i, sep_len] == separator &&
+                  (limit.nil? || parts.length < limit - 1)
+              parts << buffer
+              buffer = +""
+              i += sep_len
+            else
+              buffer << content[i]
+              i += 1
+            end
+          end
+
+          parts << buffer
+          parts
+        end
 
         # Process a heading line and add it to the document.
         #

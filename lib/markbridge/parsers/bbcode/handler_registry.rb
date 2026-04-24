@@ -125,6 +125,11 @@ module Markbridge
           registry.register(%w[list ul ol ulist olist], Handlers::ListHandler.new)
           registry.register(%w[* li .], Handlers::ListItemHandler.new)
 
+          # Table handlers
+          registry.register("table", Handlers::TableHandler.new)
+          registry.register("tr", Handlers::TableRowHandler.new)
+          registry.register(%w[td th], Handlers::TableCellHandler.new)
+
           # Set the closing strategy
           registry.closing_strategy = closing_strategy || default_closing_strategy(registry)
 

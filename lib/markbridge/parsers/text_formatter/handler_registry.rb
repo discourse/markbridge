@@ -91,6 +91,14 @@ module Markbridge
 
           # Paragraphs
           register("P", Handlers::SimpleHandler.new(AST::Paragraph))
+
+          # Table elements
+          register("TABLE", Handlers::SimpleHandler.new(AST::Table))
+          register("TR", Handlers::SimpleHandler.new(AST::TableRow))
+          register("TD", Handlers::TableCellHandler.new)
+          register("TH", Handlers::TableCellHandler.new)
+
+          self
         end
       end
     end

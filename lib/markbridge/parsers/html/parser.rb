@@ -5,6 +5,11 @@ module Markbridge
     module HTML
       # Parses HTML into an AST using Nokogiri
       class Parser
+        # Tags whose contents should be dropped entirely (not emitted as text).
+        # These are raw-text/metadata elements whose children are either CSS,
+        # JavaScript, or document metadata that shouldn't appear in output.
+        IGNORED_TAGS = %w[style script head title noscript template].freeze
+
         attr_reader :unknown_tags
 
         # Create a new parser with optional custom handlers
@@ -26,8 +31,12 @@ module Markbridge
         def parse(input)
           @unknown_tags.clear
 
-          # Parse HTML with Nokogiri
-          doc = Nokogiri::HTML5.fragment(input)
+          # Parse HTML with Nokogiri. Using the generic HTML (HTML4) parser rather
+          # than HTML5 because Nokogiri::HTML5 is not available on JRuby
+          # (see sparklemotion/nokogiri#2227). Table support treats thead/tbody/tfoot
+          # as transparent, so the parse-tree difference (HTML5 auto-inserts tbody,
+          # HTML4 does not) has no effect on the AST.
+          doc = Nokogiri::HTML.fragment(input)
 
           # Create root AST document
           document = AST::Document.new
@@ -63,18 +72,29 @@ module Markbridge
         # @param node [Nokogiri::XML::Text]
         # @param parent [AST::Element]
         def process_text_node(node, parent)
-          parent << AST::Text.new(node.text)
+          text = node.text
+          parent << AST::Text.new(text) unless text.empty?
         end
 
         # Process an element node
         # @param node [Nokogiri::XML::Element]
         # @param parent [AST::Element]
         def process_element_node(node, parent)
-          tag_name = node.name
+          tag_name = node.name.downcase
+          return if IGNORED_TAGS.include?(tag_name)
+
           handler = @handlers[tag_name]
 
           if handler
-            ast_element = handler.process(element: node, parent:)
+            # Handler returns element if children should be processed, nil otherwise
+            ast_element =
+              if handler.respond_to?(:process)
+                handler.process(element: node, parent:)
+              else
+                handler.call(element: node, parent:)
+              end
+
+            # Automatically process children if handler returned element
             process_children(node, ast_element) if ast_element
           else
             handle_unknown_tag(node, parent)
@@ -86,8 +106,17 @@ module Markbridge
         # @param node [Nokogiri::XML::Element]
         # @param parent [AST::Element]
         def handle_unknown_tag(node, parent)
-          @unknown_tags[node.name] += 1
+          @unknown_tags[node.name.downcase] += 1
           process_children(node, parent)
+        end
+
+        # Check if an element is a void element (self-closing)
+        # @param tag_name [String]
+        # @return [Boolean]
+        def void_element?(tag_name)
+          %w[area base br col embed hr img input link meta param source track wbr].include?(
+            tag_name.downcase,
+          )
         end
       end
     end

@@ -137,6 +137,29 @@ module Markbridge
               [/list]
             BBCODE
           ),
+          example(
+            id: "bbcode-tables",
+            format: "bbcode",
+            scenario: "tables",
+            description: "Pipe tables with formatted cells and HTML fallback for uneven rows",
+            highlights: %w[table tr th td bold italic url html_fallback],
+            input: <<~BBCODE.strip,
+              [table]
+              [tr][th]Feature[/th][th]Status[/th][th]Notes[/th][/tr]
+              [tr][td][b]Parser[/b][/td][td]Ready[/td][td]All [i]four[/i] parsers[/td][/tr]
+              [tr][td]Renderer[/td][td]Ready[/td][td]Markdown-first, HTML fallback[/td][/tr]
+              [tr][td][url=https://example.com/docs]Docs[/url][/td][td]Partial[/td][td]See issues[/td][/tr]
+              [/table]
+
+              Uneven rows fall back to HTML:
+
+              [table]
+              [tr][th]Col A[/th][th]Col B[/th][/tr]
+              [tr][td]1[/td][td]2[/td][/tr]
+              [tr][td]only one cell[/td][/tr]
+              [/table]
+            BBCODE
+          ),
         ]
       end
 
@@ -240,6 +263,40 @@ module Markbridge
               <p>`inline code` and ~~strike~~ should stay literal</p>
               <p>&lt;div class="note"&gt;literal html&lt;/div&gt;</p>
               <p>&lt;https://example.com&gt; should remain clickable</p>
+            HTML
+          ),
+          example(
+            id: "html-tables",
+            format: "html",
+            scenario: "tables",
+            description: "thead/tbody pipe tables and HTML fallback for nested tables",
+            highlights: %w[table thead tbody tr th td strong em a html_fallback],
+            input: <<~HTML.strip,
+              <p>Basic table with thead/tbody:</p>
+              <table>
+                <thead>
+                  <tr><th>Feature</th><th>Status</th><th>Notes</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><strong>Parser</strong></td><td>Ready</td><td>All <em>four</em> parsers</td></tr>
+                  <tr><td>Renderer</td><td>Ready</td><td>Markdown-first, HTML fallback</td></tr>
+                  <tr><td><a href="https://example.com/docs">Docs</a></td><td>Partial</td><td>See issues</td></tr>
+                </tbody>
+              </table>
+
+              <p>Nested tables fall back to HTML:</p>
+              <table>
+                <tr><th>Outer A</th><th>Outer B</th></tr>
+                <tr>
+                  <td>simple</td>
+                  <td>
+                    <table>
+                      <tr><th>Inner</th></tr>
+                      <tr><td>nested</td></tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
             HTML
           ),
         ]
@@ -462,6 +519,48 @@ module Markbridge
               `inline code` and ~~strike~~ should stay literal
               <div class="note">literal html</div>
               <https://example.com> should remain clickable</nowiki>
+            WIKI
+          ),
+          example(
+            id: "media-wiki-tables",
+            format: "media_wiki",
+            scenario: "tables",
+            description:
+              "Wikitext tables with inline !! || separators, per-line cells, and internal links with pipes",
+            highlights: %w[
+              table
+              header
+              row
+              bold
+              italic
+              external_link
+              internal_link
+              inline_cells
+              per_line_cells
+            ],
+            input: <<~WIKI.strip,
+              {|
+              ! Feature !! Page !! Notes
+              |-
+              | '''Parser''' || [[Main Page|Home]] || All ''four'' parsers
+              |-
+              | Renderer || [[Renderer]] || Markdown-first, HTML fallback
+              |-
+              | Docs || [https://example.com/docs external] || See issues
+              |}
+
+              Per-line cells work too:
+
+              {|
+              |-
+              ! A
+              ! B
+              ! C
+              |-
+              | 1
+              | 2
+              | 3
+              |}
             WIKI
           ),
         ]

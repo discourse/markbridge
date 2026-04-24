@@ -15,14 +15,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EventTag do
           raw: "[event]ORIGINAL[/event]",
         )
 
-      expect(tag.render(element, interface)).to eq("[event]ORIGINAL[/event]")
+      expect(tag.render(element, interface)).to eq("[event]ORIGINAL[/event]\n\n")
     end
 
     it "reconstructs BBCode with name and start when raw is missing" do
       element = Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-01-01 14:00")
 
       expect(tag.render(element, interface)).to eq(
-        %([event name="Meeting" start="2026-01-01 14:00"]\n[/event]),
+        %([event name="Meeting" start="2026-01-01 14:00"]\n[/event]\n\n),
       )
     end
 
@@ -31,7 +31,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EventTag do
         Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-01-01", ends_at: "2026-01-02")
 
       expect(tag.render(element, interface)).to eq(
-        %([event name="Meeting" start="2026-01-01" end="2026-01-02"]\n[/event]),
+        %([event name="Meeting" start="2026-01-01" end="2026-01-02"]\n[/event]\n\n),
       )
     end
 
@@ -40,7 +40,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EventTag do
         Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-01-01", status: "public")
 
       expect(tag.render(element, interface)).to eq(
-        %([event name="Meeting" start="2026-01-01" status="public"]\n[/event]),
+        %([event name="Meeting" start="2026-01-01" status="public"]\n[/event]\n\n),
       )
     end
 
@@ -53,7 +53,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EventTag do
         )
 
       expect(tag.render(element, interface)).to eq(
-        %([event name="Meeting" start="2026-01-01" timezone="Europe/Vienna"]\n[/event]),
+        %([event name="Meeting" start="2026-01-01" timezone="Europe/Vienna"]\n[/event]\n\n),
       )
     end
 
@@ -65,6 +65,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EventTag do
       expect(result).not_to include("end=")
       expect(result).not_to include("status=")
       expect(result).not_to include("timezone=")
+    end
+
+    it "emits a trailing blank line after a reconstructed event" do
+      element = Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-04-24 10:00")
+
+      expect(tag.render(element, interface)).to end_with("[/event]\n\n")
+    end
+
+    it "emits a trailing blank line after a raw-passthrough event" do
+      element =
+        Markbridge::AST::Event.new(
+          name: "Meeting",
+          starts_at: "2026-04-24 10:00",
+          raw: %([event name="Meeting" start="2026-04-24 10:00"]\n[/event]),
+        )
+
+      expect(tag.render(element, interface)).to end_with("[/event]\n\n")
     end
   end
 end

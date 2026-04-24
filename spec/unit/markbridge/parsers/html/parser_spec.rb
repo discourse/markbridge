@@ -132,6 +132,39 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(doc.children[1].children[0].text).to eq("Two")
     end
 
+    it "drops style tag contents entirely" do
+      doc = parser.parse("<style>.foo { color: red; }</style>hello")
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[0].text).to eq("hello")
+    end
+
+    it "drops script tag contents entirely" do
+      doc = parser.parse("<script>alert('xss')</script>hello")
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[0].text).to eq("hello")
+    end
+
+    it "drops head subtree including nested style/title/meta" do
+      html =
+        "<html><head><title>T</title><style>.a{}</style></head>" \
+          "<body>body text</body></html>"
+      doc = parser.parse(html)
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[0].text).to eq("body text")
+    end
+
+    it "does not count ignored tags as unknown" do
+      parser.parse("<style>.a{}</style><script>x</script>")
+
+      expect(parser.unknown_tags).to be_empty
+    end
+
     it "tracks unknown tags" do
       parser.parse("<unknown>text</unknown>")
 
@@ -165,9 +198,17 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
     it "handles malformed HTML gracefully" do
       doc = parser.parse("<b>bold <i>italic</b></i>")
 
-      # Nokogiri fixes the nesting
-      expect(doc.children.size).to eq(1)
-      expect(doc.children[0]).to be_a(Markbridge::AST::Bold)
+      # Nokogiri recovers from the mismatched tags. The exact tree shape is
+      # parser-dependent (libxml2 reparents into <b><i>…</i></b>; JRuby's
+      # NekoHTML leaves <b> and <i> as siblings), but the content survives
+      # and the top-level node is always the <b>.
+      expect(doc.children.first).to be_a(Markbridge::AST::Bold)
+
+      collect_text = ->(node) do
+        return node.text if node.is_a?(Markbridge::AST::Text)
+        node.respond_to?(:children) ? node.children.map(&collect_text).join : ""
+      end
+      expect(collect_text.call(doc)).to include("bold", "italic")
     end
 
     it "handles empty input" do
