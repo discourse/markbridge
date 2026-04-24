@@ -50,6 +50,28 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::TableRowHandler do
 
       expect(context.current).to be_a(Markbridge::AST::TableRow)
       expect(context.current).not_to eq(old_row)
+      # The new row must be a direct child of the table, not nested
+      # under the old row or cell — kills mutations that skip the
+      # pop-cell / pop-row steps.
+      new_row = context.current
+      expect(table.children.last).to eq(new_row)
+      expect(old_row.children.last).to eq(cell)
+    end
+
+    it "does NOT pop when current is a non-table-container element" do
+      # A stray non-table element (e.g. Paragraph) must not be popped
+      # by [tr]; the new row is inserted as its child instead. Kills
+      # `if true` / `if context.is_a?(...)` mutations that would pop
+      # the wrong thing.
+      table = Markbridge::AST::Table.new
+      context.push(table)
+      stray = Markbridge::AST::Paragraph.new
+      context.push(stray)
+
+      handler.on_open(token: open_token, context:, registry:)
+
+      expect(context.current).to be_a(Markbridge::AST::TableRow)
+      expect(stray.children.last).to eq(context.current)
     end
   end
 

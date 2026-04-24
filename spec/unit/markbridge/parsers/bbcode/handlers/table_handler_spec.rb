@@ -70,7 +70,15 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::TableHandler do
 
       handler.on_close(token: close_token, context:, registry:)
 
+      # Pin the tree shape so the auto-close pops are observably
+      # correct — cell stays inside row, row inside table, and the
+      # outer table is closed so we're back at the document. Kills
+      # mutations that skip either `if current.is_a?(TableCell)` or
+      # `if current.is_a?(TableRow)` guards.
       expect(context.current).to eq(document)
+      expect(row.children.last).to eq(cell)
+      expect(table.children.last).to eq(row)
+      expect(document.children.last).to eq(table)
     end
   end
 
