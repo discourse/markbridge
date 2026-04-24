@@ -233,6 +233,22 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(result).to eq("\n\n| only |\n| --- |\n\n")
     end
 
+    # Kills `content.strip` → `.lstrip` / `.rstrip` / drop mutations
+    # in extract_rows. Cell content with whitespace on BOTH sides must
+    # end up fully stripped.
+    it "strips leading AND trailing whitespace from cell content" do
+      table = Markbridge::AST::Table.new
+      row = Markbridge::AST::TableRow.new
+      cell = Markbridge::AST::TableCell.new
+      cell << Markbridge::AST::Text.new("  padded  ")
+      row << cell
+      table << row
+
+      result = tag.render(table, interface)
+
+      expect(result).to eq("\n\n| padded |\n| --- |\n\n")
+    end
+
     # Kills the `unless cells.empty?` drop in extract_rows: rows that
     # end up with zero real cells (e.g. only interlopers) must not
     # contribute a row to rows_data.
