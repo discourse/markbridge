@@ -1,0 +1,68 @@
+---
+title: Markbridge
+description: Extensible Ruby pipeline that turns BBCode, HTML, and other markup into Discourse-ready Markdown via a parse → AST → render flow.
+template: splash
+hero:
+  tagline: |
+    Turn BBCode, HTML, MediaWiki wikitext, and <span class="nowrap">s9e/TextFormatter</span> XML into
+    Discourse-ready Markdown — via a predictable parse → AST → render pipeline.
+  image:
+    file: ../../assets/markbridge-icon.svg
+    alt: Markbridge logo
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/discourse/markbridge
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Install
+
+```bash
+bundle add markbridge
+```
+
+## See it in action
+
+```ruby
+require "markbridge/all"
+
+Markbridge.bbcode_to_markdown("[b]Hello[/b] [url=https://example.com]world[/url]!")
+# => "**Hello** [world](https://example.com)!"
+
+Markbridge.html_to_markdown("<p>Nested <em>is</em> fine.</p>")
+# => "Nested *is* fine."
+```
+
+<CardGrid stagger>
+  <Card title="Four input formats" icon="seti:config">
+    One AST, four parsers: BBCode, HTML, MediaWiki wikitext, and <span class="nowrap">s9e/TextFormatter</span> XML.
+    Pick the right entry point; the Markdown renderer is shared.
+  </Card>
+  <Card title="Graceful degradation" icon="approve-check-circle">
+    Unknown tags don't crash — they're preserved or skipped while parsing continues.
+    Built for the messy reality of forum migrations.
+  </Card>
+  <Card title="Extensible" icon="puzzle">
+    Register custom handlers to recognize new tags; register custom renderer tags
+    to shape the Markdown output. No monkey-patching.
+  </Card>
+  <Card title="Performance-conscious" icon="rocket">
+    Single-pass scanner, O(1) parent lookups, minimal allocations.
+    O(n) in the size of the input.
+  </Card>
+  <Card title="Battle-tested" icon="seti:ruby">
+    Powers Discourse forum migrations. Extensive unit, integration, and
+    end-to-end system tests keep real-world inputs covered.
+  </Card>
+  <Card title="Zero runtime gems" icon="seti:default">
+    Pure Ruby (3.3+). Nokogiri is only required when you use the HTML parser.
+    Drop it in and go.
+  </Card>
+</CardGrid>

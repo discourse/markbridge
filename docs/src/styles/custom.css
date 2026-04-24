@@ -1,0 +1,20 @@
+:root {
+  --sl-color-accent-low: #4a1a0a;
+  --sl-color-accent: #e45735;
+  --sl-color-accent-high: #ffc2b0;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #ffd9cc;
+  --sl-color-accent: #c13d1a;
+  --sl-color-accent-high: #5c1f0a;
+}
+
+:root {
+  --sl-font: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+}
+
+.nowrap {
+  white-space: nowrap;
+}

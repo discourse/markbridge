@@ -14,9 +14,11 @@ use:
 setup:
   - bundle install
   - bundle exec lefthook install
+  - (cd docs && pnpm install)
 
 sync:
   - bundle install
+  - (cd docs && pnpm install)
 
 update:
   - sudo dnf update -y
@@ -24,8 +26,12 @@ update:
 
 ports:
   - 4567:4567
+  - 4321:4321
 
 daemons:
   playground:
     cmd: bin/playground
+    autostart: true
+  docs:
+    cmd: bin/docs
     autostart: true
