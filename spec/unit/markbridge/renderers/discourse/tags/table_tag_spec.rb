@@ -174,6 +174,26 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(result).to include("| --- |")
     end
 
+    # Kills `r[:cells].all? { c[:header] }` → `.any?`. An earlier row
+    # with mixed header/data cells must NOT become header_idx; only a
+    # pure all-header row qualifies. Put the mixed row first and the
+    # all-header row second — correct picks row 1, `.any?` picks row 0.
+    it "does not promote a mixed-header row above a true all-header row" do
+      table =
+        build_table(
+          [
+            [{ text: "M", header: true }, "data"],
+            [{ text: "H1", header: true }, { text: "H2", header: true }],
+            %w[d1 d2],
+          ],
+        )
+
+      result = tag.render(table, interface)
+
+      # "H1 | H2" is the header row; the mixed row falls into data.
+      expect(result).to eq("\n\n| H1 | H2 |\n| --- | --- |\n| M | data |\n| d1 | d2 |\n\n")
+    end
+
     # Kills `header_idx = nil` and `r[:cells].all? { … }` → truthy-all?
     # mutations. When a header row appears MID-TABLE (row 1 is all
     # headers, rows 0 and 2 are data), rendering must reorder so the
