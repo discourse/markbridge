@@ -218,23 +218,30 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
     # Kills drop-AST-guard mutations on `next unless child.is_a?(AST::TableRow)`
     # and the inner `next unless cell.is_a?(AST::TableCell)` in
     # extract_rows. Non-TableRow or non-TableCell children must be
-    # silently skipped.
+    # silently skipped — not recursively consumed.
     it "skips non-TableRow children inside the table" do
       table = Markbridge::AST::Table.new
-      # Interloper: a stray Paragraph shouldn't produce an extra row.
+      # Interloper: a stray Paragraph containing a TableCell. Without
+      # the `next unless child.is_a?(AST::TableRow)` guard, the
+      # Paragraph's inner TableCell would be harvested and rendered
+      # as a phantom row. The next-drop / `unless true` / `unless child`
+      # / `unless AST::TableRow` mutations all expose this by emitting
+      # the extra row.
       stray = Markbridge::AST::Paragraph.new
-      stray << Markbridge::AST::Text.new("stray")
+      stray_cell = Markbridge::AST::TableCell.new
+      stray_cell << Markbridge::AST::Text.new("ghost")
+      stray << stray_cell
       table << stray
 
       row = Markbridge::AST::TableRow.new
       cell = Markbridge::AST::TableCell.new
-      cell << Markbridge::AST::Text.new("x")
+      cell << Markbridge::AST::Text.new("real")
       row << cell
       table << row
 
       result = tag.render(table, interface)
 
-      expect(result).to eq("\n\n| x |\n| --- |\n\n")
+      expect(result).to eq("\n\n| real |\n| --- |\n\n")
     end
 
     it "skips non-TableCell children inside a row" do

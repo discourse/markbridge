@@ -131,8 +131,13 @@ mutation:
     # present by extract_rows' filter_map construction (the hashes
     # are built with those exact keys on every entry), so `[]` and
     # `fetch` return identical values. Bucket A.
+    #
+    # `row[:cells]` / `rows_data.first[:cells]` are the same shape in
+    # markdown_compatible? / render_markdown. Covered below.
     - "index{receiver=lvar{value=r}}"
     - "index{receiver=lvar{value=c}}"
+    - "index{receiver=lvar{value=row}}"
+    - "index{receiver=send{selector=first}}"
 
     # `arr[0...-1]` vs `arr[nil...-1]` / `arr[0..-1]` — Ruby's
     # array-slice accepts nil as 0 and the inclusive/exclusive
@@ -293,6 +298,13 @@ mutation:
     # nested-list-inside-list-item case is still covered by the outer
     # List being in the parent chain via RenderContext construction.
     - "lvasgn{name=child_context value=send{selector=with_parent}}"
+
+    # TableTag's `cell_context = child_context.with_parent(child)` —
+    # same equivalence class as child_context above, just nested one
+    # level deeper (row → cell). Cell renderers don't consult the
+    # TableRow parent, so `= child_context` / `.with_parent(nil)`
+    # produce byte-identical output.
+    - "lvasgn{name=cell_context value=send{selector=with_parent}}"
 
     # `interface.render_children(element, context: child_context)` —
     # the `context:` kwarg is load-bearing when children consult the
