@@ -25,6 +25,12 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       expect(registry["BOLD"]).to eq(handler)
     end
 
+    it "coerces non-string tag names to string before downcasing" do
+      registry.register(:B, handler)
+
+      expect(registry["b"]).to eq(handler)
+    end
+
     it "returns self for chaining" do
       result = registry.register("b", handler)
 
@@ -32,7 +38,7 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
     end
 
     it "supports lambdas as handlers" do
-      handler = ->(element:, parent:, processor:) { parent << "test" }
+      handler = ->(element:, parent:) { parent << "test" }
       registry.register("br", handler)
 
       expect(registry["br"]).to eq(handler)
@@ -56,6 +62,12 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       expect(registry["BOLD"]).to eq(handler)
       expect(registry["Bold"]).to eq(handler)
     end
+
+    it "coerces non-string tag names to string before downcasing" do
+      registry.register("b", handler)
+
+      expect(registry[:B]).to eq(handler)
+    end
   end
 
   describe ".default" do
@@ -65,67 +77,64 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       expect(default_registry).to be_a(described_class)
     end
 
-    it "registers bold tags" do
-      expect(default_registry["b"]).not_to be_nil
-      expect(default_registry["strong"]).not_to be_nil
+    {
+      "b" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Bold],
+      "strong" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Bold],
+      "i" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Italic],
+      "em" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Italic],
+      "s" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Strikethrough],
+      "strike" => [
+        Markbridge::Parsers::HTML::Handlers::SimpleHandler,
+        Markbridge::AST::Strikethrough,
+      ],
+      "del" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Strikethrough],
+      "u" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Underline],
+      "sup" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Superscript],
+      "sub" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Subscript],
+      "code" => [Markbridge::Parsers::HTML::Handlers::RawHandler, Markbridge::AST::Code],
+      "pre" => [Markbridge::Parsers::HTML::Handlers::RawHandler, Markbridge::AST::Code],
+      "tt" => [Markbridge::Parsers::HTML::Handlers::RawHandler, Markbridge::AST::Code],
+      "a" => [Markbridge::Parsers::HTML::Handlers::UrlHandler, Markbridge::AST::Url],
+      "img" => [Markbridge::Parsers::HTML::Handlers::ImageHandler, Markbridge::AST::Image],
+      "blockquote" => [Markbridge::Parsers::HTML::Handlers::QuoteHandler, Markbridge::AST::Quote],
+      "ul" => [Markbridge::Parsers::HTML::Handlers::ListHandler, Markbridge::AST::List],
+      "ol" => [Markbridge::Parsers::HTML::Handlers::ListHandler, Markbridge::AST::List],
+      "li" => [Markbridge::Parsers::HTML::Handlers::ListItemHandler, Markbridge::AST::ListItem],
+      "table" => [Markbridge::Parsers::HTML::Handlers::TableHandler, Markbridge::AST::Table],
+      "tr" => [Markbridge::Parsers::HTML::Handlers::TableRowHandler, Markbridge::AST::TableRow],
+      "td" => [Markbridge::Parsers::HTML::Handlers::TableCellHandler, Markbridge::AST::TableCell],
+      "th" => [Markbridge::Parsers::HTML::Handlers::TableCellHandler, Markbridge::AST::TableCell],
+      "p" => [Markbridge::Parsers::HTML::Handlers::ParagraphHandler, Markbridge::AST::Paragraph],
+    }.each do |tag, (handler_class, element_class)|
+      it "registers #{handler_class.name.split("::").last} producing #{element_class.name.split("::").last} for <#{tag}>" do
+        registered = default_registry[tag]
+        expect(registered).to be_a(handler_class)
+        if registered.respond_to?(:element_class)
+          expect(registered.element_class).to eq(element_class)
+        end
+      end
     end
 
-    it "registers italic tags" do
-      expect(default_registry["i"]).not_to be_nil
-      expect(default_registry["em"]).not_to be_nil
+    # br and hr are inline lambdas, not handler instances
+    it "registers a lambda for <br> that emits a LineBreak and returns nil" do
+      parent = Markbridge::AST::Paragraph.new
+      default_registry["br"].call(element: nil, parent:)
+
+      expect(parent.children).to all(be_a(Markbridge::AST::LineBreak))
+      # Returns nil so the parser does NOT descend into children
+      expect(
+        default_registry["br"].call(element: nil, parent: Markbridge::AST::Paragraph.new),
+      ).to be_nil
     end
 
-    it "registers strikethrough tags" do
-      expect(default_registry["s"]).not_to be_nil
-      expect(default_registry["strike"]).not_to be_nil
-      expect(default_registry["del"]).not_to be_nil
-    end
+    it "registers a lambda for <hr> that emits a HorizontalRule and returns nil" do
+      parent = Markbridge::AST::Paragraph.new
+      default_registry["hr"].call(element: nil, parent:)
 
-    it "registers underline tag" do
-      expect(default_registry["u"]).not_to be_nil
-    end
-
-    it "registers superscript and subscript" do
-      expect(default_registry["sup"]).not_to be_nil
-      expect(default_registry["sub"]).not_to be_nil
-    end
-
-    it "registers code tags" do
-      expect(default_registry["code"]).not_to be_nil
-      expect(default_registry["pre"]).not_to be_nil
-      expect(default_registry["tt"]).not_to be_nil
-    end
-
-    it "registers link tag" do
-      expect(default_registry["a"]).not_to be_nil
-    end
-
-    it "registers image tag" do
-      expect(default_registry["img"]).not_to be_nil
-    end
-
-    it "registers blockquote tag" do
-      expect(default_registry["blockquote"]).not_to be_nil
-    end
-
-    it "registers void element tags" do
-      expect(default_registry["br"]).not_to be_nil
-      expect(default_registry["hr"]).not_to be_nil
-    end
-
-    it "registers list tags" do
-      expect(default_registry["ul"]).not_to be_nil
-      expect(default_registry["ol"]).not_to be_nil
-      expect(default_registry["li"]).not_to be_nil
-    end
-
-    it "registers paragraph tag" do
-      expect(default_registry["p"]).not_to be_nil
-    end
-
-    it "uses lambdas for void elements" do
-      expect(default_registry["br"]).to respond_to(:call)
-      expect(default_registry["hr"]).to respond_to(:call)
+      expect(parent.children).to all(be_a(Markbridge::AST::HorizontalRule))
+      expect(
+        default_registry["hr"].call(element: nil, parent: Markbridge::AST::Paragraph.new),
+      ).to be_nil
     end
   end
 
@@ -142,6 +151,13 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
 
       expect(registry["custom"]).to eq(custom_handler)
       expect(registry["b"]).not_to be_nil # Still has defaults
+    end
+
+    it "returns the default registry unchanged when no block is given" do
+      registry = described_class.build_from_default
+
+      expect(registry).to be_a(described_class)
+      expect(registry["b"]).to be_a(Markbridge::Parsers::HTML::Handlers::SimpleHandler)
     end
   end
 end

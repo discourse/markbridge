@@ -109,15 +109,6 @@ module Markbridge
           @unknown_tags[node.name.downcase] += 1
           process_children(node, parent)
         end
-
-        # Check if an element is a void element (self-closing)
-        # @param tag_name [String]
-        # @return [Boolean]
-        def void_element?(tag_name)
-          %w[area base br col embed hr img input link meta param source track wbr].include?(
-            tag_name.downcase,
-          )
-        end
       end
     end
   end
