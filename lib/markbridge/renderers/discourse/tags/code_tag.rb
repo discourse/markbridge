@@ -28,7 +28,9 @@ module Markbridge
             fence = calculate_fence(content)
             lang = language || ""
 
-            "#{fence}#{lang}\n#{content}\n#{fence}"
+            # Trailing blank line so consecutive code blocks don't merge fences
+            # and following content is treated as a separate block.
+            "#{fence}#{lang}\n#{content}\n#{fence}\n\n"
           end
 
           def calculate_fence(content)

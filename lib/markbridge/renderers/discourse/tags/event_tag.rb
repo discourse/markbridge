@@ -19,10 +19,10 @@ module Markbridge
         #   end
         class EventTag < Tag
           def render(element, _interface)
-            # Return raw BBCode if available, otherwise reconstruct
-            return element.raw if element.raw
-
-            build_event_bbcode(element)
+            # Trailing blank line so consecutive events don't merge and
+            # following content is treated as a separate block.
+            body = element.raw || build_event_bbcode(element)
+            "#{body}\n\n"
           end
 
           private
