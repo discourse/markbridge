@@ -20,12 +20,4 @@ RSpec.describe Markbridge::Parsers::BBCode::TagEndToken do
       expect(token.tag).to be_frozen
     end
   end
-
-  describe "#inspect" do
-    it "renders a custom one-line representation" do
-      token = described_class.new(tag: "b", pos: 0, source: "[/b]")
-
-      expect(token.inspect).to eq("#<TagEndToken [/b]>")
-    end
-  end
 end

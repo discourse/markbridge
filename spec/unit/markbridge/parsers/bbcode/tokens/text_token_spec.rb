@@ -26,10 +26,4 @@ RSpec.describe Markbridge::Parsers::BBCode::TextToken do
 
     expect(token.text).to be_frozen
   end
-
-  it "renders a custom one-line representation" do
-    token = described_class.new(text: "test", pos: 0)
-
-    expect(token.inspect).to eq('#<TextToken "test">')
-  end
 end

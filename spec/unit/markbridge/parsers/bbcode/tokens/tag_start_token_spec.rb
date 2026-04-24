@@ -34,28 +34,4 @@ RSpec.describe Markbridge::Parsers::BBCode::TagStartToken do
       expect(token.attrs).to be_frozen
     end
   end
-
-  describe "#inspect" do
-    it "shows readable representation with attrs" do
-      token =
-        described_class.new(
-          tag: "url",
-          attrs: {
-            href: "test",
-          },
-          pos: 0,
-          source: "[url href=\"test\"]",
-        )
-
-      expect(token.inspect).to eq('#<TagStartToken [url] {href: "test"}>')
-    end
-
-    # Kills `attrs.empty? ? "" : " #{attrs.inspect}"` ternary branch
-    # mutations (branch collapse, `nil` → empty, `if false`).
-    it "omits the attrs section when attrs is empty" do
-      token = described_class.new(tag: "b", attrs: {}, pos: 0, source: "[b]")
-
-      expect(token.inspect).to eq("#<TagStartToken [b]>")
-    end
-  end
 end

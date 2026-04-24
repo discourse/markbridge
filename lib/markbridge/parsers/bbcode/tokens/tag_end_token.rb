@@ -11,10 +11,6 @@ module Markbridge
           super(pos:, source:)
           @tag = tag.freeze
         end
-
-        def inspect
-          "#<TagEndToken [/#{tag}]>"
-        end
       end
     end
   end

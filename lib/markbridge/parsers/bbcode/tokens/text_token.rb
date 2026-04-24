@@ -11,10 +11,6 @@ module Markbridge
           super(pos:, source: text)
           @text = text.freeze
         end
-
-        def inspect
-          "#<TextToken #{text.inspect}>"
-        end
       end
     end
   end
