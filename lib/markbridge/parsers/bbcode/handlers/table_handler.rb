@@ -17,9 +17,9 @@ module Markbridge
 
           def on_close(token:, context:, registry:, tokens: nil)
             # Auto-close open cell before closing row
-            context.pop if context.current.is_a?(AST::TableCell)
+            context.pop if context.current.instance_of?(AST::TableCell)
             # Auto-close open row before closing table
-            context.pop if context.current.is_a?(AST::TableRow)
+            context.pop if context.current.instance_of?(AST::TableRow)
 
             super
           end

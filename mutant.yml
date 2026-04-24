@@ -306,6 +306,31 @@ mutation:
     # produce byte-identical output.
     - "lvasgn{name=cell_context value=send{selector=with_parent}}"
 
+    # `context.push(element, token:)` kwarg mutations. The `token:`
+    # kwarg is only consulted by ParserState#push in the
+    # MAX_DEPTH-exceeded branch for graceful-degradation error
+    # reporting — normal pushes never read it. So dropping the kwarg
+    # or passing `token: nil` is equivalent for any realistic (< 100
+    # deep) nesting. Bucket A.
+    - "send{receiver=lvar{value=context} selector=push}"
+
+    # TableRowHandler#on_close's `context.pop if
+    # context.current.instance_of?(AST::TableCell)` auto-close guard.
+    # Mutations that flip the guard to always-true (`if true`,
+    # `if context.current`, `if AST::TableCell`, drop-if-keep-body)
+    # cause an extra pop of the TableRow before super fires. The
+    # Reordering closing strategy recovers: close_element looks up
+    # the matching `tr` element on the stack, and when it's already
+    # popped, the close is a no-op. Net effect: identical context
+    # state (current=Table, depth=2). Not observable through the
+    # public handler API; covered by the auto-close specs that
+    # exercise the WITH-cell path.
+    # Selector `instance_of?` has `?` which the pattern lexer rejects,
+    # so we match shape by receiver only — this catches the source
+    # `if context.current.<predicate>(...)` expression wherever it
+    # appears in BBCode table handlers.
+    - "if{condition=send{receiver=send{receiver=lvar{value=context} selector=current}}}"
+
     # `interface.render_children(element, context: child_context)` —
     # the `context:` kwarg is load-bearing when children consult the
     # parent chain; otherwise dropping it is equivalent (children use

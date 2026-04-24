@@ -91,6 +91,26 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::TableRowHandler do
 
       expect(context.current).to eq(table)
     end
+
+    it "does NOT pop an extra level when no TableCell is open" do
+      # Kills `if context.current.instance_of?(AST::TableCell)` →
+      # `if true` / `if context.current` / `if AST::TableCell` /
+      # drop-if-keep-body. With those, `context.pop` would fire on
+      # the TableRow itself before `super` pops it, leaving us on
+      # the document instead of the intended "back to table" state.
+      table = Markbridge::AST::Table.new
+      context.push(table)
+      row = Markbridge::AST::TableRow.new
+      context.push(row)
+
+      close_token =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "tr", pos: 10, source: "[/tr]")
+
+      handler.on_close(token: close_token, context:, registry:)
+
+      # Only one pop (from super). Context should be on the table.
+      expect(context.current).to eq(table)
+    end
   end
 
   describe "#element_class" do
