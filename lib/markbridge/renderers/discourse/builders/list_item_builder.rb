@@ -15,12 +15,10 @@ module Markbridge
           # @return [String]
           def build(content, marker:, indent:)
             lines = content.split("\n")
-            lines = [""] if lines.empty? # Handle empty content
             first_line = "#{indent}#{marker}#{lines.first}"
 
-            return "#{first_line}\n" if lines.size == 1
+            return "#{first_line}\n" if lines.size < 2
 
-            # Handle multi-line content with sophisticated blank line handling
             format_multiline(lines, first_line, indent)
           end
 

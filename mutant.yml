@@ -78,16 +78,19 @@ matcher:
     # is killable through the public parse API. Subject-level ignore.
     - Markbridge::Parsers::HTML::Parser#process_text_node
 
-    # escape_block_ordered_list's fallthrough `[content, false]`. When
-    # content starts with a digit but doesn't match ORDERED_LIST
-    # (e.g. "1x" without a period), the skip_inline=true mutation
-    # still produces identical output for content without inline-
-    # special chars. Content with `*` / `_` / etc AND a digit prefix
-    # that isn't an ordered marker is contrived — no realistic
-    # Markdown input hits it. The `[content]` (drop second) mutation
-    # sets skip_inline to nil (falsy, same truthiness as false in
-    # the caller's destructure check). Bucket A.
+    # escape_block_* fallthrough `[content, false]` returns. The `false`
+    # → drop-second / `true` mutations on the non-match branch are
+    # equivalent because content that doesn't match the specific
+    # block pattern is handed to inline escape which produces
+    # identical bytes (or bytes that don't affect the truthiness
+    # check on skip_inline in the caller). Bucket A — covered across
+    # escape_block_ordered_list, escape_block_dash, escape_block_star,
+    # and the outermost escape_block_level `[content, false]` for
+    # non-construct content.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_ordered_list
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_dash
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_star
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_level
 
     # BBCode::Scanner#consume's `true` return and `!=` comparison.
     # All 3 callers (`closing = consume(...)`, `unless consume(...)`,
@@ -96,6 +99,45 @@ matcher:
     # Integer > 0, equally truthy. `!=` vs `!eql?` on single-char
     # String comparison is a Bucket-A Fixnum/String equivalence.
     - Markbridge::Parsers::BBCode::Scanner#consume
+
+    # CodeBlockTracker helpers `check_inline_boundary` /
+    # `skip_leading_spaces`: `input[pos] != " "` / `!= "`"` vs
+    # `!input[pos].eql?(" ")` / `!.eql?("`")`. `!=` and `!eql?` are
+    # identical for single-character strings. Bucket A.
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#check_inline_boundary
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#skip_leading_spaces
+
+    # `parents.select {...}[0...-1]` in ListItemTag#calculate_indent —
+    # `[nil...-1]` is equivalent to `[0...-1]` because Ruby treats
+    # `nil` as `0` in range-start positions for array slicing.
+    # Bucket A.
+    - Markbridge::Renderers::Discourse::Tags::ListItemTag#calculate_indent
+
+    # Upload#parse_upload_url's `if ext.empty?; nil; else; url_part; end`
+    # vs `unless ext.empty?; url_part end`. The latter is syntactic
+    # inversion that produces identical return values (nil if empty,
+    # url_part otherwise). Bucket A.
+    - Markbridge::Processors::DiscourseMarkdown::Detectors::Upload#parse_upload_url
+
+    # ListItemBuilder#build's `lines.size < 2` fast-path. When lines
+    # has exactly 1 element, format_multiline with empty
+    # continuation_lines produces byte-identical output to the early
+    # return (first_line + "\n"). When lines has 0 elements,
+    # `lines[1..]` returns nil (not []), so the fast-path is
+    # load-bearing to avoid a NoMethodError. Mutations `< 1` /
+    # `<= 0` would drop the size==1 case into format_multiline — no
+    # observable output difference, pure perf. Bucket A.
+    - Markbridge::Renderers::Discourse::Builders::ListItemBuilder#build
+
+    # CodeBlockTracker#check_indented_boundary's `input[pos...line_end]`
+    # vs `input[pos..line_end]`. When line_end points at `\n`, the
+    # inclusive form adds the newline to line_content; both downstream
+    # checks (`/\A\s*\z/` blank probe and `start_with?("    ")` indent
+    # probe) are unaffected by a trailing `\n` — `\n` is whitespace
+    # for /\s/, and `start_with?` is anchored. When
+    # `line_end == input_length`, Ruby clamps both ranges to the
+    # same substring. Bucket A, subject-level ignore.
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#check_indented_boundary
 
 
     # advance_code_boundary mutations are all Bucket A equivalents

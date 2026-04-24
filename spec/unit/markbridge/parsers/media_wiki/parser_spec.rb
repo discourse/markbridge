@@ -599,6 +599,15 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect { parser.parse("{|\n| unclosed") }.not_to raise_error
     end
 
+    it "recognizes `{|` with leading whitespace as a table start" do
+      # Kills `\A\s*\{\|` → `\A\S*\{\|` on table_start_line?. A
+      # leading-indented table opener must still be detected;
+      # `\S*` would require non-whitespace before `{|` and fail.
+      doc = parser.parse("  {|\n| x\n|}")
+
+      expect(doc.children.first).to be_a(Markbridge::AST::Table)
+    end
+
     it "closes any open list before starting a table" do
       # Kills `close_open_lists` → drop / nil on the `table_start_line?`
       # branch. Without the close, the list stack stays populated

@@ -100,6 +100,17 @@ RSpec.describe Markbridge::Parsers::BBCode::Scanner do
 
         expect(tokens[0].source).to eq("[BOLD]")
       end
+
+      it "preserves the original close-tag source on TagEndToken" do
+        # Kills `TagEndToken.new(tag:, pos:, source:)` → `source: nil`.
+        # The source attribute is load-bearing for RawContentCollector,
+        # which concatenates `token.source` when collecting raw content
+        # across non-matching close tags inside [code]...[/code].
+        tokens = scan("[/CODE]")
+
+        expect(tokens[0]).to match_tag_end("code")
+        expect(tokens[0].source).to eq("[/CODE]")
+      end
     end
 
     context "with tag attributes" do
