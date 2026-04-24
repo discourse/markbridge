@@ -69,6 +69,15 @@ matcher:
     # non-empty arrays, which `String#split` always returns).
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_external_link
 
+    # HTML::Parser#process_text_node's `unless text.empty?` guard is
+    # dead defensive code — Nokogiri's HTML parser never emits empty
+    # text nodes (verified exhaustively with adjacent tags, void
+    # elements, empty elements, comments). So `unless false` /
+    # drop-unless give identical output for every reachable input.
+    # The 3 remaining alive mutations target the guard's shape; none
+    # is killable through the public parse API. Subject-level ignore.
+    - Markbridge::Parsers::HTML::Parser#process_text_node
+
     # advance_code_boundary mutations are all Bucket A equivalents
     # that flow through to inline-code detection: `unless new_pos`
     # flipped to `unless nil` / `unless false` / `return false` early
@@ -134,10 +143,12 @@ mutation:
     #
     # `row[:cells]` / `rows_data.first[:cells]` / `header_row[:cells]` —
     # same shape in markdown_compatible? / render_markdown.
+    # `cell[:header]` / `cell[:content]` in html_row — same structure.
     - "index{receiver=lvar{value=r}}"
     - "index{receiver=lvar{value=c}}"
     - "index{receiver=lvar{value=row}}"
     - "index{receiver=lvar{value=header_row}}"
+    - "index{receiver=lvar{value=cell}}"
     - "index{receiver=send{selector=first}}"
 
     # `rows_data[header_idx]` / `rows_data[0...header_idx]` / ... —
@@ -161,6 +172,32 @@ mutation:
     # stripping just one side from an all-whitespace string also
     # leaves "". Bucket A.
     - "send{receiver=send{receiver=lvar{value=child} selector=text} selector=strip}"
+
+    # RenderContext#with_parent's `parent_cache:` kwarg plumbing.
+    # Mutations that drop the kwarg or pass `parent_cache: nil` cause
+    # the constructor to rebuild the cache via `build_cache(parents)`
+    # — same contents, just O(depth) instead of O(1). Behaviorally
+    # equivalent; only observable as a perf regression under deep
+    # nesting. Covered by the `parent_cache ||= []` guarantee on
+    # line 30 for the index→fetch variant.
+    - "send{receiver=send{receiver=self selector=class} selector=new}"
+    - "index{receiver=lvar{value=new_cache}}"
+
+    # HTML::Parser#process_element_node's `handler.call(element: node,
+    # parent:)` is the lambda-dispatch path, used only by the `br` /
+    # `hr` handlers in HandlerRegistry.default. Neither lambda reads
+    # `element:` — both just emit a void AST node into `parent`. So
+    # `element: nil` is equivalent for every registered caller.
+    # Bucket A.
+    - "send{receiver=lvar{value=handler} selector=call}"
+
+    # `node.name.downcase` in process_element_node: Nokogiri's HTML
+    # parser already normalizes tag names to lowercase, so the
+    # `.downcase` call is a no-op. `node.name` produces identical
+    # values. Keep the `.downcase` defensively (SGML / XHTML modes
+    # could produce uppercase) but accept the mutation. Bucket A.
+    - "send{receiver=send{receiver=lvar{value=node} selector=name} selector=downcase}"
+
 
     # `arr[0...-1]` vs `arr[nil...-1]` / `arr[0..-1]` — Ruby's
     # array-slice accepts nil as 0 and the inclusive/exclusive
