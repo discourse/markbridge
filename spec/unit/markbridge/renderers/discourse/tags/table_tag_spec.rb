@@ -355,9 +355,76 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(tbody_match[1]).to include("<td>d1</td>")
     end
 
+    # Kills `rows_data.any? { r -> ... }` → `.all?` on the OUTER
+    # has_header probe. With `.all?`, a single data-only row would
+    # flip has_header to false and the HTML path would skip
+    # <thead>/<tbody>. Needs BOTH an all-header row AND a data-only
+    # row (plus uneven cell counts to force HTML fallback).
+    it "emits <thead>/<tbody> when at least one row has headers (not all)" do
+      table =
+        build_table(
+          [
+            [{ text: "H1", header: true }, { text: "H2", header: true }],
+            %w[d1 d2],
+            %w[d3 d4 d5], # uneven forces HTML fallback
+          ],
+        )
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<thead>")
+      expect(result).to include("<tbody>")
+    end
+
+    # Kills `unless body_rows.empty?` → `unless false` / `unless nil`
+    # / drop-unless. With an all-header table that falls into HTML
+    # mode (forced by a mid-row mixed cell set that defeats the
+    # markdown path), body_rows is empty and the <tbody>…</tbody>
+    # pair MUST NOT appear.
+    it "omits <tbody> when every row is an all-header row" do
+      table =
+        build_table(
+          [
+            [{ text: "A", header: true }, { text: "B", header: true }],
+            [{ text: "C", header: true }, { text: "D", header: true }, { text: "E", header: true }], # uneven forces HTML fallback
+          ],
+        )
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<thead>")
+      expect(result).not_to include("<tbody>")
+      expect(result).not_to include("</tbody>")
+    end
+
+    # Kills `lines.join("\n")` → `lines.join` / `.join(nil)` /
+    # `.join("")`. The HTML table output MUST have newlines between
+    # `<table>`, `<thead>`, `<tr>`, etc. Without separator, the tags
+    # concatenate into one long line and the output loses readability.
+    it "separates HTML lines with newlines" do
+      table =
+        build_table(
+          [
+            [{ text: "H1", header: true }, { text: "H2", header: true }],
+            %w[d1 d2 d3], # uneven forces HTML fallback
+          ],
+        )
+
+      result = tag.render(table, interface)
+
+      # Each HTML element should be on its own line.
+      expect(result).to match(/<table>\n<thead>\n<tr>/)
+      expect(result).to match(%r{</tr>\n</thead>\n<tbody>})
+      expect(result).to match(%r{</tbody>\n</table>})
+    end
+
     # Kills `r[:cells].all? { c[:header] }` → `.any?` mutations on the
     # partition guard. A row where only SOME cells are headers must
     # NOT go into <thead>; it lands in <tbody> with mixed th/td cells.
+    # Also kills the INNER `r[:cells].any? { c[:header] }` → `.all?`
+    # on the has_header probe — with the mutation, a mixed row
+    # (one header, one data) returns false for `.all?`, so has_header
+    # flips to false and <tbody> disappears.
     it "routes a mixed-header row to <tbody>, not <thead>" do
       table =
         build_table(
@@ -372,6 +439,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
 
       # No <thead> because no row has all cells as headers.
       expect(result).not_to include("<thead>")
+      # <tbody> must still appear — the inner-any-vs-all mutation
+      # would flip has_header to false and drop <tbody> entirely.
+      expect(result).to include("<tbody>")
       expect(result).to include("<th>H</th>")
       expect(result).to include("<td>x</td>")
     end
