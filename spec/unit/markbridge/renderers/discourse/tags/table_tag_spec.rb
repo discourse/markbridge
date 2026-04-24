@@ -290,5 +290,54 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(result).to include("<th>C</th>")
       expect(result).to include("<td>a</td>")
     end
+
+    # Kills `has_header = rows_data.any? { r[:cells].any? { c[:header] } }`
+    # → `.all?` mutations. A table with MIXED cells (some header, some
+    # data) in a row must have `has_header = true` so the HTML output
+    # wraps the all-header rows in <thead>. With `.all?`, a mixed row
+    # returns false, so the table renders without <thead>/<tbody>.
+    it "wraps all-header rows in <thead> even when some rows have mixed cells" do
+      table =
+        build_table(
+          [
+            [{ text: "H1", header: true }, { text: "H2", header: true }],
+            [{ text: "m1", header: true }, "data1"],
+            %w[d1 d2 d3], # extra cell — forces HTML fallback via uneven counts
+          ],
+        )
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<thead>")
+      expect(result).to include("<tbody>")
+      thead_match = result.match(%r{<thead>(.*?)</thead>}m)
+      tbody_match = result.match(%r{<tbody>(.*?)</tbody>}m)
+      expect(thead_match[1]).to include("<th>H1</th>")
+      expect(thead_match[1]).to include("<th>H2</th>")
+      expect(tbody_match[1]).to include("<th>m1</th>") # mixed row's header cell
+      expect(tbody_match[1]).to include("<td>data1</td>")
+      expect(tbody_match[1]).to include("<td>d1</td>")
+    end
+
+    # Kills `r[:cells].all? { c[:header] }` → `.any?` mutations on the
+    # partition guard. A row where only SOME cells are headers must
+    # NOT go into <thead>; it lands in <tbody> with mixed th/td cells.
+    it "routes a mixed-header row to <tbody>, not <thead>" do
+      table =
+        build_table(
+          [
+            [{ text: "H", header: true }, "x"], # mixed — not a header-only row
+            %w[d1 d2],
+            %w[d3 d4 d5], # uneven — forces HTML fallback
+          ],
+        )
+
+      result = tag.render(table, interface)
+
+      # No <thead> because no row has all cells as headers.
+      expect(result).not_to include("<thead>")
+      expect(result).to include("<th>H</th>")
+      expect(result).to include("<td>x</td>")
+    end
   end
 end
