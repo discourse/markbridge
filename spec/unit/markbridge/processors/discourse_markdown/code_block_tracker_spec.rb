@@ -364,6 +364,23 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_indented_block).to be true
     end
 
+    # Kills `is_blank = line_content.match?(/\A\s*\z/)` → `.match?(/\A\S*\z/)`.
+    # A whitespace-only line (not empty) must still count as blank so
+    # the indented block continues across it. With `\S*`, a 3-space
+    # line fails the blank check AND fails the code-indent check
+    # (start_with?("    ") wants 4), so the block ends.
+    it "continues indented block across a whitespace-only (<4 spaces) line" do
+      input = "    line1\n   \n    line2"
+      # Start block
+      tracker.check_indented_boundary(input, 0, line_start: true)
+      expect(tracker.in_indented_block).to be true
+
+      # Whitespace-only line (3 spaces)
+      new_pos = tracker.check_indented_boundary(input, 10, line_start: true)
+      expect(new_pos).not_to be_nil
+      expect(tracker.in_indented_block).to be true
+    end
+
     it "ends indented block on non-indented line" do
       input = "    code\nnot code"
       # Start code block

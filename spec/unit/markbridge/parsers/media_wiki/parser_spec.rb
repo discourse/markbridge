@@ -599,6 +599,25 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect { parser.parse("{|\n| unclosed") }.not_to raise_error
     end
 
+    it "closes any open list before starting a table" do
+      # Kills `close_open_lists` → drop / nil on the `table_start_line?`
+      # branch. Without the close, the list stack stays populated
+      # across the table, so a list item AFTER the table is treated
+      # as a continuation of the pre-table list instead of opening a
+      # fresh one.
+      doc = parser.parse("* item1\n{|\n| x\n|}\n* item2")
+
+      # Original: List(item1), Table, List(item2) — three siblings.
+      # Mutation: List(item1, item2), Table — only two siblings with
+      # the second item merged into the first list.
+      expect(doc.children.size).to eq(3)
+      expect(doc.children[0]).to be_a(Markbridge::AST::List)
+      expect(doc.children[0].children.size).to eq(1)
+      expect(doc.children[1]).to be_a(Markbridge::AST::Table)
+      expect(doc.children[2]).to be_a(Markbridge::AST::List)
+      expect(doc.children[2].children.size).to eq(1)
+    end
+
     it "strips leading AND trailing whitespace on table lines" do
       # Kills `lines[i].strip` → `.lstrip` / `.rstrip` / no strip.
       # Indented `  | foo` must still match the `|` branch.

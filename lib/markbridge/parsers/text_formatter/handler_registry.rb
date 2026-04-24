@@ -97,8 +97,6 @@ module Markbridge
           register("TR", Handlers::SimpleHandler.new(AST::TableRow))
           register("TD", Handlers::TableCellHandler.new)
           register("TH", Handlers::TableCellHandler.new)
-
-          self
         end
       end
     end

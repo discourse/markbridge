@@ -78,6 +78,26 @@ matcher:
     # is killable through the public parse API. Subject-level ignore.
     - Markbridge::Parsers::HTML::Parser#process_text_node
 
+    # escape_block_ordered_list's fallthrough `[content, false]`. When
+    # content starts with a digit but doesn't match ORDERED_LIST
+    # (e.g. "1x" without a period), the skip_inline=true mutation
+    # still produces identical output for content without inline-
+    # special chars. Content with `*` / `_` / etc AND a digit prefix
+    # that isn't an ordered marker is contrived — no realistic
+    # Markdown input hits it. The `[content]` (drop second) mutation
+    # sets skip_inline to nil (falsy, same truthiness as false in
+    # the caller's destructure check). Bucket A.
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_ordered_list
+
+    # BBCode::Scanner#consume's `true` return and `!=` comparison.
+    # All 3 callers (`closing = consume(...)`, `unless consume(...)`,
+    # `break unless consume(...)`) use consume as a truthy check.
+    # Dropping `true` returns the `@current_pos += 1` result — an
+    # Integer > 0, equally truthy. `!=` vs `!eql?` on single-char
+    # String comparison is a Bucket-A Fixnum/String equivalence.
+    - Markbridge::Parsers::BBCode::Scanner#consume
+
+
     # advance_code_boundary mutations are all Bucket A equivalents
     # that flow through to inline-code detection: `unless new_pos`
     # flipped to `unless nil` / `unless false` / `return false` early
@@ -157,6 +177,21 @@ mutation:
     # Bucket A.
     - "index{receiver=lvar{value=rows_data}}"
 
+    # ListItemBuilder#handle_empty_line's `next_line = continuation_lines[idx+1]`
+    # is followed by `next_line&.match?(...)` — the safe-nav guard is
+    # dead defensive code in practice because `build` calls
+    # `content.split("\n")` with default limit, which trims trailing
+    # empty strings; so an empty line at the LAST continuation index
+    # is unreachable through the public API. That means:
+    #  - `[idx+1]` / `.at(idx+1)` are equivalent (both return nil on
+    #    the unreachable out-of-bounds case).
+    #  - `next_line&.match?` / `.match?` (drop safe-nav) would only
+    #    differ on that same unreachable nil case — equivalent in
+    #    practice.
+    # Bucket A.
+    - "index{receiver=lvar{value=continuation_lines}}"
+    - "csend{receiver=lvar{value=next_line}}"
+
     # CodeTag#calculate_fence's `... || 0` default for empty scan.
     # When no backticks / tildes are in content, scan.map returns []
     # and .max/.min/.first/.last all return nil → `|| 0` kicks in.
@@ -197,6 +232,27 @@ mutation:
     # values. Keep the `.downcase` defensively (SGML / XHTML modes
     # could produce uppercase) but accept the mutation. Bucket A.
     - "send{receiver=send{receiver=lvar{value=node} selector=name} selector=downcase}"
+
+
+    # CodeTag#render_block's `lang = language || ""` — `lang` is only
+    # ever interpolated into `"#{fence}#{lang}\n"`, and `"#{nil}"` ==
+    # `""`. So `|| nil` and dropping the default both produce identical
+    # string output. Bucket A.
+    - "lvasgn{name=lang}"
+
+    # MarkdownEscaper#block_construct?'s `when DIGIT_0..DIGIT_9` range.
+    # Mutations `when DIGIT_0..nil` / `when nil..DIGIT_9` extend the
+    # range to unbounded, but the body is `ORDERED_LIST.match?(content)`
+    # which only matches content starting with `\d+\.` — non-digit bytes
+    # like `:` or `<` land in this arm but produce `false` identically
+    # to the `else false` arm. Dropping `else false` also fine: case
+    # returns nil, `!block_construct?(content)` becomes `!nil == true`
+    # — same as `!false == true` for the `paragraph_line?` caller.
+    # Bucket A.
+    - "case{value=send{receiver=lvar{value=content} selector=getbyte}}"
+
+
+
 
 
     # `arr[0...-1]` vs `arr[nil...-1]` / `arr[0..-1]` — Ruby's
