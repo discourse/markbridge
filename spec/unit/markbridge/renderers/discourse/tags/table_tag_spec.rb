@@ -173,5 +173,122 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(result).to include("| only |")
       expect(result).to include("| --- |")
     end
+
+    # Kills `header_idx = nil` and `r[:cells].all? { … }` → truthy-all?
+    # mutations. When a header row appears MID-TABLE (row 1 is all
+    # headers, rows 0 and 2 are data), rendering must reorder so the
+    # header row heads the output and the other rows become data
+    # rows.
+    it "places a mid-table header row at the top of the Markdown output" do
+      table =
+        build_table(
+          [
+            %w[pre1 pre2],
+            [{ text: "H1", header: true }, { text: "H2", header: true }],
+            %w[post1 post2],
+          ],
+        )
+
+      result = tag.render(table, interface)
+
+      # Header first, separator, then the two data rows in original order.
+      expect(result).to eq("\n\n| H1 | H2 |\n| --- | --- |\n| pre1 | pre2 |\n| post1 | post2 |\n\n")
+    end
+
+    # Kills drop-AST-guard mutations on `next unless child.is_a?(AST::TableRow)`
+    # and the inner `next unless cell.is_a?(AST::TableCell)` in
+    # extract_rows. Non-TableRow or non-TableCell children must be
+    # silently skipped.
+    it "skips non-TableRow children inside the table" do
+      table = Markbridge::AST::Table.new
+      # Interloper: a stray Paragraph shouldn't produce an extra row.
+      stray = Markbridge::AST::Paragraph.new
+      stray << Markbridge::AST::Text.new("stray")
+      table << stray
+
+      row = Markbridge::AST::TableRow.new
+      cell = Markbridge::AST::TableCell.new
+      cell << Markbridge::AST::Text.new("x")
+      row << cell
+      table << row
+
+      result = tag.render(table, interface)
+
+      expect(result).to eq("\n\n| x |\n| --- |\n\n")
+    end
+
+    it "skips non-TableCell children inside a row" do
+      table = Markbridge::AST::Table.new
+      row = Markbridge::AST::TableRow.new
+      # Interloper inside the row
+      stray = Markbridge::AST::Text.new("ignored")
+      row << stray
+      cell = Markbridge::AST::TableCell.new
+      cell << Markbridge::AST::Text.new("only")
+      row << cell
+      table << row
+
+      result = tag.render(table, interface)
+
+      expect(result).to eq("\n\n| only |\n| --- |\n\n")
+    end
+
+    # Kills the `unless cells.empty?` drop in extract_rows: rows that
+    # end up with zero real cells (e.g. only interlopers) must not
+    # contribute a row to rows_data.
+    it "drops rows with no TableCell children entirely" do
+      table = Markbridge::AST::Table.new
+
+      empty_row = Markbridge::AST::TableRow.new
+      empty_row << Markbridge::AST::Text.new("no cells")
+      table << empty_row
+
+      data_row = Markbridge::AST::TableRow.new
+      data_cell = Markbridge::AST::TableCell.new
+      data_cell << Markbridge::AST::Text.new("x")
+      data_row << data_cell
+      table << data_row
+
+      result = tag.render(table, interface)
+
+      # Only one row survives → rendered as both header and (no) data.
+      expect(result).to eq("\n\n| x |\n| --- |\n\n")
+    end
+
+    # Kills `has_header = rows_data` / `has_header = true` mutations
+    # in render_html. When no cell is flagged as header, the HTML
+    # output must NOT wrap anything in <thead>/<tbody>.
+    it "renders HTML without thead/tbody when no header cells are present" do
+      # Force HTML fallback with different cell counts + no headers.
+      table = build_table([%w[a b], %w[solo]])
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<table>")
+      expect(result).not_to include("<thead>")
+      expect(result).not_to include("<tbody>")
+      expect(result).to include("<td>a</td>")
+      expect(result).to include("<td>solo</td>")
+    end
+
+    # Kills mutations that swap th/td in html_row (e.g. drop the
+    # ternary, `force_header: false` always, `cell[:header]` vs other).
+    it "emits <th> for header cells and <td> for data cells in HTML fallback" do
+      # Mixed header/data in one row forces HTML fallback (rows uneven).
+      mixed_row_table =
+        build_table(
+          [
+            [{ text: "A", header: true }, "B", { text: "C", header: true }],
+            %w[a b c d], # extra cell => uneven => HTML fallback
+          ],
+        )
+
+      result = tag.render(mixed_row_table, interface)
+
+      expect(result).to include("<th>A</th>")
+      expect(result).to include("<td>B</td>")
+      expect(result).to include("<th>C</th>")
+      expect(result).to include("<td>a</td>")
+    end
   end
 end
