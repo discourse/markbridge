@@ -106,11 +106,32 @@ mutation:
     # Bucket A.
     - "send{receiver=lvar{value=limit} selector=(-)}"
 
+    # process_table's `i = start_index + 1` initial offset. The `+ 0`
+    # / `start_index` variants leave the loop pointing at the `{|`
+    # line, which never matches any of the four `start_with?` branches
+    # (`|}`, `|-`, `!`, `|`) because it starts with `{`. So the extra
+    # iteration is a no-op and observationally identical. Bucket A.
+    - "send{receiver=lvar{value=start_index} selector=(+)}"
+
+    # `lines[i].strip` → `.lstrip`. Trailing whitespace on a table
+    # line never affects the subsequent `start_with?` checks, and
+    # cell content is re-stripped by parse_table_cells before inline
+    # parsing. Bucket A.
+    #
+    # Pattern also covers `lines[i]` ↔ `lines.at(i)` ↔ `lines.fetch(i)`
+    # — mutant's Index mutator emits `at` / `fetch` / `key?` swaps
+    # for every `:index` node. All are equivalent for valid indices
+    # that `while i < lines.length` already bounds. Note: unparser's
+    # AST uses `:index` (not `:send`) for `arr[x]` reads.
+    - "send{receiver=index{receiver=lvar{value=lines}} selector=strip}"
+    - "index{receiver=lvar{value=lines}}"
+
     # `arr[0...-1]` vs `arr[nil...-1]` / `arr[0..-1]` — Ruby's
     # array-slice accepts nil as 0 and the inclusive/exclusive
     # variants differ only at the far end where -1 points to the
-    # same final index.
-    - "send{receiver=send{selector=select} selector=([])}"
+    # same final index. Target is the `:index` node (unparser AST)
+    # with a `.select` receiver.
+    - "index{receiver=send{selector=select}}"
 
 
     # Inline loop-progress guards in Scanner#scan_while / #skip_whitespace /
