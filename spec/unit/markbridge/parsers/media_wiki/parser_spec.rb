@@ -572,6 +572,19 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(row.children.first.children.first.text).to eq("value")
     end
 
+    it "splits a cell on ONLY the first attr-pipe, keeping later `|` in content" do
+      # Kills the `limit - 1` → `limit` / `limit + 1` / drop-limit /
+      # `< 1` / `|| true` / `|| parts.length` variants on the
+      # split_outside_brackets limit check. With `limit: 2`, the
+      # split must stop after one `|`, so `b | c` stays joined as
+      # the cell content (not split into two "b" and "c" cells).
+      table = parse_table("{|\n| a | b | c\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(1)
+      expect(row.children.first.children.first.text).to eq("b | c")
+    end
+
     it "keeps trailing blank cells when `||` ends the line" do
       table = parse_table("{|\n| 1 || \n|}")
 
@@ -580,6 +593,37 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(row.children.first.children.first.text).to eq("1")
       # The trailing empty cell has no children (parse of empty content).
       expect(row.children[1].children).to be_empty
+    end
+
+    it "treats unbalanced `]]` as plain text, not a depth close" do
+      # Kills `depth.positive?` → drop / `true` / `depth` (integer is
+      # truthy so `depth` alone behaves like `true`). Without the
+      # guard, the unbalanced `]]` would push depth to -1 and the
+      # subsequent `||` would NOT split (depth != 0), collapsing the
+      # row into a single cell.
+      table = parse_table("{|\n| a]] || b\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(2)
+      expect(row.children[1].children.first.text).to eq("b")
+    end
+
+    it "advances exactly 2 positions past a balanced `]]`" do
+      # Kills `i += 2` → `i += 1` / `i -= 2` / `i += 0` on the `]]`
+      # branch. A mis-advance leaks stray `]` / re-scans chars into
+      # cell 0, producing either extra Text siblings next to the Url
+      # or a wrong href. All three cases are observable on the cell
+      # subtree shape.
+      table = parse_table("{|\n| [[x]] || y\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(2)
+      # Cell 0 is exactly one Url child — no stray `]`/`x` Text after.
+      expect(row.children[0].children.size).to eq(1)
+      url = row.children[0].children.first
+      expect(url).to be_a(Markbridge::AST::Url)
+      expect(url.href).to eq("x")
+      expect(row.children[1].children.first.text).to eq("y")
     end
   end
 

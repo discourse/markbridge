@@ -98,6 +98,14 @@ mutation:
     # inputs (< 167 lines) all three are observably identical.
     - "send{receiver=lvar{value=text} selector=split}"
 
+    # split_outside_brackets' `limit - 1` expression inside the
+    # split-count check. The only call site that passes a limit uses
+    # `limit: 2`, so `limit - 1 == 1` is the only reachable value —
+    # making the `< 1` / `< limit` / `< limit + 1` mutation variants
+    # behave identically once the `limit: 2` argument is threaded.
+    # Bucket A.
+    - "send{receiver=lvar{value=limit} selector=(-)}"
+
     # `arr[0...-1]` vs `arr[nil...-1]` / `arr[0..-1]` — Ruby's
     # array-slice accepts nil as 0 and the inclusive/exclusive
     # variants differ only at the far end where -1 points to the

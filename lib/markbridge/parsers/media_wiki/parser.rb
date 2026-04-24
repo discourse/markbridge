@@ -257,7 +257,6 @@ module Markbridge
           end
 
           parts << buffer
-          parts
         end
 
         # Process a heading line and add it to the document.
