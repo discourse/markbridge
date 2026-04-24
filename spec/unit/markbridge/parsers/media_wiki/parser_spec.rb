@@ -572,6 +572,94 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(row.children.first.children.first.text).to eq("value")
     end
 
+    it "resumes parsing from the line AFTER `|}` without duplicating earlier lines" do
+      # Kills `i = start_index + 1` → `i = 1` (constant). With the
+      # mutation, when the table starts AFTER line 1, iteration
+      # restarts from line 1 and a `|}` there would break early,
+      # returning a stale index that triggers ParserStuckError via
+      # progressed!(i) in the outer process_lines loop.
+      expect do parser.parse("dummy\n|} gotcha\n{|\n| x\n|}") end.not_to raise_error
+    end
+
+    it "places the table between preceding and following document content" do
+      doc = parser.parse("before\n{|\n| x\n|}\nafter")
+
+      expect(doc.children.size).to eq(3)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
+      expect(doc.children[1]).to be_a(Markbridge::AST::Table)
+      expect(doc.children[2]).to be_a(Markbridge::AST::Paragraph)
+      expect(doc.children[2].children.first.text).to eq("after")
+    end
+
+    it "does not index past end-of-input on an unclosed table" do
+      # Kills `while i < lines.length` → `while i` / `while lines.length`.
+      # Both mutations never terminate; on an unclosed table, the
+      # index walks past end-of-input and `lines[i].strip` raises
+      # NoMethodError on nil.
+      expect { parser.parse("{|\n| unclosed") }.not_to raise_error
+    end
+
+    it "strips leading AND trailing whitespace on table lines" do
+      # Kills `lines[i].strip` → `.lstrip` / `.rstrip` / no strip.
+      # Indented `  | foo` must still match the `|` branch.
+      table = parse_table("{|\n  | indented\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(1)
+      expect(row.children.first.children.first.text).to eq("indented")
+    end
+
+    it "opens closing `|}` only when the line STARTS with `|}`, not ends" do
+      # Kills `start_with?("|}")` → `end_with?("|}")`. A cell line
+      # whose text happens to end with `|}` must be treated as cell
+      # content, not as the table close.
+      table = parse_table("{|\n| data ends here |}\n|}")
+
+      expect(table.children.size).to eq(1)
+      # With end_with? mutation, the trap line would break and the
+      # table would close with zero rows.
+      expect(table.children[0].children.size).to eq(1)
+    end
+
+    it "opens row separator `|-` only when line STARTS with `|-`, not ends" do
+      # Kills `start_with?("|-")` → `end_with?("|-")`. A cell line
+      # ending in `|-` text must not create a new row.
+      table = parse_table("{|\n| foo\n| bar|-\n|}")
+
+      expect(table.children.size).to eq(1)
+      expect(table.children[0].children.size).to eq(2)
+    end
+
+    it "keeps consecutive `!` header lines in the SAME row absent a `|-`" do
+      # Kills `ensure_table_row(table, current_row)` → `(table, nil)`
+      # on the header branch. Without `|-`, consecutive headers
+      # must share a row.
+      table = parse_table("{|\n! A\n! B\n|}")
+
+      expect(table.children.size).to eq(1)
+      expect(table.children[0].children.size).to eq(2)
+    end
+
+    it "strips exactly ONE leading `!` before cell content" do
+      # Kills `stripped[1..]` → `stripped[2..]` on the header
+      # branch. With no-space input `!x`, slice(1..) is "x",
+      # slice(2..) is "" (empty cell).
+      table = parse_table("{|\n!x\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(1)
+      expect(row.children.first.children.first.text).to eq("x")
+    end
+
+    it "strips exactly ONE leading `|` before cell content" do
+      # Kills `stripped[1..]` → `stripped[2..]` on the data branch.
+      table = parse_table("{|\n|x\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(1)
+      expect(row.children.first.children.first.text).to eq("x")
+    end
+
     it "splits a cell on ONLY the first attr-pipe, keeping later `|` in content" do
       # Kills the `limit - 1` → `limit` / `limit + 1` / drop-limit /
       # `< 1` / `|| true` / `|| parts.length` variants on the
