@@ -14,7 +14,7 @@ module Markbridge
       # @param child [Node] the node to add
       # @return [Table] self for chaining
       def <<(child)
-        return self if child.is_a?(Text) && child.text.strip.empty?
+        return self if child.instance_of?(Text) && child.text.strip.empty?
 
         super
       end
@@ -32,7 +32,7 @@ module Markbridge
       # @param child [Node] the node to add
       # @return [TableRow] self for chaining
       def <<(child)
-        return self if child.is_a?(Text) && child.text.strip.empty?
+        return self if child.instance_of?(Text) && child.text.strip.empty?
 
         super
       end

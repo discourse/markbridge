@@ -132,12 +132,35 @@ mutation:
     # are built with those exact keys on every entry), so `[]` and
     # `fetch` return identical values. Bucket A.
     #
-    # `row[:cells]` / `rows_data.first[:cells]` are the same shape in
-    # markdown_compatible? / render_markdown. Covered below.
+    # `row[:cells]` / `rows_data.first[:cells]` / `header_row[:cells]` —
+    # same shape in markdown_compatible? / render_markdown.
     - "index{receiver=lvar{value=r}}"
     - "index{receiver=lvar{value=c}}"
     - "index{receiver=lvar{value=row}}"
+    - "index{receiver=lvar{value=header_row}}"
     - "index{receiver=send{selector=first}}"
+
+    # `rows_data[header_idx]` / `rows_data[0...header_idx]` / ... —
+    # `.at` / `.fetch` equivalences (valid index by construction) and
+    # `nil...X` == `0...X` range equivalences in render_markdown.
+    # Bucket A.
+    - "index{receiver=lvar{value=rows_data}}"
+
+    # CodeTag#calculate_fence's `... || 0` default for empty scan.
+    # When no backticks / tildes are in content, scan.map returns []
+    # and .max/.min/.first/.last all return nil → `|| 0` kicks in.
+    # Mutations `|| 1` / `|| -1` are equivalent because the downstream
+    # `[3, max + 1].max` clamps small values to 3 regardless. Bucket A.
+    - "lvasgn{name=max_backticks}"
+    - "lvasgn{name=max_tildes}"
+
+    # `child.text.strip.empty?` ↔ `.lstrip.empty?` ↔ `.rstrip.empty?`
+    # on AST::Table#<< and AST::TableRow#<< whitespace guards. The
+    # `.empty?` check after stripping ANY whitespace side is true
+    # iff the original string is all-whitespace — by construction,
+    # stripping just one side from an all-whitespace string also
+    # leaves "". Bucket A.
+    - "send{receiver=send{receiver=lvar{value=child} selector=text} selector=strip}"
 
     # `arr[0...-1]` vs `arr[nil...-1]` / `arr[0..-1]` — Ruby's
     # array-slice accepts nil as 0 and the inclusive/exclusive

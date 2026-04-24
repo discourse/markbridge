@@ -120,5 +120,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to start_with("~~~\n")
       expect(result).to end_with("\n~~~\n\n")
     end
+
+    # Mixed content that exercises .max (not .min/.first/.last) on
+    # BOTH scan arrays. Without .max on tildes, mutation would pick
+    # min tilde length (1) and select tildes as the shorter fence,
+    # but a 3-tilde fence fails against the content's 6-tilde run.
+    # Similarly without .max on backticks, mutation would undersize
+    # the backtick fence.
+    it "uses max (not min/first/last) on both tilde and backtick run lengths" do
+      element = Markbridge::AST::Code.new
+      # Backtick runs: [3]. Tilde runs: [6, 1].
+      # Original: required_backticks=4, required_tildes=7 → backtick fence (4).
+      # .min on tildes: required_tildes=2→3 ≤ required_backticks=4 → backticks.
+      #   Same selection but WRONG sizing on tildes would break if fence=tildes.
+      # .max on backticks missing: required_backticks=2→3 → 3 ≤ 7 → backticks (3).
+      #   Content has ``` → fence=``` fails.
+      element << Markbridge::AST::Text.new("```\nand\n~~~~~~\n~")
+
+      result = tag.render(element, interface)
+      # 4-backtick fence: original backticks max=3 → fence=4.
+      expect(result).to start_with("````\n")
+      expect(result).to end_with("\n````\n\n")
+    end
   end
 end
