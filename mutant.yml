@@ -129,6 +129,16 @@ matcher:
     # observable output difference, pure perf. Bucket A.
     - Markbridge::Renderers::Discourse::Builders::ListItemBuilder#build
 
+    # Reordering#handle_close's `current_handler == closing_handler`
+    # fast-path. `Base#handle_close` (reached via `super`) performs
+    # the SAME check and pops identically, so every mutation that
+    # skips or mis-routes the fast-path produces behaviorally
+    # identical output via super. The fast-path exists purely to
+    # avoid the cost of `try_reorder` + `try_reopen` reconciliation
+    # walks on the hot path (~4x speedup on well-formed input).
+    # Not observable through the public parser API. Bucket A.
+    - Markbridge::Parsers::BBCode::ClosingStrategies::Reordering#handle_close
+
     # CodeBlockTracker#check_indented_boundary's `input[pos...line_end]`
     # vs `input[pos..line_end]`. When line_end points at `\n`, the
     # inclusive form adds the newline to line_content; both downstream
