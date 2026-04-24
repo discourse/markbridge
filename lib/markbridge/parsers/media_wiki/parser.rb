@@ -21,8 +21,6 @@ module Markbridge
       #   parser = Markbridge::Parsers::MediaWiki::Parser.new
       #   ast = parser.parse("'''bold''' and ''italic''")
       class Parser
-        include Markbridge::ProgressGuard
-
         # Parse MediaWiki wikitext into an AST Document.
         #
         # @param input [String] MediaWiki source
@@ -34,7 +32,6 @@ module Markbridge
           @document = AST::Document.new
           @inline_parser = InlineParser.new
           @list_stack = []
-          reset_progress_guard
 
           process_lines(lines)
           @document
@@ -56,7 +53,6 @@ module Markbridge
         def process_lines(lines)
           i = 0
           while i < lines.length
-            progressed!(i)
             line = lines.fetch(i)
 
             if heading_line?(line)
@@ -291,14 +287,7 @@ module Markbridge
         # @param prefix [String] the list prefix characters (e.g., "**#")
         def reconcile_list_stack(prefix)
           keep = matching_prefix_depth(prefix)
-          while @list_stack.length > keep
-            len_before = @list_stack.length
-            @list_stack.pop
-            len_after = @list_stack.length
-            if len_after >= len_before
-              raise ParserStuckError.new(parser: self.class, pos: len_after)
-            end
-          end
+          @list_stack.pop while @list_stack.length > keep
           prefix[keep..].each_char { |char| open_new_list(char == "#", @list_stack.length) }
         end
 

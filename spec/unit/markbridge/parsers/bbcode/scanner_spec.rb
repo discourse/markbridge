@@ -433,29 +433,5 @@ RSpec.describe Markbridge::Parsers::BBCode::Scanner do
         expect(tokens[1]).to match_text_token("]")
       end
     end
-
-    # Loop-progress guard: every call to next_token that does not
-    # return nil must advance @current_pos. A regression that leaves
-    # @current_pos unchanged would cause the outer parser loop to
-    # spin; the guard raises ParserStuckError instead.
-    describe "loop-progress guard" do
-      it "raises ParserStuckError when a subclass override stalls next_token" do
-        buggy =
-          Class.new(described_class) do
-            # Override parse_tag_at_cursor to return a fake token
-            # without advancing @current_pos. Any bracketed input then
-            # re-enters next_token at the same position.
-            define_method(:parse_tag_at_cursor) do
-              Markbridge::Parsers::BBCode::TextToken.new(text: "", pos: 0)
-            end
-            private :parse_tag_at_cursor
-          end
-
-        scanner = buggy.new("[a]")
-        scanner.next_token
-
-        expect { scanner.next_token }.to raise_error(Markbridge::ParserStuckError)
-      end
-    end
   end
 end

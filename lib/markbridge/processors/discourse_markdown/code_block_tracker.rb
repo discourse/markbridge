@@ -123,23 +123,10 @@ module Markbridge
         private
 
         # Skip up to 3 leading spaces of indentation.
-        #
-        # All five compound `while A && B` loops in this file are split into
-        # `while <bound>` + `break if …` to dodge a Ruby 3.4.8 PRISM VM bug
-        # (https://bugs.ruby-lang.org/issues/22002, fixed in 3.4.10).
         def skip_leading_spaces(input, pos)
           scan_pos = pos
           spaces = 0
-          guard_last_pos = -1
-          while spaces < 3
-            # input[scan_pos] returns nil past end of string, and
-            # `nil != " "` is true — no separate bounds check needed.
-            break if input[scan_pos] != " "
-            if scan_pos <= guard_last_pos
-              raise ParserStuckError.new(parser: self.class, pos: scan_pos)
-            end
-
-            guard_last_pos = scan_pos
+          while spaces < 3 && input[scan_pos] == " "
             spaces += 1
             scan_pos += 1
           end
@@ -149,8 +136,7 @@ module Markbridge
         # Count consecutive fence characters and return [count, new_position].
         def count_fence_chars(input, scan_pos, fence_char, input_length)
           fence_length = 0
-          while scan_pos < input_length
-            break if input[scan_pos] != fence_char
+          while scan_pos < input_length && input[scan_pos] == fence_char
             fence_length += 1
             scan_pos += 1
           end
@@ -162,10 +148,7 @@ module Markbridge
           return nil unless fence_char == @fence_char && fence_length >= @fence_length
 
           # Closing fence must be followed only by spaces then newline/EOF
-          while scan_pos < input_length
-            break if input[scan_pos] != " "
-            scan_pos += 1
-          end
+          scan_pos += 1 while scan_pos < input_length && input[scan_pos] == " "
           return nil unless scan_pos >= input_length || input[scan_pos] == "\n"
 
           # @fence_char / @fence_length are not reset here: they are only
@@ -178,10 +161,7 @@ module Markbridge
         # Open a new fenced code block. Returns position after the opening line.
         def open_fence(input, scan_pos, fence_char, fence_length, input_length)
           # Skip to end of line (info string)
-          while scan_pos < input_length
-            break if input[scan_pos] == "\n"
-            scan_pos += 1
-          end
+          scan_pos += 1 while scan_pos < input_length && input[scan_pos] != "\n"
 
           @in_fenced_block = true
           @fence_char = fence_char
@@ -208,10 +188,7 @@ module Markbridge
         # Open inline code. Returns position after opening delimiter.
         def open_inline(input, pos, input_length)
           delimiter_start = pos
-          while pos < input_length
-            break if input[pos] != "`"
-            pos += 1
-          end
+          pos += 1 while pos < input_length && input[pos] == "`"
 
           @inline_delimiter = input[delimiter_start...pos]
           @in_inline_code = true

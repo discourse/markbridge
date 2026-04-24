@@ -32,8 +32,6 @@ module Markbridge
       #   result.nodes[0].type # => :group
       #   result.nodes[1].type # => :user
       class Scanner
-        include Markbridge::ProgressGuard
-
         # Default detectors in priority order
         DEFAULT_DETECTORS = [
           Detectors::Poll,
@@ -67,7 +65,6 @@ module Markbridge
           @pos = 0
           @input = input.to_s
           @line_start = true
-          reset_progress_guard
 
           scan_input
 
@@ -88,8 +85,6 @@ module Markbridge
 
         def scan_input
           while @pos < @input.length
-            progressed!(@pos)
-
             # Check for fenced code block boundary at line start
             if @line_start
               next if advance_code_boundary(:check_fenced_boundary)

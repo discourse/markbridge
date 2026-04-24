@@ -72,8 +72,7 @@ module Markbridge
         # @param node [Nokogiri::XML::Text]
         # @param parent [AST::Element]
         def process_text_node(node, parent)
-          text = node.text
-          parent << AST::Text.new(text) unless text.empty?
+          parent << AST::Text.new(node.text)
         end
 
         # Process an element node

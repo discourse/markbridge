@@ -7,8 +7,6 @@ module Markbridge
       # Handles bold ('''), italic (''), links ([[...]]), external links ([...]),
       # and HTML inline tags (<code>, <nowiki>, <s>, <del>, <u>, <ins>, <sup>, <sub>, <br>).
       class InlineParser
-        include Markbridge::ProgressGuard
-
         # Parse inline markup and append resulting AST nodes to the parent element.
         #
         # @param text [String] the text to parse for inline markup
@@ -19,10 +17,8 @@ module Markbridge
           @length = text.length
           @parent = parent
           @text_buffer = +""
-          reset_progress_guard
 
           while @pos < @length
-            progressed!(@pos)
             char = @input[@pos]
 
             case char
@@ -106,18 +102,13 @@ module Markbridge
         # @return [String, nil]
         def collect_until_apostrophes(count)
           start = @pos
-          guard_last_pos = -1
           while @pos < @length
-            pos = @pos
-            raise ParserStuckError.new(parser: self.class, pos:) if pos <= guard_last_pos
-
-            guard_last_pos = pos
-            if consecutive_apostrophes_at(pos) >= count
-              content = @input[start...pos]
-              @pos = pos + count
+            if consecutive_apostrophes_at(@pos) >= count
+              content = @input[start...@pos]
+              @pos += count
               return content
             end
-            @pos = pos + 1
+            @pos += 1
           end
         end
 

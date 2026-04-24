@@ -165,17 +165,8 @@ module Markbridge
 
           # After INDENTED_CODE, line has at most 3 leading spaces, so the
           # `< 3` bound keeps this a tight YJIT-friendly hot loop.
-          #
-          # Split into `while <bound>` + `break if` rather than the natural
-          # `while <bound> && <byte-check>` to avoid a Ruby 3.4.8 PRISM VM
-          # bug: mutant generates `while nil && <expr>` mutations which
-          # segfault (https://bugs.ruby-lang.org/issues/22002, fixed in
-          # 3.4.10). Revisit once 3.4.10 is our minimum.
           indent_len = 0
-          while indent_len < 3
-            break if line.getbyte(indent_len) != SPACE
-            indent_len += 1
-          end
+          indent_len += 1 while indent_len < 3 && line.getbyte(indent_len) == SPACE
 
           # Whitespace-only line (1-3 spaces) — getbyte past end is nil.
           return line if line.getbyte(indent_len).nil?
@@ -210,9 +201,7 @@ module Markbridge
           # starts with at least one SPACE or TAB; ws_end is always ≥ 1.
           line_length = line.length
           ws_end = 0
-          while ws_end < line_length
-            byte = line.getbyte(ws_end)
-            break if byte != SPACE && byte != TAB
+          while ws_end < line_length && ((byte = line.getbyte(ws_end)) == SPACE || byte == TAB)
             ws_end += 1
           end
 
@@ -486,15 +475,8 @@ module Markbridge
 
         def paragraph_line?(line)
           pos = 0
-          guard_last_pos = -1
           line_len = line.bytesize
-          while pos < line_len
-            break if line.getbyte(pos) != SPACE
-            raise ParserStuckError.new(parser: self.class, pos:) if pos <= guard_last_pos
-
-            guard_last_pos = pos
-            pos += 1
-          end
+          pos += 1 while pos < line_len && line.getbyte(pos) == SPACE
           first_non_space = pos
 
           # Empty or whitespace-only lines: getbyte past the end returns nil.

@@ -572,13 +572,15 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(row.children.first.children.first.text).to eq("value")
     end
 
-    it "resumes parsing from the line AFTER `|}` without duplicating earlier lines" do
-      # Kills `i = start_index + 1` → `i = 1` (constant). With the
-      # mutation, when the table starts AFTER line 1, iteration
-      # restarts from line 1 and a `|}` there would break early,
-      # returning a stale index that triggers ParserStuckError via
-      # progressed!(i) in the outer process_lines loop.
-      expect do parser.parse("dummy\n|} gotcha\n{|\n| x\n|}") end.not_to raise_error
+    it "does not re-process lines before the `{|` when a prior `|}` appears as text" do
+      # Covers `i = start_index + 1` — start of table iteration must
+      # skip the `{|` line itself, not restart from an earlier line
+      # whose text happens to begin with `|}`.
+      doc = parser.parse("dummy\n|} gotcha\n{|\n| x\n|}")
+
+      expect(doc.children.map(&:class)).to eq(
+        [Markbridge::AST::Paragraph, Markbridge::AST::Paragraph, Markbridge::AST::Table],
+      )
     end
 
     it "places the table between preceding and following document content" do
@@ -740,32 +742,6 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(url).to be_a(Markbridge::AST::Url)
       expect(url.href).to eq("x")
       expect(row.children[1].children.first.text).to eq("y")
-    end
-  end
-
-  # process_pre_tag_block) must return an index ≥ the current one,
-  # otherwise the `i += 1` at the end leaves us at the same position.
-  describe "loop-progress guard" do
-    it "raises ParserStuckError if a block handler returns an index that doesn't advance" do
-      buggy =
-        Class.new(described_class) do
-          # Stub process_pre_tag_block to always return start_index - 2,
-          # simulating a regression where the return value would stall
-          # the process_lines loop.
-          define_method(:process_pre_tag_block) { |_lines, start_index| start_index - 2 }
-          private :process_pre_tag_block
-        end
-
-      expect { buggy.new.parse("<pre>stuck</pre>") }.to raise_error(Markbridge::ParserStuckError)
-    end
-
-    it "resets guard state between successive parses on the same instance" do
-      parser = described_class.new
-      parser.parse("first document")
-
-      # Without reset, @last_progress_pos from the prior parse would
-      # cause the first progressed!(0) of the second parse to raise.
-      expect { parser.parse("second document") }.not_to raise_error
     end
   end
 end

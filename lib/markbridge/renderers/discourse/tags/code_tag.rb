@@ -26,10 +26,10 @@ module Markbridge
 
           def render_block(content, language)
             fence = calculate_fence(content)
-            lang = language || ""
 
-            # Blank line keeps adjacent fences from merging.
-            "#{fence}#{lang}\n#{content}\n#{fence}\n\n"
+            # nil language interpolates as empty string. Blank line keeps
+            # adjacent fences from merging.
+            "#{fence}#{language}\n#{content}\n#{fence}\n\n"
           end
 
           def calculate_fence(content)

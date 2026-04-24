@@ -6,18 +6,14 @@ module Markbridge
       # High-performance character-by-character BBCode scanner
       # Tokenizes BBCode in O(n) time with minimal allocations and bounded backtracking
       class Scanner
-        include Markbridge::ProgressGuard
-
         def initialize(input)
           @input = input
           @length = input.length
           @current_pos = 0
-          reset_progress_guard
         end
 
         def next_token
           return nil if end_of_input?
-          progressed!(@current_pos)
           start_pos = @current_pos
           bracket_index = @input.index("[", @current_pos)
 
@@ -181,16 +177,7 @@ module Markbridge
         # Consumes characters matching +pattern+; returns substring or nil if empty
         def scan_while(pattern)
           stop_index = @current_pos
-          guard_last_pos = -1
-          while stop_index < @length
-            break unless @input[stop_index].match?(pattern)
-            if stop_index <= guard_last_pos
-              raise ParserStuckError.new(parser: self.class, pos: stop_index)
-            end
-
-            guard_last_pos = stop_index
-            stop_index += 1
-          end
+          stop_index += 1 while stop_index < @length && @input[stop_index].match?(pattern)
           consume_range(stop_index)
         end
 
@@ -213,15 +200,8 @@ module Markbridge
         end
 
         def skip_whitespace
-          guard_last_pos = -1
-          while @current_pos < @length
-            break unless @input[@current_pos].match?(WHITESPACE_CHAR)
-            pos = @current_pos
-            raise ParserStuckError.new(parser: self.class, pos:) if pos <= guard_last_pos
-
-            guard_last_pos = pos
-            @current_pos = pos + 1
-          end
+          @current_pos += 1 while @current_pos < @length &&
+            @input[@current_pos].match?(WHITESPACE_CHAR)
         end
 
         def end_of_input?

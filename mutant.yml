@@ -13,18 +13,6 @@ matcher:
   subjects:
     - "Markbridge*"
   ignore:
-    # ProgressGuard#progressed! is a self-referential loop-progress
-    # guard: its correctness is verified end-to-end by each parser's
-    # dedicated "loop-progress guard" spec (InlineParser, Parser,
-    # BBCode::Scanner, DiscourseMarkdown::Scanner). Mutations to its
-    # internals (drop `raise`, swap `==` for `eql?`/`equal?`, nil-out
-    # `@last_progress_pos`, etc.) all produce timeouts when the guard
-    # is exercised by the stalled-loop specs, because removing or
-    # weakening the guard is exactly what the guarded loops depend on
-    # to terminate under a bug. Keep as an ignored subject; the
-    # behaviour is covered by call-site tests.
-    - Markbridge::ProgressGuard#progressed!
-    - Markbridge::ProgressGuard#reset_progress_guard
 
 # Central-dispatcher methods. The surviving mutations here are all
     # flow-control permutations (`if X && Y && Z` → variants that OR
@@ -62,16 +50,24 @@ matcher:
     # non-empty arrays, which `String#split` always returns).
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_external_link
 
-    # HTML::Parser#process_text_node's `unless text.empty?` guard is
-    # dead defensive code — Nokogiri's HTML parser never emits empty
-    # text nodes (verified exhaustively with adjacent tags, void
-    # elements, empty elements, comments). So `unless false` /
-    # drop-unless give identical output for every reachable input.
-    # The 3 remaining alive mutations target the guard's shape; none
-    # is killable through the public parse API. Subject-level ignore.
-    - Markbridge::Parsers::HTML::Parser#process_text_node
+    # Bounded `while X < N && byte_check(pos)` loops throughout the
+    # escaper and CodeBlockTracker. Mutations on either half of the
+    # compound (bound drop, N permutation, byte_check drop) terminate
+    # via the other: the byte-check fails past end-of-string (getbyte
+    # returns nil, nil != <byte_val>) and the bound redundantly caps
+    # iterations at a small constant. Also `while nil && Y` mutations
+    # trigger the Ruby 3.4.8 PRISM bug (#22002) — surface as timeouts
+    # on 3.4.9+, never alive. All Bucket A.
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#paragraph_line?
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#try_close_fence
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#open_fence
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#open_inline
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#count_fence_chars
+    - Markbridge::Parsers::BBCode::Scanner#scan_while
 
-    # escape_block_* fallthrough `[content, false]` returns. The `false`
+# escape_block_* fallthrough `[content, false]` returns. The `false`
     # → drop-second / `true` mutations on the non-match branch are
     # equivalent because content that doesn't match the specific
     # block pattern is handed to inline escape which produces
@@ -315,13 +311,7 @@ mutation:
     - "send{receiver=send{receiver=lvar{value=node} selector=name} selector=downcase}"
 
 
-    # CodeTag#render_block's `lang = language || ""` — `lang` is only
-    # ever interpolated into `"#{fence}#{lang}\n"`, and `"#{nil}"` ==
-    # `""`. So `|| nil` and dropping the default both produce identical
-    # string output. Bucket A.
-    - "lvasgn{name=lang}"
-
-    # MarkdownEscaper#block_construct?'s `when DIGIT_0..DIGIT_9` range.
+# MarkdownEscaper#block_construct?'s `when DIGIT_0..DIGIT_9` range.
     # Mutations `when DIGIT_0..nil` / `when nil..DIGIT_9` extend the
     # range to unbounded, but the body is `ORDERED_LIST.match?(content)`
     # which only matches content starting with `\d+\.` — non-digit bytes
@@ -344,39 +334,7 @@ mutation:
     - "index{receiver=send{selector=select}}"
 
 
-    # Inline loop-progress guards in Scanner#scan_while / #skip_whitespace /
-    # Parser#parse_tokens / MediaWiki::Parser#reconcile_list_stack.
-    # These are bookkeeping around an explicit `raise ParserStuckError`
-    # that fires when the loop body fails to advance. Every mutation on
-    # the bookkeeping (`guard_last_pos = -1` → `= 1`, `<=` → `<`, drop
-    # raise, mutate error args, etc.) is structural — its only
-    # observable effect is weakening or disabling the guard itself,
-    # which is exactly what the corresponding stall specs exercise.
-    # Covered by scanner/parser loop-progress-guard specs.
-    - "lvasgn{name=guard_last_pos}"
-    - "lvasgn{name=guard_iter}"
-    - "lvasgn{name=len_before}"
-    - "lvasgn{name=len_after}"
-    - "op_asgn{target=lvasgn{name=guard_iter}}"
-    - "if{condition=send{receiver=lvar{value=stop_index} selector=(<=)}}"
-    - "if{condition=send{receiver=lvar{value=pos} selector=(<=)}}"
-    - "if{condition=send{receiver=lvar{value=scan_pos} selector=(<=)}}"
-    - "if{condition=send{receiver=lvar{value=guard_iter} selector=(>=)}}"
-    - "if{condition=send{receiver=lvar{value=len_after} selector=(>=)}}"
-
-    # The `progressed!(pos)` call site is the Bucket-A application of
-    # the ProgressGuard mixin: every mutation either disables the
-    # guard (`→ nil`, drop) or corrupts its argument (`@pos` → `nil`,
-    # integer mutations). Every one of those effects manifests only
-    # as "the guard stops catching stalls", which each parser's stall
-    # spec exercises via timeout — currently counted as a kill, but
-    # exposing as timeout rather than a test-fail kill. The helper
-    # itself is already in matcher.ignore; ignoring the call matches
-    # the same equivalence class.
-    - "send{selector=progressed!}"
-    - "send{selector=reset_progress_guard}"
-
-    # String.new(capacity:, encoding:) calls are preallocation hints —
+# String.new(capacity:, encoding:) calls are preallocation hints —
     # capacity is a tuning knob with no observable effect on output, and
     # encoding is restored downstream via force_encoding. Mutations on
     # the kwargs (e.g. /4 → *4, drop encoding) are perf-only equivalents.

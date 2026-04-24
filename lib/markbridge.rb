@@ -2,8 +2,6 @@
 
 require_relative "markbridge/version"
 require_relative "markbridge/configuration"
-require_relative "markbridge/parser_stuck_error"
-require_relative "markbridge/progress_guard"
 
 require_relative "markbridge/ast"
 require_relative "markbridge/renderers/discourse"
