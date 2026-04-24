@@ -12,7 +12,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
       element << Markbridge::AST::Text.new("This is a quote")
 
       result = tag.render(element, interface)
-      expect(result).to eq("> This is a quote")
+      expect(result).to eq("> This is a quote\n\n")
     end
 
     it "renders quote with author as Discourse BBCode" do
@@ -20,7 +20,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
       element << Markbridge::AST::Text.new("This is a quote")
 
       result = tag.render(element, interface)
-      expect(result).to eq("[quote=\"John\"]\nThis is a quote\n[/quote]")
+      expect(result).to eq("[quote=\"John\"]\nThis is a quote\n[/quote]\n\n")
     end
 
     it "renders quote with full Discourse context" do
@@ -28,7 +28,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
       element << Markbridge::AST::Text.new("This is a quote")
 
       result = tag.render(element, interface)
-      expect(result).to eq("[quote=\"john, post:123, topic:456\"]\nThis is a quote\n[/quote]")
+      expect(result).to eq("[quote=\"john, post:123, topic:456\"]\nThis is a quote\n[/quote]\n\n")
     end
 
     it "renders multi-line plain quote with blockquote syntax" do
@@ -36,7 +36,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
       element << Markbridge::AST::Text.new("Line 1\nLine 2\nLine 3")
 
       result = tag.render(element, interface)
-      expect(result).to eq("> Line 1\n> Line 2\n> Line 3")
+      expect(result).to eq("> Line 1\n> Line 2\n> Line 3\n\n")
     end
   end
 end
