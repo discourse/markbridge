@@ -457,6 +457,132 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
 
   # Loop-progress guard: process_lines must advance `i` every
   # iteration. The block-reassigning branches (process_preformatted_block,
+  describe "tables" do
+    def parse_table(wikitext)
+      doc = parser.parse(wikitext)
+      doc.children.first
+    end
+
+    let(:parser) { described_class.new }
+
+    it "parses a minimal table with a header row" do
+      table = parse_table("{|\n! A !! B\n|}")
+
+      expect(table).to be_a(Markbridge::AST::Table)
+      expect(table.children.size).to eq(1)
+
+      row = table.children.first
+      expect(row).to be_a(Markbridge::AST::TableRow)
+      expect(row.children.size).to eq(2)
+      expect(row.children.map(&:header?)).to eq([true, true])
+      expect(row.children[0].children.first.text).to eq("A")
+      expect(row.children[1].children.first.text).to eq("B")
+    end
+
+    it "splits `|| data cells` within one data line" do
+      table = parse_table("{|\n| 1 || 2 || 3\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(3)
+      expect(row.children.map(&:header?)).to eq([false, false, false])
+      expect(row.children.map { |c| c.children.first.text }).to eq(%w[1 2 3])
+    end
+
+    it "splits `!! header cells` within one header line" do
+      table = parse_table("{|\n! x !! y !! z\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(3)
+      expect(row.children.map(&:header?)).to eq([true, true, true])
+    end
+
+    it "creates a new row on `|-` separators" do
+      table = parse_table("{|\n| 1\n|-\n| 2\n|-\n| 3\n|}")
+
+      expect(table.children.size).to eq(3)
+      expect(table.children.flat_map(&:children).map { |c| c.children.first.text }).to eq(%w[1 2 3])
+    end
+
+    it "puts each stand-alone data line in its own row when separated by `|-`" do
+      table = parse_table("{|\n| 1\n| 2\n|-\n| 3\n|}")
+
+      # Without a `|-` between lines 1 and 2, they share a row.
+      expect(table.children.size).to eq(2)
+      expect(table.children[0].children.size).to eq(2)
+      expect(table.children[1].children.size).to eq(1)
+    end
+
+    it "treats `|-` before any cells as a no-op" do
+      table = parse_table("{|\n|-\n| 1\n|}")
+
+      expect(table.children.size).to eq(1)
+      expect(table.children.first.children.size).to eq(1)
+    end
+
+    it "ignores lines that don't start with `!`, `|`, or `|-`" do
+      table = parse_table("{|\nclass=\"foo\"\n| 1\n|}")
+
+      expect(table.children.size).to eq(1)
+      expect(table.children.first.children.first.children.first.text).to eq("1")
+    end
+
+    it "stops at the closing `|}` and leaves following content alone" do
+      doc = parser.parse("{|\n| 1\n|}\nafter")
+
+      expect(doc.children[0]).to be_a(Markbridge::AST::Table)
+      expect(doc.children[1]).to be_a(Markbridge::AST::Paragraph)
+    end
+
+    it "preserves pipes inside [[target|display]] when splitting cells" do
+      table = parse_table("{|\n| [[Page|Home]] || trailing\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(2)
+      # First cell contains the full Url target with "Home" display
+      url = row.children.first.children.first
+      expect(url).to be_a(Markbridge::AST::Url)
+      expect(url.href).to eq("Page")
+      expect(url.children.first.text).to eq("Home")
+      expect(row.children[1].children.first.text).to eq("trailing")
+    end
+
+    it "preserves pipes inside nested [[ [[ ]] ]] markers" do
+      table = parse_table("{|\n| [[Outer|[[Inner|X]]]] || after\n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(2)
+      expect(row.children[1].children.first.text).to eq("after")
+    end
+
+    it "treats a `|-` after `|` or `!` as row separator, not a cell" do
+      # Two explicit headers separated by `|-`
+      table = parse_table("{|\n! A\n|-\n! B\n|}")
+
+      expect(table.children.size).to eq(2)
+      expect(table.children[0].children.first.children.first.text).to eq("A")
+      expect(table.children[1].children.first.children.first.text).to eq("B")
+    end
+
+    it "allows attribute-pipe inside a cell (keeps only the content after the first `|`)" do
+      # A single `|` inside a cell separates attrs from content.
+      table = parse_table('{|\n| class="x" | value\n|}'.gsub('\n', "\n"))
+
+      row = table.children.first
+      expect(row.children.size).to eq(1)
+      expect(row.children.first.children.first.text).to eq("value")
+    end
+
+    it "keeps trailing blank cells when `||` ends the line" do
+      table = parse_table("{|\n| 1 || \n|}")
+
+      row = table.children.first
+      expect(row.children.size).to eq(2)
+      expect(row.children.first.children.first.text).to eq("1")
+      # The trailing empty cell has no children (parse of empty content).
+      expect(row.children[1].children).to be_empty
+    end
+  end
+
   # process_pre_tag_block) must return an index ≥ the current one,
   # otherwise the `i += 1` at the end leaves us at the same position.
   describe "loop-progress guard" do
