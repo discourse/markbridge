@@ -340,6 +340,26 @@ RSpec.describe Markbridge::Parsers::BBCode::HandlerRegistry do
         Markbridge::AST::ListItem,
         false,
       ],
+      "table" => [
+        Markbridge::Parsers::BBCode::Handlers::TableHandler,
+        Markbridge::AST::Table,
+        false,
+      ],
+      "tr" => [
+        Markbridge::Parsers::BBCode::Handlers::TableRowHandler,
+        Markbridge::AST::TableRow,
+        false,
+      ],
+      "td" => [
+        Markbridge::Parsers::BBCode::Handlers::TableCellHandler,
+        Markbridge::AST::TableCell,
+        false,
+      ],
+      "th" => [
+        Markbridge::Parsers::BBCode::Handlers::TableCellHandler,
+        Markbridge::AST::TableCell,
+        false,
+      ],
     }.each do |tag, (handler_class, element_class, auto_closeable)|
       it "registers #{handler_class.name.split("::").last} producing #{element_class.name.split("::").last} for [#{tag}] (auto_closeable: #{auto_closeable})" do
         registered = default_registry[tag]

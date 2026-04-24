@@ -180,30 +180,115 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
   end
 
   describe ".default" do
-    it "returns a registry with the full default handler set registered" do
-      default = described_class.default
+    let(:default_registry) { described_class.default }
 
-      %w[
-        B
-        I
-        U
-        S
-        URL
-        EMAIL
-        CODE
-        QUOTE
-        IMG
-        LIST
-        COLOR
-        SIZE
-        ALIGN
-        SPOILER
-        ATTACHMENT
-        ATTACH
-        LI
-        *
-        P
-      ].each { |name| expect(default.has_handler?(name)).to be(true), "missing #{name}" }
+    def handler_for(name)
+      default_registry.instance_variable_get(:@mappings)[name]
+    end
+
+    {
+      "B" => [Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler, Markbridge::AST::Bold],
+      "I" => [Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler, Markbridge::AST::Italic],
+      "U" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Underline,
+      ],
+      "S" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Strikethrough,
+      ],
+      "URL" => [Markbridge::Parsers::TextFormatter::Handlers::UrlHandler, Markbridge::AST::Url],
+      "EMAIL" => [
+        Markbridge::Parsers::TextFormatter::Handlers::EmailHandler,
+        Markbridge::AST::Email,
+      ],
+      "CODE" => [Markbridge::Parsers::TextFormatter::Handlers::CodeHandler, Markbridge::AST::Code],
+      "QUOTE" => [
+        Markbridge::Parsers::TextFormatter::Handlers::QuoteHandler,
+        Markbridge::AST::Quote,
+      ],
+      "IMG" => [Markbridge::Parsers::TextFormatter::Handlers::ImageHandler, Markbridge::AST::Image],
+      "LIST" => [Markbridge::Parsers::TextFormatter::Handlers::ListHandler, Markbridge::AST::List],
+      "LI" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::ListItem,
+      ],
+      "*" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::ListItem,
+      ],
+      "P" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Paragraph,
+      ],
+      "TABLE" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Table,
+      ],
+      "TR" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::TableRow,
+      ],
+      "TD" => [
+        Markbridge::Parsers::TextFormatter::Handlers::TableCellHandler,
+        Markbridge::AST::TableCell,
+      ],
+      "TH" => [
+        Markbridge::Parsers::TextFormatter::Handlers::TableCellHandler,
+        Markbridge::AST::TableCell,
+      ],
+    }.each do |tag, (handler_class, element_class)|
+      it "registers #{handler_class.name.split("::").last} producing #{element_class.name.split("::").last} for <#{tag}>" do
+        registered = handler_for(tag)
+        expect(registered).to be_a(handler_class)
+        if registered.respond_to?(:element_class)
+          expect(registered.element_class).to eq(element_class)
+        end
+      end
+    end
+
+    # AttributeHandler-based registrations — exercise the attribute arg.
+    it "registers AttributeHandler(:color) for <COLOR>" do
+      handler = handler_for("COLOR")
+      expect(handler).to be_a(Markbridge::Parsers::TextFormatter::Handlers::AttributeHandler)
+      expect(handler.element_class).to eq(Markbridge::AST::Color)
+      expect(handler.instance_variable_get(:@attribute)).to eq(:color)
+    end
+
+    it "registers AttributeHandler(:size) for <SIZE>" do
+      handler = handler_for("SIZE")
+      expect(handler).to be_a(Markbridge::Parsers::TextFormatter::Handlers::AttributeHandler)
+      expect(handler.element_class).to eq(Markbridge::AST::Size)
+      expect(handler.instance_variable_get(:@attribute)).to eq(:size)
+    end
+
+    it "registers AttributeHandler(:align, param: :alignment) for <ALIGN>" do
+      handler = handler_for("ALIGN")
+      expect(handler).to be_a(Markbridge::Parsers::TextFormatter::Handlers::AttributeHandler)
+      expect(handler.element_class).to eq(Markbridge::AST::Align)
+      expect(handler.instance_variable_get(:@attribute)).to eq(:align)
+      expect(handler.instance_variable_get(:@param)).to eq(:alignment)
+    end
+
+    it "registers AttributeHandler(:title) for <SPOILER>" do
+      handler = handler_for("SPOILER")
+      expect(handler).to be_a(Markbridge::Parsers::TextFormatter::Handlers::AttributeHandler)
+      expect(handler.element_class).to eq(Markbridge::AST::Spoiler)
+      expect(handler.instance_variable_get(:@attribute)).to eq(:title)
+    end
+
+    it "registers AttachmentHandler for both ATTACH and ATTACHMENT" do
+      expect(handler_for("ATTACH")).to be_a(
+        Markbridge::Parsers::TextFormatter::Handlers::AttachmentHandler,
+      )
+      expect(handler_for("ATTACHMENT")).to be_a(
+        Markbridge::Parsers::TextFormatter::Handlers::AttachmentHandler,
+      )
+    end
+
+    it "registers the asterisk (*) key directly, not the literal string \"*\".upcase" do
+      # Ruby upcases "*" to "*" — included here to pin the literal key.
+      expect(default_registry.has_handler?("*")).to be(true)
     end
   end
 
