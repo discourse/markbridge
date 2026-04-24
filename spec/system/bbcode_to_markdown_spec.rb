@@ -448,6 +448,28 @@ RSpec.describe "BBCode to Markdown Conversion" do
       result = Markbridge.bbcode_to_markdown("[right]right-aligned[/right]")
       expect(result).to eq('<div align="right">right-aligned</div>')
     end
+
+    it "separates two consecutive aligned blocks with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[left]a[/left][right]b[/right]")
+      expect(result).to eq(%(<div align="left">a</div>\n\n<div align="right">b</div>))
+    end
+
+    it "separates an aligned block from trailing text with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[center]a[/center]after")
+      expect(result).to eq(%(<div align="center">a</div>\n\nafter))
+    end
+  end
+
+  describe "block code separation" do
+    it "separates two consecutive block code fences with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[code]line1\nline2[/code][code]line3\nline4[/code]")
+      expect(result).to eq("```\nline1\nline2\n```\n\n```\nline3\nline4\n```")
+    end
+
+    it "separates a block code fence from trailing text with a blank line" do
+      result = Markbridge.bbcode_to_markdown("[code]line1\nline2[/code]after")
+      expect(result).to eq("```\nline1\nline2\n```\n\nafter")
+    end
   end
 
   describe "edge cases" do
