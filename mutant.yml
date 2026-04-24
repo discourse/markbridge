@@ -126,6 +126,14 @@ mutation:
     - "send{receiver=index{receiver=lvar{value=lines}} selector=strip}"
     - "index{receiver=lvar{value=lines}}"
 
+    # TableTag row/cell hash accesses: `r[:cells]` ↔ `r.fetch(:cells)`
+    # and `c[:header]` ↔ `c.fetch(:header)`. Both keys are guaranteed
+    # present by extract_rows' filter_map construction (the hashes
+    # are built with those exact keys on every entry), so `[]` and
+    # `fetch` return identical values. Bucket A.
+    - "index{receiver=lvar{value=r}}"
+    - "index{receiver=lvar{value=c}}"
+
     # `arr[0...-1]` vs `arr[nil...-1]` / `arr[0..-1]` — Ruby's
     # array-slice accepts nil as 0 and the inclusive/exclusive
     # variants differ only at the far end where -1 points to the

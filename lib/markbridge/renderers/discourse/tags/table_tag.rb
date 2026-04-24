@@ -90,7 +90,7 @@ module Markbridge
 
               unless header_rows.empty?
                 lines << "<thead>"
-                header_rows.each { |row| lines << html_row(row, force_header: true) }
+                header_rows.each { |row| lines << html_row(row) }
                 lines << "</thead>"
               end
 
@@ -108,10 +108,10 @@ module Markbridge
           end
 
           # Render a single HTML table row
-          def html_row(row, force_header: false)
+          def html_row(row)
             cells_html =
               row[:cells].map do |cell|
-                tag = (cell[:header] || force_header) ? "th" : "td"
+                tag = cell[:header] ? "th" : "td"
                 "<#{tag}>#{cell[:content]}</#{tag}>"
               end
 
