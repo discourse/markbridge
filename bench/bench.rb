@@ -135,8 +135,9 @@ def all_in_one_process(report_names)
 end
 
 def isolated(report_names)
+  ruby_args = RUBY_ENGINE == "ruby" ? ["--yjit"] : []
   report_names.each do |name|
-    cmd = [RbConfig.ruby, "--yjit", __FILE__, "--single", name]
+    cmd = [RbConfig.ruby, *ruby_args, __FILE__, "--single", name]
     pid = Process.spawn(*cmd)
     Process.wait(pid)
   end
