@@ -112,6 +112,12 @@ REPORTS = {
   },
 }
 
+# Defaults match a CRuby+YJIT warmup curve. Override with env vars
+# for slow-warmup engines (JRuby/TruffleRuby) or for higher-fidelity
+# measurements.
+WARMUP = Integer(ENV.fetch("BENCH_WARMUP", "2"))
+MEASURE = Integer(ENV.fetch("BENCH_MEASURE", "3"))
+
 def all_in_one_process(report_names)
   $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
   require "markbridge/all"
@@ -120,7 +126,7 @@ def all_in_one_process(report_names)
   escaper = Markbridge::Renderers::Discourse::MarkdownEscaper.new
 
   Benchmark.ips do |x|
-    x.config(time: 3, warmup: 2)
+    x.config(time: MEASURE, warmup: WARMUP)
     report_names.each do |name|
       report = REPORTS.fetch(name)
       input = report[:input]
@@ -153,7 +159,7 @@ def single_report(name)
   escaper = Markbridge::Renderers::Discourse::MarkdownEscaper.new
 
   Benchmark.ips do |x|
-    x.config(time: 3, warmup: 2)
+    x.config(time: MEASURE, warmup: WARMUP)
     case report[:type]
     when :convert
       x.report(name) { Markbridge.bbcode_to_markdown(input) }
