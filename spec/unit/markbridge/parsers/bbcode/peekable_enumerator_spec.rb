@@ -96,26 +96,6 @@ RSpec.describe Markbridge::Parsers::BBCode::PeekableEnumerator do
     end
   end
 
-  describe "#has_next?" do
-    it "returns true when items remain" do
-      expect(enum.has_next?).to be true
-    end
-
-    it "returns false when exhausted" do
-      5.times do
-        expect(enum.has_next?).to be true
-        enum.next
-      end
-      expect(enum.has_next?).to be false
-    end
-
-    it "fetches at most one token from the scanner per call" do
-      enum.has_next?
-
-      expect(scanner).to have_received(:next_token).once
-    end
-  end
-
   describe "peek and next interleaved" do
     it "works correctly when mixed" do
       expect(enum.peek).to eq(1)

@@ -10,7 +10,7 @@ module Markbridge
       # `next_token`) so callers can:
       # - inspect the next token with {#peek} without advancing the scanner
       # - inspect several upcoming tokens with {#peek_ahead}
-      # - consume tokens with {#next}
+      # - consume tokens with {#next} (returns `nil` when exhausted)
       #
       # The enumerator is lazy: tokens are only requested from the scanner
       # when needed. Once the underlying scanner returns `nil`, the enumerator
@@ -39,13 +39,6 @@ module Markbridge
         def next
           ensure_peeked(1)
           @peeked.shift
-        end
-
-        # Return whether more tokens are available.
-        # @return [Boolean]
-        def has_next?
-          ensure_peeked(1)
-          !@peeked.empty?
         end
 
         # Peek at the next single token without consuming it.

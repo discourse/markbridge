@@ -113,6 +113,26 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListItemTag do
       expect(result).to eq("     - deep item\n")
     end
 
+    it "ignores non-List parents in the chain when counting indent" do
+      # Kills `unless parent.instance_of?(AST::List)` → `unless true` /
+      # `unless AST::List` / drop-unless. With those mutations, the
+      # loop would call `.ordered?` on non-List parents (Document,
+      # Paragraph, ListItem, ...), raising NoMethodError.
+      doc = Markbridge::AST::Document.new
+      list1 = Markbridge::AST::List.new(ordered: false)
+      paragraph = Markbridge::AST::Paragraph.new # interloper, not a List
+      list2 = Markbridge::AST::List.new(ordered: false)
+      context = Markbridge::Renderers::Discourse::RenderContext.new([doc, list1, paragraph, list2])
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+      item = Markbridge::AST::ListItem.new
+      item << Markbridge::AST::Text.new("nested")
+
+      # 2 Lists in chain → 1 ancestor (list1, unordered = 2 spaces).
+      result = tag.render(item, interface)
+      expect(result).to eq("  - nested\n")
+    end
+
     it "works without parent list (edge case)" do
       context = Markbridge::Renderers::Discourse::RenderContext.new
       interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)

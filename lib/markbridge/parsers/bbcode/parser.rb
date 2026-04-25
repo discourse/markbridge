@@ -66,8 +66,7 @@ module Markbridge
         def parse_tokens(scanner, context)
           tokens = PeekableEnumerator.new(scanner)
 
-          while tokens.has_next?
-            token = tokens.next
+          while (token = tokens.next)
             case token
             when TextToken
               process_text(token, context)

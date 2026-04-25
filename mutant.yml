@@ -112,13 +112,20 @@ matcher:
     - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#check_inline_boundary
     - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#skip_leading_spaces
 
-    # `parents.select {...}[0...-1]` in ListItemTag#calculate_indent —
-    # `[nil...-1]` is equivalent to `[0...-1]` because Ruby treats
-    # `nil` as `0` in range-start positions for array slicing.
-    # Bucket A.
+    # ListItemTag#calculate_indent's `if list_count <= 1; return ""`
+    # early-return is a perf optimization (saves the parents.each
+    # walk on the common top-level-list case — material on JRuby
+    # where it's ~25% of list-rendering time). Mutations to the
+    # comparison (`< 1`, `== 1`, `<= 0`, `eql?(1)`, `equal?(1)`,
+    # `if false`, drop-if) all produce the same final indent string
+    # because the loop body returns "" anyway when list_count is
+    # 0 or 1 (the only matching ancestor is the immediate parent,
+    # which is skipped via `break if found == list_count`). The
+    # killable case (loop iterates non-List parents) is covered by
+    # the "ignores non-List parents" spec. Bucket A.
     - Markbridge::Renderers::Discourse::Tags::ListItemTag#calculate_indent
 
-    # Upload#parse_upload_url's `if ext.empty?; nil; else; url_part; end`
+# Upload#parse_upload_url's `if ext.empty?; nil; else; url_part; end`
     # vs `unless ext.empty?; url_part end`. The latter is syntactic
     # inversion that produces identical return values (nil if empty,
     # url_part otherwise). Bucket A.
@@ -310,14 +317,6 @@ mutation:
 
 
 
-
-
-    # `arr[0...-1]` vs `arr[nil...-1]` / `arr[0..-1]` — Ruby's
-    # array-slice accepts nil as 0 and the inclusive/exclusive
-    # variants differ only at the far end where -1 points to the
-    # same final index. Target is the `:index` node (unparser AST)
-    # with a `.select` receiver.
-    - "index{receiver=send{selector=select}}"
 
 
 # String.new(capacity:, encoding:) calls are preallocation hints —

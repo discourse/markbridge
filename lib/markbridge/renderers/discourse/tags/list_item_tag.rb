@@ -37,9 +37,23 @@ module Markbridge
           # @param interface [RenderingInterface]
           # @return [String]
           def calculate_indent(interface)
-            ancestor_lists =
-              interface.context.parents.select { |p| p.instance_of?(AST::List) }[0...-1]
-            ancestor_lists.map { |list| list.ordered? ? "   " : "  " }.join
+            list_count = interface.count_parents(AST::List)
+            # Top-level list — no ancestor lists contribute indent. The
+            # common case; short-circuit before any array allocations.
+            return "" if list_count <= 1
+
+            indent = +""
+            found = 0
+            interface.context.parents.each do |parent|
+              next unless parent.instance_of?(AST::List)
+              found += 1
+              # The immediate parent List is the LAST one in parents; its
+              # marker width is already accounted for by the item's own
+              # marker, so it doesn't contribute to indent.
+              break if found == list_count
+              indent << (parent.ordered? ? "   " : "  ")
+            end
+            indent
           end
         end
       end
