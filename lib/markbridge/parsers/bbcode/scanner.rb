@@ -56,7 +56,7 @@ module Markbridge
           @current_pos += 1 # skip '['
           closing = consume("/")
           tag_name = scan_tag_name
-          attrs = closing || tag_name.nil? ? {} : scan_attributes
+          attrs = (closing || tag_name.nil?) ? {} : scan_attributes
           return rollback(tag_start_pos) unless tag_name && consume("]")
 
           source = @input[tag_start_pos...@current_pos]
