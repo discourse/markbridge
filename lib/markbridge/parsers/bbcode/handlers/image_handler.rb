@@ -34,8 +34,6 @@ module Markbridge
             ]
           end
 
-          # Convert dimension to positive integer, or nil when absent or invalid.
-          # Handles string input from BBCode attributes.
           def sanitize_dimension(value)
             dim = value.to_i
             dim if dim.positive?

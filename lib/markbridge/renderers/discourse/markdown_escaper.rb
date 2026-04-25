@@ -41,13 +41,10 @@ module Markbridge
           # no defensive init needed.
         end
 
-        # Fast-path check: any character that might need escaping
-        # Only includes characters we actually escape (removed ], {, }, ^)
-        # > is needed for blockquote detection at line start
+        # Fast-path: skip escape_text entirely for content with no special
+        # chars. `>` is needed for blockquote detection at line start.
         MAYBE_SPECIAL = /[\\`*_\[#+\-.!<>&|~=>)]/
 
-        # Check for indented code on any line
-        # Matches: 4+ spaces, tab, or space+tab combinations that reach column 4+
         MAYBE_INDENTED_CODE = /(?:^|\n)(?: {4}|\t| {1,3}\t)/
 
         # Block-level patterns

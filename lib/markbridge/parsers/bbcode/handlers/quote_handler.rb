@@ -30,7 +30,6 @@ module Markbridge
             author, post, topic, username = extract_from_option(token)
             author ||= token.attrs[:author]
 
-            # Explicit attributes override option-parsed values
             {
               author:,
               post: token.attrs[:post] || post,

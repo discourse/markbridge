@@ -11,7 +11,6 @@ module Markbridge
           end
 
           def on_open(token:, context:, registry:, tokens: nil)
-            # Auto-close previous list item if opening a new one
             context.pop if context.current.instance_of?(AST::ListItem)
 
             element = AST::ListItem.new

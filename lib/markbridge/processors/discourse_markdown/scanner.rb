@@ -155,10 +155,7 @@ module Markbridge
         def handle_match(match)
           node = match.node
           @nodes << node
-
-          # Render placeholder using tag library if available
-          placeholder = render_placeholder(node)
-          @result << placeholder
+          @result << render_placeholder(node)
 
           # Every detector shipped today matches content that ends on a
           # non-newline byte (`]`, `)`, `_`, alphanumeric), so @line_start
@@ -173,13 +170,9 @@ module Markbridge
         def render_placeholder(node)
           if @tag_library
             tag = @tag_library[node.class]
-            if tag
-              # Create a minimal interface for rendering
-              return tag.render(node, nil)
-            end
+            return tag.render(node, nil) if tag
           end
 
-          # Default placeholder format if no tag library or tag not found
           default_placeholder(node)
         end
 

@@ -45,7 +45,6 @@ module Markbridge
           @pos += 1
         end
 
-        # Count consecutive apostrophes and dispatch to bold/italic parsing.
         # Precondition: caller has verified @input[@pos..@pos+1] is "''".
         def parse_bold_italic
           start = @pos
@@ -169,7 +168,6 @@ module Markbridge
           @parent << url
         end
 
-        # Parse an HTML tag (<code>, <nowiki>, <pre>, <br>, <s>, <del>, <u>, <ins>, <sup>, <sub>).
         def parse_html_tag
           tag_match = @input[@pos..].match(%r{\A<(/?)([a-z]+)(?: [^>]*)?\s*(/?)>}i)
           unless tag_match

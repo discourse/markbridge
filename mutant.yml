@@ -295,14 +295,6 @@ mutation:
     # Bucket A.
     - "send{receiver=lvar{value=handler} selector=call}"
 
-    # `node.name.downcase` in process_element_node: Nokogiri's HTML
-    # parser already normalizes tag names to lowercase, so the
-    # `.downcase` call is a no-op. `node.name` produces identical
-    # values. Keep the `.downcase` defensively (SGML / XHTML modes
-    # could produce uppercase) but accept the mutation. Bucket A.
-    - "send{receiver=send{receiver=lvar{value=node} selector=name} selector=downcase}"
-
-
 # MarkdownEscaper#block_construct?'s `when DIGIT_0..DIGIT_9` range.
     # Mutations `when DIGIT_0..nil` / `when nil..DIGIT_9` extend the
     # range to unbounded, but the body is `ORDERED_LIST.match?(content)`

@@ -79,7 +79,7 @@ module Markbridge
         # @param node [Nokogiri::XML::Element]
         # @param parent [AST::Element]
         def process_element_node(node, parent)
-          tag_name = node.name.downcase
+          tag_name = node.name
           return if IGNORED_TAGS.include?(tag_name)
 
           handler = @handlers[tag_name]
@@ -105,7 +105,7 @@ module Markbridge
         # @param node [Nokogiri::XML::Element]
         # @param parent [AST::Element]
         def handle_unknown_tag(node, parent)
-          @unknown_tags[node.name.downcase] += 1
+          @unknown_tags[node.name] += 1
           process_children(node, parent)
         end
       end
