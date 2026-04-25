@@ -2,87 +2,170 @@
 
 # Benchmark suite for Markbridge end-to-end conversion paths.
 #
-# Usage:
-#   bundle exec ruby --yjit bench/bench.rb
+# Two modes:
 #
-# Each report measures throughput (iterations per second) on a
-# representative BBCode input shape. The escaper hot path gets its
-# own group at the end for direct `Renderers::Discourse::MarkdownEscaper#escape`
-# measurements.
+#   bundle exec ruby --yjit bench/bench.rb            # suite mode
+#   bundle exec ruby --yjit bench/bench.rb --isolated # one process per report
 #
-# Notes:
-# - `--yjit` is important; YJIT warmup materially changes numbers.
-# - `benchmark-ips` warmup is set to 2s / measurement 3s. Shorter
-#   warmup under-reports YJIT-friendly code.
-# - Isolated micro-benchmarks may diverge from these numbers because
-#   YJIT's code cache is shared across the suite; running 12 reports
-#   back-to-back can cause eviction that a single-report run avoids.
-#   Compare branch-to-branch at the suite level, not absolute numbers.
+# Suite mode runs all reports in one process. It's faster to run
+# but YJIT compiles 12 hot paths concurrently, so they compete for
+# the JIT budget and inline-decision heuristics — the resulting
+# numbers tend to under-report per-path throughput, especially on
+# the inline-escape path.
+#
+# Isolated mode forks a fresh process per report. Each path gets
+# YJIT all to itself, so numbers are closer to what a hot path in
+# a real workload would see. Use this when comparing branch-to-
+# branch on a single path.
+#
+# Reproducibility:
+# - --yjit is essential; non-YJIT numbers are 2-5x slower and
+#   don't reflect production.
+# - benchmark-ips warmup is 2s / measure 3s. Shorter warmup
+#   under-reports YJIT-friendly code.
 
-$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+REPORTS = {
+  "simple" => {
+    type: :convert,
+    input: "[b]bold[/b] [i]italic[/i] [u]underline[/u] text",
+  },
+  "nested" => {
+    type: :convert,
+    input: "[b]bold [i]italic [u]underline[/u][/i][/b]",
+  },
+  "list" => {
+    type: :convert,
+    input: <<~BBCODE,
+      [list]
+      [*]First item
+      [*]Second item
+      [*]Third item
+      [/list]
+    BBCODE
+  },
+  "table" => {
+    type: :convert,
+    input: <<~BBCODE,
+      [table]
+      [tr][th]A[/th][th]B[/th][th]C[/th][/tr]
+      [tr][td]1[/td][td]2[/td][td]3[/td][/tr]
+      [tr][td]4[/td][td]5[/td][td]6[/td][/tr]
+      [/table]
+    BBCODE
+  },
+  "quote_nested" => {
+    type: :convert,
+    input: <<~BBCODE,
+      [quote="alice"]
+      Some quoted text with [b]bold[/b] content.
+      [quote="bob"]
+      Nested quote.
+      [/quote]
+      [/quote]
+    BBCODE
+  },
+  "code" => {
+    type: :convert,
+    input: "[code]def hello\n  puts 'hello world'\nend[/code]",
+  },
+  "url" => {
+    type: :convert,
+    input:
+      "Check out [url=https://example.com]this link[/url] and [url=https://foo.com]another[/url]",
+  },
+  "escaping" => {
+    type: :convert,
+    input:
+      "Text with *asterisks* and _underscores_ and `backticks` and [brackets] and |pipes|" \
+        "\n\n# Not a heading\n---\nnot a rule",
+  },
+  "mixed" => {
+    type: :convert,
+    input: [
+      "[b]bold[/b]",
+      "[quote]x[/quote]",
+      "[list]\n[*]a\n[*]b\n[/list]",
+      "[table][tr][td]1[/td][td]2[/td][/tr][/table]",
+      "[code]x[/code]",
+    ].join("\n\n"),
+  },
+  "large_doc" => {
+    type: :convert,
+    input:
+      (
+        [
+          "[b]bold[/b]",
+          "[quote]x[/quote]",
+          "[list]\n[*]a\n[*]b\n[/list]",
+          "[table][tr][td]1[/td][td]2[/td][/tr][/table]",
+          "[code]x[/code]",
+        ].join("\n\n") + "\n\n"
+      ) * 20,
+  },
+  "escape_plain" => {
+    type: :escape,
+    input: "This is plain text with no special chars. " * 100,
+  },
+  "escape_mixed" => {
+    type: :escape,
+    input: "Text with *stars*, _underscores_, `code`, and [brackets]. " * 50,
+  },
+}
 
-require "markbridge/all"
-require "benchmark/ips"
+def all_in_one_process(report_names)
+  $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+  require "markbridge/all"
+  require "benchmark/ips"
 
-SIMPLE = "[b]bold[/b] [i]italic[/i] [u]underline[/u] text"
+  escaper = Markbridge::Renderers::Discourse::MarkdownEscaper.new
 
-NESTED = "[b]bold [i]italic [u]underline[/u][/i][/b]"
+  Benchmark.ips do |x|
+    x.config(time: 3, warmup: 2)
+    report_names.each do |name|
+      report = REPORTS.fetch(name)
+      input = report[:input]
+      case report[:type]
+      when :convert
+        x.report(name) { Markbridge.bbcode_to_markdown(input) }
+      when :escape
+        x.report(name) { escaper.escape(input) }
+      end
+    end
+  end
+end
 
-LIST = <<~BBCODE
-  [list]
-  [*]First item
-  [*]Second item
-  [*]Third item
-  [/list]
-BBCODE
+def isolated(report_names)
+  report_names.each do |name|
+    cmd = [RbConfig.ruby, "--yjit", __FILE__, "--single", name]
+    pid = Process.spawn(*cmd)
+    Process.wait(pid)
+  end
+end
 
-TABLE = <<~BBCODE
-  [table]
-  [tr][th]A[/th][th]B[/th][th]C[/th][/tr]
-  [tr][td]1[/td][td]2[/td][td]3[/td][/tr]
-  [tr][td]4[/td][td]5[/td][td]6[/td][/tr]
-  [/table]
-BBCODE
+def single_report(name)
+  $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+  require "markbridge/all"
+  require "benchmark/ips"
 
-QUOTE = <<~BBCODE
-  [quote="alice"]
-  Some quoted text with [b]bold[/b] content.
-  [quote="bob"]
-  Nested quote.
-  [/quote]
-  [/quote]
-BBCODE
+  report = REPORTS.fetch(name)
+  input = report[:input]
+  escaper = Markbridge::Renderers::Discourse::MarkdownEscaper.new
 
-CODE = "[code]def hello\n  puts 'hello world'\nend[/code]"
+  Benchmark.ips do |x|
+    x.config(time: 3, warmup: 2)
+    case report[:type]
+    when :convert
+      x.report(name) { Markbridge.bbcode_to_markdown(input) }
+    when :escape
+      x.report(name) { escaper.escape(input) }
+    end
+  end
+end
 
-URL = "Check out [url=https://example.com]this link[/url] and [url=https://foo.com]another[/url]"
-
-MIXED = [SIMPLE, NESTED, LIST, TABLE, QUOTE, CODE, URL].join("\n\n")
-
-ESCAPING =
-  "Text with *asterisks* and _underscores_ and `backticks` and [brackets] and |pipes| " \
-    "\n\n# Not a heading\n---\nnot a rule"
-
-LARGE = (MIXED + "\n\n") * 20
-
-ESCAPER = Markbridge::Renderers::Discourse::MarkdownEscaper.new
-PLAIN_TEXT = "This is plain text with no special chars. " * 100
-MIXED_ESCAPE_TEXT = "Text with *stars*, _underscores_, `code`, and [brackets]. " * 50
-
-Benchmark.ips do |x|
-  x.config(time: 3, warmup: 2)
-
-  x.report("simple") { Markbridge.bbcode_to_markdown(SIMPLE) }
-  x.report("nested") { Markbridge.bbcode_to_markdown(NESTED) }
-  x.report("list") { Markbridge.bbcode_to_markdown(LIST) }
-  x.report("table") { Markbridge.bbcode_to_markdown(TABLE) }
-  x.report("quote_nested") { Markbridge.bbcode_to_markdown(QUOTE) }
-  x.report("code") { Markbridge.bbcode_to_markdown(CODE) }
-  x.report("url") { Markbridge.bbcode_to_markdown(URL) }
-  x.report("mixed") { Markbridge.bbcode_to_markdown(MIXED) }
-  x.report("escaping") { Markbridge.bbcode_to_markdown(ESCAPING) }
-  x.report("large_doc") { Markbridge.bbcode_to_markdown(LARGE) }
-
-  x.report("escape_plain") { ESCAPER.escape(PLAIN_TEXT) }
-  x.report("escape_mixed") { ESCAPER.escape(MIXED_ESCAPE_TEXT) }
+if ARGV.include?("--single")
+  single_report(ARGV[ARGV.index("--single") + 1])
+elsif ARGV.include?("--isolated")
+  isolated(REPORTS.keys)
+else
+  all_in_one_process(REPORTS.keys)
 end
