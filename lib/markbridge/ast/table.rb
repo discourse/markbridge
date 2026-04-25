@@ -8,11 +8,9 @@ module Markbridge
     #   table = AST::Table.new
     #   table << AST::TableRow.new
     class Table < Element
-      # Add a child node to the table.
-      # Whitespace-only Text nodes are ignored.
-      #
-      # @param child [Node] the node to add
-      # @return [Table] self for chaining
+      # HTML/BBCode parsers add a Text("\n") child for the whitespace
+      # between `<table>` and `<tr>` (and equivalent BBCode). Drop
+      # those so the AST contains only TableRow children.
       def <<(child)
         return self if child.instance_of?(Text) && child.text.strip.empty?
 
@@ -26,11 +24,7 @@ module Markbridge
     #   row = AST::TableRow.new
     #   row << AST::TableCell.new
     class TableRow < Element
-      # Add a child node to the row.
-      # Whitespace-only Text nodes are ignored.
-      #
-      # @param child [Node] the node to add
-      # @return [TableRow] self for chaining
+      # See Table#<< — same whitespace skip for `<tr>` / `<td>` gaps.
       def <<(child)
         return self if child.instance_of?(Text) && child.text.strip.empty?
 

@@ -31,16 +31,18 @@ matcher:
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_html_tag
 
     # parse_tag_at_cursor: mutations on the `attrs = closing ||
-    # tag_name.nil? ? {} : scan_attributes` ternary. The `tag_name.nil?`
-    # short-circuit is load-bearing for input like `[/url=ignored]`
-    # (prevents scan_attributes from advancing @current_pos past the
-    # `=`, so the subsequent `consume("]")` fails and rolls back).
-    # Other permutations (`if closing`, `if closing || nil`,
-    # `if closing || false`, `if closing || self.nil?`, `attrs = nil`
-    # on the non-taken branch) are observably equivalent because
-    # the result either goes to a rolled-back path or to a
-    # TagStartToken whose stored attrs aren't consulted on the
-    # equivalence-inputs.
+    # tag_name.nil? ? {} : scan_attributes` ternary. The `closing ||`
+    # half is load-bearing for inputs like `[/url=ignored]` —
+    # without it, scan_attributes would advance @current_pos past
+    # `=ignored`, the subsequent `consume("]")` would succeed, and
+    # we'd accept a closing tag that's syntactically invalid (closing
+    # tags must end with `]`, no attrs allowed). The `tag_name.nil?`
+    # half is a perf optimization: when tag_name is nil, the
+    # `unless tag_name && consume("]")` rolls back regardless,
+    # discarding any scan_attributes work. Mutations on that half
+    # are observably equivalent (output identical, just slower).
+    # Verified end-to-end on `[/url=ignored]`, `[123]`, `[$x=y]`,
+    # `[ foo]`, `[=x]`, `[]`, `[1=2]`, `[/123]`.
     - Markbridge::Parsers::BBCode::Scanner#parse_tag_at_cursor
 
     # parse_external_link mutations are all Bucket A: `split(" ", 2)`
