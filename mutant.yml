@@ -254,22 +254,14 @@ mutation:
     # Bucket A.
     - "index{receiver=lvar{value=rows_data}}"
 
-    # ListItemBuilder#handle_empty_line's `next_line = continuation_lines[idx+1]`
-    # is followed by `next_line&.match?(...)` — the safe-nav guard is
-    # dead defensive code in practice because `build` calls
-    # `content.split("\n")` with default limit, which trims trailing
-    # empty strings; so an empty line at the LAST continuation index
-    # is unreachable through the public API. That means:
-    #  - `[idx+1]` / `.at(idx+1)` are equivalent (both return nil on
-    #    the unreachable out-of-bounds case).
-    #  - `next_line&.match?` / `.match?` (drop safe-nav) would only
-    #    differ on that same unreachable nil case — equivalent in
-    #    practice.
-    # Bucket A.
+    # ListItemBuilder#handle_empty_line's `continuation_lines[idx + 1]`
+    # — `idx + 1` is always in bounds by construction (caller only
+    # invokes handle_empty_line on empty lines, and split("\n") trims
+    # trailing empties so the last line is never empty), so `[]` /
+    # `.at` / `.fetch` all return the same value. Bucket A.
     - "index{receiver=lvar{value=continuation_lines}}"
-    - "csend{receiver=lvar{value=next_line}}"
 
-    # CodeTag#calculate_fence's `... || 0` default for empty scan.
+# CodeTag#calculate_fence's `... || 0` default for empty scan.
     # When no backticks / tildes are in content, scan.map returns []
     # and .max/.min/.first/.last all return nil → `|| 0` kicks in.
     # Mutations `|| 1` / `|| -1` are equivalent because the downstream

@@ -61,15 +61,17 @@ module Markbridge
             end
           end
 
-          # Handle empty lines in continuation
+          # Handle empty lines in continuation. Caller (format_continuation_line)
+          # only invokes this when `line.empty?`, and `content.split("\n")`
+          # trims trailing empty strings, so the LAST continuation line is
+          # never empty — `idx + 1` is always in bounds when we get here.
           # @param idx [Integer] index in continuation_lines
           # @param continuation_lines [Array<String>] all continuation lines
           # @param continuation_indent [String] indent for continuation
           # @return [String, nil] formatted line or nil to skip
           def handle_empty_line(idx, continuation_lines, continuation_indent)
             # Skip empty lines that come before nested list items (structural blanks)
-            next_line = continuation_lines[idx + 1]
-            return nil if next_line&.match?(/\A\s*(?:-|\d+\.)\s/)
+            return nil if continuation_lines[idx + 1].match?(/\A\s*(?:-|\d+\.)\s/)
 
             # Preserve empty lines within text content (paragraph breaks) with indentation
             continuation_indent
