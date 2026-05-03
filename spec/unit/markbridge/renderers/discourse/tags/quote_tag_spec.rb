@@ -70,5 +70,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
 
     let(:element_class) { Markbridge::AST::Quote }
     it_behaves_like "a tag that propagates parent context"
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders <blockquote>" do
+        element = Markbridge::AST::Quote.new
+        element << Markbridge::AST::Text.new("Hi")
+
+        expect(tag.render(element, interface)).to eq("<blockquote>Hi</blockquote>")
+      end
+
+      it "drops BBCode attribution in html_mode" do
+        element = Markbridge::AST::Quote.new(author: "John")
+        element << Markbridge::AST::Text.new("Hi")
+
+        expect(tag.render(element, interface)).to eq("<blockquote>Hi</blockquote>")
+      end
+    end
   end
 end

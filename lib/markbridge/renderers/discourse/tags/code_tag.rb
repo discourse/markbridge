@@ -10,7 +10,11 @@ module Markbridge
             content = interface.render_children(element, context: child_context)
 
             if interface.block_context?(element)
-              render_block(content, element.language)
+              if interface.html_mode?
+                render_html_block(content, element.language)
+              else
+                render_block(content, element.language)
+              end
             elsif interface.html_mode?
               "<code>#{content}</code>"
             else
@@ -29,6 +33,11 @@ module Markbridge
           def render_block(content, language)
             fence = calculate_fence(content)
             "#{fence}#{language}\n#{content}\n#{fence}\n\n"
+          end
+
+          def render_html_block(content, language)
+            class_attr = language ? %( class="language-#{HtmlEscaper.escape(language)}") : ""
+            "<pre><code#{class_attr}>#{content}</code></pre>"
           end
 
           def calculate_fence(content)

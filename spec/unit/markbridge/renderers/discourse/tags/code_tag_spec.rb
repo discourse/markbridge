@@ -160,11 +160,29 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
         expect(tag.render(element, interface)).to eq("<code>a &lt; b</code>")
       end
 
-      it "still uses fenced block form for multi-line code" do
+      it "renders block code as <pre><code>" do
         element = Markbridge::AST::Code.new
         element << Markbridge::AST::Text.new("line1\nline2")
 
-        expect(tag.render(element, interface)).to include("```")
+        expect(tag.render(element, interface)).to eq("<pre><code>line1\nline2</code></pre>")
+      end
+
+      it "adds a language class when language is set" do
+        element = Markbridge::AST::Code.new(language: "ruby")
+        element << Markbridge::AST::Text.new("puts 1\nputs 2")
+
+        expect(tag.render(element, interface)).to eq(
+          %(<pre><code class="language-ruby">puts 1\nputs 2</code></pre>),
+        )
+      end
+
+      it "HTML-escapes block code content" do
+        element = Markbridge::AST::Code.new
+        element << Markbridge::AST::Text.new("a < b\n&& c")
+
+        expect(tag.render(element, interface)).to eq(
+          "<pre><code>a &lt; b\n&amp;&amp; c</code></pre>",
+        )
       end
     end
   end
