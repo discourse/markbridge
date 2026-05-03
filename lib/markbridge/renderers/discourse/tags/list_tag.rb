@@ -5,6 +5,8 @@ module Markbridge
     module Discourse
       module Tags
         class ListTag < Tag
+          def html_mode_aware? = true
+
           def render(element, interface)
             child_context = interface.with_parent(element)
 

@@ -7,6 +7,8 @@ module Markbridge
         # Tag for rendering images
         # Renders to Markdown image syntax with optional Discourse sizing
         class ImageTag < Tag
+          def html_mode_aware? = true
+
           def render(element, interface)
             src = element.src || ""
             width = element.width

@@ -23,6 +23,15 @@ module Markbridge
             raise NotImplementedError, "#{self.class} must implement #render or provide a block"
           end
         end
+
+        # Whether this tag's output is safe to splice directly into an HTML
+        # block (e.g. inside an HTML <table> fallback). Override and return
+        # true when the tag emits valid HTML in html_mode and does not need a
+        # blank-line "Markdown island" wrap. Defaults to false so that any
+        # unaware tag — stubs, custom user tags — gets wrapped automatically.
+        def html_mode_aware?
+          false
+        end
       end
     end
   end

@@ -6,6 +6,8 @@ module Markbridge
       module Tags
         # Tag for rendering list items
         class ListItemTag < Tag
+          def html_mode_aware? = true
+
           def initialize
             @builder = Builders::ListItemBuilder.new
           end

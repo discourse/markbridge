@@ -111,6 +111,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       end
     end
 
+    context "when dispatching to a tag in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "passes through output of an html_mode_aware? tag unchanged" do
+        # BoldTag is html_mode_aware? = true
+        bold = Markbridge::AST::Bold.new
+        bold << Markbridge::AST::Text.new("hi")
+
+        result = renderer.render(bold, context:)
+        expect(result).to eq("<strong>hi</strong>")
+      end
+
+      it "wraps an unaware tag's output in blank lines" do
+        # MentionTag is a stub and not html_mode_aware?
+        mention = Markbridge::AST::Mention.new(name: "alice")
+
+        result = renderer.render(mention, context:)
+        expect(result).to eq("\n\n@alice\n\n")
+      end
+    end
+
     context "when rendering MarkdownText nodes" do
       it "passes through verbatim in Markdown mode" do
         node = Markbridge::AST::MarkdownText.new("**already bold**")
