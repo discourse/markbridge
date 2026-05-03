@@ -38,7 +38,7 @@ module Markbridge
           end
 
           def render_html_block(content, language)
-            class_attr = language ? %( class="language-#{HtmlEscaper.escape(language)}") : ""
+            class_attr = %( class="language-#{HtmlEscaper.escape(language)}") if language
             "<pre><code#{class_attr}>#{content}</code></pre>"
           end
 

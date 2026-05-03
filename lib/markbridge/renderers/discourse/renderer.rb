@@ -8,7 +8,11 @@ module Markbridge
         def initialize(tag_library: nil, escaper: nil, html_escaper: nil)
           @tag_library = tag_library || TagLibrary.default
           @escaper = escaper || MarkdownEscaper.new
-          @html_escaper = html_escaper || HtmlEscaper.new
+          # `HtmlEscaper` (the class) responds to `.escape` via a class method
+          # that mirrors the instance method body. Using the class as the
+          # default avoids a redundant allocation; tests can still inject an
+          # instance double via the kwarg.
+          @html_escaper = html_escaper || HtmlEscaper
           # @interface_cache is lazily initialized in #render's top-level
           # call and reset to nil after the call completes. No init
           # needed here — unset ivar returns nil under `.nil?` check.

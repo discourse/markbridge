@@ -10,7 +10,7 @@ module Markbridge
           def html_mode_aware? = true
 
           def render(element, interface)
-            src = element.src || ""
+            src = element.src
             width = element.width
             height = element.height
 
@@ -30,7 +30,7 @@ module Markbridge
           private
 
           def render_html(src, width, height)
-            attrs = +%(src="#{HtmlEscaper.escape(src)}" alt="")
+            attrs = %(src="#{HtmlEscaper.escape(src)}" alt="")
             attrs << %( width="#{width}") if width
             attrs << %( height="#{height}") if height
             "<img #{attrs}>"

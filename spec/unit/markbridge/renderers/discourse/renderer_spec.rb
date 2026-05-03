@@ -54,7 +54,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(html_escaper).to have_received(:escape).with("a < b")
     end
 
-    it "falls back to HtmlEscaper.new when no html_escaper is provided" do
+    it "falls back to the HtmlEscaper class when no html_escaper is provided" do
       # The default html_escaper must HTML-escape `<` and `&` in html_mode.
       text = Markbridge::AST::Text.new("a < b & c")
       context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
