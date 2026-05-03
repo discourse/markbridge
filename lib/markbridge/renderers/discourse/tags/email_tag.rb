@@ -11,10 +11,12 @@ module Markbridge
             text = interface.render_children(element, context: child_context)
             address = element.address
 
-            if address
-              "[#{text}](mailto:#{address})"
+            return text unless address
+
+            if interface.html_mode?
+              %(<a href="mailto:#{HtmlEscaper.escape(address)}">#{text}</a>)
             else
-              text
+              "[#{text}](mailto:#{address})"
             end
           end
         end

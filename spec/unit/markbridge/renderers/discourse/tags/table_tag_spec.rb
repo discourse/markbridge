@@ -154,6 +154,98 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(result).to include("<tbody>")
       expect(result).to include("</tbody>")
     end
+
+    it "renders bold cells as <strong> in the HTML fallback" do
+      table = Markbridge::AST::Table.new
+      row1 = Markbridge::AST::TableRow.new
+      cell1 = Markbridge::AST::TableCell.new
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("Alice")
+      cell1 << bold
+      row1 << cell1
+      table << row1
+
+      # Force HTML fallback with an uneven extra row
+      row2 = Markbridge::AST::TableRow.new
+      cell_a = Markbridge::AST::TableCell.new
+      cell_a << Markbridge::AST::Text.new("a")
+      cell_b = Markbridge::AST::TableCell.new
+      cell_b << Markbridge::AST::Text.new("b")
+      row2 << cell_a
+      row2 << cell_b
+      table << row2
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<td><strong>Alice</strong></td>")
+    end
+
+    it "renders URL cells as <a href> in the HTML fallback" do
+      table = Markbridge::AST::Table.new
+      row1 = Markbridge::AST::TableRow.new
+      cell1 = Markbridge::AST::TableCell.new
+      url = Markbridge::AST::Url.new(href: "https://example.com")
+      url << Markbridge::AST::Text.new("link")
+      cell1 << url
+      row1 << cell1
+      table << row1
+
+      # Force HTML fallback
+      row2 = Markbridge::AST::TableRow.new
+      [Markbridge::AST::TableCell.new, Markbridge::AST::TableCell.new].each do |c|
+        c << Markbridge::AST::Text.new("x")
+        row2 << c
+      end
+      table << row2
+
+      result = tag.render(table, interface)
+
+      expect(result).to include(%(<td><a href="https://example.com">link</a></td>))
+    end
+
+    it "renders inline code cells as <code> in the HTML fallback" do
+      table = Markbridge::AST::Table.new
+      row1 = Markbridge::AST::TableRow.new
+      cell1 = Markbridge::AST::TableCell.new
+      code = Markbridge::AST::Code.new
+      code << Markbridge::AST::Text.new("x")
+      cell1 << code
+      row1 << cell1
+      table << row1
+
+      # Force HTML fallback
+      row2 = Markbridge::AST::TableRow.new
+      [Markbridge::AST::TableCell.new, Markbridge::AST::TableCell.new].each do |c|
+        c << Markbridge::AST::Text.new("y")
+        row2 << c
+      end
+      table << row2
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<td><code>x</code></td>")
+    end
+
+    it "HTML-escapes plain text in cells in the HTML fallback" do
+      table = Markbridge::AST::Table.new
+      row1 = Markbridge::AST::TableRow.new
+      cell1 = Markbridge::AST::TableCell.new
+      cell1 << Markbridge::AST::Text.new("a < b")
+      row1 << cell1
+      table << row1
+
+      # Force HTML fallback
+      row2 = Markbridge::AST::TableRow.new
+      [Markbridge::AST::TableCell.new, Markbridge::AST::TableCell.new].each do |c|
+        c << Markbridge::AST::Text.new("y")
+        row2 << c
+      end
+      table << row2
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<td>a &lt; b</td>")
+    end
   end
 
   describe "edge cases" do

@@ -10,5 +10,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::LineBreakTag do
     it "returns a single newline" do
       expect(tag.render(Markbridge::AST::LineBreak.new, interface)).to eq("\n")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders <br>" do
+        expect(tag.render(Markbridge::AST::LineBreak.new, interface)).to eq("<br>")
+      end
+    end
   end
 end

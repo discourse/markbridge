@@ -5,6 +5,7 @@ require_relative "discourse/tag_library"
 require_relative "discourse/render_context"
 require_relative "discourse/rendering_interface"
 require_relative "discourse/markdown_escaper"
+require_relative "discourse/html_escaper"
 
 # Builders
 require_relative "discourse/builders/list_item_builder"

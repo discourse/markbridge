@@ -95,5 +95,32 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
     let(:element_class) { Markbridge::AST::Url }
     let(:element_factory) { Markbridge::AST::Url.new(href: "https://example.com") }
     it_behaves_like "a tag that propagates parent context"
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders as <a href> for valid hrefs" do
+        element = Markbridge::AST::Url.new(href: "https://example.com")
+        element << Markbridge::AST::Text.new("Example")
+
+        expect(tag.render(element, interface)).to eq(%(<a href="https://example.com">Example</a>))
+      end
+
+      it "attribute-escapes the href" do
+        element = Markbridge::AST::Url.new(href: %(https://example.com/?a="b"&c=<d>))
+        element << Markbridge::AST::Text.new("X")
+
+        expect(tag.render(element, interface)).to eq(
+          %(<a href="https://example.com/?a=&quot;b&quot;&amp;c=&lt;d&gt;">X</a>),
+        )
+      end
+
+      it "falls back to plain text for invalid schemes" do
+        element = Markbridge::AST::Url.new(href: "javascript:alert(1)")
+        element << Markbridge::AST::Text.new("Bad")
+
+        expect(tag.render(element, interface)).to eq("Bad")
+      end
+    end
   end
 end

@@ -5,9 +5,10 @@ module Markbridge
     module Discourse
       # Renders AST to Discourse-flavored Markdown in-memory.
       class Renderer
-        def initialize(tag_library: nil, escaper: nil)
+        def initialize(tag_library: nil, escaper: nil, html_escaper: nil)
           @tag_library = tag_library || TagLibrary.default
           @escaper = escaper || MarkdownEscaper.new
+          @html_escaper = html_escaper || HtmlEscaper.new
           # @interface_cache is lazily initialized in #render's top-level
           # call and reset to nil after the call completes. No init
           # needed here — unset ivar returns nil under `.nil?` check.
@@ -30,7 +31,7 @@ module Markbridge
           when AST::MarkdownText
             node.text
           when AST::Text
-            context.has_parent?(AST::Code) ? node.text : @escaper.escape(node.text)
+            render_text(node, context)
           else
             ""
           end
@@ -75,6 +76,18 @@ module Markbridge
 
         def interface_for(context)
           @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)
+        end
+
+        def render_text(node, context)
+          # In html_mode even inside a code block we must HTML-escape, otherwise a
+          # stray `<` in a code cell would break the surrounding <td>.
+          if context.has_parent?(AST::Code)
+            context.html_mode? ? @html_escaper.escape(node.text) : node.text
+          elsif context.html_mode?
+            @html_escaper.escape(node.text)
+          else
+            @escaper.escape(node.text)
+          end
         end
       end
     end

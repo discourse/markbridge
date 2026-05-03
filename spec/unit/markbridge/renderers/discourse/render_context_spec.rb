@@ -254,6 +254,65 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
     end
   end
 
+  describe "#html_mode?" do
+    it "defaults to false" do
+      context = described_class.new
+      expect(context.html_mode?).to be false
+    end
+
+    it "is true when constructed with html_mode: true" do
+      context = described_class.new([], html_mode: true)
+      expect(context.html_mode?).to be true
+    end
+  end
+
+  describe "#with_html_mode" do
+    it "returns a new context with html_mode set" do
+      context = described_class.new
+      new_context = context.with_html_mode(true)
+
+      expect(new_context.html_mode?).to be true
+      expect(context.html_mode?).to be false
+    end
+
+    it "preserves parents" do
+      bold = Markbridge::AST::Bold.new
+      context = described_class.new([bold])
+
+      new_context = context.with_html_mode(true)
+
+      expect(new_context.parents).to eq([bold])
+      expect(new_context.find_parent(Markbridge::AST::Bold)).to eq(bold)
+    end
+
+    it "can be turned off again" do
+      context = described_class.new([], html_mode: true)
+      new_context = context.with_html_mode(false)
+
+      expect(new_context.html_mode?).to be false
+    end
+  end
+
+  describe "html_mode propagation through with_parent" do
+    it "carries html_mode forward when descending" do
+      context = described_class.new([], html_mode: true)
+      bold = Markbridge::AST::Bold.new
+
+      new_context = context.with_parent(bold)
+
+      expect(new_context.html_mode?).to be true
+    end
+
+    it "stays false when starting from default context" do
+      context = described_class.new
+      bold = Markbridge::AST::Bold.new
+
+      new_context = context.with_parent(bold)
+
+      expect(new_context.html_mode?).to be false
+    end
+  end
+
   describe "immutability" do
     it "prevents modifying parents array" do
       context = described_class.new

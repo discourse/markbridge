@@ -93,6 +93,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
       expect(renderer.render(bold)).to include('a\*b')
     end
+
+    context "in html_mode" do
+      it "HTML-escapes text" do
+        text = Markbridge::AST::Text.new("a < b")
+        context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+
+        expect(renderer.render(text, context:)).to eq("a &lt; b")
+      end
+
+      it "HTML-escapes text inside AST::Code" do
+        code = Markbridge::AST::Code.new
+        code << Markbridge::AST::Text.new("a < b")
+        context = Markbridge::Renderers::Discourse::RenderContext.new([code], html_mode: true)
+
+        expect(renderer.render(code.children.first, context:)).to eq("a &lt; b")
+      end
+    end
   end
 
   describe "#render_children" do

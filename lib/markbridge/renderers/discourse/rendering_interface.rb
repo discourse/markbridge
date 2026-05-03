@@ -27,6 +27,14 @@ module Markbridge
           @context.with_parent(element)
         end
 
+        def with_html_mode(value)
+          @context.with_html_mode(value)
+        end
+
+        def html_mode?
+          @context.html_mode?
+        end
+
         def find_parent(klass)
           @context.find_parent(klass)
         end

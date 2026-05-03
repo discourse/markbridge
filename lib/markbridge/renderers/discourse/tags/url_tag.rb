@@ -11,10 +11,12 @@ module Markbridge
             text = interface.render_children(element, context: child_context)
             href = element.href
 
-            if href&.match?(/\A(?:https?|ftps?|mailto):/i)
-              "[#{text}](#{href})"
+            return text unless href&.match?(/\A(?:https?|ftps?|mailto):/i)
+
+            if interface.html_mode?
+              %(<a href="#{HtmlEscaper.escape(href)}">#{text}</a>)
             else
-              text
+              "[#{text}](#{href})"
             end
           end
         end

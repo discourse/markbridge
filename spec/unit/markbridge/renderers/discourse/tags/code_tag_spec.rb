@@ -142,5 +142,30 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to start_with("````\n")
       expect(result).to end_with("\n````\n\n")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders inline code as <code>" do
+        element = Markbridge::AST::Code.new
+        element << Markbridge::AST::Text.new("x")
+
+        expect(tag.render(element, interface)).to eq("<code>x</code>")
+      end
+
+      it "HTML-escapes text content inside inline code" do
+        element = Markbridge::AST::Code.new
+        element << Markbridge::AST::Text.new("a < b")
+
+        expect(tag.render(element, interface)).to eq("<code>a &lt; b</code>")
+      end
+
+      it "still uses fenced block form for multi-line code" do
+        element = Markbridge::AST::Code.new
+        element << Markbridge::AST::Text.new("line1\nline2")
+
+        expect(tag.render(element, interface)).to include("```")
+      end
+    end
   end
 end

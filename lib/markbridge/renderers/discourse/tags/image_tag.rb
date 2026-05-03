@@ -7,10 +7,12 @@ module Markbridge
         # Tag for rendering images
         # Renders to Markdown image syntax with optional Discourse sizing
         class ImageTag < Tag
-          def render(element, _interface)
-            src = element.src
+          def render(element, interface)
+            src = element.src || ""
             width = element.width
             height = element.height
+
+            return render_html(src, width, height) if interface.html_mode?
 
             # Build Discourse image syntax with dimensions
             # Format: ![alt|WIDTHxHEIGHT](url) or ![alt|WIDTH](url)
@@ -21,6 +23,15 @@ module Markbridge
             else
               "![](#{src})"
             end
+          end
+
+          private
+
+          def render_html(src, width, height)
+            attrs = +%(src="#{HtmlEscaper.escape(src)}" alt="")
+            attrs << %( width="#{width}") if width
+            attrs << %( height="#{height}") if height
+            "<img #{attrs}>"
           end
         end
       end

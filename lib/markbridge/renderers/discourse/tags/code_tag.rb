@@ -11,6 +11,8 @@ module Markbridge
 
             if interface.block_context?(element)
               render_block(content, element.language)
+            elsif interface.html_mode?
+              "<code>#{content}</code>"
             else
               render_inline(content)
             end

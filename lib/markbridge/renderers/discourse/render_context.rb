@@ -11,10 +11,11 @@ module Markbridge
       class RenderContext
         attr_reader :parents, :depth
 
-        def initialize(parents = [], parent_cache: nil)
+        def initialize(parents = [], parent_cache: nil, html_mode: false)
           @parents = parents.freeze
           @depth = parents.size
           @parent_cache = parent_cache || build_cache(parents)
+          @html_mode = html_mode
         end
 
         # Create new context with element added to parent chain.
@@ -30,7 +31,20 @@ module Markbridge
           new_cache[element_class] ||= []
           new_cache[element_class] = new_cache[element_class] + [element]
 
-          self.class.new(new_parents, parent_cache: new_cache)
+          self.class.new(new_parents, parent_cache: new_cache, html_mode: @html_mode)
+        end
+
+        # Create new context with html_mode toggled
+        # Preserves parent chain and cache
+        # @param value [Boolean]
+        # @return [RenderContext]
+        def with_html_mode(value)
+          self.class.new(@parents, parent_cache: @parent_cache, html_mode: value)
+        end
+
+        # @return [Boolean]
+        def html_mode?
+          @html_mode
         end
 
         # Find closest parent of given type
