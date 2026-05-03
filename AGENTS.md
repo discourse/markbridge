@@ -112,7 +112,31 @@ Markbridge
 4. Create tag: `lib/markbridge/renderers/discourse/tags/quote_tag.rb`
 5. Register in `TagLibrary.default` OR use auto_register! for convention-based discovery
 6. Add requires to loader files
-7. Write tests (unit + integration)
+7. Decide on html_mode behavior (see below)
+8. Write tests (unit + integration)
+
+### html_mode contract
+
+`RenderContext#html_mode?` is `true` when a tag is rendering inside an HTML
+container (today: TableTag's HTML fallback for uneven rows / multi-line
+cells / nested tables). CommonMark won't parse Markdown inside an HTML
+block except across blank lines, so each tag must pick one of two
+contracts:
+
+- **html_mode-aware** (preferred for inline + block formatting): the tag's
+  `render` checks `interface.html_mode?` and emits an HTML equivalent
+  (`<strong>` instead of `**`, `<ul><li>` instead of `- `, etc.). HTML-escape
+  any text that becomes attribute or element content via `HtmlEscaper`.
+  Override `html_mode_aware?` to return `true` so the renderer splices your
+  output verbatim into the surrounding HTML.
+
+- **html_mode-unaware** (the default): leave `html_mode_aware?` returning
+  `false`. The renderer wraps your tag's Markdown output in `\n\n…\n\n`
+  so CommonMark closes the HTML block, parses the island, then reopens.
+  Safe but visible: inside table cells this produces `<p>…</p>` margin
+  around inline content, which is usually undesirable.
+
+Tags audited as html_mode-aware today: see `grep -l 'html_mode_aware?' lib/markbridge/renderers/discourse/tags/`.
 
 **See `examples/` for complete examples.**
 

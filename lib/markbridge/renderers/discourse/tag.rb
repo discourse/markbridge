@@ -25,10 +25,27 @@ module Markbridge
         end
 
         # Whether this tag's output is safe to splice directly into an HTML
-        # block (e.g. inside an HTML <table> fallback). Override and return
-        # true when the tag emits valid HTML in html_mode and does not need a
-        # blank-line "Markdown island" wrap. Defaults to false so that any
-        # unaware tag — stubs, custom user tags — gets wrapped automatically.
+        # block (e.g. inside an HTML <table> fallback).
+        #
+        # When `interface.html_mode?` is true, the tag is rendering inside an
+        # HTML container that CommonMark won't re-enter Markdown parsing on
+        # except across blank lines. Two contracts are valid:
+        #
+        # 1. Override `render` to emit an HTML equivalent in html_mode (e.g.
+        #    `<strong>` instead of `**`, `<ul><li>` instead of `- `), and
+        #    override this method to return `true`. The renderer splices your
+        #    output verbatim into the surrounding HTML block.
+        #
+        # 2. Do nothing. Leave this method returning `false`. The renderer
+        #    wraps your tag's normal Markdown output in `\n\n…\n\n` so
+        #    CommonMark closes the HTML block, parses the Markdown island,
+        #    then reopens the HTML block. Safe but visible: in table cells
+        #    the wrapping creates `<p>…</p>` with margin around inline
+        #    content, which is usually undesirable.
+        #
+        # Pick (1) for any tag that can sensibly emit HTML; pick (2) for
+        # tags whose Markdown form is strictly preferable (e.g. text-only
+        # output that already round-trips through CommonMark unchanged).
         def html_mode_aware?
           false
         end
