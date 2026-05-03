@@ -56,6 +56,29 @@ jobs:
       - name: Run tests
         run: bundle exec rake spec
 
+  mutation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          # `--since` walks git history; default shallow clone hides the base.
+          fetch-depth: 0
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      # On PR: mutate subjects changed since main.
+      # On push to main: mutate subjects changed by this push.
+      - name: Run mutant
+        run: bin/mutant run --since "${{ github.event_name == 'pull_request' && 'origin/main' || github.event.before }}"
+
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
