@@ -46,6 +46,14 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       expect(context.find_parent(Markbridge::AST::Italic)).to eq(sentinel)
       expect(context.find_parent(Markbridge::AST::Bold)).to be_nil
     end
+
+    it "defaults html_mode to false" do
+      expect(described_class.new.html_mode?).to be false
+    end
+
+    it "stores the html_mode kwarg as-is" do
+      expect(described_class.new([], html_mode: true).html_mode?).to be true
+    end
   end
 
   describe "#with_parent" do

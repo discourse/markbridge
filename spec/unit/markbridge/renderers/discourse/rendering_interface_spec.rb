@@ -89,6 +89,33 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
+  describe "#html_mode?" do
+    it "delegates to context" do
+      context = instance_double(Markbridge::Renderers::Discourse::RenderContext, html_mode?: true)
+      interface =
+        described_class.new(instance_double(Markbridge::Renderers::Discourse::Renderer), context)
+
+      expect(interface.html_mode?).to be true
+      expect(context).to have_received(:html_mode?)
+    end
+  end
+
+  describe "#with_html_mode" do
+    it "delegates to context with the supplied flag" do
+      new_context = instance_double(Markbridge::Renderers::Discourse::RenderContext)
+      context =
+        instance_double(
+          Markbridge::Renderers::Discourse::RenderContext,
+          with_html_mode: new_context,
+        )
+      interface =
+        described_class.new(instance_double(Markbridge::Renderers::Discourse::Renderer), context)
+
+      expect(interface.with_html_mode(true)).to equal(new_context)
+      expect(context).to have_received(:with_html_mode).with(true)
+    end
+  end
+
   describe "#block_context?" do
     it "returns true for AST::List" do
       expect(interface.block_context?(Markbridge::AST::List.new)).to be true
