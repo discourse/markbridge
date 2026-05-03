@@ -29,7 +29,7 @@ module Markbridge
           when AST::Element # Document is an Element subclass
             render_children(node, context:)
           when AST::MarkdownText
-            node.text
+            render_markdown_text(node, context)
           when AST::Text
             render_text(node, context)
           else
@@ -76,6 +76,14 @@ module Markbridge
 
         def interface_for(context)
           @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)
+        end
+
+        # In html_mode, surround pre-formatted Markdown with blank lines so that
+        # CommonMark terminates the enclosing HTML block (e.g. <table>) and
+        # parses the content as Markdown before the closing tags reopen another
+        # HTML block.
+        def render_markdown_text(node, context)
+          context.html_mode? ? "\n\n#{node.text}\n\n" : node.text
         end
 
         def render_text(node, context)

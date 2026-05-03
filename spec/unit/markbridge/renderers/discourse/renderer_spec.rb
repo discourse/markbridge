@@ -110,6 +110,22 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
         expect(renderer.render(code.children.first, context:)).to eq("a &lt; b")
       end
     end
+
+    context "when rendering MarkdownText nodes" do
+      it "passes through verbatim in Markdown mode" do
+        node = Markbridge::AST::MarkdownText.new("**already bold**")
+        result = renderer.render(node)
+        expect(result).to eq("**already bold**")
+      end
+
+      it "wraps in blank lines in html_mode so CommonMark re-enters Markdown parsing" do
+        node = Markbridge::AST::MarkdownText.new("**already bold**")
+        context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+
+        result = renderer.render(node, context:)
+        expect(result).to eq("\n\n**already bold**\n\n")
+      end
+    end
   end
 
   describe "#render_children" do

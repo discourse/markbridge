@@ -23,5 +23,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::AlignTag do
 
     let(:element_class) { Markbridge::AST::Align }
     it_behaves_like "a tag that propagates parent context"
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "drops the trailing blank line so the surrounding HTML block stays intact" do
+        element = Markbridge::AST::Align.new(alignment: "center")
+        element << Markbridge::AST::Text.new("hello")
+
+        expect(tag.render(element, interface)).to eq(%(<div align="center">hello</div>))
+      end
+    end
   end
 end
