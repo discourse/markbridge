@@ -3,98 +3,77 @@
 RSpec.describe Markbridge::Parsers::BBCode::Handlers::UrlHandler do
   let(:registry) { Markbridge::Parsers::BBCode::HandlerRegistry.default }
   let(:handler) { described_class.new }
+  let(:document) { Markbridge::AST::Document.new }
+  let(:context) { Markbridge::Parsers::BBCode::ParserState.new(document) }
+
+  def tag_start(attrs: {})
+    Markbridge::Parsers::BBCode::TagStartToken.new(tag: "url", attrs:, pos: 0, source: "[url]")
+  end
+
+  describe "#initialize" do
+    it "exposes AST::Url as the element_class" do
+      expect(described_class.new.element_class).to eq(Markbridge::AST::Url)
+    end
+  end
 
   describe "#on_open" do
-    it "creates Url element with href from option attribute" do
-      token =
-        Markbridge::Parsers::BBCode::TagStartToken.new(
-          tag: "url",
-          attrs: {
-            option: "https://example.com",
-          },
-          pos: 0,
-          source: "[url=https://example.com]",
-        )
-      document = Markbridge::AST::Document.new
-      context = Markbridge::Parsers::BBCode::ParserState.new(document)
-
-      handler.on_open(token:, context:, registry:)
+    it "pushes a Url element using attrs[:href]" do
+      handler.on_open(token: tag_start(attrs: { href: "https://example.com" }), context:, registry:)
 
       expect(context.current).to be_a(Markbridge::AST::Url)
       expect(context.current.href).to eq("https://example.com")
     end
 
-    it "creates Url element with href from href attribute" do
-      token =
-        Markbridge::Parsers::BBCode::TagStartToken.new(
-          tag: "url",
-          attrs: {
-            href: "https://google.com",
-          },
-          pos: 0,
-          source: "[url href=https://google.com]",
-        )
-      document = Markbridge::AST::Document.new
-      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+    it "falls back to attrs[:url] when :href is missing" do
+      handler.on_open(token: tag_start(attrs: { url: "https://example.com" }), context:, registry:)
 
-      handler.on_open(token:, context:, registry:)
-
-      expect(context.current.href).to eq("https://google.com")
+      expect(context.current.href).to eq("https://example.com")
     end
 
-    it "creates Url element with href from url attribute" do
-      token =
-        Markbridge::Parsers::BBCode::TagStartToken.new(
-          tag: "url",
-          attrs: {
-            url: "https://github.com",
-          },
-          pos: 0,
-          source: "[url url=https://github.com]",
-        )
-      document = Markbridge::AST::Document.new
-      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+    it "falls back to attrs[:option] when :href and :url are missing" do
+      handler.on_open(
+        token: tag_start(attrs: { option: "https://example.com" }),
+        context:,
+        registry:,
+      )
 
-      handler.on_open(token:, context:, registry:)
-
-      expect(context.current.href).to eq("https://github.com")
+      expect(context.current.href).to eq("https://example.com")
     end
 
-    it "prefers href over url and option" do
-      token =
-        Markbridge::Parsers::BBCode::TagStartToken.new(
-          tag: "url",
-          attrs: {
-            href: "https://a.com",
-            url: "https://b.com",
-            option: "https://c.com",
-          },
-          pos: 0,
-          source: "[url href=https://a.com url=https://b.com]",
-        )
-      document = Markbridge::AST::Document.new
-      context = Markbridge::Parsers::BBCode::ParserState.new(document)
-
-      handler.on_open(token:, context:, registry:)
+    it "prefers :href over :url" do
+      handler.on_open(
+        token: tag_start(attrs: { href: "https://a.com", url: "https://b.com" }),
+        context:,
+        registry:,
+      )
 
       expect(context.current.href).to eq("https://a.com")
     end
 
-    it "creates Url element with nil href when no attributes" do
-      token =
-        Markbridge::Parsers::BBCode::TagStartToken.new(
-          tag: "url",
-          attrs: {
-          },
-          pos: 0,
-          source: "[url]",
-        )
-      document = Markbridge::AST::Document.new
-      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+    it "prefers :url over :option" do
+      handler.on_open(
+        token: tag_start(attrs: { url: "https://a.com", option: "https://b.com" }),
+        context:,
+        registry:,
+      )
 
-      handler.on_open(token:, context:, registry:)
+      expect(context.current.href).to eq("https://a.com")
+    end
+
+    it "pushes with nil href when no attribute is present" do
+      handler.on_open(token: tag_start, context:, registry:)
 
       expect(context.current.href).to be_nil
+    end
+
+    it "forwards the token to context.push for graceful-degradation bookkeeping" do
+      max = Markbridge::Parsers::BBCode::ParserState::MAX_DEPTH
+      max.times { context.push(Markbridge::AST::Italic.new) }
+
+      expect { handler.on_open(token: tag_start, context:, registry:) }.to change(
+        context,
+        :depth_exceeded_count,
+      ).by(1)
     end
   end
 end

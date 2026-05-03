@@ -19,6 +19,33 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       context = described_class.new
       expect(context.parents).to be_frozen
     end
+
+    it "exposes depth equal to parents.size" do
+      bold = Markbridge::AST::Bold.new
+      italic = Markbridge::AST::Italic.new
+
+      expect(described_class.new.depth).to eq(0)
+      expect(described_class.new([bold, italic]).depth).to eq(2)
+    end
+
+    it "builds the parent_cache from the parents array when none is supplied" do
+      bold = Markbridge::AST::Bold.new
+      context = described_class.new([bold])
+
+      expect(context.find_parent(Markbridge::AST::Bold)).to eq(bold)
+    end
+
+    it "uses an explicit parent_cache when one is supplied (does not rebuild)" do
+      bold = Markbridge::AST::Bold.new
+      sentinel = Markbridge::AST::Italic.new
+      preset_cache = { Markbridge::AST::Italic => [sentinel] }
+
+      context = described_class.new([bold], parent_cache: preset_cache)
+
+      # Cache lookup wins: Italic resolves via the supplied cache; Bold isn't in it.
+      expect(context.find_parent(Markbridge::AST::Italic)).to eq(sentinel)
+      expect(context.find_parent(Markbridge::AST::Bold)).to be_nil
+    end
   end
 
   describe "#with_parent" do
@@ -51,6 +78,39 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       final_context = context.with_parent(bold).with_parent(italic)
 
       expect(final_context.parents).to eq([bold, italic])
+    end
+
+    it "caches the new parent under its element class for O(1) find_parent" do
+      bold = Markbridge::AST::Bold.new
+      new_context = described_class.new.with_parent(bold)
+
+      expect(new_context.find_parent(Markbridge::AST::Bold)).to eq(bold)
+    end
+
+    it "appends to the existing cached array when the same class is added twice" do
+      bold1 = Markbridge::AST::Bold.new
+      bold2 = Markbridge::AST::Bold.new
+      ctx = described_class.new.with_parent(bold1).with_parent(bold2)
+
+      expect(ctx.count_parents(Markbridge::AST::Bold)).to eq(2)
+      expect(ctx.find_parent(Markbridge::AST::Bold)).to eq(bold2)
+    end
+
+    it "increments depth by one on each call" do
+      ctx = described_class.new
+      expect(ctx.with_parent(Markbridge::AST::Bold.new).depth).to eq(1)
+      expect(
+        ctx.with_parent(Markbridge::AST::Bold.new).with_parent(Markbridge::AST::Italic.new).depth,
+      ).to eq(2)
+    end
+
+    it "does not mutate the original context's cache (functional, not in-place update)" do
+      bold = Markbridge::AST::Bold.new
+      original = described_class.new
+      original.with_parent(bold)
+
+      expect(original.find_parent(Markbridge::AST::Bold)).to be_nil
+      expect(original.count_parents(Markbridge::AST::Bold)).to eq(0)
     end
   end
 

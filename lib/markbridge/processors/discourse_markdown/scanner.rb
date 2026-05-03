@@ -49,13 +49,8 @@ module Markbridge
         def initialize(detectors: DEFAULT_DETECTORS, tag_library: nil, mention_resolver: nil)
           @detector_instances = build_detectors(detectors, mention_resolver)
           @tag_library = tag_library
-          @code_tracker = nil
-          @result = nil
-          @nodes = nil
-          @node_index = 0
-          @pos = 0
-          @input = nil
-          @line_start = true
+          # @code_tracker / @result / @nodes / @node_index / @pos / @input /
+          # @line_start are set by #scan before use; no defensive init needed.
         end
 
         # Scan input and extract constructs.
@@ -63,14 +58,12 @@ module Markbridge
         # @param input [String] Discourse Markdown input
         # @return [ScanResult] result containing processed markdown and extracted nodes
         def scan(input)
-          return ScanResult.new(markdown: "", nodes: []) if input.nil? || input.empty?
-
           @code_tracker = CodeBlockTracker.new
           @result = +""
           @nodes = []
           @node_index = 0
           @pos = 0
-          @input = input
+          @input = input.to_s
           @line_start = true
 
           scan_input
@@ -82,14 +75,10 @@ module Markbridge
 
         def build_detectors(detectors, mention_resolver)
           detectors.map do |klass|
-            if klass.is_a?(Class)
-              if klass == Detectors::Mention && mention_resolver
-                klass.new(type_resolver: mention_resolver)
-              else
-                klass.new
-              end
+            if klass == Detectors::Mention
+              klass.new(type_resolver: mention_resolver)
             else
-              klass
+              klass.new
             end
           end
         end
@@ -102,9 +91,10 @@ module Markbridge
               next if advance_code_boundary(:check_indented_boundary)
             end
 
-            # Check for inline code boundary
-            if @input[@pos] == "`" && !@code_tracker.in_fenced_block &&
-                 !@code_tracker.in_indented_block
+            # Check for inline code boundary. check_inline_boundary's
+            # own fenced/indented guard means we don't need to pre-check
+            # here — it'll just return nil in those cases.
+            if @input[@pos] == "`"
               new_pos = @code_tracker.check_inline_boundary(@input, @pos)
               if new_pos
                 @result << @input[@pos...new_pos]
@@ -142,9 +132,15 @@ module Markbridge
           new_pos = @code_tracker.public_send(method, @input, @pos, line_start: true)
           return false unless new_pos
 
+          # check_fenced_boundary / check_indented_boundary always stop
+          # at pos_after_line, which is either after a "\n" or at EOF.
+          # After-newline → @line_start should be true; at EOF the
+          # outer `while @pos < @input.length` exits and @line_start
+          # is unobservable. Setting true unconditionally drops the
+          # `@input[new_pos - 1] == "\n"` dance.
           @result << @input[@pos...new_pos]
           @pos = new_pos
-          @line_start = new_pos > 0 && @input[new_pos - 1] == "\n"
+          @line_start = true
           true
         end
 
@@ -159,26 +155,24 @@ module Markbridge
         def handle_match(match)
           node = match.node
           @nodes << node
+          @result << render_placeholder(node)
 
-          # Render placeholder using tag library if available
-          placeholder = render_placeholder(node)
-          @result << placeholder
-
+          # Every detector shipped today matches content that ends on a
+          # non-newline byte (`]`, `)`, `_`, alphanumeric), so @line_start
+          # is always false after a successful match. If a future custom
+          # detector produces a match whose end_pos sits right after
+          # "\n", re-introduce the `@input[@pos - 1] == "\n"` check.
           @pos = match.end_pos
-          @line_start = @pos > 0 && @input[@pos - 1] == "\n"
+          @line_start = false
           @node_index += 1
         end
 
         def render_placeholder(node)
           if @tag_library
             tag = @tag_library[node.class]
-            if tag
-              # Create a minimal interface for rendering
-              return tag.render(node, nil)
-            end
+            return tag.render(node, nil) if tag
           end
 
-          # Default placeholder format if no tag library or tag not found
           default_placeholder(node)
         end
 
@@ -192,8 +186,6 @@ module Markbridge
             "<<EVENT:#{@node_index}:#{node.name}>>"
           when AST::Upload
             "<<UPLOAD:#{@node_index}:#{node.sha1}>>"
-          else
-            "<<UNKNOWN:#{@node_index}>>"
           end
         end
       end

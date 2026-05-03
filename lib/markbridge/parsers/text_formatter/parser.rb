@@ -57,11 +57,8 @@ module Markbridge
           document = AST::Document.new
           process_node(root, document)
           document
-        rescue Nokogiri::XML::SyntaxError => e
-          # Invalid XML - treat as plain text
-          document = AST::Document.new
-          document << AST::Text.new(input)
-          document
+        rescue Nokogiri::XML::SyntaxError
+          AST::Document.new << AST::Text.new(input)
         end
 
         # Process children of an XML element (public for handler access)
@@ -122,9 +119,7 @@ module Markbridge
         # @param ast_parent [AST::Element]
         def process_text(text_node, ast_parent)
           text = text_node.content
-          return if text.strip.empty?
-
-          ast_parent << AST::Text.new(text)
+          ast_parent << AST::Text.new(text) if text.match?(/\S/)
         end
       end
     end

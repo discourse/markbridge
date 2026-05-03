@@ -70,7 +70,35 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::TableHandler do
 
       handler.on_close(token: close_token, context:, registry:)
 
+      # Pin the tree shape so the auto-close pops are observably
+      # correct — cell stays inside row, row inside table, and the
+      # outer table is closed so we're back at the document. Kills
+      # mutations that skip either `if current.instance_of?(TableCell)`
+      # or `if current.instance_of?(TableRow)` guards.
       expect(context.current).to eq(document)
+      expect(row.children.last).to eq(cell)
+      expect(table.children.last).to eq(row)
+      expect(document.children.last).to eq(table)
+    end
+
+    it "does NOT pop anything extra when only the Table is on the stack" do
+      # Kills `if context.current.instance_of?(AST::TableCell)` →
+      # `if true` / `if context.current` / drop-if-keep-body. With
+      # those mutations, `context.pop` fires unconditionally and
+      # the Table itself gets popped off before `super` pops it
+      # again, leaving the Document popped too — observable via
+      # the document disappearing from the top of the stack.
+      table = Markbridge::AST::Table.new
+      context.push(table)
+
+      close_token =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "table", pos: 10, source: "[/table]")
+
+      handler.on_close(token: close_token, context:, registry:)
+
+      # Expected: exactly ONE pop (from `super`), landing on document.
+      expect(context.current).to eq(document)
+      expect(document.children.last).to eq(table)
     end
   end
 

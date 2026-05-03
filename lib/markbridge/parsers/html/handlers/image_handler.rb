@@ -26,12 +26,9 @@ module Markbridge
 
           private
 
-          # Convert dimension to positive integer or nil
           def sanitize_dimension(value)
-            return nil if value.nil?
-
             dim = value.to_i
-            dim.positive? ? dim : nil
+            dim if dim.positive?
           end
         end
       end

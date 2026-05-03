@@ -15,10 +15,10 @@ module Markbridge
             context.add_child(element)
           end
 
-          def on_close(token:, context:, registry:, tokens: nil)
-            # Treat unexpected closing tag as text
-            context.add_child(AST::Text.new(token.source))
-          end
+          # on_close is inherited from BaseHandler. SelfClosing elements are
+          # never pushed onto the stack, so the registry's closing strategy
+          # always falls through to adding the closing-tag source as text -
+          # the same result as a dedicated override.
 
           attr_reader :element_class
         end

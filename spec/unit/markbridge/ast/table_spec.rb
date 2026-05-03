@@ -27,6 +27,33 @@ RSpec.describe Markbridge::AST::Table do
 
     expect(table.children).to eq([text])
   end
+
+  it "returns self when skipping whitespace Text (for chaining)" do
+    table = described_class.new
+    result = table << Markbridge::AST::Text.new("  ")
+
+    # Kills `return self` → `return nil` / `return child` mutations.
+    expect(result).to eq(table)
+  end
+
+  it "only skips Text whitespace, not other whitespace-stringified nodes" do
+    # Kills `is_a?(Text)` → `is_a?(Node)` / `true` / drop. A Paragraph
+    # that happens to stringify to whitespace must still be added.
+    table = described_class.new
+    para = Markbridge::AST::Paragraph.new
+    table << para
+
+    expect(table.children).to eq([para])
+  end
+
+  it "preserves Text that is only a newline (non-empty after strip check)" do
+    # Kills `.strip.empty?` → `.strip` (truthy) mutations. A Text with
+    # just "\n" strips to "" and should be skipped.
+    table = described_class.new
+    table << Markbridge::AST::Text.new("\n")
+
+    expect(table.children).to be_empty
+  end
 end
 
 RSpec.describe Markbridge::AST::TableRow do
@@ -47,6 +74,21 @@ RSpec.describe Markbridge::AST::TableRow do
     row << Markbridge::AST::Text.new("  \n  ")
 
     expect(row.children).to be_empty
+  end
+
+  it "returns self when skipping whitespace Text (for chaining)" do
+    row = described_class.new
+    result = row << Markbridge::AST::Text.new("  ")
+
+    expect(result).to eq(row)
+  end
+
+  it "preserves a non-whitespace Text child" do
+    row = described_class.new
+    text = Markbridge::AST::Text.new("bare text")
+    row << text
+
+    expect(row.children).to eq([text])
   end
 end
 

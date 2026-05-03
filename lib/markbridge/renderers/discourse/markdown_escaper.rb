@@ -36,18 +36,15 @@ module Markbridge
         #   breaks disabled by default.
         def initialize(escape_hard_line_breaks: false)
           @escape_hard_line_breaks = escape_hard_line_breaks
-          @inline_content = nil
-          @inline_result = nil
-          @inline_len = 0
+          # @inline_content / @inline_result / @inline_len are set by
+          # escape_inline on every call before any helper reads them;
+          # no defensive init needed.
         end
 
-        # Fast-path check: any character that might need escaping
-        # Only includes characters we actually escape (removed ], {, }, ^)
-        # > is needed for blockquote detection at line start
+        # Fast-path: skip escape_text entirely for content with no special
+        # chars. `>` is needed for blockquote detection at line start.
         MAYBE_SPECIAL = /[\\`*_\[#+\-.!<>&|~=>)]/
 
-        # Check for indented code on any line
-        # Matches: 4+ spaces, tab, or space+tab combinations that reach column 4+
         MAYBE_INDENTED_CODE = /(?:^|\n)(?: {4}|\t| {1,3}\t)/
 
         # Block-level patterns
@@ -122,8 +119,7 @@ module Markbridge
         # @return [String] the escaped text, or empty string if input is nil
         # @note Multi-line HTML tags and blocks are handled by escaping the opening <
         def escape(text)
-          return "".freeze if text.nil?
-          return text if text.empty?
+          return "" if text.nil?
 
           # Neutralize hard line breaks (trailing 2+ spaces before newline)
           text = text.gsub(/  +\n/, "\n") if @escape_hard_line_breaks && text.include?("  \n")
@@ -158,37 +154,32 @@ module Markbridge
         end
 
         def escape_line(line, prev_was_paragraph)
-          return line if line.empty?
-
-          # Handle indented code blocks first
+          # No `line.empty?` early-return: it's redundant with the
+          # `line.getbyte(indent_len).nil?` guard below, which catches both
+          # empty and whitespace-only lines while also preserving object
+          # identity (returns `line`).
           return escape_indented_code(line) if INDENTED_CODE.match?(line)
 
-          # Extract 0-3 space indent
-          line_length = line.length
+          # After INDENTED_CODE, line has at most 3 leading spaces, so the
+          # `< 3` bound keeps this a tight YJIT-friendly hot loop.
           indent_len = 0
-          while indent_len < 3 && indent_len < line_length && line.getbyte(indent_len) == SPACE
-            indent_len += 1
-          end
+          indent_len += 1 while indent_len < 3 && line.getbyte(indent_len) == SPACE
 
-          return line if indent_len >= line_length
+          # Whitespace-only line (1-3 spaces) — getbyte past end is nil.
+          return line if line.getbyte(indent_len).nil?
 
           has_indent = indent_len > 0
           content = has_indent ? line[indent_len..] : line
 
-          # Apply block-level escaping (which may also do inline escaping)
           escaped, skip_inline = escape_block_level(content, prev_was_paragraph)
-
-          # Apply inline escaping if block-level didn't handle it
           escaped = escape_inline(escaped) unless skip_inline
 
-          # Prepend indent if present, preserve encoding
           if has_indent
-            encoding = line.encoding
-            result = String.new(encoding:)
+            result = String.new(encoding: line.encoding)
             result << line[0, indent_len] << escaped
             result
           else
-            escaped.is_a?(String) ? escaped.force_encoding(line.encoding) : escaped
+            escaped.force_encoding(line.encoding)
           end
         end
 
@@ -203,15 +194,14 @@ module Markbridge
           # - Content doesn't start at valid block position (no lists, headings, etc.)
           # - Visual indentation is preserved (NBSP renders as space)
           # We still escape inline content since it's no longer protected.
+          # Caller (escape_line) guarantees INDENTED_CODE matched, so line
+          # starts with at least one SPACE or TAB; ws_end is always ≥ 1.
           line_length = line.length
           ws_end = 0
-          while ws_end < line_length
-            byte = line.getbyte(ws_end)
-            break if byte != SPACE && byte != TAB
+          while ws_end < line_length && ((byte = line.getbyte(ws_end)) == SPACE || byte == TAB)
             ws_end += 1
           end
 
-          return line if ws_end == 0 # No leading whitespace (shouldn't happen, but safe)
           return line if ws_end >= line_length # Whitespace-only line
 
           # Convert leading whitespace to NBSP (tab = 4 NBSP for visual consistency)
@@ -310,6 +300,13 @@ module Markbridge
           @inline_len = bytesize
           pos = 0
 
+          # No loop-progress guard: every `dispatch_inline_byte` branch
+          # returns `pos + N` for N >= 1 by construction, so the loop
+          # is provably terminating. Mutations that break this
+          # (`while true`, body drops, selector swaps that short-circuit
+          # the dispatch) surface as timeouts rather than alive
+          # mutations, and the inline guard would otherwise cost ~15%
+          # on this hot path per benchmark.
           while pos < @inline_len
             byte = @inline_content.getbyte(pos)
             pos = dispatch_inline_byte(byte, pos)
@@ -474,39 +471,42 @@ module Markbridge
         end
 
         def paragraph_line?(line)
-          return false if line.empty?
+          pos = 0
+          line_len = line.bytesize
+          pos += 1 while pos < line_len && line.getbyte(pos) == SPACE
+          first_non_space = pos
 
-          line_length = line.length
-          first_non_space = 0
-          while first_non_space < line_length && line.getbyte(first_non_space) == SPACE
-            first_non_space += 1
-          end
-          return false if first_non_space >= line_length || line.getbyte(first_non_space) == TAB
+          # Empty or whitespace-only lines: getbyte past the end returns nil.
+          return false if line.getbyte(first_non_space).nil?
 
-          content = first_non_space <= 3 ? line[first_non_space..] : line
+          # Indented code (4+ spaces or any leading \t) is not a paragraph.
+          # INDENTED_CODE also catches lines where first_non_space > 3, so no
+          # separate numeric boundary check is needed.
+          return false if INDENTED_CODE.match?(line)
 
-          # Lines starting with [ get escaped to \[, which IS paragraph content
-          # So setext headings CAN follow them
-          return true if content.getbyte(0) == BRACKET_OPEN
+          content = first_non_space == 0 ? line : line[first_non_space..]
 
-          !block_construct?(content) && !INDENTED_CODE.match?(line)
+          # Lines starting with [ are paragraph content (the escaper rewrites [
+          # to \[). block_construct? has no BRACKET_OPEN case arm, so such
+          # lines naturally fall through and !block_construct?(content) == true.
+          !block_construct?(content)
         end
 
         # Checks whether content starts with a block-level markdown construct.
         # Used by both escape_block_level (to decide what to escape) and
         # paragraph_line? (to decide if setext underlines can follow).
         def block_construct?(content)
-          first_byte = content.getbyte(0)
-
-          case first_byte
+          case content.getbyte(0)
           when HASH
             ATX_HEADING.match?(content)
           when GT
             true
-          when DASH, PLUS, STAR
-            BULLET_LIST.match?(content) ||
-              (first_byte == DASH && THEMATIC_BREAK_DASH.match?(content)) ||
-              (first_byte == STAR && THEMATIC_BREAK_STAR.match?(content))
+          when DASH
+            BULLET_LIST.match?(content) || THEMATIC_BREAK_DASH.match?(content)
+          when STAR
+            BULLET_LIST.match?(content) || THEMATIC_BREAK_STAR.match?(content)
+          when PLUS
+            BULLET_LIST.match?(content)
           when UNDERSCORE
             THEMATIC_BREAK_UNDERSCORE.match?(content)
           when BACKTICK

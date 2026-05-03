@@ -47,6 +47,52 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_fenced_block).to be true
     end
 
+    # Kills mutations that drop or loosen the `fence_char == "`" ||
+    # fence_char == "~"` guard. Without that guard, any repeated
+    # non-fence character at line start (e.g. "aaa") would be counted
+    # by count_fence_chars and mis-identified as an opening fence.
+    it "does not open a fence with non-backtick/tilde characters" do
+      input = "aaaaaa not a fence\n"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    it "does not open a fence with repeated hash characters" do
+      input = "#### heading-like\n"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    # Kills mutations on the `fence_length < 3` guard (< 2, < 1, < 0).
+    # 1 and 2 backtick / tilde sequences must NOT open a fence.
+    it "does not open a fence with fewer than 3 backticks" do
+      input = "``not a fence\n"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    it "does not open a fence with a single backtick at line start" do
+      input = "`inline`"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    it "does not open a fence with fewer than 3 tildes" do
+      input = "~~not a fence\n"
+      new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be false
+    end
+
     it "allows up to 3 spaces of indentation" do
       input = "   ```\ncode\n```"
       new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
@@ -82,6 +128,28 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_fenced_block).to be false
     end
 
+    # Kills mutations on the `scan_pos >= input_length || input[scan_pos]
+    # == "\n"` branch. With more content after the closing fence + \n,
+    # the \n arm is what closes the fence (the `>= input_length` arm
+    # only fires at actual EOF).
+    it "detects closing fence followed by a newline and more content" do
+      input = "```\ncode\n```\ntrailing"
+      tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      new_pos = tracker.check_fenced_boundary(input, 9, line_start: true)
+      expect(new_pos).to eq(13) # Position after "```\n"
+      expect(tracker.in_fenced_block).to be false
+    end
+
+    it "rejects a closing fence followed by non-whitespace content" do
+      input = "```\ncode\n``` text"
+      tracker.check_fenced_boundary(input, 0, line_start: true)
+
+      new_pos = tracker.check_fenced_boundary(input, 9, line_start: true)
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be true
+    end
+
     it "requires matching fence character for close" do
       input = "```\ncode\n~~~"
       # Open with backticks
@@ -104,6 +172,35 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_fenced_block).to be false
     end
 
+    # Kills mutations that drop `fence_length >= @fence_length` from
+    # try_close_fence's guard. A candidate closing fence with FEWER
+    # chars than the opening must not close it.
+    it "rejects closing fence with fewer characters than opening" do
+      input = "````\ncode\n```\ncontent"
+      # Open with 4 backticks
+      tracker.check_fenced_boundary(input, 0, line_start: true)
+      expect(tracker.in_fenced_block).to be true
+
+      # "```" (3 backticks) should NOT close the 4-backtick fence
+      new_pos = tracker.check_fenced_boundary(input, 10, line_start: true)
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be true
+    end
+
+    # Kills mutations that drop `input[scan_pos] == "\n"` from the
+    # trailing-whitespace guard. After a closing fence with non-newline
+    # non-space trailing content (e.g. "```XYZ"), it must NOT close.
+    it "rejects closing fence followed by non-space non-newline content" do
+      input = "```\ncode\n```XYZ"
+      tracker.check_fenced_boundary(input, 0, line_start: true)
+      expect(tracker.in_fenced_block).to be true
+
+      # "```XYZ" has trailing "XYZ" — not spaces-then-newline/EOF
+      new_pos = tracker.check_fenced_boundary(input, 9, line_start: true)
+      expect(new_pos).to be_nil
+      expect(tracker.in_fenced_block).to be true
+    end
+
     it "handles fence with language identifier" do
       input = "```ruby\ncode\n```"
       new_pos = tracker.check_fenced_boundary(input, 0, line_start: true)
@@ -122,6 +219,43 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_inline_code).to be true
     end
 
+    # Kills `@inline_delimiter = input[delimiter_start...pos]` →
+    # `@inline_delimiter = input[nil...pos]`. With nil-start the
+    # slice starts at 0, swallowing any prefix before the delimiter.
+    it "detects opening backticks at a mid-string position" do
+      input = "xx``code``"
+      new_pos = tracker.check_inline_boundary(input, 2)
+
+      expect(new_pos).to eq(4)
+      # `close at pos 8 only succeeds if @inline_delimiter was set
+      # to exactly "``" (2 backticks starting at pos 2) — the mutation
+      # would produce "xx``" (4 chars) and close wouldn't match.
+      close_pos = tracker.check_inline_boundary(input, 8)
+      expect(close_pos).to eq(10)
+      expect(tracker.in_inline_code).to be false
+    end
+
+    # Kills mutations on the `input[pos] != "`"` guard. At a non-backtick
+    # position the method must return nil without touching in_inline_code
+    # or @inline_delimiter; otherwise mutations to `if nil` / `if false`
+    # / `if input[pos].eql?("`")` etc. would fall through to open_inline
+    # and return a non-nil position.
+    it "returns nil at non-backtick positions" do
+      input = "hello `code`"
+      new_pos = tracker.check_inline_boundary(input, 0)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_inline_code).to be false
+    end
+
+    it "returns nil past end of input" do
+      input = "abc"
+      new_pos = tracker.check_inline_boundary(input, 3)
+
+      expect(new_pos).to be_nil
+      expect(tracker.in_inline_code).to be false
+    end
+
     it "detects closing backtick" do
       input = "`code`"
       tracker.check_inline_boundary(input, 0) # Open
@@ -138,8 +272,12 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(new_pos).to eq(2)
       expect(tracker.in_inline_code).to be true
 
-      # Single ` inside should not close
-      new_pos = tracker.check_inline_boundary(input, 13)
+      # Single ` at pos 12 (one backtick not matching the `` delimiter)
+      # must NOT close the inline. Kills try_close_inline mutations
+      # that drop the `input[pos, delim_length] == @inline_delimiter`
+      # guard — without it, a lone `` ` `` would satisfy the
+      # "no trailing backtick" check and spuriously close the span.
+      new_pos = tracker.check_inline_boundary(input, 12)
       expect(new_pos).to be_nil
       expect(tracker.in_inline_code).to be true
 
@@ -226,6 +364,23 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       expect(tracker.in_indented_block).to be true
     end
 
+    # Kills `is_blank = line_content.match?(/\A\s*\z/)` → `.match?(/\A\S*\z/)`.
+    # A whitespace-only line (not empty) must still count as blank so
+    # the indented block continues across it. With `\S*`, a 3-space
+    # line fails the blank check AND fails the code-indent check
+    # (start_with?("    ") wants 4), so the block ends.
+    it "continues indented block across a whitespace-only (<4 spaces) line" do
+      input = "    line1\n   \n    line2"
+      # Start block
+      tracker.check_indented_boundary(input, 0, line_start: true)
+      expect(tracker.in_indented_block).to be true
+
+      # Whitespace-only line (3 spaces)
+      new_pos = tracker.check_indented_boundary(input, 10, line_start: true)
+      expect(new_pos).not_to be_nil
+      expect(tracker.in_indented_block).to be true
+    end
+
     it "ends indented block on non-indented line" do
       input = "    code\nnot code"
       # Start code block
@@ -278,6 +433,16 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker do
       tracker.reset!
 
       expect(tracker.in_indented_block).to be false
+    end
+
+    it "resets inline code state" do
+      input = "`code"
+      tracker.check_inline_boundary(input, 0)
+      expect(tracker.in_inline_code).to be true
+
+      tracker.reset!
+
+      expect(tracker.in_inline_code).to be false
     end
   end
 end

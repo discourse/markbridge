@@ -525,7 +525,8 @@ module Markbridge
             id: "media-wiki-tables",
             format: "media_wiki",
             scenario: "tables",
-            description: "Wikitext tables with inline !! || separators, per-line cells, and internal links with pipes",
+            description:
+              "Wikitext tables with inline !! || separators, per-line cells, and internal links with pipes",
             highlights: %w[
               table
               header

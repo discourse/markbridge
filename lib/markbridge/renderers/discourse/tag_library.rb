@@ -29,37 +29,25 @@ module Markbridge
         # @return [self]
         def auto_register!
           Tags.constants.each do |tag_constant|
-            tag_class = Tags.const_get(tag_constant)
-            next unless tag_class.is_a?(Class) && tag_class < Tag
-
-            # Extract element name from tag name: BoldTag → Bold
-            element_name = tag_constant.to_s.sub(/Tag$/, "")
-            element_class =
-              begin
-                AST.const_get(element_name)
-              rescue StandardError
-                nil
-              end
-
-            register(element_class, tag_class.new) if element_class
+            element_class = ast_class_for(tag_constant)
+            register(element_class, Tags.const_get(tag_constant).new) if element_class
           end
-
           self
+        end
+
+        # Look up the AST element class matching a +XxxTag+ constant via the
+        # +XxxTag → AST::Xxx+ naming convention.
+        # @return [Class, nil]
+        def ast_class_for(tag_constant)
+          AST.const_get(tag_constant.to_s.sub(/Tag\z/, ""))
+        rescue NameError
+          nil
         end
 
         # Create the default tag library for Discourse Markdown
         # @return [TagLibrary]
         def self.default
-          library = new
-
-          # Auto-register tags based on naming convention
-          library.auto_register!
-
-          # Special cases: inline tags that don't follow the convention
-          library.register AST::LineBreak, Tags::LineBreakTag.new
-          library.register AST::HorizontalRule, Tags::HorizontalRuleTag.new
-
-          library
+          new.auto_register!
         end
       end
     end

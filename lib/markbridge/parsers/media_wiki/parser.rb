@@ -21,26 +21,19 @@ module Markbridge
       #   parser = Markbridge::Parsers::MediaWiki::Parser.new
       #   ast = parser.parse("'''bold''' and ''italic''")
       class Parser
-        def initialize
-          @document = nil
-          @inline_parser = nil
-          @list_stack = []
-        end
-
         # Parse MediaWiki wikitext into an AST Document.
         #
         # @param input [String] MediaWiki source
         # @return [AST::Document]
         def parse(input)
           normalized = normalize_line_endings(input)
-          lines = normalized.split("\n", -1)
+          lines = normalized.split("\n")
 
           @document = AST::Document.new
           @inline_parser = InlineParser.new
           @list_stack = []
 
           process_lines(lines)
-          close_open_lists
           @document
         end
 
@@ -60,7 +53,7 @@ module Markbridge
         def process_lines(lines)
           i = 0
           while i < lines.length
-            line = lines[i]
+            line = lines.fetch(i)
 
             if heading_line?(line)
               close_open_lists
@@ -90,12 +83,15 @@ module Markbridge
           end
         end
 
+        HEADING_LINE = /\A={1,6}(?:[^=].*[^=]={1,6}|[^=]+=*)\s*\z/
+        private_constant :HEADING_LINE
+
         # Check if a line is a heading (starts and ends with = signs).
         #
         # @param line [String]
         # @return [Boolean]
         def heading_line?(line)
-          line.match?(/\A={1,6}[^=].*[^=]={1,6}\s*\z/) || line.match?(/\A={1,6}[^=]+=*\s*\z/)
+          line.match?(HEADING_LINE)
         end
 
         # Check if a line is a horizontal rule (4+ dashes).
@@ -135,8 +131,12 @@ module Markbridge
         # @param line [String]
         # @return [Boolean]
         def blank_line?(line)
-          line.strip.empty?
+          !line.match?(/\S/)
         end
+
+        HEADING_LEVEL_PREFIX = /\A={1,6}/
+        HEADING_LEVEL_SUFFIX = /\s*={1,6}\s*\z/
+        private_constant :HEADING_LEVEL_PREFIX, :HEADING_LEVEL_SUFFIX
 
         # Check if a line starts a table ({|).
         #
@@ -253,23 +253,16 @@ module Markbridge
           end
 
           parts << buffer
-          parts
         end
 
         # Process a heading line and add it to the document.
         #
         # @param line [String]
         def process_heading(line)
-          stripped = line.strip
-          # Count leading = signs for level
-          level = 0
-          level += 1 while level < stripped.length && stripped[level] == "="
-          level = [level, 6].min
+          leading = line[HEADING_LEVEL_PREFIX]
+          content = line[leading.length..].sub(HEADING_LEVEL_SUFFIX, "").strip
 
-          # Remove leading/trailing = signs and whitespace
-          content = stripped[level..].sub(/\s*={1,6}\s*\z/, "").strip
-
-          heading = AST::Heading.new(level:)
+          heading = AST::Heading.new(level: leading.length)
           @inline_parser.parse(content, parent: heading)
           @document << heading
         end
@@ -278,48 +271,28 @@ module Markbridge
         #
         # @param line [String]
         def process_list_item(line)
-          # Count prefix characters to determine depth and type
-          prefix = +""
-          i = 0
-          while i < line.length && (line[i] == "*" || line[i] == "#")
-            prefix << line[i]
-            i += 1
-          end
+          prefix = line[/\A[*#]+/]
+          content = line[prefix.length..].strip
 
-          content = line[i..].strip
-          desired_depth = prefix.length
+          reconcile_list_stack(prefix)
 
-          # Adjust list stack to match desired depth
-          reconcile_list_stack(prefix, desired_depth)
-
-          # Create list item and add content
           item = AST::ListItem.new
           @inline_parser.parse(content, parent: item)
-          @list_stack.last[:list] << item
+          @list_stack.last.fetch(:list) << item
         end
 
         # Reconcile the list stack with the desired prefix.
         # Opens new lists or closes existing ones as needed.
         #
         # @param prefix [String] the list prefix characters (e.g., "**#")
-        # @param desired_depth [Integer]
-        def reconcile_list_stack(prefix, desired_depth)
-          # Close lists that no longer match
-          @list_stack.pop while @list_stack.length > desired_depth
+        def reconcile_list_stack(prefix)
+          keep = matching_prefix_depth(prefix)
+          @list_stack.pop while @list_stack.length > keep
+          prefix[keep..].each_char { |char| open_new_list(char == "#", @list_stack.length) }
+        end
 
-          # Check if existing stack entries match the type at each level
-          prefix.chars.each_with_index do |char, idx|
-            ordered = char == "#"
-            if idx < @list_stack.length
-              # If type changed at this level, close from here and reopen
-              if @list_stack[idx][:ordered] != ordered
-                @list_stack.pop while @list_stack.length > idx
-                open_new_list(ordered, idx)
-              end
-            else
-              open_new_list(ordered, idx)
-            end
-          end
+        def matching_prefix_depth(prefix)
+          @list_stack.take_while.with_index { |entry, i| entry.fetch(:char) == prefix[i] }.length
         end
 
         # Open a new list at the given depth.
@@ -332,13 +305,12 @@ module Markbridge
           if depth.zero?
             @document << list
           else
-            # Nest inside the last item of the parent list
-            parent_list = @list_stack.last[:list]
+            parent_list = @list_stack.last.fetch(:list)
             parent_list << AST::ListItem.new if parent_list.children.empty?
             parent_list.children.last << list
           end
 
-          @list_stack << { list:, ordered: }
+          @list_stack << { list:, char: ordered ? "#" : "*" }
         end
 
         # Close all open lists.
@@ -352,20 +324,20 @@ module Markbridge
         # @param start_index [Integer]
         # @return [Integer] the last index consumed (will be incremented by caller)
         def process_preformatted_block(lines, start_index)
-          content_lines = []
-          i = start_index
-
-          while i < lines.length && lines[i].start_with?(" ")
-            content_lines << lines[i][1..] # Remove leading space
-            i += 1
-          end
+          consumed = lines[start_index..].take_while { |line| line.start_with?(" ") }
+          content = consumed.map { |line| line[1..] }.join("\n")
 
           code = AST::Code.new
-          code << AST::Text.new(content_lines.join("\n"))
+          code << AST::Text.new(content)
           @document << code
 
-          i - 1 # Return last consumed index
+          start_index + consumed.length - 1
         end
+
+        PRE_TAG_OPEN = /\A\s*<pre\b[^>]*>/i
+        PRE_TAG_CLOSE = %r{</pre\s*>}i
+        PRE_TAG_CLOSE_TRAILING = %r{</pre\s*>\s*\z}i
+        private_constant :PRE_TAG_OPEN, :PRE_TAG_CLOSE, :PRE_TAG_CLOSE_TRAILING
 
         # Process a <pre>...</pre> block that may span multiple lines.
         #
@@ -373,24 +345,18 @@ module Markbridge
         # @param start_index [Integer]
         # @return [Integer] the last index consumed
         def process_pre_tag_block(lines, start_index)
-          combined = +""
-          i = start_index
+          consumed = lines[start_index..].take_while { |line| !line.match?(PRE_TAG_CLOSE) }
+          terminated = consumed.length < lines.length - start_index
+          consumed << lines.fetch(start_index + consumed.length) if terminated
 
-          while i < lines.length
-            combined << lines[i]
-            break if lines[i].match?(%r{</pre\s*>}i)
-            combined << "\n"
-            i += 1
-          end
-
-          # Extract content between <pre> and </pre>
-          content = combined.sub(/\A\s*<pre\b[^>]*>/i, "").sub(%r{</pre\s*>\s*\z}i, "")
+          combined = consumed.join("\n")
+          content = combined.sub(PRE_TAG_OPEN, "").sub(PRE_TAG_CLOSE_TRAILING, "")
 
           code = AST::Code.new
           code << AST::Text.new(content)
           @document << code
 
-          i
+          start_index + consumed.length - 1
         end
 
         # Process a line as inline content wrapped in a paragraph.

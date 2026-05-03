@@ -11,8 +11,6 @@ module Markbridge
           # @param parent [AST::Element] the parent AST node
           # @return [AST::Element, nil] the created element if children should be processed, nil otherwise
           def process(element:, parent:)
-            # Default: do nothing, subclasses override
-            nil
           end
 
           # The element class created by this handler

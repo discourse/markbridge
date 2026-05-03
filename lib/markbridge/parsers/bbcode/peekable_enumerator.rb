@@ -10,7 +10,7 @@ module Markbridge
       # `next_token`) so callers can:
       # - inspect the next token with {#peek} without advancing the scanner
       # - inspect several upcoming tokens with {#peek_ahead}
-      # - consume tokens with {#next}
+      # - consume tokens with {#next} (returns `nil` when exhausted)
       #
       # The enumerator is lazy: tokens are only requested from the scanner
       # when needed. Once the underlying scanner returns `nil`, the enumerator
@@ -32,71 +32,29 @@ module Markbridge
         def initialize(scanner)
           @scanner = scanner
           @peeked = []
-          @finished = false
         end
 
         # Consume and return the next token.
-        #
-        # If there are tokens in the internal buffer (from prior peeks) the
-        # buffered token is returned. Otherwise, the next token is requested
-        # from the underlying scanner via `next_token`.
-        #
         # @return [Object, nil] next token or `nil` when exhausted
         def next
-          return @peeked.shift if @peeked.any?
-          return nil if @finished
-
-          value = @scanner.next_token
-          @finished = true if value.nil?
-          value
-        end
-
-        # Return whether more tokens are available.
-        #
-        # This will attempt to fetch one token from the scanner if necessary
-        # to determine whether more tokens remain.
-        #
-        # @return [Boolean] `true` if at least one token is available
-        def has_next?
-          return true if @peeked.any?
-          return false if @finished
-
-          value = @scanner.next_token
-          if value.nil?
-            @finished = true
-            false
-          else
-            @peeked << value
-            true
-          end
+          ensure_peeked(1)
+          @peeked.shift
         end
 
         # Peek at the next single token without consuming it.
-        #
-        # If the enumerator has been exhausted this returns `nil`.
-        #
         # @return [Object, nil] the next token or `nil` when exhausted
         def peek
-          return @peeked.first if @peeked.any?
-          return nil if @finished
-
           ensure_peeked(1)
           @peeked.first
         end
 
         # Peek ahead at up to `count` upcoming tokens without consuming them.
-        #
-        # The method will return an array with at most `count` elements.
-        # If fewer tokens remain, a shorter array is returned. When the
-        # enumerator is exhausted an empty array is returned.
-        #
-        # @param count [Integer] number of tokens to peek ahead (non\-negative)
+        # @param count [Integer] number of tokens to peek ahead (clamped to 0..)
         # @return [Array<Object>] array of upcoming tokens (possibly empty)
         def peek_ahead(count)
-          return [] if count <= 0
-
+          count = [count, 0].max
           ensure_peeked(count)
-          @peeked.take(count)
+          @peeked.first(count)
         end
 
         alias next_token next
@@ -104,19 +62,11 @@ module Markbridge
         private
 
         # Ensure at least `count` items are present in the peek buffer.
-        #
-        # This will repeatedly call `next_token` on the scanner until the
-        # buffer contains `count` items or the scanner returns `nil`.
-        #
-        # @param count [Integer] desired buffer size
-        # @return [void]
         def ensure_peeked(count)
-          while !@finished && @peeked.size < count
+          while @peeked.size < count
             value = @scanner.next_token
-            if value.nil?
-              @finished = true
-              break
-            end
+            break if value.nil?
+
             @peeked << value
           end
         end

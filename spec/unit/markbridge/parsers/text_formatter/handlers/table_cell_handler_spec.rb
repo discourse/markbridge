@@ -25,6 +25,17 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::TableCellHandler do
       expect(parent.children[0].header?).to be true
       expect(result).to eq(parent.children[0])
     end
+
+    it "treats lowercase <th> as a header cell (case-insensitive)" do
+      # Kills `element.name.upcase == "TH"` → `element.name == "TH"`.
+      # Without the upcase, a lowercase `th` would fail the equality
+      # check and be classified as a data cell.
+      element = Nokogiri.XML("<th>header</th>").root
+
+      handler.process(element:, parent:)
+
+      expect(parent.children[0].header?).to be true
+    end
   end
 
   describe "#element_class" do

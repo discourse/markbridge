@@ -38,5 +38,37 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
       result = tag.render(element, interface)
       expect(result).to eq("> Line 1\n> Line 2\n> Line 3\n\n")
     end
+
+    it "falls back to author-only form when post is missing but topic and username are set" do
+      element = Markbridge::AST::Quote.new(author: "John", topic: "456", username: "john")
+      element << Markbridge::AST::Text.new("hi")
+
+      expect(tag.render(element, interface)).to eq("[quote=\"John\"]\nhi\n[/quote]\n\n")
+    end
+
+    it "falls back to author-only form when topic is missing but post and username are set" do
+      element = Markbridge::AST::Quote.new(author: "John", post: "123", username: "john")
+      element << Markbridge::AST::Text.new("hi")
+
+      expect(tag.render(element, interface)).to eq("[quote=\"John\"]\nhi\n[/quote]\n\n")
+    end
+
+    it "falls back to author-only form when username is missing but post and topic are set" do
+      element = Markbridge::AST::Quote.new(author: "John", post: "123", topic: "456")
+      element << Markbridge::AST::Text.new("hi")
+
+      expect(tag.render(element, interface)).to eq("[quote=\"John\"]\nhi\n[/quote]\n\n")
+    end
+
+    it "falls back to plain blockquote when no attribution is present" do
+      element = Markbridge::AST::Quote.new(post: "123", topic: "456")
+      element << Markbridge::AST::Text.new("hi")
+
+      # post + topic without username AND without author -> plain blockquote
+      expect(tag.render(element, interface)).to eq("> hi\n\n")
+    end
+
+    let(:element_class) { Markbridge::AST::Quote }
+    it_behaves_like "a tag that propagates parent context"
   end
 end

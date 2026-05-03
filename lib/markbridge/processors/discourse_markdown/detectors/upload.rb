@@ -22,11 +22,18 @@ module Markbridge
         #   match = detector.detect(input, 0)
         #   match.node.type # => :attachment
         class Upload < Base
-          # Pattern for image: ![alt|dimensions](upload://sha1.ext)
-          IMAGE_PATTERN = %r{!\[([^\]]*)\]\(upload://([^)]+)\)}
+          # Image: ![alt|dimensions](upload://sha1.ext)
+          IMAGE_PATTERN =
+            %r{\A!\[(?<alt>[^|\]]*)(?:\|(?<dimensions>[^\]]*))?\]\(upload://(?<url>[^)]+)\)}
 
-          # Pattern for attachment: [filename|attachment](upload://sha1.ext) followed by optional (size)
-          ATTACHMENT_PATTERN = %r{\[([^\]]*\|attachment)\]\(upload://([^)]+)\)(\s*\([^)]+\))?}
+          # Attachment: [filename|attachment](upload://sha1.ext) (size)
+          ATTACHMENT_PATTERN =
+            %r{
+            \A
+            \[(?<filename>[^|\]]*)\|attachment\]
+            \(upload://(?<url>[^)]+)\)
+            (?:\s*\((?<size>[^)]+)\))?
+          }xi
 
           # Attempt to detect an upload at the given position.
           #
@@ -34,14 +41,11 @@ module Markbridge
           # @param pos [Integer] current position to check
           # @return [Match, nil] match result or nil if no match
           def detect(input, pos)
-            char = input[pos]
-            return nil unless char == "!" || char == "["
-
             remaining = input[pos..]
-
-            if char == "!"
+            case input[pos]
+            when "!"
               detect_image(remaining, pos)
-            else
+            when "["
               detect_attachment(remaining, pos)
             end
           end
@@ -50,71 +54,42 @@ module Markbridge
 
           def detect_image(remaining, pos)
             match = IMAGE_PATTERN.match(remaining)
-            return nil unless match&.begin(0)&.zero?
+            return nil unless match
 
-            raw = match[0]
-            alt_part = match[1]
-            url_part = match[2]
+            sha1, filename = parse_upload_url(match[:url])
+            alt = match[:alt]
+            alt = nil if alt.empty?
 
-            # Parse alt and dimensions from "alt|dimensions" format
-            alt, dimensions = parse_alt_dimensions(alt_part)
+            # `type: :image` is omitted because it is AST::Upload's default -
+            # passing it explicitly was an equivalent-mutation surface.
+            node =
+              AST::Upload.new(sha1:, filename:, alt:, dimensions: match[:dimensions], raw: match[0])
 
-            # Extract SHA1 and filename from URL
-            sha1, filename = parse_upload_url(url_part)
-
-            node = AST::Upload.new(sha1:, filename:, type: :image, alt:, dimensions:, raw:)
-
-            Match.new(start_pos: pos, end_pos: pos + raw.length, node:)
+            Match.new(start_pos: pos, end_pos: pos + match[0].length, node:)
           end
 
           def detect_attachment(remaining, pos)
             match = ATTACHMENT_PATTERN.match(remaining)
-            return nil unless match&.begin(0)&.zero?
+            return nil unless match
 
-            raw = match[0]
-            name_part = match[1]
-            url_part = match[2]
-            size_part = match[3]
+            sha1, = parse_upload_url(match[:url])
 
-            # Parse filename from "filename|attachment" format
-            filename = name_part.sub(/\|attachment$/i, "")
+            node =
+              AST::Upload.new(
+                sha1:,
+                filename: match[:filename],
+                type: :attachment,
+                size: match[:size],
+                raw: match[0],
+              )
 
-            # Extract SHA1 from URL
-            sha1, _url_filename = parse_upload_url(url_part)
-
-            # Parse size if present
-            size = size_part&.strip&.delete_prefix("(")&.delete_suffix(")")
-
-            node = AST::Upload.new(sha1:, filename:, type: :attachment, size:, raw:)
-
-            Match.new(start_pos: pos, end_pos: pos + raw.length, node:)
+            Match.new(start_pos: pos, end_pos: pos + match[0].length, node:)
           end
 
-          def parse_alt_dimensions(alt_part)
-            return nil, nil if alt_part.nil? || alt_part.empty?
-
-            if alt_part.include?("|")
-              parts = alt_part.split("|", 2)
-              alt = parts[0].empty? ? nil : parts[0]
-              dimensions = parts[1]
-              [alt, dimensions]
-            else
-              [alt_part, nil]
-            end
-          end
-
+          # URL format: sha1.ext or just sha1. Returns [sha1, filename-or-nil].
           def parse_upload_url(url_part)
-            # URL format: sha1.ext or just sha1
-            if url_part.include?(".")
-              parts = url_part.split(".", 2)
-              sha1 = parts[0]
-              filename = url_part
-            else
-              sha1 = url_part
-              filename = nil
-            end
-
-            [sha1, filename]
+            sha1, _, ext = url_part.partition(".")
+            [sha1, ext.empty? ? nil : url_part]
           end
         end
       end

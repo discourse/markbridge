@@ -5,14 +5,33 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::RawHandler do
   let(:handler) { described_class.new(element_class) }
 
   describe "#initialize" do
-    it "accepts an element class" do
-      expect { described_class.new(Markbridge::AST::Code) }.not_to raise_error
+    it "exposes the element_class via reader" do
+      expect(described_class.new(Markbridge::AST::Code).element_class).to eq(Markbridge::AST::Code)
     end
 
-    it "accepts a custom collector" do
-      custom_collector = Markbridge::Parsers::BBCode::RawContentCollector.new
-      handler = described_class.new(element_class, collector: custom_collector)
-      expect(handler).to be_a(described_class)
+    it "uses a default collector that collects body content until the closing tag" do
+      # When no collector is passed, the default RawContentCollector is used
+      # and produces a Code element with the collected text.
+      document = Markbridge::AST::Document.new
+      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+      registry = Markbridge::Parsers::BBCode::HandlerRegistry.new
+
+      token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "code",
+          attrs: {
+          },
+          pos: 0,
+          source: "[code]",
+        )
+      text_token = Markbridge::Parsers::BBCode::TextToken.new(text: "body", pos: 6)
+      close_token =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "code", pos: 10, source: "[/code]")
+      scanner = MockScanner.new([text_token, close_token])
+
+      described_class.new(element_class).on_open(token:, context:, registry:, tokens: scanner)
+
+      expect(document.children.first.children.first.text).to eq("body")
     end
   end
 
@@ -173,6 +192,62 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::RawHandler do
       code_element = document.children.first
       # Should collect everything until the matching closing tag
       expect(code_element.children.first.text).to eq("[code]nested[/code]")
+    end
+
+    it "marks the tag as unclosed in the context when no closing tag is found" do
+      token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "code",
+          attrs: {
+          },
+          pos: 0,
+          source: "[code]",
+        )
+      text_token = Markbridge::Parsers::BBCode::TextToken.new(text: "no close here", pos: 6)
+      scanner = MockScanner.new([text_token]) # no closing tag
+
+      handler.on_open(token:, context:, registry:, tokens: scanner)
+
+      expect(context.unclosed_raw_tags).to eq("code" => 1)
+    end
+
+    it "does not mark the tag as unclosed when the closing tag is present" do
+      token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "code",
+          attrs: {
+          },
+          pos: 0,
+          source: "[code]",
+        )
+      close_token =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "code", pos: 6, source: "[/code]")
+      scanner = MockScanner.new([close_token])
+
+      handler.on_open(token:, context:, registry:, tokens: scanner)
+
+      expect(context.unclosed_raw_tags).to be_empty
+    end
+  end
+
+  describe "#on_close" do
+    let(:document) { Markbridge::AST::Document.new }
+    let(:context) { Markbridge::Parsers::BBCode::ParserState.new(document) }
+    let(:registry) { Markbridge::Parsers::BBCode::HandlerRegistry.new }
+
+    it "appends the closing-tag source as text to the current element" do
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "code", pos: 0, source: "[/code]")
+
+      handler.on_close(token:, context:, registry:)
+
+      expect(document.children.first).to be_a(Markbridge::AST::Text)
+      expect(document.children.first.text).to eq("[/code]")
+    end
+
+    it "treats an omitted tokens kwarg the same as tokens: nil" do
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "code", pos: 0, source: "[/code]")
+
+      expect { handler.on_close(token:, context:, registry:) }.not_to raise_error
     end
   end
 end

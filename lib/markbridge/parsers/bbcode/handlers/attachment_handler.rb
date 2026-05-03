@@ -38,21 +38,26 @@ module Markbridge
             @collector.collect(token.tag, tokens).content
           end
 
+          CLOSING_TAG_PEEK_DEPTH = 100
+          private_constant :CLOSING_TAG_PEEK_DEPTH
+
           def closing_tag_ahead?(tag, tokens)
-            tokens.peek_ahead(100).any? { |token| token.is_a?(TagEndToken) && token.tag == tag }
+            tokens
+              .peek_ahead(CLOSING_TAG_PEEK_DEPTH)
+              .any? { |token| token.instance_of?(TagEndToken) && token.tag == tag }
           end
 
           def build_attachment(token:, content:)
             attrs = normalize_attrs(token.attrs)
             option = attrs[:option]
-            body = presence(content&.strip)
+            body = presence(content)
 
             id = preferred_id(attrs)
             index = preferred_index(attrs)
             filename = attrs[:filename]
             alt = attrs[:alt]
 
-            index ||= option if option && numeric?(option)
+            index ||= option if numeric?(option)
             id, filename = apply_body_content(body:, id:, index:, filename:)
 
             AST::Attachment.new(id:, index:, filename:, alt:)
@@ -63,8 +68,6 @@ module Markbridge
           end
 
           def apply_body_content(body:, id:, index:, filename:)
-            return id, filename unless body
-
             if id.nil?
               return body, filename if index.nil?
               return body, filename if numeric?(body)
@@ -75,27 +78,29 @@ module Markbridge
             [id, filename]
           end
 
+          # Caller must have applied normalize_attrs first (whitespace already stripped).
           def preferred_id(attrs)
-            presence(attrs[:msg]) || presence(attrs[:id])
+            attrs[:msg] || attrs[:id]
           end
 
+          # Caller must have applied normalize_attrs first.
           def preferred_index(attrs)
-            explicit_index = presence(attrs[:index])
-            smf_index = presence(attrs[:id]) if attrs[:msg]
-
-            explicit_index || smf_index
+            attrs[:index] || (attrs[:id] if attrs[:msg])
           end
 
+          # Callers only ever pass String or nil (via #normalize_attrs
+          # over token.attrs, which the BBCode scanner populates with
+          # String values exclusively), so no defensive non-String
+          # passthrough is needed here or in #numeric?.
           def presence(value)
             return if value.nil?
-            return value unless value.is_a?(String)
 
             stripped = value.strip
             stripped unless stripped.empty?
           end
 
           def numeric?(value)
-            value.is_a?(String) && value.match?(/\A\d+\z/)
+            value&.match?(/\A\d+\z/)
           end
         end
       end

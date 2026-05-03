@@ -18,4 +18,12 @@ RSpec.describe Markbridge::AST::Align do
 
     expect(element.alignment).to be_nil
   end
+
+  it "can have children" do
+    element = described_class.new
+    text = Markbridge::AST::Text.new("aligned text")
+    element << text
+
+    expect(element.children).to eq([text])
+  end
 end

@@ -142,7 +142,7 @@ module Markbridge
       parser.parse(input.to_s)
     end
 
-    def render_to_markdown(ast, tag_library: nil)
+    def render_to_markdown(ast, tag_library:)
       tag_library ||= default_tag_library
       renderer = build_renderer(tag_library:)
       cleanup_markdown(renderer.render(ast))
@@ -159,7 +159,7 @@ module Markbridge
     def cleanup_markdown(text)
       text
         .gsub(/\n{3,}/, "\n\n") # Max 2 consecutive newlines
-        .gsub(/^[ \t]+$/m, "") # Remove whitespace-only lines
+        .gsub(/^[ \t]+$/, "") # Remove whitespace-only lines
         .strip # Trim leading/trailing whitespace
     end
   end

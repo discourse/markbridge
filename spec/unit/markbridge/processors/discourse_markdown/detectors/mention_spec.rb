@@ -82,5 +82,41 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Detectors::Mention do
       expect(match).not_to be_nil
       expect(match.node.name).to eq("gerhard")
     end
+
+    it "defaults the mention type to :user when no resolver is given" do
+      match = detector.detect("@gerhard", 0)
+
+      expect(match.node.type).to eq(:user)
+    end
+
+    context "with a type resolver" do
+      it "uses the resolver's result as the mention type" do
+        resolver = ->(name) { name == "Testers" ? :group : :user }
+        detector = described_class.new(type_resolver: resolver)
+
+        expect(detector.detect("@Testers", 0).node.type).to eq(:group)
+        expect(detector.detect("@gerhard", 0).node.type).to eq(:user)
+      end
+
+      it "falls back to :user when the resolver returns nil" do
+        resolver = ->(_name) { nil }
+        detector = described_class.new(type_resolver: resolver)
+
+        expect(detector.detect("@x", 0).node.type).to eq(:user)
+      end
+
+      it "passes the resolved name (not the whole input) to the resolver" do
+        received = nil
+        resolver = ->(name) do
+          received = name
+          :user
+        end
+        detector = described_class.new(type_resolver: resolver)
+
+        detector.detect("hi @alice!", 3)
+
+        expect(received).to eq("alice")
+      end
+    end
   end
 end

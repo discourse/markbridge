@@ -22,4 +22,12 @@ RSpec.describe Markbridge::AST::Image do
     expect(element.width).to be_nil
     expect(element.height).to be_nil
   end
+
+  it "can have children" do
+    element = described_class.new
+    text = Markbridge::AST::Text.new("alt-like content")
+    element << text
+
+    expect(element.children).to eq([text])
+  end
 end

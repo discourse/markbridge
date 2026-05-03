@@ -172,6 +172,21 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(parser.unknown_tags["unknown"]).to eq(1)
     end
 
+    it "increments the counter for repeated unknown tags" do
+      parser.parse("<unknown>a</unknown><unknown>b</unknown>")
+
+      expect(parser.unknown_tags["unknown"]).to eq(2)
+    end
+
+    it "clears unknown tags from a previous parse on the next parse" do
+      parser.parse("<unknown>a</unknown>")
+      expect(parser.unknown_tags).to have_key("unknown")
+
+      parser.parse("<b>bold</b>")
+
+      expect(parser.unknown_tags).to be_empty
+    end
+
     it "ignores unknown tags while processing their children" do
       doc = parser.parse("<unknown>content</unknown>")
 
@@ -216,24 +231,38 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
   end
 
   describe "#initialize" do
-    it "accepts custom handlers" do
-      custom_registry = Markbridge::Parsers::HTML::HandlerRegistry.new
-      parser = described_class.new(handlers: custom_registry)
-
-      expect(parser).to be_a(described_class)
+    it "initializes unknown_tags as a counting hash defaulting to 0" do
+      expect(parser.unknown_tags).to be_empty
+      expect(parser.unknown_tags["never-seen"]).to eq(0)
     end
 
-    it "accepts a block to customize handlers" do
+    it "routes parsing through a custom handlers registry when one is passed" do
+      custom_registry = Markbridge::Parsers::HTML::HandlerRegistry.new
+      custom_registry.register(
+        "b",
+        Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Italic),
+      )
+
+      parser = described_class.new(handlers: custom_registry)
+      doc = parser.parse("<b>test</b>")
+
+      expect(doc.children[0]).to be_a(Markbridge::AST::Italic)
+    end
+
+    it "invokes the block with the default registry and uses the resulting handlers" do
       parser =
         described_class.new do |registry|
-          # Block is called with registry
-          expect(registry).to be_a(Markbridge::Parsers::HTML::HandlerRegistry)
+          registry.register(
+            "b",
+            Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Italic),
+          )
         end
+      doc = parser.parse("<b>test</b>")
 
-      expect(parser).to be_a(described_class)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Italic)
     end
 
-    it "uses default handlers when none provided" do
+    it "falls back to the default registry when no block and no handlers are given" do
       parser = described_class.new
 
       doc = parser.parse("<b>test</b>")

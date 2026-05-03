@@ -41,44 +41,21 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
       expect(default_library).to be_a(described_class)
     end
 
-    it "registers Bold tag" do
-      expect(default_library[Markbridge::AST::Bold]).not_to be_nil
-    end
+    Markbridge::Renderers::Discourse::Tags.constants.each do |const_name|
+      tag_class = Markbridge::Renderers::Discourse::Tags.const_get(const_name)
+      next unless tag_class.is_a?(Class) && tag_class < Markbridge::Renderers::Discourse::Tag
+      element_name = const_name.to_s.sub(/Tag$/, "")
+      element_class =
+        begin
+          Markbridge::AST.const_get(element_name)
+        rescue StandardError
+          nil
+        end
+      next unless element_class
 
-    it "registers Italic tag" do
-      expect(default_library[Markbridge::AST::Italic]).not_to be_nil
-    end
-
-    it "registers Strikethrough tag" do
-      expect(default_library[Markbridge::AST::Strikethrough]).not_to be_nil
-    end
-
-    it "registers Underline tag" do
-      expect(default_library[Markbridge::AST::Underline]).not_to be_nil
-    end
-
-    it "registers Code tag" do
-      expect(default_library[Markbridge::AST::Code]).not_to be_nil
-    end
-
-    it "registers Url tag" do
-      expect(default_library[Markbridge::AST::Url]).not_to be_nil
-    end
-
-    it "registers List tag" do
-      expect(default_library[Markbridge::AST::List]).not_to be_nil
-    end
-
-    it "registers ListItem tag" do
-      expect(default_library[Markbridge::AST::ListItem]).not_to be_nil
-    end
-
-    it "registers LineBreak tag" do
-      expect(default_library[Markbridge::AST::LineBreak]).not_to be_nil
-    end
-
-    it "registers HorizontalRule tag" do
-      expect(default_library[Markbridge::AST::HorizontalRule]).not_to be_nil
+      it "registers #{tag_class.name.split("::").last} for #{element_class.name.split("::").last}" do
+        expect(default_library[element_class]).to be_a(tag_class)
+      end
     end
 
     it "renders bold correctly" do
@@ -101,6 +78,16 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
       result = tag.render(italic, interface)
 
       expect(result).to eq("*text*")
+    end
+  end
+
+  describe "#ast_class_for" do
+    it "returns the matching AST class via the XxxTag → AST::Xxx convention" do
+      expect(library.ast_class_for(:BoldTag)).to eq(Markbridge::AST::Bold)
+    end
+
+    it "returns nil when no matching AST class exists" do
+      expect(library.ast_class_for(:NonexistentXyzTag)).to be_nil
     end
   end
 
@@ -135,9 +122,21 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
       expect(result).to eq(library)
     end
 
-    it "skips tags that don't have matching AST elements" do
-      # Should not raise an error even if there's a tag without matching element
-      expect { library.auto_register! }.not_to raise_error
+    it "skips tags whose name does not have a matching AST element class" do
+      # Inject a Tag subclass whose name doesn't map to any AST class.
+      orphan = Class.new(Markbridge::Renderers::Discourse::Tag)
+      Markbridge::Renderers::Discourse::Tags.const_set(:NonexistentXyzTag, orphan)
+
+      begin
+        # Without the guard, `register(nil, ...)` would be called and the nil key
+        # would later overwrite a real lookup via `library[nil]`. Verify the
+        # orphan is silently skipped.
+        library.auto_register!
+
+        expect(library[nil]).to be_nil
+      ensure
+        Markbridge::Renderers::Discourse::Tags.send(:remove_const, :NonexistentXyzTag)
+      end
     end
   end
 end

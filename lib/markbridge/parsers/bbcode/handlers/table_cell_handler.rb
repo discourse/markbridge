@@ -12,7 +12,7 @@ module Markbridge
 
           def on_open(token:, context:, registry:, tokens: nil)
             # Auto-close previous cell if still open
-            context.pop if context.current.is_a?(AST::TableCell)
+            context.pop if context.current.instance_of?(AST::TableCell)
 
             element = AST::TableCell.new(header: token.tag == "th")
             context.push(element, token:)

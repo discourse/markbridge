@@ -17,14 +17,14 @@ module Markbridge
           @parent_cache = parent_cache || build_cache(parents)
         end
 
-        # Create new context with element added to parent chain
-        # Incrementally updates cache instead of rebuilding from scratch
+        # Create new context with element added to parent chain.
+        # Incrementally updates the cache (O(1)) instead of rebuilding from
+        # parents (O(depth)) — important for deeply-nested documents.
         # @param element [AST::Element]
         # @return [RenderContext]
         def with_parent(element)
           new_parents = @parents + [element]
 
-          # Incrementally update cache instead of rebuilding
           new_cache = @parent_cache.dup
           element_class = element.class
           new_cache[element_class] ||= []
@@ -54,7 +54,7 @@ module Markbridge
         # @param klass [Class]
         # @return [Boolean]
         def has_parent?(klass)
-          @parent_cache.key?(klass) && !@parent_cache[klass].empty?
+          !@parent_cache[klass].nil?
         end
 
         # Check if we're at the root (no parents)
@@ -65,14 +65,12 @@ module Markbridge
 
         private
 
-        # Build cache from parents array
-        # Groups parents by class for fast lookup
+        # Build cache from parents array.
+        # Groups parents by class for fast O(1) lookup.
         # @param parents [Array<AST::Element>]
         # @return [Hash{Class => Array<AST::Element>}]
         def build_cache(parents)
-          parents.each_with_object(Hash.new { |h, k| h[k] = [] }) do |parent, cache|
-            cache[parent.class] = cache[parent.class] + [parent]
-          end
+          parents.group_by(&:class)
         end
       end
     end

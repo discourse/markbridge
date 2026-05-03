@@ -30,7 +30,6 @@ module Markbridge
             author, post, topic, username = extract_from_option(token)
             author ||= token.attrs[:author]
 
-            # Explicit attributes override option-parsed values
             {
               author:,
               post: token.attrs[:post] || post,
@@ -43,24 +42,13 @@ module Markbridge
             option = token.attrs[:option]
             return nil, nil, nil, nil unless option
 
-            unless option.match?(/,\s*post:\d+/)
-              # Simple author attribution
-              return option, nil, nil, nil
-            end
+            post = option[/,\s*post:(\d+)/, 1]
+            return option, nil, nil, nil unless post
 
-            # Discourse format: "username, post:123, topic:456"
-            parts = option.split(",").map(&:strip)
-            username = parts[0]
-            post = nil
-            topic = nil
-
-            parts[1..].each do |part|
-              if part =~ /^post:(\d+)$/
-                post = ::Regexp.last_match(1)
-              elsif part =~ /^topic:(\d+)$/
-                topic = ::Regexp.last_match(1)
-              end
-            end
+            # Discourse format: "username, post:123, topic:456" (topic optional,
+            # order irrelevant between post: and topic:).
+            username = option.split(",").first.strip
+            topic = option[/,\s*topic:(\d+)/, 1]
 
             [username, post, topic, username]
           end

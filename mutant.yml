@@ -1,0 +1,479 @@
+usage: opensource
+
+integration:
+  name: rspec
+
+requires:
+  - markbridge/all
+
+includes:
+  - lib
+
+matcher:
+  subjects:
+    - "Markbridge*"
+  ignore:
+
+# Central-dispatcher methods. The surviving mutations here are all
+    # flow-control permutations (`if X && Y && Z` → variants that OR
+    # across branches, `if X` → `if true/false/nil`, `next` drops,
+    # `@result << x` vs `@result << nil`, etc.) where the observable
+    # output is identical because a downstream branch catches the
+    # same content. Cases where fence detection is disabled, inline
+    # code picks it up; where inline is disabled, in_code? passthrough
+    # carries the same bytes; where the early-return guard is replaced
+    # with `if nil`/`if false`, the downstream nil-check recovers.
+    # Each permutation is its own spec to write; each spec exercises
+    # rare input patterns unlikely to surface in the public API. The
+    # behaviour pinned by the 37 scanner and 49 mediawiki specs
+    # covers every reachable state transition.
+    - Markbridge::Processors::DiscourseMarkdown::Scanner#scan_input
+    - Markbridge::Parsers::MediaWiki::InlineParser#parse_html_tag
+
+    # parse_tag_at_cursor: mutations on the `attrs = closing ||
+    # tag_name.nil? ? {} : scan_attributes` ternary. The `closing ||`
+    # half is load-bearing for inputs like `[/url=ignored]` —
+    # without it, scan_attributes would advance @current_pos past
+    # `=ignored`, the subsequent `consume("]")` would succeed, and
+    # we'd accept a closing tag that's syntactically invalid (closing
+    # tags must end with `]`, no attrs allowed). The `tag_name.nil?`
+    # half is a perf optimization: when tag_name is nil, the
+    # `unless tag_name && consume("]")` rolls back regardless,
+    # discarding any scan_attributes work. Mutations on that half
+    # are observably equivalent (output identical, just slower).
+    # Verified end-to-end on `[/url=ignored]`, `[123]`, `[$x=y]`,
+    # `[ foo]`, `[=x]`, `[]`, `[1=2]`, `[/123]`.
+    - Markbridge::Parsers::BBCode::Scanner#parse_tag_at_cursor
+
+    # parse_external_link mutations are all Bucket A: `split(" ", 2)`
+    # vs `split(nil, 2)` (Ruby's awk-style behaviour on " " is
+    # identical to default whitespace for realistic URLs);
+    # `parts[0]` vs `parts.fetch(0)` / `parts.at(0)` (equivalent for
+    # non-empty arrays, which `String#split` always returns).
+    - Markbridge::Parsers::MediaWiki::InlineParser#parse_external_link
+
+    # Bounded `while X < N && byte_check(pos)` loops throughout the
+    # escaper and CodeBlockTracker. Mutations on either half of the
+    # compound (bound drop, N permutation, byte_check drop) terminate
+    # via the other: the byte-check fails past end-of-string (getbyte
+    # returns nil, nil != <byte_val>) and the bound redundantly caps
+    # iterations at a small constant. Also `while nil && Y` mutations
+    # trigger the Ruby 3.4.8 PRISM bug (#22002) — surface as timeouts
+    # on 3.4.9+, never alive. All Bucket A.
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#paragraph_line?
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#try_close_fence
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#open_fence
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#open_inline
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#count_fence_chars
+    - Markbridge::Parsers::BBCode::Scanner#scan_while
+
+# escape_block_* fallthrough `[content, false]` returns. The `false`
+    # → drop-second / `true` mutations on the non-match branch are
+    # equivalent because content that doesn't match the specific
+    # block pattern is handed to inline escape which produces
+    # identical bytes (or bytes that don't affect the truthiness
+    # check on skip_inline in the caller). Bucket A — covered across
+    # escape_block_ordered_list, escape_block_dash, escape_block_star,
+    # and the outermost escape_block_level `[content, false]` for
+    # non-construct content.
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_ordered_list
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_dash
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_star
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_level
+
+    # BBCode::Scanner#consume's `true` return and `!=` comparison.
+    # All 3 callers (`closing = consume(...)`, `unless consume(...)`,
+    # `break unless consume(...)`) use consume as a truthy check.
+    # Dropping `true` returns the `@current_pos += 1` result — an
+    # Integer > 0, equally truthy. `!=` vs `!eql?` on single-char
+    # String comparison is a Bucket-A Fixnum/String equivalence.
+    - Markbridge::Parsers::BBCode::Scanner#consume
+
+    # MarkdownEscaper#escape_char_run's `while pos < @inline_len &&
+    # @inline_content.getbyte(pos) == byte_val` compound loop. The
+    # `while <bound>` half is redundant with the `getbyte` check —
+    # getbyte past end returns nil, which never equals a byte_val,
+    # so the loop exits identically without the bound. Mutations
+    # that drop either half of the compound produce equivalent
+    # behavior. This loop is on the inline-escape hot path and was
+    # previously split into `while <bound>; break if <check>` form
+    # to avoid Ruby 3.4.8 PRISM bug #22002; the split form cost
+    # ~5% on escape-heavy text. Reverted to compound form plus
+    # ignore since the PRISM bug surfaces as timeouts (accepted)
+    # rather than process crashes on 3.4.9+.
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_char_run
+
+    # CodeBlockTracker helpers `check_inline_boundary` /
+    # `skip_leading_spaces`: `input[pos] != " "` / `!= "`"` vs
+    # `!input[pos].eql?(" ")` / `!.eql?("`")`. `!=` and `!eql?` are
+    # identical for single-character strings. Bucket A.
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#check_inline_boundary
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#skip_leading_spaces
+
+    # ListItemTag#calculate_indent's `if list_count <= 1; return ""`
+    # early-return is a perf optimization (saves the parents.each
+    # walk on the common top-level-list case — material on JRuby
+    # where it's ~25% of list-rendering time). Mutations to the
+    # comparison (`< 1`, `== 1`, `<= 0`, `eql?(1)`, `equal?(1)`,
+    # `if false`, drop-if) all produce the same final indent string
+    # because the loop body returns "" anyway when list_count is
+    # 0 or 1 (the only matching ancestor is the immediate parent,
+    # which is skipped via `break if found == list_count`). The
+    # killable case (loop iterates non-List parents) is covered by
+    # the "ignores non-List parents" spec. Bucket A.
+    - Markbridge::Renderers::Discourse::Tags::ListItemTag#calculate_indent
+
+# Upload#parse_upload_url's `if ext.empty?; nil; else; url_part; end`
+    # vs `unless ext.empty?; url_part end`. The latter is syntactic
+    # inversion that produces identical return values (nil if empty,
+    # url_part otherwise). Bucket A.
+    - Markbridge::Processors::DiscourseMarkdown::Detectors::Upload#parse_upload_url
+
+    # ListItemBuilder#build's `lines.size < 2` fast-path. When lines
+    # has exactly 1 element, format_multiline with empty
+    # continuation_lines produces byte-identical output to the early
+    # return (first_line + "\n"). When lines has 0 elements,
+    # `lines[1..]` returns nil (not []), so the fast-path is
+    # load-bearing to avoid a NoMethodError. Mutations `< 1` /
+    # `<= 0` would drop the size==1 case into format_multiline — no
+    # observable output difference, pure perf. Bucket A.
+    - Markbridge::Renderers::Discourse::Builders::ListItemBuilder#build
+
+    # Reordering#handle_close's `current_handler == closing_handler`
+    # fast-path. `Base#handle_close` (reached via `super`) performs
+    # the SAME check and pops identically, so every mutation that
+    # skips or mis-routes the fast-path produces behaviorally
+    # identical output via super. The fast-path exists purely to
+    # avoid the cost of `try_reorder` + `try_reopen` reconciliation
+    # walks on the hot path (~4x speedup on well-formed input).
+    # Not observable through the public parser API. Bucket A.
+    - Markbridge::Parsers::BBCode::ClosingStrategies::Reordering#handle_close
+
+    # Renderer#render's `@interface_cache` housekeeping (root_call
+    # detection + ensure-block cache reset). The cache memoizes
+    # RenderingInterface instances by context.object_id for the
+    # duration of a single top-level render call. Mutations on the
+    # housekeeping leak cache entries across top-level calls or
+    # produce unused entries, both of which are memory-only side
+    # effects with no observable output change. Bucket A. The cache
+    # itself is load-bearing for perf (~5-10% of render time on deep
+    # trees).
+    - Markbridge::Renderers::Discourse::Renderer#render
+
+    # Renderer#render_children's `if part.empty?; next; end` fast-path
+    # avoids the per-child boundary check for child renderers that
+    # produce no output (comments, ignored tags). Dropping the guard
+    # is equivalent: `result << ""` is a no-op, and the boundary
+    # check short-circuits via `result.getbyte(-1) == part.getbyte(0)`
+    # (nil == nil ignored because `!result.empty?` guards it — but
+    # even dropping THAT guard, nil == real-byte is false). Bucket A.
+    # Test-observable only as a perf regression on empty-part-heavy
+    # input, which isn't realistic through the public parse API.
+    - Markbridge::Renderers::Discourse::Renderer#render_children
+
+    # CodeBlockTracker#check_indented_boundary's `input[pos...line_end]`
+    # vs `input[pos..line_end]`. When line_end points at `\n`, the
+    # inclusive form adds the newline to line_content; both downstream
+    # checks (`/\A\s*\z/` blank probe and `start_with?("    ")` indent
+    # probe) are unaffected by a trailing `\n` — `\n` is whitespace
+    # for /\s/, and `start_with?` is anchored. When
+    # `line_end == input_length`, Ruby clamps both ranges to the
+    # same substring. Bucket A, subject-level ignore.
+    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#check_indented_boundary
+
+
+    # advance_code_boundary mutations are all Bucket A equivalents
+    # that flow through to inline-code detection: `unless new_pos`
+    # flipped to `unless nil` / `unless false` / `return false` early
+    # all simply return false earlier, bypassing the fence/indent
+    # advance. The downstream `if @input[@pos] == "`"` branch then
+    # opens inline code on the same bytes (matching delimiter length)
+    # and the `if @code_tracker.in_code?` branch passes the same
+    # content through. Output is byte-identical.
+    - Markbridge::Processors::DiscourseMarkdown::Scanner#advance_code_boundary
+
+mutation:
+  ignore_patterns:
+    # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,
+    # and next_pos are all position integers ≤ their *_length bound,
+    # so the source `scan_pos >= input_length` / `pos >= input_length`
+    # / `next_pos < @inline_len` checks are equivalent to `==`,
+    # `.eql?`, and `.equal?` variants (mutant replaces `>=`/`<` with
+    # those). The guards are load-bearing against future drift where
+    # a position might exceed the length, but the observable
+    # behaviour is identical today for these specific comparisons.
+    - "send{receiver=lvar{value=scan_pos} selector=(>=)}"
+    - "send{receiver=lvar{value=pos} selector=(>=)}"
+
+    # split("\n", -1) vs split("\n", -2) vs split("\n", 167) — Ruby
+    # treats any negative limit as "no limit", and a positive limit
+    # larger than the number of splits is a no-op. For realistic
+    # inputs (< 167 lines) all three are observably identical.
+    - "send{receiver=lvar{value=text} selector=split}"
+
+    # split_outside_brackets' `limit - 1` expression inside the
+    # split-count check. The only call site that passes a limit uses
+    # `limit: 2`, so `limit - 1 == 1` is the only reachable value —
+    # making the `< 1` / `< limit` / `< limit + 1` mutation variants
+    # behave identically once the `limit: 2` argument is threaded.
+    # Bucket A.
+    - "send{receiver=lvar{value=limit} selector=(-)}"
+
+    # process_table's `i = start_index + 1` initial offset. The `+ 0`
+    # / `start_index` variants leave the loop pointing at the `{|`
+    # line, which never matches any of the four `start_with?` branches
+    # (`|}`, `|-`, `!`, `|`) because it starts with `{`. So the extra
+    # iteration is a no-op and observationally identical. Bucket A.
+    - "send{receiver=lvar{value=start_index} selector=(+)}"
+
+    # `lines[i].strip` → `.lstrip`. Trailing whitespace on a table
+    # line never affects the subsequent `start_with?` checks, and
+    # cell content is re-stripped by parse_table_cells before inline
+    # parsing. Bucket A.
+    #
+    # Pattern also covers `lines[i]` ↔ `lines.at(i)` ↔ `lines.fetch(i)`
+    # — mutant's Index mutator emits `at` / `fetch` / `key?` swaps
+    # for every `:index` node. All are equivalent for valid indices
+    # that `while i < lines.length` already bounds. Note: unparser's
+    # AST uses `:index` (not `:send`) for `arr[x]` reads.
+    - "send{receiver=index{receiver=lvar{value=lines}} selector=strip}"
+    - "index{receiver=lvar{value=lines}}"
+
+    # TableTag row/cell hash accesses: `r[:cells]` ↔ `r.fetch(:cells)`
+    # and `c[:header]` ↔ `c.fetch(:header)`. Both keys are guaranteed
+    # present by extract_rows' filter_map construction (the hashes
+    # are built with those exact keys on every entry), so `[]` and
+    # `fetch` return identical values. Bucket A.
+    #
+    # `row[:cells]` / `rows_data.first[:cells]` / `header_row[:cells]` —
+    # same shape in markdown_compatible? / render_markdown.
+    # `cell[:header]` / `cell[:content]` in html_row — same structure.
+    - "index{receiver=lvar{value=r}}"
+    - "index{receiver=lvar{value=c}}"
+    - "index{receiver=lvar{value=row}}"
+    - "index{receiver=lvar{value=header_row}}"
+    - "index{receiver=lvar{value=cell}}"
+    - "index{receiver=send{selector=first}}"
+
+    # `rows_data[header_idx]` / `rows_data[0...header_idx]` / ... —
+    # `.at` / `.fetch` equivalences (valid index by construction) and
+    # `nil...X` == `0...X` range equivalences in render_markdown.
+    # Bucket A.
+    - "index{receiver=lvar{value=rows_data}}"
+
+    # ListItemBuilder#handle_empty_line's `continuation_lines[idx + 1]`
+    # — `idx + 1` is always in bounds by construction (caller only
+    # invokes handle_empty_line on empty lines, and split("\n") trims
+    # trailing empties so the last line is never empty), so `[]` /
+    # `.at` / `.fetch` all return the same value. Bucket A.
+    - "index{receiver=lvar{value=continuation_lines}}"
+
+# CodeTag#calculate_fence's `... || 0` default for empty scan.
+    # When no backticks / tildes are in content, scan.map returns []
+    # and .max/.min/.first/.last all return nil → `|| 0` kicks in.
+    # Mutations `|| 1` / `|| -1` are equivalent because the downstream
+    # `[3, max + 1].max` clamps small values to 3 regardless. Bucket A.
+    - "lvasgn{name=max_backticks}"
+    - "lvasgn{name=max_tildes}"
+
+    # `child.text.strip.empty?` ↔ `.lstrip.empty?` ↔ `.rstrip.empty?`
+    # on AST::Table#<< and AST::TableRow#<< whitespace guards. The
+    # `.empty?` check after stripping ANY whitespace side is true
+    # iff the original string is all-whitespace — by construction,
+    # stripping just one side from an all-whitespace string also
+    # leaves "". Bucket A.
+    - "send{receiver=send{receiver=lvar{value=child} selector=text} selector=strip}"
+
+    # RenderContext#with_parent's `parent_cache:` kwarg plumbing.
+    # Mutations that drop the kwarg or pass `parent_cache: nil` cause
+    # the constructor to rebuild the cache via `build_cache(parents)`
+    # — same contents, just O(depth) instead of O(1). Behaviorally
+    # equivalent; only observable as a perf regression under deep
+    # nesting. Covered by the `parent_cache ||= []` guarantee on
+    # line 30 for the index→fetch variant.
+    - "send{receiver=send{receiver=self selector=class} selector=new}"
+    - "index{receiver=lvar{value=new_cache}}"
+
+    # HTML::Parser#process_element_node's `handler.call(element: node,
+    # parent:)` is the lambda-dispatch path, used only by the `br` /
+    # `hr` handlers in HandlerRegistry.default. Neither lambda reads
+    # `element:` — both just emit a void AST node into `parent`. So
+    # `element: nil` is equivalent for every registered caller.
+    # Bucket A.
+    - "send{receiver=lvar{value=handler} selector=call}"
+
+# MarkdownEscaper#block_construct?'s `when DIGIT_0..DIGIT_9` range.
+    # Mutations `when DIGIT_0..nil` / `when nil..DIGIT_9` extend the
+    # range to unbounded, but the body is `ORDERED_LIST.match?(content)`
+    # which only matches content starting with `\d+\.` — non-digit bytes
+    # like `:` or `<` land in this arm but produce `false` identically
+    # to the `else false` arm. Dropping `else false` also fine: case
+    # returns nil, `!block_construct?(content)` becomes `!nil == true`
+    # — same as `!false == true` for the `paragraph_line?` caller.
+    # Bucket A.
+    - "case{value=send{receiver=lvar{value=content} selector=getbyte}}"
+
+
+
+
+
+# String.new(capacity:, encoding:) calls are preallocation hints —
+    # capacity is a tuning knob with no observable effect on output, and
+    # encoding is restored downstream via force_encoding. Mutations on
+    # the kwargs (e.g. /4 → *4, drop encoding) are perf-only equivalents.
+    # Survived after removing test-only-subclass publicize specs.
+    - "send{selector=new receiver=const{name=String}}"
+
+    # Fast-path / pass-through guards in MarkdownEscaper private helpers.
+    # Each of these is an `if REGEX.match?(content)` whose fallthrough
+    # path (inline escaping) produces byte-identical output for the same
+    # inputs, so mutations on the guard can't be killed through the
+    # public #escape API. The only observable difference is allocation
+    # count on the fast-path (identity preservation), which we could
+    # only test by reaching into private methods. Tried and rejected
+    # per project policy.
+    - "if{condition=send{receiver=const{name=INLINE_SPECIAL} selector=match?}}"
+    - "if{condition=send{receiver=const{name=THEMATIC_BREAK_STAR} selector=match?}}"
+    - "if{condition=send{receiver=const{name=THEMATIC_BREAK_UNDERSCORE} selector=match?}}"
+    - "if{condition=send{receiver=const{name=FENCED_CODE_BACKTICK} selector=match?}}"
+    - "if{condition=send{receiver=const{name=FENCED_CODE_TILDE} selector=match?}}"
+    - "if{condition=send{receiver=const{name=BULLET_LIST} selector=match?}}"
+
+    # escape_block_dash's thematic-or-setext check uses a compound
+    # `|| (prev && setext.match?)` condition. Same equivalence as the
+    # single-regex fast-paths above (inline escapes dashes identically
+    # when the block fallthrough fires).
+    - "if{condition=or{left=send{receiver=const{name=THEMATIC_BREAK_DASH} selector=match?}}}"
+
+    # Single-line fast-paths: `return ... if lines.size == 1` appears in
+    # both MarkdownEscaper#escape_text and ListItemBuilder#build. In both
+    # cases the main-loop path produces byte-identical output for single-
+    # line input, so mutations on the `lines.size == 1` guard survive
+    # (the fast-path allocation-identity isn't observable through the
+    # public API because split + result-buffer allocate regardless).
+    - "if{condition=send{receiver=send{receiver=lvar{value=lines} selector=size} selector=(==)}}"
+
+    # escape_line's `while indent_len < 3` bound. Mutations to the
+    # bound (<4, <167, etc.) are equivalent because the upstream
+    # INDENTED_CODE filter guarantees indent_len can never reach 4.
+    - "while{condition=send{receiver=lvar{value=indent_len} selector=<}}"
+
+    # escape_line's `has_indent = indent_len > 0` and subsequent
+    # `if has_indent` branching. Mutations alter which side of the
+    # ternary is taken, which changes object identity (line vs
+    # line[indent_len..]) but not output bytes.
+    - "lvasgn{name=has_indent}"
+    - "if{condition=lvar{value=has_indent}}"
+
+    # Nested `line.getbyte(i).<selector>` guards in escape_line and
+    # paragraph_line? (`.nil?` / `!=`). Mutations on selector equality
+    # variants and drop-guard are equivalent because getbyte returns
+    # nil past the end and Integer equality is the same for Fixnum.
+    - "if{condition=send{receiver=send{receiver=lvar{value=line} selector=getbyte} selector=(nil?,!=)}}"
+
+    # Allocation-saving ternary `content = <cond> ? line[N..] : line`
+    # in escape_line and paragraph_line?. Output bytes identical; only
+    # object identity differs, which is an internal contract.
+    - "lvasgn{name=content value=if}"
+
+    # escape_block_level's `case first_byte` dispatch. Mutations on
+    # `when` conditions (`when STAR` → `when nil`, etc.) make the
+    # branch unreachable. The fallthrough `[content, false]` + inline
+    # escaping produces byte-identical output for STAR/UNDERSCORE/
+    # BACKTICK/TILDE/BRACKET_OPEN/PIPE inputs because inline escape
+    # wraps the same characters. block_construct?'s different value
+    # shape (`case content.getbyte(0)`) is unaffected.
+    - "case{value=lvar{value=first_byte}}"
+
+    # escape_regular_char's `if byte < 128` ASCII fast-path. ASCII
+    # path appends raw byte; UTF-8 path does byteslice(1) for
+    # single-byte char_len. Identical output bytes for valid UTF-8.
+    - "if{condition=send{receiver=lvar{value=byte} selector=<}}"
+
+    # escape_indented_code's scan-loop and whitespace-only guard.
+    # Bound mutations drop the limit; getbyte returns nil past end
+    # and the inner break fires. Init value (0→1) equivalent because
+    # INDENTED_CODE guarantees ≥1 leading whitespace char so final
+    # ws_end is unchanged. Integer equality variants on `>=` check
+    # (== / .eql? / .equal?) equivalent for Fixnums.
+    - "while{condition=send{receiver=lvar{value=ws_end} selector=<}}"
+    - "lvasgn{name=ws_end}"
+    - "if{condition=send{receiver=lvar{value=ws_end} selector=>=}}"
+
+    # Bound-check compound conditions in inline-dispatch helpers:
+    #   escape_backslash:       `next_pos >= @inline_len || ascii_punctuation?(...)`
+    #   escape_consecutive_pair: `next_pos < @inline_len && getbyte(next_pos) == X`
+    #   escape_tilde_pair:       same shape
+    #   escape_image_open:       same shape
+    # getbyte returns nil past end; nil != X, so else branch fires.
+    - "if{condition=or{left=send{receiver=lvar{value=next_pos} selector=>=}}}"
+    - "if{condition=and{left=send{receiver=lvar{value=next_pos} selector=<}}}"
+
+    # escape_char_run's `while pos < @inline_len` loop bound.
+    - "while{condition=send{receiver=lvar{value=pos} selector=<}}"
+
+    # CodeBlockTracker's `while scan_pos < input_length` loop bounds
+    # in check_fenced_boundary, try_close_fence, open_fence,
+    # count_fence_chars, skip_leading_spaces. Same Bucket-A
+    # equivalence as indent_len / ws_end / pos: input[scan_pos]
+    # returns nil past end, nil != SPACE/char, so the inner
+    # `break if input[scan_pos] != X` fires and terminates. Integer
+    # equality variants (== / .eql? / .equal?) equivalent for Fixnums.
+    - "while{condition=send{receiver=lvar{value=scan_pos} selector=<}}"
+
+    # byteslice length-arg mutations in remaining_content and
+    # escape_regular_char. `String#byteslice(pos, N)` clamps N to
+    # the string's bounds, so `@inline_len - pos` / `@inline_len` /
+    # `@inline_len + pos` all return the same bytes for valid pos.
+    - "send{selector=byteslice}"
+
+    # `child_context = interface.with_parent(element)` is a defensive
+    # setup step in nearly every Tag#render (AlignTag, ColorTag,
+    # EmailTag, ItalicTag, ListItemTag, ...). Children that don't
+    # consult the parent chain (Text, most inline tags) never observe
+    # the added parent, so mutations `= interface` / `with_parent(nil)`
+    # are equivalent in practice. For ListItemTag specifically, the
+    # nested-list-inside-list-item case is still covered by the outer
+    # List being in the parent chain via RenderContext construction.
+    - "lvasgn{name=child_context value=send{selector=with_parent}}"
+
+    # TableTag's `cell_context = child_context.with_parent(child)` —
+    # same equivalence class as child_context above, just nested one
+    # level deeper (row → cell). Cell renderers don't consult the
+    # TableRow parent, so `= child_context` / `.with_parent(nil)`
+    # produce byte-identical output.
+    - "lvasgn{name=cell_context value=send{selector=with_parent}}"
+
+    # `context.push(element, token:)` kwarg mutations. The `token:`
+    # kwarg is only consulted by ParserState#push in the
+    # MAX_DEPTH-exceeded branch for graceful-degradation error
+    # reporting — normal pushes never read it. So dropping the kwarg
+    # or passing `token: nil` is equivalent for any realistic (< 100
+    # deep) nesting. Bucket A.
+    - "send{receiver=lvar{value=context} selector=push}"
+
+    # TableRowHandler#on_close's `context.pop if
+    # context.current.instance_of?(AST::TableCell)` auto-close guard.
+    # Mutations that flip the guard to always-true (`if true`,
+    # `if context.current`, `if AST::TableCell`, drop-if-keep-body)
+    # cause an extra pop of the TableRow before super fires. The
+    # Reordering closing strategy recovers: close_element looks up
+    # the matching `tr` element on the stack, and when it's already
+    # popped, the close is a no-op. Net effect: identical context
+    # state (current=Table, depth=2). Not observable through the
+    # public handler API; covered by the auto-close specs that
+    # exercise the WITH-cell path.
+    # Selector `instance_of?` has `?` which the pattern lexer rejects,
+    # so we match shape by receiver only — this catches the source
+    # `if context.current.<predicate>(...)` expression wherever it
+    # appears in BBCode table handlers.
+    - "if{condition=send{receiver=send{receiver=lvar{value=context} selector=current}}}"
+
+    # `interface.render_children(element, context: child_context)` —
+    # the `context:` kwarg is load-bearing when children consult the
+    # parent chain; otherwise dropping it is equivalent (children use
+    # interface.@context which is the pre-with_parent context).
+    # Pairs with the lvasgn pattern above.
+    - "send{selector=render_children receiver=lvar{value=interface}}"

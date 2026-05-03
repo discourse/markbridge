@@ -12,9 +12,9 @@ module Markbridge
 
           def on_open(token:, context:, registry:, tokens: nil)
             # Auto-close open cell before starting new row
-            context.pop if context.current.is_a?(AST::TableCell)
+            context.pop if context.current.instance_of?(AST::TableCell)
             # Auto-close previous row if still open
-            context.pop if context.current.is_a?(AST::TableRow)
+            context.pop if context.current.instance_of?(AST::TableRow)
 
             element = AST::TableRow.new
             context.push(element, token:)
@@ -22,7 +22,7 @@ module Markbridge
 
           def on_close(token:, context:, registry:, tokens: nil)
             # Auto-close open cell before closing row
-            context.pop if context.current.is_a?(AST::TableCell)
+            context.pop if context.current.instance_of?(AST::TableCell)
 
             super
           end

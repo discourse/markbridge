@@ -25,11 +25,11 @@ module Markbridge
           # @return [Array<Hash>] array of {cells: [{content:, header:}], ...}
           def extract_rows(element, interface, child_context)
             element.children.filter_map do |child|
-              next unless child.is_a?(AST::TableRow)
+              next unless child.instance_of?(AST::TableRow)
 
               cells =
                 child.children.filter_map do |cell|
-                  next unless cell.is_a?(AST::TableCell)
+                  next unless cell.instance_of?(AST::TableCell)
 
                   cell_context = child_context.with_parent(child)
                   content = interface.render_children(cell, context: cell_context).strip
@@ -42,7 +42,6 @@ module Markbridge
 
           # Check if the table can be rendered as Markdown
           def markdown_compatible?(rows_data, interface)
-            return false if rows_data.empty?
             return false if interface.has_parent?(AST::Table)
 
             cell_count = rows_data.first[:cells].length
@@ -90,7 +89,7 @@ module Markbridge
 
               unless header_rows.empty?
                 lines << "<thead>"
-                header_rows.each { |row| lines << html_row(row, force_header: true) }
+                header_rows.each { |row| lines << html_row(row) }
                 lines << "</thead>"
               end
 
@@ -108,10 +107,10 @@ module Markbridge
           end
 
           # Render a single HTML table row
-          def html_row(row, force_header: false)
+          def html_row(row)
             cells_html =
               row[:cells].map do |cell|
-                tag = (cell[:header] || force_header) ? "th" : "td"
+                tag = cell[:header] ? "th" : "td"
                 "<#{tag}>#{cell[:content]}</#{tag}>"
               end
 

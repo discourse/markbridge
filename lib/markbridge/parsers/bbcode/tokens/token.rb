@@ -6,7 +6,7 @@ module Markbridge
       class Token
         attr_reader :pos, :source
 
-        def initialize(pos: 0, source: nil)
+        def initialize(pos:, source:)
           @pos = pos
           @source = source
         end

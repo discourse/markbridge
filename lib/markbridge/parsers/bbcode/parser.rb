@@ -66,8 +66,7 @@ module Markbridge
         def parse_tokens(scanner, context)
           tokens = PeekableEnumerator.new(scanner)
 
-          while tokens.has_next?
-            token = tokens.next
+          while (token = tokens.next)
             case token
             when TextToken
               process_text(token, context)
@@ -94,7 +93,7 @@ module Markbridge
           if (handler = @handlers[token.tag])
             handler.on_open(token:, context:, registry: @handlers, tokens:)
           else
-            handle_unknown_tag(token, context)
+            track_unknown_tag(token)
           end
         end
 
@@ -106,15 +105,13 @@ module Markbridge
           if (handler = @handlers[token.tag])
             handler.on_close(token:, context:, registry: @handlers, tokens:)
           else
-            handle_unknown_tag(token, context)
+            track_unknown_tag(token)
           end
         end
 
-        # Handle unknown tag by tracking it and ignoring the wrapper
-        # while still processing its children
+        # Track unknown tag by name; the wrapper is ignored, children pass through.
         # @param token [Token]
-        # @param context [ParserState]
-        def handle_unknown_tag(token, _context)
+        def track_unknown_tag(token)
           @unknown_tags[token.tag] += 1
         end
       end

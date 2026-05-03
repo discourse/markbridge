@@ -13,4 +13,11 @@
 
 .ruby-version
 
-/.claude
+# Ignore local-only Claude Code state but keep vendored agent skills.
+/.claude/*
+!/.claude/skills/
+/.mutant
+
+# IDE and silo-local state
+/.idea/
+/.silo.local.yml

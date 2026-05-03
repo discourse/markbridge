@@ -12,8 +12,7 @@ module Markbridge
         #   match = detector.detect(input, 0)
         #   match.node.type # => "regular"
         class Poll < Base
-          OPEN_TAG_PATTERN = /\[poll([^\]]*)\]/i
-          CLOSE_TAG_PATTERN = %r{\[/poll\]}i
+          TAG_PATTERN = %r{\A\[poll(?<attrs>[^\]]*)\](?<content>.*?)\[/poll\]}im
 
           # Attempt to detect a poll at the given position.
           #
@@ -21,57 +20,30 @@ module Markbridge
           # @param pos [Integer] current position to check
           # @return [Match, nil] match result or nil if no match
           def detect(input, pos)
-            return nil unless input[pos] == "["
+            match = TAG_PATTERN.match(input[pos..])
+            return nil unless match
 
-            # Check for opening tag
-            remaining = input[pos..]
-            open_match = OPEN_TAG_PATTERN.match(remaining)
-            return nil unless open_match&.begin(0)&.zero?
-
-            # Find closing tag
-            close_match = CLOSE_TAG_PATTERN.match(remaining, open_match.end(0))
-            return nil unless close_match
-
-            # Extract raw content
-            end_pos = pos + close_match.end(0)
-            raw = input[pos...end_pos]
-
-            # Parse attributes from opening tag
-            attrs = parse_attributes(open_match[1])
-
-            # Extract options from content between tags
-            content = remaining[open_match.end(0)...close_match.begin(0)]
-            options = extract_options(content)
-
+            attrs = parse_attributes(match[:attrs])
             node =
               AST::Poll.new(
                 name: attrs["name"] || "poll",
                 type: attrs["type"],
                 results: attrs["results"],
                 public: attrs["public"] == "true",
-                chart_type: attrs["charttype"] || attrs["chartType"],
-                options:,
-                raw:,
+                chart_type: attrs["charttype"],
+                options: extract_options(match[:content]),
+                raw: match[0],
               )
 
-            Match.new(start_pos: pos, end_pos:, node:)
+            Match.new(start_pos: pos, end_pos: pos + match.end(0), node:)
           end
 
           private
 
+          OPTION_PATTERN = /\A\s*(?:\*\s|-\s|\d+\.\s+)(?<value>.+?)\s*\z/
+
           def extract_options(content)
-            options = []
-            content.each_line do |line|
-              line = line.strip
-              if line.start_with?("* ")
-                options << line[2..].strip
-              elsif line.start_with?("- ")
-                options << line[2..].strip
-              elsif line.match?(/^\d+\.\s/)
-                options << line.sub(/^\d+\.\s*/, "").strip
-              end
-            end
-            options
+            content.each_line.filter_map { |line| OPTION_PATTERN.match(line)&.[](:value) }
           end
         end
       end

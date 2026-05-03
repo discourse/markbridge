@@ -42,5 +42,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
       result = tag.render(element, interface)
       expect(result).to eq("![|150x250]()")
     end
+
+    it "renders without dimensions when only height is provided (height alone is meaningless)" do
+      element = Markbridge::AST::Image.new(src: "x.png", height: 200)
+
+      expect(tag.render(element, interface)).to eq("![](x.png)")
+    end
   end
 end

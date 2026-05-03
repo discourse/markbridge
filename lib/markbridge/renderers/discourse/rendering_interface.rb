@@ -48,18 +48,18 @@ module Markbridge
         # @return [Boolean]
         def block_context?(node)
           # Check if it's a block-level element type (but not code, which can be inline)
-          return true if node.is_a?(AST::List) || node.is_a?(AST::HorizontalRule)
+          return true if node.instance_of?(AST::List) || node.instance_of?(AST::HorizontalRule)
           return false unless node.is_a?(AST::Element)
 
           # Check if content has newlines
-          node.children.any? { |c| c.is_a?(AST::Text) && c.text.include?("\n") }
+          node.children.any? { |c| c.instance_of?(AST::Text) && c.text.include?("\n") }
         end
 
         # Helper: wrap inline content with markers
         # Handles edge cases like existing markers and whitespace
         def wrap_inline(content, open_marker, close_marker = nil)
           close_marker ||= open_marker
-          return content if content.strip.empty?
+          return content unless content.match?(/\S/)
 
           # Handle conflicts with existing markers
           if content.include?(open_marker) || content.include?(close_marker)
@@ -75,7 +75,7 @@ module Markbridge
           end
 
           # Preserve leading/trailing whitespace
-          content.sub(/^(\s*)(.+?)(\s*)$/m) do
+          content.sub(/\A(\s*)(.+?)(\s*)\z/m) do
             match = Regexp.last_match
             "#{match[1]}#{open_marker}#{match[2]}#{close_marker}#{match[3]}"
           end

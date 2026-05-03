@@ -22,6 +22,12 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ImageHandler do
     end
   end
 
+  describe "#initialize" do
+    it "exposes AST::Image as the element_class" do
+      expect(described_class.new.element_class).to eq(Markbridge::AST::Image)
+    end
+  end
+
   describe "#on_open" do
     it "creates Image element with src from content" do
       token =

@@ -1,14 +1,16 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Parsers::HTML::Handlers::UrlHandler do
+  let(:handler) { described_class.new }
   let(:parent) { Markbridge::AST::Document.new }
 
-  describe "#process" do
-    it "creates a Url element with href" do
-      handler = described_class.new
-      node = instance_double(Nokogiri::XML::Element, "[]": "http://example.org")
+  def build_element(html)
+    Nokogiri::HTML.fragment(html).children.first
+  end
 
-      result = handler.process(element: node, parent:)
+  describe "#process" do
+    it "creates a Url element with the href attribute" do
+      result = handler.process(element: build_element('<a href="http://example.org">'), parent:)
 
       expect(parent.children.size).to eq(1)
       expect(parent.children[0]).to be_a(Markbridge::AST::Url)
@@ -16,29 +18,21 @@ RSpec.describe Markbridge::Parsers::HTML::Handlers::UrlHandler do
       expect(result).to eq(parent.children[0])
     end
 
-    it "returns element to signal children should be processed" do
-      handler = described_class.new
-      node = instance_double(Nokogiri::XML::Element, "[]": "http://example.org")
-
-      result = handler.process(element: node, parent:)
-
-      expect(result).to be_a(Markbridge::AST::Url)
-    end
-
-    it "handles nil href" do
-      handler = described_class.new
-      node = instance_double(Nokogiri::XML::Element, "[]": nil)
-
-      handler.process(element: node, parent:)
+    it "leaves href nil when the attribute is missing" do
+      handler.process(element: build_element("<a>link</a>"), parent:)
 
       expect(parent.children[0].href).to be_nil
+    end
+
+    it "returns the created element so children can be processed into it" do
+      result = handler.process(element: build_element('<a href="http://example.org">'), parent:)
+
+      expect(result).to be_a(Markbridge::AST::Url)
     end
   end
 
   describe "#element_class" do
     it "returns AST::Url" do
-      handler = described_class.new
-
       expect(handler.element_class).to eq(Markbridge::AST::Url)
     end
   end

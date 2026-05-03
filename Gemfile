@@ -4,6 +4,7 @@ source "https://rubygems.org"
 
 gemspec
 
+gem "benchmark-ips"
 gem "commonmarker", install_if: -> { RUBY_ENGINE == "ruby" }
 gem "lefthook"
 gem "nokogiri"
@@ -17,3 +18,6 @@ gem "rubycritic"
 gem "simplecov"
 gem "sinatra"
 gem "syntax_tree"
+
+gem "mutant", "~> 0.16"
+gem "mutant-rspec", "~> 0.16"

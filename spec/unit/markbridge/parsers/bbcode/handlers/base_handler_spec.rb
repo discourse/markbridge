@@ -12,6 +12,12 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::BaseHandler do
     reg
   end
 
+  describe "#auto_closeable?" do
+    it "is false by default (subclasses opt in)" do
+      expect(handler.auto_closeable?).to be false
+    end
+  end
+
   describe "#on_open" do
     it "has no default behavior" do
       token =
@@ -69,6 +75,61 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::BaseHandler do
         expect(context.current).to eq(document)
         expect(document.children).to eq([bold_element])
       end
+    end
+
+    it "forwards tokens: to the registry's closing strategy so reordering can consume them" do
+      # Open [b][i], then close [b] with [/i] coming next in the stream.
+      bold_handler =
+        Markbridge::Parsers::BBCode::Handlers::SimpleHandler.new(
+          Markbridge::AST::Bold,
+          auto_closeable: true,
+        )
+      italic_handler =
+        Markbridge::Parsers::BBCode::Handlers::SimpleHandler.new(
+          Markbridge::AST::Italic,
+          auto_closeable: true,
+        )
+      registry.register("b", bold_handler)
+      registry.register("i", italic_handler)
+
+      bold_handler.on_open(
+        token:
+          Markbridge::Parsers::BBCode::TagStartToken.new(
+            tag: "b",
+            attrs: {
+            },
+            pos: 0,
+            source: "[b]",
+          ),
+        context:,
+        registry:,
+      )
+      italic_handler.on_open(
+        token:
+          Markbridge::Parsers::BBCode::TagStartToken.new(
+            tag: "i",
+            attrs: {
+            },
+            pos: 3,
+            source: "[i]",
+          ),
+        context:,
+        registry:,
+      )
+
+      scanner = Markbridge::Parsers::BBCode::Scanner.new("[/i]")
+      tokens = Markbridge::Parsers::BBCode::PeekableEnumerator.new(scanner)
+
+      bold_handler.on_close(
+        token: Markbridge::Parsers::BBCode::TagEndToken.new(tag: "b", pos: 10, source: "[/b]"),
+        context:,
+        registry:,
+        tokens:,
+      )
+
+      # Reordering must have consumed the [/i] ahead; forwarding tokens: is
+      # the load-bearing step.
+      expect(tokens.peek).to be_nil
     end
 
     context "when closing tag doesn't match current element" do

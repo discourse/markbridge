@@ -20,16 +20,12 @@ module Markbridge
           if bracket_index.nil?
             text = @input[@current_pos..]
             @current_pos = @length
-            return TextToken.new(text:, pos: start_pos)
-          end
-
-          if bracket_index > @current_pos
+            TextToken.new(text:, pos: start_pos)
+          elsif bracket_index > @current_pos
             text = @input[@current_pos...bracket_index]
             @current_pos = bracket_index
-            return TextToken.new(text:, pos: start_pos)
-          end
-
-          if (tag_token = parse_tag_at_cursor)
+            TextToken.new(text:, pos: start_pos)
+          elsif (tag_token = parse_tag_at_cursor)
             tag_token
           else
             @current_pos += 1
@@ -53,35 +49,25 @@ module Markbridge
                          :WHITESPACE_CHAR,
                          :UNQUOTED_VALUE_STOP
 
+        # @return [Token, nil] tag token or nil if not a valid tag (caller rolls back)
+        # Precondition: caller has verified current_char == "[".
         def parse_tag_at_cursor
-          return nil if current_char != "["
-
           tag_start_pos = @current_pos
           @current_pos += 1 # skip '['
-
-          # Check for closing tag
-          closing = current_char == "/"
-          @current_pos += 1 if closing
-
-          # Parse tag name
+          closing = consume("/")
           tag_name = scan_tag_name
-          return rollback(tag_start_pos) unless tag_name
+          attrs = (closing || tag_name.nil?) ? {} : scan_attributes
+          return rollback(tag_start_pos) unless tag_name && consume("]")
 
-          # Parse attributes (only for opening tags)
-          attrs = closing ? {} : scan_attributes
-          return rollback(tag_start_pos) if current_char != "]"
-
-          @current_pos += 1 # skip ']'
-
-          # Capture original source text
           source = @input[tag_start_pos...@current_pos]
+          build_token(closing:, tag: tag_name.downcase, attrs:, pos: tag_start_pos, source:)
+        end
 
-          normalized_tag_name = tag_name.downcase
-
+        def build_token(closing:, tag:, attrs:, pos:, source:)
           if closing
-            TagEndToken.new(tag: normalized_tag_name, pos: tag_start_pos, source:)
+            TagEndToken.new(tag:, pos:, source:)
           else
-            TagStartToken.new(tag: normalized_tag_name, attrs:, pos: tag_start_pos, source:)
+            TagStartToken.new(tag:, attrs:, pos:, source:)
           end
         end
 
@@ -90,19 +76,21 @@ module Markbridge
           nil
         end
 
-        # Scan a tag name: [a-z*.][a-z0-9]*(:uid)?
+        # Scan a tag name: [a-z*][a-z0-9]*(:hex*)?
+        #
+        # Char-by-char rather than a single regex over `@input[pos..]`
+        # because the regex form allocates a substring for every tag,
+        # which is a dominant cost on tag-heavy input. The char-based
+        # loop is ~3x faster under YJIT.
         # @return [String, nil]
         def scan_tag_name
           start = @current_pos
 
-          # First character: letter, *, or .
           return nil unless current_char&.match?(TAG_INITIAL_CHAR)
           @current_pos += 1
 
-          # Remaining characters: letters or digits
           @current_pos += 1 while current_char&.match?(TAG_NAME_CHAR)
 
-          # Optional :uid suffix (e.g., [quote:abc123])
           if current_char == ":"
             @current_pos += 1
             @current_pos += 1 while current_char&.match?(UID_HEX_CHAR)
@@ -119,7 +107,6 @@ module Markbridge
           attrs = {}
           skip_whitespace
 
-          # First attribute might be option: [tag=value]
           if current_char == "="
             @current_pos += 1
             skip_whitespace
@@ -129,23 +116,24 @@ module Markbridge
             skip_whitespace
           end
 
-          # Named attributes: [tag key=value key=value ...]
-          while (char = current_char) && char != "]"
-            name = scan_while(ATTR_NAME_CHAR)
-            break if name.nil?
+          while (name = scan_while(ATTR_NAME_CHAR))
+            skip_whitespace
+            break unless consume("=")
 
             skip_whitespace
-            break if current_char != "="
-
-            @current_pos += 1
-            skip_whitespace
-
             value = scan_attribute_value
             attrs[name.downcase.to_sym] = value if value
             skip_whitespace
           end
 
           attrs
+        end
+
+        def consume(char)
+          return false if current_char != char
+
+          @current_pos += 1
+          true
         end
 
         def scan_attribute_value
@@ -171,22 +159,15 @@ module Markbridge
         # Workaround: Use single quotes if you need double quotes in the value:
         #   [url='has "quotes" inside']    → option: "has \"quotes\" inside" ✓
         #
-        # @return [String] the unescaped attribute value
+        # @return [String, nil] the unescaped attribute value, or nil if unterminated
         def scan_quoted_string
           quote_char = current_char
           start = (@current_pos += 1) # skip opening quote
-
           closing_index = @input.index(quote_char, start)
+          return nil unless closing_index
 
-          if closing_index
-            value = @input[start...closing_index]
-            @current_pos = closing_index + 1 # position after closing quote
-          else
-            value = @input[start..] || ""
-            @current_pos = @length
-          end
-
-          value
+          @current_pos = closing_index + 1
+          @input[start...closing_index]
         end
 
         def scan_unquoted_value
@@ -195,18 +176,18 @@ module Markbridge
 
         # Consumes characters matching +pattern+; returns substring or nil if empty
         def scan_while(pattern)
-          start = @current_pos
-          while (char = current_char) && char.match?(pattern)
-            @current_pos += 1
-          end
-
-          return nil if @current_pos == start
-          @input[start...@current_pos]
+          stop_index = @current_pos
+          stop_index += 1 while stop_index < @length && @input[stop_index].match?(pattern)
+          consume_range(stop_index)
         end
 
-        # Consumes characters until +pattern+ matches; returns substring or nil if empty
+        # Consumes characters until +pattern+ matches (or end of input); returns substring or nil if empty
         def scan_until(pattern)
-          stop_index = @input.index(pattern, @current_pos) || @length
+          consume_range(@input.index(pattern, @current_pos) || @length)
+        end
+
+        # Slice [@current_pos, stop_index), advance the cursor, or return nil for empty.
+        def consume_range(stop_index)
           return nil if stop_index == @current_pos
 
           value = @input[@current_pos...stop_index]
@@ -219,11 +200,16 @@ module Markbridge
         end
 
         def skip_whitespace
-          @current_pos += 1 while current_char&.match?(WHITESPACE_CHAR)
+          @current_pos += 1 while @current_pos < @length &&
+            @input[@current_pos].match?(WHITESPACE_CHAR)
         end
 
         def end_of_input?
-          @current_pos >= @length
+          # All callers maintain @current_pos <= @length (scan_while
+          # bounds on @length; scan_until uses `index || @length`;
+          # consume is a no-op at EOF); `==` and `>=` are observably
+          # identical here.
+          @current_pos == @length
         end
       end
     end

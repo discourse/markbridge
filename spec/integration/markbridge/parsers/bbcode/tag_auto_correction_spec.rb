@@ -180,7 +180,8 @@ RSpec.describe "BBCode Tag Auto-Correction" do
     it "handles overlapping bold and italic" do
       result = parser.parse("[b]bold [i]both[/b] italic[/i]")
 
-      # [b]bold [i]both (auto-close i, b) because text follows [/b]
+      # [/b] closes bold and reopens italic so " italic" stays italicized,
+      # then [/i] closes the reopened italic.
       bold = result.children.first
       expect(bold).to be_a(Markbridge::AST::Bold)
       expect(bold.children.size).to eq(2)
@@ -190,8 +191,9 @@ RSpec.describe "BBCode Tag Auto-Correction" do
       expect(italic).to be_a(Markbridge::AST::Italic)
       expect(italic.children.first.text).to eq("both")
 
-      # " italic" and "[/i]" are merged into one text node
-      expect(result.children[1].text).to eq(" italic[/i]")
+      reopened_italic = result.children[1]
+      expect(reopened_italic).to be_a(Markbridge::AST::Italic)
+      expect(reopened_italic.children.first.text).to eq(" italic")
     end
 
     it "handles multiple overlapping tags" do
@@ -202,6 +204,24 @@ RSpec.describe "BBCode Tag Auto-Correction" do
 
       # Structure: Bold(a, Italic(b, Underline(c)))
       # Then: text(d), text([/i]), text(e), text([/u])
+    end
+
+    it "reopens intervening tags when closing tags are separated by content" do
+      result = parser.parse("[b]bold [i]italic [u]underline[/b] still here[/i][/u]")
+
+      bold = result.children.first
+      expect(bold).to be_a(Markbridge::AST::Bold)
+      italic_in_bold = bold.children[1]
+      expect(italic_in_bold).to be_a(Markbridge::AST::Italic)
+      underline_in_italic = italic_in_bold.children[1]
+      expect(underline_in_italic).to be_a(Markbridge::AST::Underline)
+      expect(underline_in_italic.children.first.text).to eq("underline")
+
+      reopened_italic = result.children[1]
+      expect(reopened_italic).to be_a(Markbridge::AST::Italic)
+      reopened_underline = reopened_italic.children.first
+      expect(reopened_underline).to be_a(Markbridge::AST::Underline)
+      expect(reopened_underline.children.first.text).to eq(" still here")
     end
 
     it "handles correct nesting mixed with incorrect" do
@@ -226,8 +246,11 @@ RSpec.describe "BBCode Tag Auto-Correction" do
       italic = bold.children[1]
       expect(italic.children.first.text).to eq("middle")
 
-      # " end" is outside the auto-closed tags
-      expect(result.children[1].text).to eq(" end")
+      # [/b] reopens italic so " end" continues in the italic context
+      # (with no closing [/i], it's an implicitly-open italic)
+      reopened_italic = result.children[1]
+      expect(reopened_italic).to be_a(Markbridge::AST::Italic)
+      expect(reopened_italic.children.first.text).to eq(" end")
     end
 
     it "handles empty tags in auto-close chain" do

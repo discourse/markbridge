@@ -57,9 +57,45 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::TableCellHandler do
       first_cell = context.current
 
       handler.on_open(token: token2, context:, registry:)
+      second_cell = context.current
 
-      expect(context.current).to be_a(Markbridge::AST::TableCell)
-      expect(context.current).not_to eq(first_cell)
+      expect(second_cell).to be_a(Markbridge::AST::TableCell)
+      expect(second_cell).not_to eq(first_cell)
+      # Both cells must be siblings, not nested (second_cell under
+      # first_cell). Kills mutations that skip the `pop` guard.
+      expect(first_cell.children).not_to include(second_cell)
+    end
+
+    it "does NOT pop when current is a TableRow (not a TableCell)" do
+      # The `before` block leaves current as the TableRow. The first
+      # cell opened must attach to that row as a sibling child, not
+      # to the outer table.
+      row_before = context.current
+      token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(tag: "td", attrs: {}, pos: 0, source: "[td]")
+
+      handler.on_open(token:, context:, registry:)
+
+      expect(row_before).to be_a(Markbridge::AST::TableRow)
+      expect(row_before.children.last).to eq(context.current)
+    end
+
+    it "creates distinct cells for sequential `td`/`th` mix" do
+      # Previous td → new th: both must still end up as siblings.
+      td_token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(tag: "td", attrs: {}, pos: 0, source: "[td]")
+      th_token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(tag: "th", attrs: {}, pos: 4, source: "[th]")
+
+      handler.on_open(token: td_token, context:, registry:)
+      td_cell = context.current
+
+      handler.on_open(token: th_token, context:, registry:)
+      th_cell = context.current
+
+      expect(td_cell.header?).to be false
+      expect(th_cell.header?).to be true
+      expect(td_cell).not_to eq(th_cell)
     end
   end
 

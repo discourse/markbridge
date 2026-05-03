@@ -21,9 +21,9 @@ module Markbridge
       # @return [List] self for chaining
       # @raise [TypeError] if child is not a Node
       def <<(child)
-        return self if child.is_a?(Text) && child.text.strip.empty?
+        return self if child.instance_of?(Text) && !child.text.match?(/\S/)
 
-        if child.is_a?(ListItem)
+        if child.instance_of?(ListItem)
           super
         else
           @children << ListItem.new if @children.empty?

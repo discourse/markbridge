@@ -9,7 +9,6 @@ module Markbridge
 
         def initialize(closing_strategy: nil)
           @handlers = {}
-          @normalized_tag_cache = {}
           @element_handlers = {}
           @auto_closeable_elements = Set.new
           @closing_strategy = closing_strategy
@@ -20,11 +19,7 @@ module Markbridge
         # @param handler [BaseHandler] the handler instance
         def register(tag_names, handler)
           element_class = handler.element_class
-          Array(tag_names).each do |tag_name|
-            normalized = tag_name.to_s.downcase
-            @handlers[normalized] = handler
-            @normalized_tag_cache[tag_name.to_s] = normalized
-          end
+          Array(tag_names).each { |tag_name| @handlers[tag_name.to_s.downcase] = handler }
           @element_handlers[element_class] = handler
           @auto_closeable_elements << element_class if handler.auto_closeable?
           self
@@ -34,9 +29,7 @@ module Markbridge
         # @param tag_name [String]
         # @return [BaseHandler, nil]
         def [](tag_name)
-          tag_str = tag_name.to_s
-          normalized = @normalized_tag_cache[tag_str] || tag_str.downcase
-          @handlers[normalized]
+          @handlers[tag_name.to_s.downcase]
         end
 
         # Get handler for an element instance
@@ -95,7 +88,7 @@ module Markbridge
           )
 
           # Code handlers (raw content)
-          registry.register(%w[code pre tt], Handlers::RawHandler.new(AST::Code))
+          registry.register(%w[code pre tt], Handlers::CodeHandler.new)
 
           # Image handler
           registry.register("img", Handlers::ImageHandler.new)

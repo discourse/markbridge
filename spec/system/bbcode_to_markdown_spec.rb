@@ -386,9 +386,9 @@ RSpec.describe "BBCode to Markdown Conversion" do
   end
 
   describe "underline" do
-    it "converts underline to HTML" do
+    it "passes underline through as BBCode (Discourse renders [u] natively)" do
       result = Markbridge.bbcode_to_markdown("[u]underlined[/u]")
-      expect(result).to eq("<u>underlined</u>")
+      expect(result).to eq("[u]underlined[/u]")
     end
   end
 
@@ -485,12 +485,21 @@ RSpec.describe "BBCode to Markdown Conversion" do
 
     it "handles deeply nested formatting" do
       result = Markbridge.bbcode_to_markdown("[b][i][u]deep[/u][/i][/b]")
-      expect(result).to eq("***<u>deep</u>***")
+      expect(result).to eq("***[u]deep[/u]***")
     end
 
     it "handles unclosed tags gracefully" do
       result = Markbridge.bbcode_to_markdown("[b]bold text")
       expect(result).to eq("**bold text**")
+    end
+
+    it "inserts an HTML comment to break colliding emphasis delimiters between siblings" do
+      # After reorder-with-reopen the Bold ends with *** and the reopened
+      # Italic starts with * — adjacent they would form **** and parse
+      # ambiguously in CommonMark.
+      result =
+        Markbridge.bbcode_to_markdown("[b]bold [i]italic [u]underline[/b] still here[/i][/u]")
+      expect(result).to eq("**bold *italic [u]underline[/u]***<!---->*[u] still here[/u]*")
     end
   end
 

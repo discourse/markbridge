@@ -8,7 +8,9 @@ module Markbridge
         def initialize(tag_library: nil, escaper: nil)
           @tag_library = tag_library || TagLibrary.default
           @escaper = escaper || MarkdownEscaper.new
-          @interface_cache = nil
+          # @interface_cache is lazily initialized in #render's top-level
+          # call and reset to nil after the call completes. No init
+          # needed here — unset ivar returns nil under `.nil?` check.
         end
 
         # Render a node to Markdown
@@ -20,24 +22,15 @@ module Markbridge
           @interface_cache ||= {}
 
           tag = @tag_library[node.class]
-          if tag
-            interface = interface_for(context)
-            return tag.render(node, interface)
-          end
+          return tag.render(node, interface_for(context)) if tag
 
           case node
-          when AST::Document, AST::Element
+          when AST::Element # Document is an Element subclass
             render_children(node, context:)
           when AST::MarkdownText
-            # Pass through markdown text as-is (already formatted)
             node.text
           when AST::Text
-            # Escape plain text unless we're inside a code block
-            if context.has_parent?(AST::Code)
-              node.text
-            else
-              @escaper.escape(node.text)
-            end
+            context.has_parent?(AST::Code) ? node.text : @escaper.escape(node.text)
           else
             ""
           end
@@ -50,10 +43,35 @@ module Markbridge
         # @param context [RenderContext] rendering context
         # @return [String]
         def render_children(node, context:)
-          node.children.map { |child| render(child, context:) }.join
+          result = +""
+          node.children.each do |child|
+            part = render(child, context:)
+            next if part.empty?
+
+            # Integer-byte check avoids allocating substrings for the
+            # per-child adjacency probe. EMPHASIS_DELIMITER_BYTES.include?
+            # over a 4-element Set is O(1).
+            if !result.empty? && (last_byte = result.getbyte(-1)) == part.getbyte(0) &&
+                 EMPHASIS_DELIMITER_BYTES.include?(last_byte)
+              result << EMPHASIS_BOUNDARY
+            end
+            result << part
+          end
+          result
         end
 
         private
+
+        # Inserted between sibling outputs when their adjacent characters
+        # would merge into a longer Markdown emphasis delimiter run (e.g.
+        # `***` + `*...` becoming `****...`). The HTML comment is invisible
+        # in rendered output but breaks the delimiter run during Markdown
+        # parsing.
+        EMPHASIS_BOUNDARY = "<!---->"
+        # Bytes where adjacent runs merge into a single longer run during
+        # Markdown parsing: emphasis (* _), strikethrough (~), code spans (`).
+        EMPHASIS_DELIMITER_BYTES = Set[42, 95, 126, 96].freeze
+        private_constant :EMPHASIS_BOUNDARY, :EMPHASIS_DELIMITER_BYTES
 
         def interface_for(context)
           @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)

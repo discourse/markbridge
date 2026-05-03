@@ -13,6 +13,7 @@ setup:
   - rv ruby install 3.3
   - rv ruby install 3.4
   - rv ruby install 4.0
+  - rv ruby pin 4.0
   - rv run bundle install
   - rv run bundle exec lefthook install
   - echo '. "$HOME/.cargo/env"' >> ~/.zshenv

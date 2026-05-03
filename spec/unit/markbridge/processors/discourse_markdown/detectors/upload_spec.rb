@@ -131,5 +131,45 @@ RSpec.describe Markbridge::Processors::DiscourseMarkdown::Detectors::Upload do
         expect(match).to be_nil # Should not match partial
       end
     end
+
+    context "when detecting at a non-zero position" do
+      it "detects image upload at the given position" do
+        input = "prefix ![alt](upload://abc.png) suffix"
+        match = detector.detect(input, 7)
+
+        expect(match).not_to be_nil
+        expect(match.start_pos).to eq(7)
+        expect(match.end_pos).to eq(input.length - " suffix".length)
+        expect(match.node.raw).to eq("![alt](upload://abc.png)")
+      end
+
+      it "detects attachment upload at the given position" do
+        input = "prefix [doc.pdf|attachment](upload://xyz.pdf) suffix"
+        match = detector.detect(input, 7)
+
+        expect(match).not_to be_nil
+        expect(match.start_pos).to eq(7)
+        expect(match.end_pos).to eq(input.length - " suffix".length)
+        expect(match.node.raw).to eq("[doc.pdf|attachment](upload://xyz.pdf)")
+      end
+    end
+
+    context "with an image upload URL that has an extension" do
+      it "sets the filename on the node" do
+        input = "![alt](upload://abc.png)"
+        match = detector.detect(input, 0)
+
+        expect(match.node.filename).to eq("abc.png")
+      end
+    end
+
+    context "with an image upload URL that has no extension" do
+      it "leaves filename nil on the node" do
+        input = "![alt](upload://abc123)"
+        match = detector.detect(input, 0)
+
+        expect(match.node.filename).to be_nil
+      end
+    end
   end
 end

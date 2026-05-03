@@ -6,8 +6,10 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::SelfClosingHandler do
   let(:handler) { described_class.new(element_class) }
 
   describe "#initialize" do
-    it "accepts an element class" do
-      expect do described_class.new(Markbridge::AST::LineBreak) end.not_to raise_error
+    it "exposes the element_class via reader" do
+      expect(described_class.new(Markbridge::AST::LineBreak).element_class).to eq(
+        Markbridge::AST::LineBreak,
+      )
     end
   end
 

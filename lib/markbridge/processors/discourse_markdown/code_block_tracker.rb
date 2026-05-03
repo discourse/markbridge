@@ -31,11 +31,12 @@ module Markbridge
 
         def initialize
           @in_fenced_block = false
-          @fence_char = nil
-          @fence_length = 0
           @in_indented_block = false
           @in_inline_code = false
-          @inline_delimiter = nil
+          # @fence_char / @fence_length / @inline_delimiter are set by
+          # open_fence / open_inline before any helper reads them;
+          # they're only consulted when the corresponding in_X flag is
+          # true, which requires a prior open_* call.
         end
 
         # Check if currently inside any code context
@@ -53,9 +54,10 @@ module Markbridge
           return nil unless line_start
 
           input_length = input.length
-          scan_pos = skip_leading_spaces(input, pos, input_length)
-          return nil if scan_pos >= input_length
-
+          scan_pos = skip_leading_spaces(input, pos)
+          # No `scan_pos >= input_length` guard: `input[input_length]` is
+          # nil, and `nil == "`"` / `nil == "~"` are both false so the
+          # next check returns nil anyway.
           fence_char = input[scan_pos]
           return nil unless fence_char == "`" || fence_char == "~"
 
@@ -106,10 +108,11 @@ module Markbridge
         # @return [Integer, nil] end position after inline code, or nil if not at boundary
         def check_inline_boundary(input, pos)
           return nil if @in_fenced_block || @in_indented_block
+          # No `pos >= input_length` guard: `input[input_length]` is nil,
+          # and `nil != "`"` is true so the next check returns nil anyway.
+          return nil if input[pos] != "`"
 
           input_length = input.length
-          return nil if pos >= input_length || input[pos] != "`"
-
           if @in_inline_code
             try_close_inline(input, pos, input_length)
           else
@@ -120,10 +123,10 @@ module Markbridge
         private
 
         # Skip up to 3 leading spaces of indentation.
-        def skip_leading_spaces(input, pos, input_length)
+        def skip_leading_spaces(input, pos)
           scan_pos = pos
           spaces = 0
-          while spaces < 3 && scan_pos < input_length && input[scan_pos] == " "
+          while spaces < 3 && input[scan_pos] == " "
             spaces += 1
             scan_pos += 1
           end
@@ -148,9 +151,10 @@ module Markbridge
           scan_pos += 1 while scan_pos < input_length && input[scan_pos] == " "
           return nil unless scan_pos >= input_length || input[scan_pos] == "\n"
 
+          # @fence_char / @fence_length are not reset here: they are only
+          # consulted while @in_fenced_block is true, and open_fence
+          # overwrites them on the next opening.
           @in_fenced_block = false
-          @fence_char = nil
-          @fence_length = 0
           pos_after_line(scan_pos, input_length)
         end
 
@@ -174,8 +178,10 @@ module Markbridge
           next_pos = pos + delimiter_length
           return nil if next_pos < input_length && input[next_pos] == "`"
 
+          # @inline_delimiter is not reset here: it is only consulted
+          # while @in_inline_code is true, and open_inline overwrites it
+          # on the next opening.
           @in_inline_code = false
-          @inline_delimiter = nil
           next_pos
         end
 
@@ -196,14 +202,15 @@ module Markbridge
 
         public
 
-        # Reset the tracker state
+        # Reset the tracker state. The @fence_char / @fence_length /
+        # @inline_delimiter companions are not cleared: they're only
+        # consulted while the corresponding in_* flag is true, and
+        # open_fence / open_inline overwrites them on the next
+        # opening (same pattern as try_close_fence / try_close_inline).
         def reset!
           @in_fenced_block = false
-          @fence_char = nil
-          @fence_length = 0
           @in_indented_block = false
           @in_inline_code = false
-          @inline_delimiter = nil
         end
       end
     end

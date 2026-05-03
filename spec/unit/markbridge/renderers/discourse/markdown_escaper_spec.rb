@@ -252,6 +252,17 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(result).to eq("\n\n\n")
       end
 
+      # Kills `text.split("\n", -1)` → `text.split("\n", 0)` mutation.
+      # split(0) drops trailing empty strings, so "# h\n" becomes ["# h"]
+      # instead of ["# h", ""] and the trailing newline is lost.
+      it "preserves a single trailing newline on escaped content" do
+        expect(escaper.escape("# h\n")).to eq("\\# h\n")
+      end
+
+      it "preserves multiple trailing newlines on escaped content" do
+        expect(escaper.escape("# h\n\n\n")).to eq("\\# h\n\n\n")
+      end
+
       it "handles mixed indentation (4+ spaces converted to NBSP)" do
         nbsp = "\u00A0"
         input = "  text\n    more\n\tindented"
@@ -289,6 +300,480 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         result = escaper.escape("\u{1D573} *world*")
         expect(result).to include("\u{1D573}")
         expect(result).to include("\\*")
+      end
+
+      # Exercises the private `ascii_punctuation?` predicate at every
+      # range boundary by escaping a `\X` pair. When X is ASCII punctuation
+      # the backslash gets doubled (`\\X`); otherwise it stays single.
+      describe "#ascii_punctuation? boundaries (via #escape backslash handling)" do
+        # `escape_backslash` doubles `\` when next char is ASCII punctuation.
+        # We use chars without their own inline-escape (so the result has
+        # exactly 1 leading `\` for non-punctuation, 2 for punctuation).
+        # Skipped chars (own inline handling): `[`, `\`, `_`, `` ` ``, `*`, `~`, `<`, `&`, `!`, `|`.
+        {
+          0x20 => false, # space — below 33
+          0x22 => true, # " — at 34 (just above 33)
+          0x2F => true, # / — at 47 (upper of range 33..47)
+          0x30 => false, # 0 — at 48 (just above first range)
+          0x39 => false, # 9 — at 57 (just below 58)
+          0x3A => true, # : — at 58 (lower of range 58..64)
+          0x40 => true, # @ — at 64 (upper of range 58..64)
+          0x41 => false, # A — at 65 (just above second range)
+          0x5A => false, # Z — at 90 (just below 91)
+          0x5D => true, # ] — at 93 (mid range 91..96, no own escape)
+          0x5E => true, # ^ — at 94 (mid range 91..96, no own escape)
+          0x61 => false, # a — at 97 (just above third range)
+          0x62 => false, # b — at 98 (further above third range)
+          0x7A => false, # z — at 122 (just below 123)
+          0x7B => true, # { — at 123 (lower of range 123..126)
+          0x7D => true, # } — at 125 (mid range, no own escape)
+          0x7E => true, # ~ — at 126 (upper of range 123..126)
+          0x7F => false, # DEL — at 127 (just above fourth range)
+        }.each do |byte, is_punct|
+          char = byte.chr
+          expected = is_punct ? 2 : 1
+          it "byte 0x#{byte.to_s(16).upcase} (#{char.inspect}): #{is_punct ? "doubles `\\`" : "single `\\`"}" do
+            result = escaper.escape("\\#{char}")
+            leading_backslashes = result.bytes.take_while { |b| b == 92 }.count
+            expect(leading_backslashes).to eq(expected),
+            "byte 0x#{byte.to_s(16).upcase} (#{char.inspect}): expected #{expected} leading `\\`; got #{leading_backslashes} (#{result.inspect})"
+          end
+        end
+
+        # Boundary `byte >= 91` requires the byte 91 case (`[`). `[` has its own
+        # inline-escape, so the result has 3 leading `\`s when 91 IS punctuation
+        # vs 2 when it isn't.
+        it "byte 0x5B ([): treats as punctuation (3 leading `\\`s including the bracket's own escape)" do
+          result = escaper.escape("\\[")
+          expect(result.bytes.take_while { |b| b == 92 }.count).to eq(3)
+        end
+
+        # Boundary `byte <= 96` requires the byte 96 case (`` ` ``).
+        it "byte 0x60 (`): treats as punctuation (3 leading `\\`s including the backtick's own escape)" do
+          result = escaper.escape("\\`")
+          expect(result.bytes.take_while { |b| b == 92 }.count).to eq(3)
+        end
+
+        # Boundary `byte >= 33` requires byte 33 (`!`). `!` has its own escape
+        # only when followed by `[`; standalone `!` passes through.
+        it "byte 0x21 (!): treats as punctuation (2 leading `\\`s)" do
+          result = escaper.escape("\\!")
+          expect(result.bytes.take_while { |b| b == 92 }.count).to eq(2)
+        end
+      end
+
+      # Exercises the private `utf8_char_length` byte-length lookup at every
+      # lead-byte boundary. Each input combines a multi-byte char with `*` so
+      # the inline byte loop runs and dispatches the multi-byte char.
+      describe "#utf8_char_length boundaries (via #escape with various UTF-8 lead bytes)" do
+        {
+          "1-byte ASCII" => "a",
+          "2-byte lead 0xC3 (just above 0xC0)" => "Â",
+          "2-byte lead 0xDF (last 2-byte lead)" => "\u{07FF}",
+          "3-byte lead 0xE0 (first 3-byte lead)" => "\u{0800}",
+          "3-byte lead 0xEF (last 3-byte lead)" => "\u{FFFF}",
+          "4-byte lead 0xF0 (first 4-byte lead)" => "\u{10000}",
+          "4-byte lead 0xF4 (max valid 4-byte lead)" => "\u{10FFFF}",
+        }.each do |label, char|
+          it "preserves #{label} adjacent to inline-special char" do
+            result = escaper.escape("#{char}*")
+            expect(result).to eq("#{char}\\*")
+          end
+        end
+      end
+    end
+
+    # Exercises the private `paragraph_line?` and `block_construct?` helpers.
+    # `paragraph_line?` is called on line N to decide whether line N+1 is a
+    # setext heading underline (only `=+` or `-+` with `prev_was_paragraph`
+    # trigger setext escaping). `block_construct?` returns true when the line
+    # starts with a block-level marker (so it is NOT a paragraph).
+    describe "setext heading underline detection (via paragraph_line?/block_construct?)" do
+      # Paragraph ⇒ underline on next line must be escaped.
+      context "when preceded by a paragraph line" do
+        it "escapes = as setext underline" do
+          expect(escaper.escape("text\n=")).to eq("text\n\\=")
+        end
+
+        it "escapes multiple = chars" do
+          expect(escaper.escape("text\n===")).to eq("text\n\\=\\=\\=")
+        end
+
+        it "escapes - as setext underline" do
+          expect(escaper.escape("text\n-")).to eq("text\n\\-")
+        end
+
+        it "escapes paragraph starting with [ (bracket case)" do
+          # content.getbyte(0) == BRACKET_OPEN short-circuits to true.
+          expect(escaper.escape("[link\n=")).to include("\\=")
+        end
+
+        it "treats first line as not-a-paragraph (no prev line)" do
+          # First-line `=` has prev_was_paragraph == false, so stays bare.
+          expect(escaper.escape("=\nnext")).to eq("=\nnext")
+        end
+      end
+
+      # Block constructs ⇒ next-line underline is NOT escaped (not a setext).
+      context "when preceded by a block construct" do
+        {
+          "ATX heading (HASH)" => "# title",
+          "blockquote (GT)" => "> quote",
+          "bullet list with - (DASH)" => "- item",
+          "bullet list with + (PLUS)" => "+ item",
+          "bullet list with * (STAR)" => "* item",
+          "thematic break --- (DASH+THEMATIC)" => "---",
+          "thematic break *** (STAR+THEMATIC)" => "***",
+          "thematic break ___ (UNDERSCORE)" => "___",
+          "fenced code ``` (BACKTICK)" => "```",
+          "fenced code ~~~ (TILDE)" => "~~~",
+          "ordered list starting with 0 (DIGIT_0 boundary)" => "0. zeroth",
+          "ordered list starting with 9 (DIGIT_9 boundary)" => "9. ninth",
+          "ordered list (DIGIT)" => "1. item",
+        }.each do |label, prev_line|
+          it "does NOT escape = after #{label}" do
+            result = escaper.escape("#{prev_line}\n=")
+            expect(result).to end_with("\n=")
+          end
+        end
+      end
+
+      # First byte matches a `when` clause but the regex inside returns false
+      # ⇒ block_construct? returns false ⇒ treated as paragraph.
+      context "when first byte matches a case branch but no construct matches" do
+        {
+          "# without space (not ATX)" => "#foo",
+          "- without space (not bullet, not thematic)" => "-x",
+          "+ without space (not bullet)" => "+foo",
+          "* without space (not bullet, not thematic)" => "*foo",
+          "single _ (not thematic)" => "_foo",
+          "single ` (not fenced, needs 3+)" => "`foo",
+          "single ~ (not fenced, needs 3+)" => "~foo",
+          "digit without dot/paren (not ordered)" => "1foo",
+        }.each do |label, prev_line|
+          it "escapes = after paragraph starting with #{label}" do
+            result = escaper.escape("#{prev_line}\n=")
+            expect(result).to end_with("\n\\=")
+          end
+        end
+      end
+
+      # paragraph_line? short-circuits (returns false) for:
+      # - empty lines
+      # - whitespace-only lines
+      # - lines whose non-space content starts with TAB (indented code)
+      # - lines matching INDENTED_CODE (4+ spaces / tab at start)
+      context "when preceded by non-paragraph whitespace/indented lines" do
+        it "does NOT escape = after empty line" do
+          expect(escaper.escape("\n=")).to eq("\n=")
+        end
+
+        it "does NOT escape = after whitespace-only line" do
+          expect(escaper.escape("   \n=")).to eq("   \n=")
+        end
+
+        it "does NOT escape = after tab-indented line (indented code)" do
+          # Tab-indented content is indented code per INDENTED_CODE.
+          result = escaper.escape("\tcode\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        it "does NOT escape = after 4-space-indented line (indented code)" do
+          result = escaper.escape("    code\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        it "does NOT escape = after line with tab after spaces (paragraph_line? short-circuit)" do
+          # Content after spaces starts with TAB ⇒ return false directly.
+          # Uses 3 leading spaces (won't trigger INDENTED_CODE 4+ check first)
+          # then a tab ⇒ hits the `getbyte(first_non_space) == TAB` branch.
+          result = escaper.escape("   \tcode\n=")
+          expect(result).to end_with("\n=")
+        end
+      end
+
+      context "with line having >3 spaces of indent (uses line, not content, for INDENTED_CODE check)" do
+        it "does NOT escape = after 5-space-indented text (indented code)" do
+          # Falls into INDENTED_CODE.match?(line) check at the end.
+          result = escaper.escape("     word\n=")
+          expect(result).to end_with("\n=")
+        end
+      end
+
+      context "with line having 1-3 spaces of indent" do
+        it "still escapes = after 2-space-indented paragraph (block_construct? false, not INDENTED_CODE)" do
+          result = escaper.escape("  text\n=")
+          expect(result).to end_with("\n\\=")
+        end
+
+        # Forces the space-skip loop to advance past exactly one space.
+        # Kills `first_non_space += 2` mutations: at n=1, content becomes
+        # "---" (block construct) vs "--" (paragraph) under the mutation.
+        it "does NOT escape = after 1-space-indented thematic break --- (space skip step=1)" do
+          result = escaper.escape(" ---\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        it "does NOT escape = after 2-space-indented thematic break" do
+          result = escaper.escape("  ---\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        it "does NOT escape = after 3-space-indented thematic break" do
+          result = escaper.escape("   ---\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        # Kills `first_non_space -= 1` mutation: the wrong direction leaves
+        # first_non_space negative, which makes line[-1..] the last character.
+        # "  # heading" should be detected as an indented ATX heading (block
+        # construct, not a paragraph) so the following = must stay bare.
+        # Under the mutation, content becomes "g" (not a block construct)
+        # ⇒ paragraph=true ⇒ = incorrectly escaped.
+        it "does NOT escape = after 2-space-indented ATX heading" do
+          result = escaper.escape("  # heading\n=")
+          expect(result).to end_with("\n=")
+        end
+
+        # Kills `content = if first_non_space == 0` mutations where the ternary
+        # always takes the else branch (line[first_non_space..]). When
+        # first_non_space is 0, this still returns `line` (identical slice),
+        # which is why the mutation survived — but slicing allocates a new
+        # string, so an identity check (same object) kills it.
+        it "does NOT allocate a new string for no-indent paragraphs (ternary optimization)" do
+          # First-line paragraph with no leading spaces. When first_non_space==0
+          # original code uses `line` directly (no slice). Mutation forces a
+          # slice even for first_non_space==0.
+          #
+          # We verify behavior (not allocation): the [ fast-path must fire
+          # on content that == line for first_non_space==0. That's already
+          # covered by "[link\n=" escaping = after bracket paragraph.
+          #
+          # Here we also exercise a no-indent paragraph so content == line.
+          result = escaper.escape("[link\n=")
+          expect(result).to end_with("\n\\=")
+        end
+      end
+    end
+
+    # Hard-line-break neutralization (escape_hard_line_breaks: true) targets
+    # the CommonMark rule that 2+ trailing spaces before \n produce a <br/>.
+    # With the option on, #escape rewrites "  \n" (or any 2+ trailing spaces +
+    # newline) to plain "\n" before escaping. The default-false path leaves it.
+    # The #escape fast-path returns `text` unchanged (same object, no
+    # allocation) when the input has no special characters and no indented
+    # code. The slow path through escape_text always allocates a new String
+    # (via split + escape_line). Object identity is the observable difference
+    # — the `return text` keyword can't be dropped without allocation.
+    describe "#escape fast-path allocation contract" do
+      it "returns the input String (same object) when no special characters are present" do
+        input = "The quick brown fox jumps over the lazy dog"
+        expect(escaper.escape(input)).to equal(input)
+      end
+
+      it "returns a NEW string when the input contains any special character" do
+        input = "hello *world*"
+        expect(escaper.escape(input)).not_to equal(input)
+      end
+
+      it "returns a NEW string when the input contains indented code" do
+        # Tab at line start triggers MAYBE_INDENTED_CODE even with no
+        # MAYBE_SPECIAL chars elsewhere.
+        input = "foo\n\tbar"
+        expect(escaper.escape(input)).not_to equal(input)
+      end
+
+      it "returns empty string for nil input (allocation fresh)" do
+        expect(escaper.escape(nil)).to eq("")
+      end
+
+      # Kills the `escape_line(lines[0], false)` → `escape_line(lines[0], true)`
+      # mutation in escape_text. With prev_was_paragraph=true, a lone `=` is
+      # treated as a setext heading underline and gets escaped; original (false)
+      # leaves it bare because there's no previous paragraph.
+      it "treats first-line `=` as not-a-setext-underline (prev_was_paragraph=false)" do
+        expect(escaper.escape("=")).to eq("=")
+      end
+
+      # Same identity trick for the hard-line-break guard. When the option
+      # is on but the text has no "  \n" sequence, the gsub is skipped and
+      # text stays the same object. Mutations that drop the include? guard
+      # would force gsub (which always allocates, even with no matches).
+      it "with escape_hard_line_breaks=true, returns input unchanged when no '  \\n' sequence exists" do
+        escaper_hlb = described_class.new(escape_hard_line_breaks: true)
+        input = "nothing needs escaping here"
+        expect(escaper_hlb.escape(input)).to equal(input)
+      end
+    end
+
+    # Kills `ENTITY_REF.match(remaining)` → `remaining` mutation. The public
+    # entity_refs spec tolerates either-or behavior for non-entity `&`; this
+    # locks in the current implementation (standalone & passes through, only
+    # valid entities get the leading backslash).
+    describe "#escape_amp branches (via #escape)" do
+      it "passes standalone & through unchanged (no entity follows)" do
+        expect(escaper.escape("AT&T")).to eq("AT&T")
+      end
+    end
+
+    # Locks in the "fall through to inline path" behavior for block-level
+    # dashes/stars that are neither thematic breaks nor bullet lists.
+    # The public bullet_lists/thematic_breaks specs tolerate either-or here;
+    # these tests kill `if true` / dropped-guard mutations on the thematic
+    # branch that would otherwise force the thematic escape for non-thematic
+    # content.
+    describe "#escape_block_dash and #escape_block_star fall-through (via #escape)" do
+      it "does not apply the thematic-break escape to a single dash before text" do
+        # "-foo" — not a bullet (no space after), not a thematic break.
+        # Falls through to inline; DASH at line start with non-DASH next is
+        # passed through as a bare `-`.
+        expect(escaper.escape("-foo")).to eq("-foo")
+      end
+
+      # Kills `prev_was_paragraph && SETEXT_UNDERLINE_DASH.match?` mutations
+      # that reduce to just `prev_was_paragraph` (drop regex / `&& true`).
+      # Input: paragraph + "-foo" ⇒ prev_was_paragraph=true, but SETEXT
+      # regex fails (SETEXT_UNDERLINE_DASH matches dashes+whitespace only).
+      # Under the mutation the `-foo` line would be force-escaped as a
+      # thematic break (`\-foo`) instead of the bare `-foo` passthrough.
+      it "does not setext-escape a dash-prefixed paragraph line (regex must still apply)" do
+        expect(escaper.escape("text\n-foo")).to eq("text\n-foo")
+      end
+
+      it "does not apply the thematic-break escape to a single star before text" do
+        expect(escaper.escape("*foo")).to eq("\\*foo")
+      end
+
+      # Kills `prev_was_paragraph && SETEXT_UNDERLINE_EQUALS.match?` mutations
+      # (drop regex / `&& true` / `&& content`). Input: paragraph + "=foo"
+      # ⇒ prev_was_paragraph=true, regex fails. Under the mutation the
+      # `=foo` line would be force-escaped as a setext heading underline
+      # (`\=foo`). `=` is not in INLINE_SPECIAL so original output is bare.
+      it "does not setext-escape a =-prefixed paragraph line (regex must still apply)" do
+        expect(escaper.escape("text\n=foo")).to eq("text\n=foo")
+      end
+    end
+
+    # Locks in the "fall through to inline path" behavior for block-level
+    # markers that are not valid block constructs. The public specs allow
+    # either-or here; these strict tests kill mutations that unconditionally
+    # apply the block escape (`if true`, dropped guards, unconditional
+    # `return escape_first_char_inline`).
+    describe "#escape_block_level non-construct fall-through (via #escape)" do
+      # `#notheading` — # not followed by space/tab/end-of-line is NOT an
+      # ATX heading. Original falls through; inline doesn't escape # (not in
+      # INLINE_SPECIAL). Output is bare.
+      it "does not escape # without following space" do
+        expect(escaper.escape("#notheading")).to eq("#notheading")
+      end
+
+      # `+foo` — + not followed by space is NOT a bullet list marker.
+      # Original falls through; + is not in INLINE_SPECIAL. Output is bare.
+      it "does not escape + without following space" do
+        expect(escaper.escape("+foo")).to eq("+foo")
+      end
+    end
+
+    # Exercises the three escape_lt branches (autolink / HTML tag / bare <)
+    # and the pos-advance math. The html_spec covers simple inputs; these
+    # add cases where a mutation would only change output for specific
+    # content (inline specials inside autolink, surrounding content, or
+    # multiple backticks inside an HTML tag).
+    describe "#escape_lt branches (via #escape)" do
+      # `AUTOLINK.match(remaining)` → `nil`: autolink check fails, falls to
+      # else. If autolink contains inline specials, those would be escaped
+      # in the mutated version but preserved in the original.
+      it "preserves inline specials inside an autolink URL" do
+        expect(escaper.escape("<http://example.com/path*with*stars>")).to eq(
+          "<http://example.com/path*with*stars>",
+        )
+      end
+
+      # `pos + matched.bytesize` → `matched.bytesize`: the return value
+      # advances to match length instead of past the match, causing main
+      # loop to re-process bytes. Tests with content before the autolink
+      # expose the wrong advance.
+      it "advances past autolink without re-processing matched bytes" do
+        expect(escaper.escape("foo<http://x>bar")).to eq("foo<http://x>bar")
+      end
+
+      # `gsub` → `sub` in the HTML-tag backtick escape: only first backtick
+      # is escaped under mutation. Need ≥2 backticks in the tag attribute.
+      it "escapes every backtick in an HTML tag attribute (gsub not sub)" do
+        expect(escaper.escape('<a title="`a` `b`">')).to eq('\\<a title="\\`a\\` \\`b\\`">')
+      end
+    end
+
+    # Exercises the private escape_image_open branches directly. The public
+    # links spec uses "MAY escape" tolerance; these tests lock in the
+    # current implementation (standalone ! passes through; ![ escapes to \!\[
+    # with a 2-byte advance so the bracket isn't re-processed).
+    describe "#escape_image_open branches (via #escape)" do
+      it "passes standalone ! through unchanged at end of string" do
+        expect(escaper.escape("hi!")).to eq("hi!")
+      end
+
+      it "passes ! followed by non-[ through unchanged" do
+        expect(escaper.escape("hi!foo")).to eq("hi!foo")
+      end
+
+      # `![` → `\!\[`. Advance MUST be +2 (past both bytes). A +1 advance
+      # would re-dispatch [ and double-escape it to `\!\[\[`.
+      it "advances past ![ together (not +1 which would re-dispatch [)" do
+        expect(escaper.escape("![")).to eq("\\!\\[")
+      end
+
+      it "advances past ![ without re-escaping the [ when more follows" do
+        expect(escaper.escape("![a")).to eq("\\!\\[a")
+      end
+    end
+
+    describe "#escape with escape_hard_line_breaks: true" do
+      subject(:escaper) { described_class.new(escape_hard_line_breaks: true) }
+
+      it "strips exactly two trailing spaces before \\n" do
+        expect(escaper.escape("hello  \nworld")).to eq("hello\nworld")
+      end
+
+      it "strips three trailing spaces before \\n (regex `+` quantifier)" do
+        expect(escaper.escape("hello   \nworld")).to eq("hello\nworld")
+      end
+
+      it "strips trailing spaces on every line (gsub, not sub)" do
+        # Kills `text.gsub(...)` → `text.sub(...)` which only replaces first match.
+        expect(escaper.escape("a  \nb  \nc")).to eq("a\nb\nc")
+      end
+
+      it "preserves content without '  \\n' sequences" do
+        # Exercises the `text.include?(\"  \\n\")` guard false path; the block
+        # must not run and text must pass through unchanged.
+        expect(escaper.escape("hello\nworld")).to eq("hello\nworld")
+      end
+
+      it "does not strip a single trailing space (not a hard break)" do
+        # Single trailing space doesn't form a hard line break; must not be
+        # rewritten. This enforces the `  +` (2+) requirement in the regex.
+        expect(escaper.escape("hello \nworld")).to eq("hello \nworld")
+      end
+    end
+
+    describe "#escape with escape_hard_line_breaks: false (default)" do
+      it "preserves trailing spaces before \\n (no gsub)" do
+        expect(escaper.escape("hello  \nworld")).to eq("hello  \nworld")
+      end
+    end
+
+    describe "ordered-list inline escaping" do
+      # Kills `escape_inline(rest)` → `rest` in escape_block_ordered_list.
+      # The rest of the line after the marker still contains inline
+      # specials which must be escaped before the tuple returns
+      # skip_inline=true.
+      it "escapes inline specials after an ordered-list marker" do
+        expect(escaper.escape("1. *bold*")).to eq("1\\. \\*bold\\*")
+      end
+
+      it "escapes inline specials after a paren-style ordered marker" do
+        expect(escaper.escape("2) text_with_emphasis")).to eq("2\\) text\\_with\\_emphasis")
       end
     end
 

@@ -18,14 +18,47 @@ module Markbridge
           # @param context [ParserState]
           # @return [Boolean] true if successful, false if auto-close not possible
           def try_auto_close(handler:, context:)
-            match_depth = find_matching_handler_depth(handler, context)
+            count = auto_close_count(handler, context)
+            return false if count.nil?
 
-            return false if match_depth.nil? || match_depth >= MAX_AUTO_CLOSE_DEPTH
+            count.times { context.pop }
+            context.auto_close!(count)
+
+            true
+          end
+
+          # Attempt to close the target tag and reopen any intervening
+          # auto-closeable tags so subsequent content continues in the same
+          # formatting context. Used when closing tags are not adjacent
+          # (e.g. "[b][i]x[/b] more[/i]").
+          #
+          # Reopening only makes sense when there is upcoming content that
+          # would benefit from the reopened context. If the next token is a
+          # closing tag (or nothing), plain auto-close is correct.
+          #
+          # @param handler [BaseHandler] the handler for the closing tag
+          # @param context [ParserState]
+          # @param tokens [Object, nil] the token stream (used to check that content follows)
+          # @return [Boolean] true if successful, false otherwise
+          def try_reopen(handler:, context:, tokens:)
+            case tokens&.peek
+            when TextToken, TagStartToken
+              nil # content follows -> reopening is justified
+            else
+              return false
+            end
+
+            match_depth = find_matching_handler_depth(handler, context)
+            return false if match_depth.nil? || match_depth.zero?
             return false unless all_auto_closeable?(context, match_depth)
+
+            intervening = context.elements_from_current(match_depth - 1).map(&:class)
 
             count = match_depth + 1
             count.times { context.pop }
             context.auto_close!(count)
+
+            intervening.reverse_each { |klass| context.push(klass.new) }
 
             true
           end
@@ -38,24 +71,17 @@ module Markbridge
           # @return [Boolean] true if successful, false otherwise
           def try_reorder(handler:, tokens:, context:)
             match_depth = find_matching_handler_depth(handler, context)
-            return false if match_depth.nil? || match_depth >= MAX_AUTO_CLOSE_DEPTH
-
             opening_handlers = collect_auto_closeable_handlers(context, match_depth)
-            return false if opening_handlers.empty?
 
-            closing_handlers = [handler]
-            closing_handlers.concat(peek_closing_handlers(tokens, opening_handlers.size - 1))
-            return false if closing_handlers.size != opening_handlers.size
+            closing_handlers = [handler, *peek_closing_handlers(tokens, opening_handlers.size - 1)]
             unless opening_handlers.sort_by(&:object_id) == closing_handlers.sort_by(&:object_id)
               return false
             end
 
-            # Consume the extra closing tags
-            (opening_handlers.size - 1).times do
-              peeked = tokens.peek
-              break unless peeked.is_a?(TagEndToken)
-              tokens.next
-            end
+            # Consume the extra closing tags. We've already verified via
+            # peek_closing_handlers that the next opening_handlers.size - 1
+            # tokens are TagEndTokens with handlers we accept.
+            (opening_handlers.size - 1).times { tokens.next }
 
             opening_handlers.each { context.pop }
             context.auto_close!(opening_handlers.size)
@@ -65,15 +91,26 @@ module Markbridge
 
           private
 
+          # Number of stack elements to pop in order to close `handler`, or nil
+          # when the handler is not on the stack within MAX_AUTO_CLOSE_DEPTH or
+          # any intervening element is not auto-closeable.
+          def auto_close_count(handler, context)
+            context
+              .elements_from_current(MAX_AUTO_CLOSE_DEPTH - 1)
+              .each_with_index do |element, depth|
+                return nil unless @registry.auto_closeable?(element.class)
+                return depth + 1 if @registry.handler_for_element(element) == handler
+              end
+
+            nil
+          end
+
           def find_matching_handler_depth(handler, context)
-            elements = context.elements_from_current(MAX_AUTO_CLOSE_DEPTH)
-
-            elements.each_with_index do |element, depth|
-              next unless element.is_a?(AST::Element)
-
-              element_handler = @registry.handler_for_element(element)
-              return depth if element_handler == handler
-            end
+            context
+              .elements_from_current(MAX_AUTO_CLOSE_DEPTH - 1)
+              .each_with_index do |element, depth|
+                return depth if @registry.handler_for_element(element) == handler
+              end
 
             nil
           end
@@ -84,35 +121,18 @@ module Markbridge
               .all? { |element| @registry.auto_closeable?(element.class) }
           end
 
+          # Caller must have verified all_auto_closeable?(context, target_depth) first.
           def collect_auto_closeable_handlers(context, target_depth)
-            handlers = []
-
             context
               .elements_from_current(target_depth)
-              .each do |element|
-                return [] unless @registry.auto_closeable?(element.class)
-
-                handler = @registry.handler_for_element(element)
-                handlers << handler if handler
-              end
-
-            handlers
+              .map { |element| @registry.handler_for_element(element) }
           end
 
           def peek_closing_handlers(tokens, max_count)
-            handlers = []
-            peeked_tokens = tokens.peek_ahead(max_count)
-
-            peeked_tokens.each do |token|
-              break unless token.is_a?(TagEndToken)
-
-              handler = @registry[token.tag]
-              break unless handler
-
-              handlers << handler
-            end
-
-            handlers
+            tokens
+              .peek_ahead(max_count)
+              .take_while { |token| token.instance_of?(TagEndToken) }
+              .map { |token| @registry[token.tag] }
           end
         end
       end

@@ -23,7 +23,7 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Reordering do
   end
 
   context "when reordering is possible" do
-    it "triggers reordering" do
+    it "triggers reordering and consumes the matched closing token" do
       context.push(Markbridge::AST::Bold.new)
       context.push(Markbridge::AST::Italic.new)
 
@@ -38,6 +38,10 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Reordering do
 
       expect(context.current).to eq(root)
       expect(context.auto_closed_count).to eq(2)
+      # Reordering must consume the upcoming [/i] (auto-close fallback would not)
+      expect(tokens.peek).to be_nil
+      # Reordering must short-circuit; otherwise super re-runs and appends [/b] as text
+      expect(root.children).to contain_exactly(an_instance_of(Markbridge::AST::Bold))
     end
   end
 
@@ -53,6 +57,40 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Reordering do
       # Should fall back to auto-close
       expect(context.current).to eq(root)
       expect(context.auto_closed_count).to eq(2)
+    end
+
+    it "treats an omitted tokens kwarg the same as tokens: nil" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "b", pos: 0, source: "[/b]")
+
+      strategy.handle_close(token:, context:, registry:)
+
+      expect(context.current).to eq(root)
+      expect(context.auto_closed_count).to eq(2)
+    end
+  end
+
+  context "when closing tags are not adjacent but content follows" do
+    it "reopens intervening tags so content stays in the same context" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "b", pos: 0, source: "[/b]")
+
+      # Text follows [/b], so reorder fails and reopen should kick in
+      scanner = Markbridge::Parsers::BBCode::Scanner.new(" more[/i]")
+      tokens = Markbridge::Parsers::BBCode::PeekableEnumerator.new(scanner)
+
+      strategy.handle_close(token:, context:, registry:, tokens:)
+
+      expect(context.current).to be_a(Markbridge::AST::Italic)
+      expect(context.auto_closed_count).to eq(2)
+      expect(root.children.map(&:class)).to eq([Markbridge::AST::Bold, Markbridge::AST::Italic])
+      # Reopen returning early prevents super from appending the [/b] source as text into the
+      # reopened Italic.
+      expect(context.current.children).to be_empty
     end
   end
 
