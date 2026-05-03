@@ -38,15 +38,25 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EmailTag do
         element = Markbridge::AST::Email.new(address: "user@example.com")
         element << Markbridge::AST::Text.new("Email me")
 
-        expect(tag.render(element, interface)).to eq(%(<a href="mailto:user@example.com">Email me</a>))
+        expect(tag.render(element, interface)).to eq(
+          %(<a href="mailto:user@example.com">Email me</a>),
+        )
       end
 
       it "attribute-escapes the address" do
         element = Markbridge::AST::Email.new(address: %(weird"@example.com))
         element << Markbridge::AST::Text.new("X")
 
-        expect(tag.render(element, interface)).to eq(%(<a href="mailto:weird&quot;@example.com">X</a>))
+        expect(tag.render(element, interface)).to eq(
+          %(<a href="mailto:weird&quot;@example.com">X</a>),
+        )
       end
+    end
+  end
+
+  describe "#html_mode_aware?" do
+    it "returns true" do
+      expect(described_class.new.html_mode_aware?).to be true
     end
   end
 end

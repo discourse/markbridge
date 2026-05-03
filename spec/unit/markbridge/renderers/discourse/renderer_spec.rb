@@ -41,6 +41,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
       expect(result).to eq('a\*b')
     end
+
+    it "uses an explicit html_escaper when one is provided" do
+      html_escaper = instance_double(Markbridge::Renderers::Discourse::HtmlEscaper)
+      allow(html_escaper).to receive(:escape).and_return("HTML-ESCAPED")
+
+      text = Markbridge::AST::Text.new("a < b")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+      result = described_class.new(html_escaper:).render(text, context:)
+
+      expect(result).to eq("HTML-ESCAPED")
+      expect(html_escaper).to have_received(:escape).with("a < b")
+    end
+
+    it "falls back to HtmlEscaper.new when no html_escaper is provided" do
+      # The default html_escaper must HTML-escape `<` and `&` in html_mode.
+      text = Markbridge::AST::Text.new("a < b & c")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+      result = described_class.new.render(text, context:)
+
+      expect(result).to eq("a &lt; b &amp; c")
+    end
   end
 
   describe "#render" do
@@ -85,6 +106,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
       # Code formatter wraps in backticks; the inner text must NOT be \-escaped.
       expect(renderer.render(code)).to include("a*b")
+    end
+
+    it "passes Text content through verbatim inside Code in Markdown mode (no HTML escaping)" do
+      # `a < b` would change under html-escape (`a &lt; b`) but not under
+      # markdown-escape — locks in that the Code-parent path returns node.text.
+      code = Markbridge::AST::Code.new
+      code << Markbridge::AST::Text.new("a < b")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([code])
+
+      expect(renderer.render(code.children.first, context:)).to eq("a < b")
     end
 
     it "escapes Text content when no ancestor is Code" do

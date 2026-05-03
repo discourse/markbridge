@@ -55,7 +55,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
       it "renders <img> with src and empty alt" do
         element = Markbridge::AST::Image.new(src: "https://example.com/image.png")
 
-        expect(tag.render(element, interface)).to eq(%(<img src="https://example.com/image.png" alt="">))
+        expect(tag.render(element, interface)).to eq(
+          %(<img src="https://example.com/image.png" alt="">),
+        )
       end
 
       it "includes width and height when given" do
@@ -74,6 +76,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
           %(<img src="x&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;" alt="">),
         )
       end
+    end
+  end
+
+  describe "#html_mode_aware?" do
+    it "returns true" do
+      expect(described_class.new.html_mode_aware?).to be true
     end
   end
 end

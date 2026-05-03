@@ -5,9 +5,10 @@
 # chain when rendering children.
 #
 # Required `let`s in the including spec:
-#   - element_class:  the AST::Element subclass the tag operates on
-#   - empty_output:   what the tag returns for an empty element
-#   - simple_output:  what the tag returns when the element wraps "hi"
+#   - element_class:       the AST::Element subclass the tag operates on
+#   - empty_output:        what the tag returns for an empty element
+#   - simple_output:       what the tag returns when the element wraps "hi"
+#   - html_simple_output:  what the tag returns wrapping "hi" in html_mode
 RSpec.shared_examples "an inline wrapping tag" do
   let(:tag) { described_class.new }
   let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
@@ -28,7 +29,24 @@ RSpec.shared_examples "an inline wrapping tag" do
       expect(tag.render(element, interface)).to eq(empty_output)
     end
 
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "returns the html-mode wrapped output for a simple text child" do
+        element = element_class.new
+        element << Markbridge::AST::Text.new("hi")
+
+        expect(tag.render(element, interface)).to eq(html_simple_output)
+      end
+    end
+
     include_examples "a tag that propagates parent context"
+  end
+
+  describe "#html_mode_aware?" do
+    it "returns true" do
+      expect(described_class.new.html_mode_aware?).to be true
+    end
   end
 end
 

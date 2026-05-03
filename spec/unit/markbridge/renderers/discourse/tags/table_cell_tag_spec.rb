@@ -26,4 +26,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableCellTag do
       expect(tag.render(cell, interface)).to eq("")
     end
   end
+
+  describe "#html_mode_aware?" do
+    it "returns true" do
+      expect(described_class.new.html_mode_aware?).to be true
+    end
+  end
 end

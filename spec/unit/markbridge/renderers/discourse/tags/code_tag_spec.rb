@@ -184,6 +184,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
           "<pre><code>a &lt; b\n&amp;&amp; c</code></pre>",
         )
       end
+
+      it "HTML-escapes the language attribute" do
+        element = Markbridge::AST::Code.new(language: %("><script>))
+        element << Markbridge::AST::Text.new("x\ny")
+
+        expect(tag.render(element, interface)).to eq(
+          %(<pre><code class="language-&quot;&gt;&lt;script&gt;">x\ny</code></pre>),
+        )
+      end
+    end
+  end
+
+  describe "#html_mode_aware?" do
+    it "returns true" do
+      expect(described_class.new.html_mode_aware?).to be true
     end
   end
 end

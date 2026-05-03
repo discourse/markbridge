@@ -4,20 +4,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::BoldTag do
   let(:element_class) { Markbridge::AST::Bold }
   let(:empty_output) { "" }
   let(:simple_output) { "**hi**" }
+  let(:html_simple_output) { "<strong>hi</strong>" }
 
   it_behaves_like "an inline wrapping tag"
-
-  describe "#render in html_mode" do
-    let(:tag) { described_class.new }
-    let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-    let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
-    let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
-
-    it "wraps content in <strong>" do
-      element = Markbridge::AST::Bold.new
-      element << Markbridge::AST::Text.new("hello")
-
-      expect(tag.render(element, interface)).to eq("<strong>hello</strong>")
-    end
-  end
 end
