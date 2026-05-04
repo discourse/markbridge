@@ -12,6 +12,29 @@ RSpec.describe Markbridge::AST::Text do
 
       expect(node.text).not_to be_frozen
     end
+
+    it "does not share its buffer with the caller's string" do
+      original = +"hello"
+      node = described_class.new(original)
+
+      expect(node.text).not_to be(original)
+    end
+  end
+
+  describe "buffer isolation" do
+    # Regression: Text used to be initialized with `+text`, which is a no-op
+    # on already-mutable strings. A later #merge would then `<<` into the
+    # caller's original buffer, surprising any code still holding the source
+    # reference.
+    it "does not mutate the caller's string when merge is called later" do
+      original = +"hello"
+      node1 = described_class.new(original)
+      node2 = described_class.new(" world")
+
+      node1.merge(node2)
+
+      expect(original).to eq("hello")
+    end
   end
 
   describe "#merge" do

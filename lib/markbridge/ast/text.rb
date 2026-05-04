@@ -19,9 +19,13 @@ module Markbridge
 
       # Create a new text node with the given content.
       #
+      # The text is copied into a fresh mutable buffer so that subsequent
+      # in-place mutations (e.g. via {#merge}) do not leak back to the caller's
+      # original string.
+      #
       # @param text [String] the text content
       def initialize(text)
-        @text = +text
+        @text = String.new(text)
       end
 
       # Merge another text node's content into this one.
