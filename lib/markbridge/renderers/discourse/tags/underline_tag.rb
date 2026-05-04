@@ -4,7 +4,6 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Tag for rendering underline text.
         # Discourse Markdown doesn't support <u> HTML but does support [u]
         # via its BBCode extension, which cooks to <span class="bbcode-u">.
         # Inside an HTML block CommonMark passes content through raw, so the

@@ -37,9 +37,7 @@ module Markbridge
                   next unless cell.instance_of?(AST::TableCell)
 
                   # Push the cell itself into the parent chain so descendants
-                  # (e.g. ParagraphTag) can detect that they're inside a cell
-                  # via interface.has_parent?(AST::TableCell). TableRow is
-                  # not added because no current tag inspects it.
+                  # can detect they're inside a cell via has_parent?.
                   cell_context = child_context.with_parent(cell)
                   content = interface.render_children(cell, context: cell_context).strip
                   { content:, header: cell.header? }

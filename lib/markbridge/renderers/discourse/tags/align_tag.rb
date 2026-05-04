@@ -4,12 +4,9 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Tag for rendering aligned text.
-        # Emits an HTML5 `<div style="text-align: …">` (the legacy `align`
-        # attribute is deprecated). Alignment is constrained to a known
-        # CSS keyword set so the inline style is not a freeform CSS
-        # injection surface — anything outside that set falls through to
-        # bare content.
+        # Alignment is constrained to a known CSS keyword set so the inline
+        # `style` is not a freeform CSS injection surface — anything outside
+        # that set falls through to bare content.
         class AlignTag < Tag
           ALLOWED_ALIGNMENTS = Set["left", "right", "center", "justify"].freeze
           private_constant :ALLOWED_ALIGNMENTS
