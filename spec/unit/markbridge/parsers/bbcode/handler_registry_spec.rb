@@ -152,6 +152,42 @@ RSpec.describe Markbridge::Parsers::BBCode::HandlerRegistry do
     end
   end
 
+  describe "#each" do
+    it "yields registered (tag_name, handler) pairs" do
+      handler = fake_handler
+      registry.register("b", handler)
+      registry.register("i", fake_handler(element_class: Markbridge::AST::Italic))
+
+      expect(registry.each.to_a.map(&:first)).to eq(%w[b i])
+    end
+
+    it "preserves registration order" do
+      registry.register("z", fake_handler(element_class: Markbridge::AST::Italic))
+      registry.register("a", fake_handler)
+
+      expect(registry.map(&:first)).to eq(%w[z a])
+    end
+
+    it "returns an Enumerator when no block is given" do
+      expect(registry.each).to be_a(Enumerator)
+    end
+
+    it "yields nothing on an empty registry" do
+      yielded = []
+      registry.each { |pair| yielded << pair }
+
+      expect(yielded).to be_empty
+    end
+
+    it "exposes Enumerable conveniences (count, to_h)" do
+      handler = fake_handler
+      registry.register("b", handler)
+
+      expect(registry.count).to eq(1)
+      expect(registry.to_h).to eq({ "b" => handler })
+    end
+  end
+
   describe "#close_element" do
     let(:strategy) { instance_double(Markbridge::Parsers::BBCode::ClosingStrategies::Strict) }
     let(:token) { Markbridge::Parsers::BBCode::TagEndToken.new(tag: "b", pos: 0, source: "[/b]") }

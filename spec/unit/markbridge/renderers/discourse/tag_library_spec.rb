@@ -81,6 +81,38 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
     end
   end
 
+  describe "#each" do
+    it "yields registered (element_class, tag) pairs" do
+      bold_tag = Markbridge::Renderers::Discourse::Tag.new { "b" }
+      italic_tag = Markbridge::Renderers::Discourse::Tag.new { "i" }
+      library.register(Markbridge::AST::Bold, bold_tag)
+      library.register(Markbridge::AST::Italic, italic_tag)
+
+      expect(library.to_a).to eq(
+        [[Markbridge::AST::Bold, bold_tag], [Markbridge::AST::Italic, italic_tag]],
+      )
+    end
+
+    it "returns an Enumerator when no block is given" do
+      expect(library.each).to be_a(Enumerator)
+    end
+
+    it "yields nothing on an empty library" do
+      yielded = []
+      library.each { |pair| yielded << pair }
+
+      expect(yielded).to be_empty
+    end
+
+    it "exposes Enumerable conveniences (count, to_h)" do
+      tag = Markbridge::Renderers::Discourse::Tag.new { "b" }
+      library.register(Markbridge::AST::Bold, tag)
+
+      expect(library.count).to eq(1)
+      expect(library.to_h).to eq({ Markbridge::AST::Bold => tag })
+    end
+  end
+
   describe "#ast_class_for" do
     it "returns the matching AST class via the XxxTag → AST::Xxx convention" do
       expect(library.ast_class_for(:BoldTag)).to eq(Markbridge::AST::Bold)
