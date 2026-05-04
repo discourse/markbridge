@@ -5,6 +5,8 @@ module Markbridge
     module BBCode
       # Registry of BBCode tag handlers
       class HandlerRegistry
+        include Enumerable
+
         attr_writer :closing_strategy
 
         def initialize(closing_strategy: nil)
@@ -12,6 +14,16 @@ module Markbridge
           @element_handlers = {}
           @auto_closeable_elements = Set.new
           @closing_strategy = closing_strategy
+        end
+
+        # Iterate over registered (tag_name, handler) pairs.
+        # Useful for debugging custom registries — e.g. confirming an override
+        # has stuck. Iteration order matches registration order.
+        # @yieldparam tag_name [String]
+        # @yieldparam handler [BaseHandler]
+        # @return [Enumerator] when no block is given
+        def each(&block)
+          @handlers.each(&block)
         end
 
         # Register a handler for one or more tag names and associate it with an element class
@@ -54,7 +66,12 @@ module Markbridge
           @closing_strategy&.handle_close(token:, context:, registry: self, tokens:)
         end
 
-        # Create the default handler registry with common BBCode tags
+        # Create the default handler registry with common BBCode tags.
+        #
+        # Each call returns a *fresh* instance — mutations made to one will
+        # not be visible to another. If you want a process-wide singleton,
+        # use {Markbridge.default_handlers} instead, which memoizes.
+        #
         # @param closing_strategy [Object, nil] optional closing strategy to apply, defaults to Reordering strategy
         # @return [HandlerRegistry]
         def self.default(closing_strategy: nil)

@@ -5,6 +5,8 @@ module Markbridge
     module Discourse
       # Library of rendering tags for different element types
       class TagLibrary
+        include Enumerable
+
         def initialize
           @tags = {}
         end
@@ -22,6 +24,16 @@ module Markbridge
         # @return [Tag, nil]
         def [](element_class)
           @tags[element_class]
+        end
+
+        # Iterate over registered (element_class, tag) pairs.
+        # Useful for debugging custom libraries — e.g. confirming an override
+        # has stuck. Iteration order matches registration order.
+        # @yieldparam element_class [Class]
+        # @yieldparam tag [Tag]
+        # @return [Enumerator] when no block is given
+        def each(&block)
+          @tags.each(&block)
         end
 
         # Auto-register all tags using naming convention
@@ -44,7 +56,12 @@ module Markbridge
           nil
         end
 
-        # Create the default tag library for Discourse Markdown
+        # Create the default tag library for Discourse Markdown.
+        #
+        # Each call returns a *fresh* instance — mutations made to one will
+        # not be visible to another. If you want a process-wide singleton,
+        # use {Markbridge.default_tag_library} instead, which memoizes.
+        #
         # @return [TagLibrary]
         def self.default
           new.auto_register!
