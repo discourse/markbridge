@@ -112,7 +112,36 @@ Markbridge
 4. Create tag: `lib/markbridge/renderers/discourse/tags/quote_tag.rb`
 5. Register in `TagLibrary.default` OR use auto_register! for convention-based discovery
 6. Add requires to loader files
-7. Write tests (unit + integration)
+7. Decide on html_mode behavior (see below)
+8. Write tests (unit + integration)
+
+### html_mode contract
+
+`RenderContext#html_mode?` is `true` when a tag is rendering inside a
+CommonMark HTML block (currently triggered by `TableTag`'s HTML fallback
+for uneven rows, multi-line cells, or nested tables). Per [CommonMark
+§4.6](https://spec.commonmark.org/0.31.2/#html-blocks), content inside
+the block is treated as raw HTML and is not re-parsed for Markdown
+except across blank lines. Every tag must pick one of two forms when
+`interface.html_mode?` is true:
+
+1. **Raw HTML** — emit an HTML equivalent (`<strong>` for `**`,
+   `<ul><li>` for `- `, etc.). HTML-escape any user-controlled string
+   that ends up as attribute or element content via `HtmlEscaper`. The
+   output is spliced verbatim into the surrounding block. Prefer this
+   form when the tag has a natural HTML representation.
+
+2. **Markdown island** — wrap the tag's normal Markdown output in
+   `\n\n…\n\n`. The blank lines close the HTML block; CommonMark parses
+   the inner content as Markdown; the next blank line re-opens the
+   block. Cost: blank-line wrapping forces a `<p>` margin around
+   inline content, so use this form only for tags with no clean HTML
+   equivalent (e.g. `EventTag`/`PollTag` stubs that defer rendering to
+   downstream BBCode plugins).
+
+`spec/integration/markbridge/renderers/discourse/html_mode_contract_spec.rb`
+enforces this structurally: every registered tag is rendered in
+`html_mode` and the output is checked for raw Markdown sigils.
 
 **See `examples/` for complete examples.**
 

@@ -29,7 +29,9 @@ module Markbridge
         #     end
         #   end
         class UploadTag < Tag
-          def render(element, _interface)
+          def render(element, interface)
+            return build_upload_html(element) if interface.html_mode?
+
             # Return raw Markdown if available, otherwise reconstruct
             return element.raw if element.raw
 
@@ -72,6 +74,31 @@ module Markbridge
           def build_upload_url(element)
             filename = element.filename || element.sha1
             "upload://#{filename}"
+          end
+
+          # html_mode reconstructs from the AST fields rather than reusing
+          # element.raw — raw is Markdown, which CommonMark passes through
+          # unchanged inside an HTML block (so the user would see the
+          # literal "![…](upload://…)" string instead of an image).
+          def build_upload_html(element)
+            if element.type == :image
+              build_image_html(element)
+            else
+              build_attachment_html(element)
+            end
+          end
+
+          def build_image_html(element)
+            src = HtmlEscaper.escape(build_upload_url(element))
+            alt = HtmlEscaper.escape(element.alt)
+            %(<img src="#{src}" alt="#{alt}">)
+          end
+
+          def build_attachment_html(element)
+            href = HtmlEscaper.escape(build_upload_url(element))
+            filename = HtmlEscaper.escape(element.filename || "attachment")
+            size_part = " (#{HtmlEscaper.escape(element.size)})" if element.size
+            %(<a href="#{href}">#{filename}</a>#{size_part})
           end
         end
       end

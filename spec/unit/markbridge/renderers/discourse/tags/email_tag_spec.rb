@@ -30,5 +30,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EmailTag do
 
     let(:element_class) { Markbridge::AST::Email }
     it_behaves_like "a tag that propagates parent context"
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders <a href=mailto:...> when address is set" do
+        element = Markbridge::AST::Email.new(address: "user@example.com")
+        element << Markbridge::AST::Text.new("Email me")
+
+        expect(tag.render(element, interface)).to eq(
+          %(<a href="mailto:user@example.com">Email me</a>),
+        )
+      end
+
+      it "attribute-escapes the address" do
+        element = Markbridge::AST::Email.new(address: %(weird"@example.com))
+        element << Markbridge::AST::Text.new("X")
+
+        expect(tag.render(element, interface)).to eq(
+          %(<a href="mailto:weird&quot;@example.com">X</a>),
+        )
+      end
+    end
   end
 end

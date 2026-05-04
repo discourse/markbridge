@@ -41,6 +41,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
       expect(result).to eq('a\*b')
     end
+
+    it "uses an explicit html_escaper when one is provided" do
+      html_escaper = class_double(Markbridge::Renderers::Discourse::HtmlEscaper)
+      allow(html_escaper).to receive(:escape).and_return("HTML-ESCAPED")
+
+      text = Markbridge::AST::Text.new("a < b")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+      result = described_class.new(html_escaper:).render(text, context:)
+
+      expect(result).to eq("HTML-ESCAPED")
+      expect(html_escaper).to have_received(:escape).with("a < b")
+    end
+
+    it "falls back to the HtmlEscaper class when no html_escaper is provided" do
+      # The default html_escaper must HTML-escape `<` and `&` in html_mode.
+      text = Markbridge::AST::Text.new("a < b & c")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+      result = described_class.new.render(text, context:)
+
+      expect(result).to eq("a &lt; b &amp; c")
+    end
   end
 
   describe "#render" do
@@ -87,11 +108,65 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.render(code)).to include("a*b")
     end
 
+    it "passes Text content through verbatim inside Code in Markdown mode (no HTML escaping)" do
+      # `a < b` would change under html-escape (`a &lt; b`) but not under
+      # markdown-escape — locks in that the Code-parent path returns node.text.
+      code = Markbridge::AST::Code.new
+      code << Markbridge::AST::Text.new("a < b")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([code])
+
+      expect(renderer.render(code.children.first, context:)).to eq("a < b")
+    end
+
     it "escapes Text content when no ancestor is Code" do
       bold = Markbridge::AST::Bold.new
       bold << Markbridge::AST::Text.new("a*b")
 
       expect(renderer.render(bold)).to include('a\*b')
+    end
+
+    context "in html_mode" do
+      it "HTML-escapes text" do
+        text = Markbridge::AST::Text.new("a < b")
+        context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+
+        expect(renderer.render(text, context:)).to eq("a &lt; b")
+      end
+
+      it "HTML-escapes text inside AST::Code" do
+        code = Markbridge::AST::Code.new
+        code << Markbridge::AST::Text.new("a < b")
+        context = Markbridge::Renderers::Discourse::RenderContext.new([code], html_mode: true)
+
+        expect(renderer.render(code.children.first, context:)).to eq("a &lt; b")
+      end
+    end
+
+    context "when dispatching to a tag in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "splices the tag's output verbatim, with no extra wrapping" do
+        bold = Markbridge::AST::Bold.new
+        bold << Markbridge::AST::Text.new("hi")
+
+        expect(renderer.render(bold, context:)).to eq("<strong>hi</strong>")
+      end
+    end
+
+    context "when rendering MarkdownText nodes" do
+      it "passes through verbatim in Markdown mode" do
+        node = Markbridge::AST::MarkdownText.new("**already bold**")
+        result = renderer.render(node)
+        expect(result).to eq("**already bold**")
+      end
+
+      it "wraps in blank lines in html_mode so CommonMark re-enters Markdown parsing" do
+        node = Markbridge::AST::MarkdownText.new("**already bold**")
+        context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+
+        result = renderer.render(node, context:)
+        expect(result).to eq("\n\n**already bold**\n\n")
+      end
     end
   end
 

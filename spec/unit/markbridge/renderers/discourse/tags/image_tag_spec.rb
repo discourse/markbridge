@@ -48,5 +48,34 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
 
       expect(tag.render(element, interface)).to eq("![](x.png)")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders <img> with src and empty alt" do
+        element = Markbridge::AST::Image.new(src: "https://example.com/image.png")
+
+        expect(tag.render(element, interface)).to eq(
+          %(<img src="https://example.com/image.png" alt="">),
+        )
+      end
+
+      it "includes width and height when given" do
+        element =
+          Markbridge::AST::Image.new(src: "https://example.com/image.png", width: 100, height: 200)
+
+        expect(tag.render(element, interface)).to eq(
+          %(<img src="https://example.com/image.png" alt="" width="100" height="200">),
+        )
+      end
+
+      it "attribute-escapes the src" do
+        element = Markbridge::AST::Image.new(src: %(x"><script>alert(1)</script>))
+
+        expect(tag.render(element, interface)).to eq(
+          %(<img src="x&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;" alt="">),
+        )
+      end
+    end
   end
 end

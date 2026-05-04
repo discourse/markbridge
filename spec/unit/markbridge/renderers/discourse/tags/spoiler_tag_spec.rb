@@ -23,5 +23,36 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
 
     let(:element_class) { Markbridge::AST::Spoiler }
     it_behaves_like "a tag that propagates parent context"
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders <details> with default summary" do
+        element = Markbridge::AST::Spoiler.new
+        element << Markbridge::AST::Text.new("hidden")
+
+        expect(tag.render(element, interface)).to eq(
+          "<details><summary>Spoiler</summary>hidden</details>",
+        )
+      end
+
+      it "uses the title as <summary> when present" do
+        element = Markbridge::AST::Spoiler.new(title: "Reveal")
+        element << Markbridge::AST::Text.new("hidden")
+
+        expect(tag.render(element, interface)).to eq(
+          "<details><summary>Reveal</summary>hidden</details>",
+        )
+      end
+
+      it "HTML-escapes the title" do
+        element = Markbridge::AST::Spoiler.new(title: %(<scary> & "stuff"))
+        element << Markbridge::AST::Text.new("x")
+
+        expect(tag.render(element, interface)).to eq(
+          "<details><summary>&lt;scary&gt; &amp; &quot;stuff&quot;</summary>x</details>",
+        )
+      end
+    end
   end
 end

@@ -11,6 +11,8 @@ module Markbridge
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
 
+            return "<blockquote>#{content}</blockquote>" if interface.html_mode?
+
             # Build Discourse quote BBCode
             # Format: [quote="username, post:123, topic:456"]content[/quote]
             body =

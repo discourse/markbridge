@@ -15,6 +15,8 @@ module Markbridge
             content = interface.render_children(element, context: child_context).strip
             return "" if content.empty?
 
+            return "<li>#{content}</li>" if interface.html_mode?
+
             parent_list = interface.find_parent(AST::List)
             @builder.build(
               content,

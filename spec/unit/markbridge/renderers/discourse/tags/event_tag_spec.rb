@@ -83,5 +83,24 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EventTag do
 
       expect(tag.render(element, interface)).to end_with("[/event]\n\n")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "wraps the BBCode in leading + trailing blank lines so CommonMark re-enters Markdown parsing" do
+        element = Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-01-01")
+
+        expect(tag.render(element, interface)).to eq(
+          %(\n\n[event name="Meeting" start="2026-01-01"]\n[/event]\n\n),
+        )
+      end
+
+      it "wraps a raw-passthrough event in blank lines too" do
+        element =
+          Markbridge::AST::Event.new(name: "x", starts_at: "y", raw: "[event]ORIGINAL[/event]")
+
+        expect(tag.render(element, interface)).to eq("\n\n[event]ORIGINAL[/event]\n\n")
+      end
+    end
   end
 end

@@ -6,8 +6,8 @@ module Markbridge
       module Tags
         # Tag for rendering horizontal rules
         class HorizontalRuleTag < Tag
-          def render(_element, _interface)
-            "\n\n---\n\n"
+          def render(_element, interface)
+            interface.html_mode? ? "<hr>" : "\n\n---\n\n"
           end
         end
       end

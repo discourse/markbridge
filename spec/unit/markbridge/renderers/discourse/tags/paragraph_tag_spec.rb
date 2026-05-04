@@ -16,5 +16,32 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ParagraphTag do
 
     let(:element_class) { Markbridge::AST::Paragraph }
     it_behaves_like "a tag that propagates parent context"
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "wraps content in <p> with no trailing blank line" do
+        element = Markbridge::AST::Paragraph.new
+        element << Markbridge::AST::Text.new("hello")
+
+        expect(tag.render(element, interface)).to eq("<p>hello</p>")
+      end
+
+      context "when inside a TableCell" do
+        let(:context) do
+          Markbridge::Renderers::Discourse::RenderContext.new(
+            [Markbridge::AST::TableCell.new],
+            html_mode: true,
+          )
+        end
+
+        it "drops the <p> wrapper since the surrounding <td> already provides block context" do
+          element = Markbridge::AST::Paragraph.new
+          element << Markbridge::AST::Text.new("hello")
+
+          expect(tag.render(element, interface)).to eq("hello")
+        end
+      end
+    end
   end
 end

@@ -15,7 +15,10 @@ module Markbridge
             if markdown_compatible?(rows_data, interface)
               render_markdown(rows_data)
             else
-              render_html(rows_data)
+              # Re-render cells in html_mode so inline Markdown like **bold** becomes
+              # <strong>bold</strong>; CommonMark would not parse Markdown inside an HTML block.
+              html_rows = extract_rows(element, interface, child_context.with_html_mode(true))
+              render_html(html_rows)
             end
           end
 
@@ -31,7 +34,9 @@ module Markbridge
                 child.children.filter_map do |cell|
                   next unless cell.instance_of?(AST::TableCell)
 
-                  cell_context = child_context.with_parent(child)
+                  # Push the cell itself into the parent chain so descendants
+                  # can detect they're inside a cell via has_parent?.
+                  cell_context = child_context.with_parent(cell)
                   content = interface.render_children(cell, context: cell_context).strip
                   { content:, header: cell.header? }
                 end

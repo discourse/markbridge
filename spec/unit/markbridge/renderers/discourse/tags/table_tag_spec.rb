@@ -154,6 +154,198 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(result).to include("<tbody>")
       expect(result).to include("</tbody>")
     end
+
+    it "renders bold cells as <strong> in the HTML fallback" do
+      table = Markbridge::AST::Table.new
+      row1 = Markbridge::AST::TableRow.new
+      cell1 = Markbridge::AST::TableCell.new
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("Alice")
+      cell1 << bold
+      row1 << cell1
+      table << row1
+
+      # Force HTML fallback with an uneven extra row
+      row2 = Markbridge::AST::TableRow.new
+      cell_a = Markbridge::AST::TableCell.new
+      cell_a << Markbridge::AST::Text.new("a")
+      cell_b = Markbridge::AST::TableCell.new
+      cell_b << Markbridge::AST::Text.new("b")
+      row2 << cell_a
+      row2 << cell_b
+      table << row2
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<td><strong>Alice</strong></td>")
+    end
+
+    it "renders URL cells as <a href> in the HTML fallback" do
+      table = Markbridge::AST::Table.new
+      row1 = Markbridge::AST::TableRow.new
+      cell1 = Markbridge::AST::TableCell.new
+      url = Markbridge::AST::Url.new(href: "https://example.com")
+      url << Markbridge::AST::Text.new("link")
+      cell1 << url
+      row1 << cell1
+      table << row1
+
+      # Force HTML fallback
+      row2 = Markbridge::AST::TableRow.new
+      [Markbridge::AST::TableCell.new, Markbridge::AST::TableCell.new].each do |c|
+        c << Markbridge::AST::Text.new("x")
+        row2 << c
+      end
+      table << row2
+
+      result = tag.render(table, interface)
+
+      expect(result).to include(%(<td><a href="https://example.com">link</a></td>))
+    end
+
+    it "renders inline code cells as <code> in the HTML fallback" do
+      table = Markbridge::AST::Table.new
+      row1 = Markbridge::AST::TableRow.new
+      cell1 = Markbridge::AST::TableCell.new
+      code = Markbridge::AST::Code.new
+      code << Markbridge::AST::Text.new("x")
+      cell1 << code
+      row1 << cell1
+      table << row1
+
+      # Force HTML fallback
+      row2 = Markbridge::AST::TableRow.new
+      [Markbridge::AST::TableCell.new, Markbridge::AST::TableCell.new].each do |c|
+        c << Markbridge::AST::Text.new("y")
+        row2 << c
+      end
+      table << row2
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<td><code>x</code></td>")
+    end
+
+    it "HTML-escapes plain text in cells in the HTML fallback" do
+      table = Markbridge::AST::Table.new
+      row1 = Markbridge::AST::TableRow.new
+      cell1 = Markbridge::AST::TableCell.new
+      cell1 << Markbridge::AST::Text.new("a < b")
+      row1 << cell1
+      table << row1
+
+      # Force HTML fallback
+      row2 = Markbridge::AST::TableRow.new
+      [Markbridge::AST::TableCell.new, Markbridge::AST::TableCell.new].each do |c|
+        c << Markbridge::AST::Text.new("y")
+        row2 << c
+      end
+      table << row2
+
+      result = tag.render(table, interface)
+
+      expect(result).to include("<td>a &lt; b</td>")
+    end
+
+    describe "block-level content in HTML fallback cells" do
+      # Builds a table where the first row has a single cell containing the given
+      # block child, and a second row has two cells — forcing HTML fallback via
+      # uneven row widths.
+      def build_uneven_table_with(child_in_first_cell)
+        table = Markbridge::AST::Table.new
+        row1 = Markbridge::AST::TableRow.new
+        cell1 = Markbridge::AST::TableCell.new
+        cell1 << child_in_first_cell
+        row1 << cell1
+        table << row1
+
+        row2 = Markbridge::AST::TableRow.new
+        2.times do
+          c = Markbridge::AST::TableCell.new
+          c << Markbridge::AST::Text.new("x")
+          row2 << c
+        end
+        table << row2
+
+        table
+      end
+
+      it "drops the <p> wrapper since the surrounding <td> already provides block context" do
+        para = Markbridge::AST::Paragraph.new
+        para << Markbridge::AST::Text.new("hello")
+        table = build_uneven_table_with(para)
+
+        result = tag.render(table, interface)
+        expect(result).to include("<td>hello</td>")
+      end
+
+      it "renders unordered lists as <ul><li>" do
+        list = Markbridge::AST::List.new(ordered: false)
+        item = Markbridge::AST::ListItem.new
+        item << Markbridge::AST::Text.new("a")
+        list << item
+        table = build_uneven_table_with(list)
+
+        result = tag.render(table, interface)
+        expect(result).to include("<td><ul><li>a</li></ul></td>")
+      end
+
+      it "renders ordered lists as <ol><li>" do
+        list = Markbridge::AST::List.new(ordered: true)
+        item = Markbridge::AST::ListItem.new
+        item << Markbridge::AST::Text.new("a")
+        list << item
+        table = build_uneven_table_with(list)
+
+        result = tag.render(table, interface)
+        expect(result).to include("<td><ol><li>a</li></ol></td>")
+      end
+
+      it "renders headings as <h{level}>" do
+        heading = Markbridge::AST::Heading.new(level: 2)
+        heading << Markbridge::AST::Text.new("Title")
+        table = build_uneven_table_with(heading)
+
+        result = tag.render(table, interface)
+        expect(result).to include("<td><h2>Title</h2></td>")
+      end
+
+      it "renders block code as <pre><code>" do
+        code = Markbridge::AST::Code.new(language: "ruby")
+        code << Markbridge::AST::Text.new("a < b\nc")
+        table = build_uneven_table_with(code)
+
+        result = tag.render(table, interface)
+        expect(result).to include(
+          %(<td><pre><code class="language-ruby">a &lt; b\nc</code></pre></td>),
+        )
+      end
+
+      it "renders quotes as <blockquote>" do
+        quote = Markbridge::AST::Quote.new(author: "John")
+        quote << Markbridge::AST::Text.new("Hi")
+        table = build_uneven_table_with(quote)
+
+        result = tag.render(table, interface)
+        expect(result).to include("<td><blockquote>Hi</blockquote></td>")
+      end
+
+      it "renders horizontal rules as <hr>" do
+        table = build_uneven_table_with(Markbridge::AST::HorizontalRule.new)
+
+        result = tag.render(table, interface)
+        expect(result).to include("<td><hr></td>")
+      end
+
+      it "renders spoilers as <details><summary>" do
+        spoiler = Markbridge::AST::Spoiler.new(title: "Reveal")
+        spoiler << Markbridge::AST::Text.new("hidden")
+        table = build_uneven_table_with(spoiler)
+
+        result = tag.render(table, interface)
+        expect(result).to include("<td><details><summary>Reveal</summary>hidden</details></td>")
+      end
+    end
   end
 
   describe "edge cases" do

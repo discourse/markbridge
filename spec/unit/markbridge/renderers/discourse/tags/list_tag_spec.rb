@@ -150,5 +150,44 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       # Outer list adds 2-space indent to inner items.
       expect(tag.render(inner_list, interface)).to eq("\n  - nested\n")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+      let(:interface) do
+        Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      end
+
+      it "renders an unordered list as <ul>" do
+        list = Markbridge::AST::List.new(ordered: false)
+        item = Markbridge::AST::ListItem.new
+        item << Markbridge::AST::Text.new("item")
+        list << item
+
+        expect(tag.render(list, interface)).to eq("<ul><li>item</li></ul>")
+      end
+
+      it "renders an ordered list as <ol>" do
+        list = Markbridge::AST::List.new(ordered: true)
+        item = Markbridge::AST::ListItem.new
+        item << Markbridge::AST::Text.new("item")
+        list << item
+
+        expect(tag.render(list, interface)).to eq("<ol><li>item</li></ol>")
+      end
+
+      it "renders nested lists" do
+        outer = Markbridge::AST::List.new(ordered: false)
+        outer_item = Markbridge::AST::ListItem.new
+        outer_item << Markbridge::AST::Text.new("a")
+        inner = Markbridge::AST::List.new(ordered: false)
+        inner_item = Markbridge::AST::ListItem.new
+        inner_item << Markbridge::AST::Text.new("b")
+        inner << inner_item
+        outer_item << inner
+        outer << outer_item
+
+        expect(tag.render(outer, interface)).to eq("<ul><li>a<ul><li>b</li></ul></li></ul>")
+      end
+    end
   end
 end

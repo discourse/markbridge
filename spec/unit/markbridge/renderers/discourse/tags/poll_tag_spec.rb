@@ -84,5 +84,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
 
       expect(tag.render(element, interface)).to eq("[poll]\n* A\n* B\n[/poll]\n\n")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "wraps the BBCode in leading + trailing blank lines so CommonMark re-enters Markdown parsing" do
+        element = Markbridge::AST::Poll.new(options: %w[A B])
+
+        expect(tag.render(element, interface)).to eq("\n\n[poll]\n* A\n* B\n[/poll]\n\n")
+      end
+
+      it "wraps a raw-passthrough poll in blank lines too" do
+        element = Markbridge::AST::Poll.new(raw: "[poll]ORIGINAL[/poll]")
+
+        expect(tag.render(element, interface)).to eq("\n\n[poll]ORIGINAL[/poll]\n\n")
+      end
+    end
   end
 end

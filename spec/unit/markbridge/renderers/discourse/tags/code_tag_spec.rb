@@ -142,5 +142,57 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to start_with("````\n")
       expect(result).to end_with("\n````\n\n")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders inline code as <code>" do
+        element = Markbridge::AST::Code.new
+        element << Markbridge::AST::Text.new("x")
+
+        expect(tag.render(element, interface)).to eq("<code>x</code>")
+      end
+
+      it "HTML-escapes text content inside inline code" do
+        element = Markbridge::AST::Code.new
+        element << Markbridge::AST::Text.new("a < b")
+
+        expect(tag.render(element, interface)).to eq("<code>a &lt; b</code>")
+      end
+
+      it "renders block code as <pre><code>" do
+        element = Markbridge::AST::Code.new
+        element << Markbridge::AST::Text.new("line1\nline2")
+
+        expect(tag.render(element, interface)).to eq("<pre><code>line1\nline2</code></pre>")
+      end
+
+      it "adds a language class when language is set" do
+        element = Markbridge::AST::Code.new(language: "ruby")
+        element << Markbridge::AST::Text.new("puts 1\nputs 2")
+
+        expect(tag.render(element, interface)).to eq(
+          %(<pre><code class="language-ruby">puts 1\nputs 2</code></pre>),
+        )
+      end
+
+      it "HTML-escapes block code content" do
+        element = Markbridge::AST::Code.new
+        element << Markbridge::AST::Text.new("a < b\n&& c")
+
+        expect(tag.render(element, interface)).to eq(
+          "<pre><code>a &lt; b\n&amp;&amp; c</code></pre>",
+        )
+      end
+
+      it "HTML-escapes the language attribute" do
+        element = Markbridge::AST::Code.new(language: %("><script>))
+        element << Markbridge::AST::Text.new("x\ny")
+
+        expect(tag.render(element, interface)).to eq(
+          %(<pre><code class="language-&quot;&gt;&lt;script&gt;">x\ny</code></pre>),
+        )
+      end
+    end
   end
 end

@@ -31,5 +31,30 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::HeadingTag do
     let(:element_class) { Markbridge::AST::Heading }
     let(:element_factory) { Markbridge::AST::Heading.new(level: 2) }
     it_behaves_like "a tag that propagates parent context"
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders <h{level}>" do
+        element = Markbridge::AST::Heading.new(level: 3)
+        element << Markbridge::AST::Text.new("Title")
+
+        expect(tag.render(element, interface)).to eq("<h3>Title</h3>")
+      end
+
+      it "clamps levels above 6" do
+        element = Markbridge::AST::Heading.new(level: 9)
+        element << Markbridge::AST::Text.new("X")
+
+        expect(tag.render(element, interface)).to eq("<h6>X</h6>")
+      end
+
+      it "clamps levels below 1" do
+        element = Markbridge::AST::Heading.new(level: 0)
+        element << Markbridge::AST::Text.new("X")
+
+        expect(tag.render(element, interface)).to eq("<h1>X</h1>")
+      end
+    end
   end
 end

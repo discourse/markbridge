@@ -10,5 +10,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::HorizontalRuleTag do
     it "returns a horizontal rule surrounded by blank lines" do
       expect(tag.render(Markbridge::AST::HorizontalRule.new, interface)).to eq("\n\n---\n\n")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "renders <hr>" do
+        expect(tag.render(Markbridge::AST::HorizontalRule.new, interface)).to eq("<hr>")
+      end
+    end
   end
 end

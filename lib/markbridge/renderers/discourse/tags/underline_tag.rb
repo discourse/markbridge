@@ -4,14 +4,20 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Tag for rendering underline text.
-        # Discourse Markdown doesn't support <u> HTML but does support [u]
-        # via its BBCode extension, so we emit the BBCode form.
+        # Discourse's HTML sanitizer strips raw `<u>`, but `[u]…[/u]` is
+        # cooked by the BBCode plugin into `<span class="bbcode-u">`. The
+        # BBCode plugin runs on Markdown source, not on raw HTML inside an
+        # HTML block, so in html_mode we emit the cooked form directly.
         class UnderlineTag < Tag
           def render(element, interface)
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
-            "[u]#{content}[/u]"
+
+            if interface.html_mode?
+              %(<span class="bbcode-u">#{content}</span>)
+            else
+              "[u]#{content}[/u]"
+            end
           end
         end
       end

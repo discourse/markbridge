@@ -184,5 +184,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListItemTag do
       expect(result).not_to include("\n\n")
       expect(result).to include("- nested")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+      let(:interface) do
+        Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      end
+
+      it "wraps content in <li>" do
+        item = Markbridge::AST::ListItem.new
+        item << Markbridge::AST::Text.new("item text")
+
+        expect(tag.render(item, interface)).to eq("<li>item text</li>")
+      end
+
+      it "returns empty string for an item with no content" do
+        expect(tag.render(Markbridge::AST::ListItem.new, interface)).to eq("")
+      end
+    end
   end
 end
