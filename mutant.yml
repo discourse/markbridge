@@ -29,6 +29,7 @@ matcher:
     # covers every reachable state transition.
     - Markbridge::Processors::DiscourseMarkdown::Scanner#scan_input
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_html_tag
+    - Markbridge::Parsers::MediaWiki::InlineParser#dispatch_html_tag
 
     # parse_tag_at_cursor: mutations on the `attrs = closing ||
     # tag_name.nil? ? {} : scan_attributes` ternary. The `closing ||`
@@ -208,6 +209,16 @@ matcher:
     # safety net, not a correctness invariant for normal use.
     - Markbridge::Parsers::MediaWiki::InlineParser#initialize
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_inner_content
+
+    # MediaWiki Parser#initialize's block_given? conditional and the
+    # InlineTagRegistry kwarg plumbing. Mutations on `if block_given?`
+    # (`if true` / `if false`) and on the `inline_tag_registry ||`
+    # fallback are equivalent when the parser is always invoked with
+    # the default registry (as by the public API). The block form is
+    # a convenience constructor tested by parser_spec but the
+    # inline_tag_registry kwarg vs block_given? routing has no
+    # observable difference in parser output for identical inputs.
+    - Markbridge::Parsers::MediaWiki::Parser#initialize
 
 mutation:
   ignore_patterns:
