@@ -145,21 +145,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
     context "when dispatching to a tag in html_mode" do
       let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
 
-      it "passes through output of an html_mode_aware? tag unchanged" do
-        # BoldTag is html_mode_aware? = true
+      it "splices the tag's output verbatim, with no extra wrapping" do
         bold = Markbridge::AST::Bold.new
         bold << Markbridge::AST::Text.new("hi")
 
-        result = renderer.render(bold, context:)
-        expect(result).to eq("<strong>hi</strong>")
-      end
-
-      it "wraps an unaware tag's output in blank lines" do
-        # EventTag is a stub and not html_mode_aware?
-        event = Markbridge::AST::Event.new(name: "Demo", starts_at: "2026-01-01")
-
-        result = renderer.render(event, context:)
-        expect(result).to eq(%(\n\n[event name="Demo" start="2026-01-01"]\n[/event]\n\n\n\n))
+        expect(renderer.render(bold, context:)).to eq("<strong>hi</strong>")
       end
     end
 

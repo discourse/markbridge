@@ -7,8 +7,6 @@ module Markbridge
         # Tag for rendering quotes
         # Renders to Discourse BBCode quote format to preserve attribution
         class QuoteTag < Tag
-          def html_mode_aware? = true
-
           def render(element, interface)
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)

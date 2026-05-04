@@ -29,12 +29,7 @@ module Markbridge
           tag = @tag_library[node.class]
           if tag
             interface = interface_for(context)
-            output = tag.render(node, interface)
-            # Tags that haven't been audited for html_mode are wrapped in blank
-            # lines so CommonMark renders their (possibly Markdown) output as a
-            # Markdown island inside the surrounding HTML block.
-            output = "\n\n#{output}\n\n" if context.html_mode? && !tag.html_mode_aware?
-            return output
+            return tag.render(node, interface)
           end
 
           case node

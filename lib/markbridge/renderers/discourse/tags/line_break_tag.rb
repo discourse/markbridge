@@ -6,8 +6,6 @@ module Markbridge
       module Tags
         # Tag for rendering line breaks
         class LineBreakTag < Tag
-          def html_mode_aware? = true
-
           def render(_element, interface)
             interface.html_mode? ? "<br>" : "\n"
           end

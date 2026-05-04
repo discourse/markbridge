@@ -24,8 +24,6 @@ module Markbridge
         #     end
         #   end
         class MentionTag < Tag
-          def html_mode_aware? = true
-
           def render(element, _interface)
             # Escape unconditionally: realistic Discourse usernames have no
             # HTML-special characters so the Markdown path is unaffected,

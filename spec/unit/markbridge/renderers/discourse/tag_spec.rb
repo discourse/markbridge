@@ -41,10 +41,4 @@ RSpec.describe Markbridge::Renderers::Discourse::Tag do
       expect(received_interface).to eq(interface)
     end
   end
-
-  describe "#html_mode_aware?" do
-    it "defaults to false on the base class" do
-      expect(described_class.new.html_mode_aware?).to be false
-    end
-  end
 end

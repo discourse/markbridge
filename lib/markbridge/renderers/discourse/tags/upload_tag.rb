@@ -29,8 +29,6 @@ module Markbridge
         #     end
         #   end
         class UploadTag < Tag
-          def html_mode_aware? = true
-
           def render(element, interface)
             return build_upload_html(element) if interface.html_mode?
 

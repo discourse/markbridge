@@ -42,12 +42,6 @@ RSpec.shared_examples "an inline wrapping tag" do
 
     include_examples "a tag that propagates parent context"
   end
-
-  describe "#html_mode_aware?" do
-    it "returns true" do
-      expect(described_class.new.html_mode_aware?).to be true
-    end
-  end
 end
 
 # Shared example covering the "interface.with_parent(element)" hook that

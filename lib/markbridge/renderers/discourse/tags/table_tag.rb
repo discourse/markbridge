@@ -6,8 +6,6 @@ module Markbridge
       module Tags
         # Tag for rendering tables as Markdown pipe tables with HTML fallback
         class TableTag < Tag
-          def html_mode_aware? = true
-
           def render(element, interface)
             child_context = interface.with_parent(element)
             rows_data = extract_rows(element, interface, child_context)
