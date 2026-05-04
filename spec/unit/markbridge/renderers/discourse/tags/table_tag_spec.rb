@@ -270,13 +270,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
         table
       end
 
-      it "renders paragraphs as <p>" do
+      it "drops the <p> wrapper since the surrounding <td> already provides block context" do
         para = Markbridge::AST::Paragraph.new
         para << Markbridge::AST::Text.new("hello")
         table = build_uneven_table_with(para)
 
         result = tag.render(table, interface)
-        expect(result).to include("<td><p>hello</p></td>")
+        expect(result).to include("<td>hello</td>")
       end
 
       it "renders unordered lists as <ul><li>" do

@@ -36,7 +36,11 @@ module Markbridge
                 child.children.filter_map do |cell|
                   next unless cell.instance_of?(AST::TableCell)
 
-                  cell_context = child_context.with_parent(child)
+                  # Push the cell itself into the parent chain so descendants
+                  # (e.g. ParagraphTag) can detect that they're inside a cell
+                  # via interface.has_parent?(AST::TableCell). TableRow is
+                  # not added because no current tag inspects it.
+                  cell_context = child_context.with_parent(cell)
                   content = interface.render_children(cell, context: cell_context).strip
                   { content:, header: cell.header? }
                 end

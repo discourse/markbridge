@@ -26,6 +26,22 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ParagraphTag do
 
         expect(tag.render(element, interface)).to eq("<p>hello</p>")
       end
+
+      context "when inside a TableCell" do
+        let(:context) do
+          Markbridge::Renderers::Discourse::RenderContext.new(
+            [Markbridge::AST::TableCell.new],
+            html_mode: true,
+          )
+        end
+
+        it "drops the <p> wrapper since the surrounding <td> already provides block context" do
+          element = Markbridge::AST::Paragraph.new
+          element << Markbridge::AST::Text.new("hello")
+
+          expect(tag.render(element, interface)).to eq("hello")
+        end
+      end
     end
   end
 
