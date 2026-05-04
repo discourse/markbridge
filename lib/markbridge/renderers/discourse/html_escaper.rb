@@ -5,16 +5,10 @@ require "cgi"
 module Markbridge
   module Renderers
     module Discourse
-      # Escapes text for safe inclusion in HTML output.
-      # Used when rendering content inside an HTML context (e.g. inside an
-      # HTML <table> fallback) where Markdown escaping would not be parsed.
+      # Escapes text for safe inclusion in HTML output. Used when rendering
+      # content inside a CommonMark HTML block (e.g. TableTag's fallback)
+      # where Markdown-level escaping would not be applied.
       class HtmlEscaper
-        # @param text [String, nil]
-        # @return [String]
-        def escape(text)
-          CGI.escapeHTML(text || "")
-        end
-
         # @param text [String, nil]
         # @return [String]
         def self.escape(text)

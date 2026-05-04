@@ -43,7 +43,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
     end
 
     it "uses an explicit html_escaper when one is provided" do
-      html_escaper = instance_double(Markbridge::Renderers::Discourse::HtmlEscaper)
+      html_escaper = class_double(Markbridge::Renderers::Discourse::HtmlEscaper)
       allow(html_escaper).to receive(:escape).and_return("HTML-ESCAPED")
 
       text = Markbridge::AST::Text.new("a < b")
