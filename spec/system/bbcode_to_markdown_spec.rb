@@ -441,24 +441,22 @@ RSpec.describe "BBCode to Markdown Conversion" do
   describe "alignment" do
     it "converts center alignment" do
       result = Markbridge.bbcode_to_markdown("[center]centered text[/center]")
-      expect(result).to eq('<div style="text-align: center">centered text</div>')
+      expect(result).to eq('<div align="center">centered text</div>')
     end
 
     it "converts right alignment" do
       result = Markbridge.bbcode_to_markdown("[right]right-aligned[/right]")
-      expect(result).to eq('<div style="text-align: right">right-aligned</div>')
+      expect(result).to eq('<div align="right">right-aligned</div>')
     end
 
     it "separates two consecutive aligned blocks with a blank line" do
       result = Markbridge.bbcode_to_markdown("[left]a[/left][right]b[/right]")
-      expect(result).to eq(
-        %(<div style="text-align: left">a</div>\n\n<div style="text-align: right">b</div>),
-      )
+      expect(result).to eq(%(<div align="left">a</div>\n\n<div align="right">b</div>))
     end
 
     it "separates an aligned block from trailing text with a blank line" do
       result = Markbridge.bbcode_to_markdown("[center]a[/center]after")
-      expect(result).to eq(%(<div style="text-align: center">a</div>\n\nafter))
+      expect(result).to eq(%(<div align="center">a</div>\n\nafter))
     end
   end
 
