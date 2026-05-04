@@ -4,11 +4,10 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Discourse Markdown doesn't support <u> HTML but does support [u]
-        # via its BBCode extension, which cooks to <span class="bbcode-u">.
-        # Inside an HTML block CommonMark passes content through raw, so the
-        # BBCode plugin never runs and [u]…[/u] would render literally —
-        # emit the cooked form directly in html_mode.
+        # Discourse's HTML sanitizer strips raw `<u>`, but `[u]…[/u]` is
+        # cooked by the BBCode plugin into `<span class="bbcode-u">`. The
+        # BBCode plugin runs on Markdown source, not on raw HTML inside an
+        # HTML block, so in html_mode we emit the cooked form directly.
         class UnderlineTag < Tag
           def render(element, interface)
             child_context = interface.with_parent(element)
