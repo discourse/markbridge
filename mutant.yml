@@ -194,6 +194,21 @@ matcher:
     # content through. Output is byte-identical.
     - Markbridge::Processors::DiscourseMarkdown::Scanner#advance_code_boundary
 
+    # MediaWiki InlineParser depth-bookkeeping. The remaining alive
+    # mutations on `#initialize`'s `depth: 0` default and on
+    # `#parse_inner_content`'s `depth: @depth + 1` argument
+    # (variants: `@depth`, `@depth + 0`, `@depth - 1`, `1`, drop the
+    # kwarg) all share the same shape: they either lock the depth
+    # counter at a constant or shift it by an off-by-one. The
+    # boundary at MAX_INLINE_DEPTH (20) is only observable when
+    # content nests more deeply than that; realistic wikitext (and
+    # every spec input) stays well under the limit, so a locked
+    # counter recurses to natural exhaustion and produces a
+    # byte-identical AST. The depth machinery is a hostile-input
+    # safety net, not a correctness invariant for normal use.
+    - Markbridge::Parsers::MediaWiki::InlineParser#initialize
+    - Markbridge::Parsers::MediaWiki::InlineParser#parse_inner_content
+
 mutation:
   ignore_patterns:
     # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,
