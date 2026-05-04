@@ -190,8 +190,12 @@ library.auto_register!
 
 **Benefits:**
 - No manual registration needed
-- Drop-in new tags (just follow naming convention)
+- Drop-in new tags inside the gem's own `Tags` namespace (just follow the naming convention)
 - Reduce boilerplate
+
+> Auto-registration walks `Markbridge::Renderers::Discourse::Tags::*` only.
+> Tag classes defined in consumer code are not discovered automatically —
+> register them explicitly with `library.register(MyAst, MyTag.new)`.
 
 **Fallback Behavior:**
 
