@@ -54,5 +54,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::AttachmentTag do
       result = tag.render(element, interface)
       expect(result).to eq("<!-- ATTACHMENT: UNIDENTIFIED -->")
     end
+
+    context "in html_mode" do
+      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+
+      it "emits the same HTML comment so the renderer leaves it unwrapped" do
+        element = Markbridge::AST::Attachment.new(id: "1234")
+
+        expect(tag.render(element, interface)).to eq("<!-- ATTACHMENT: id=1234 -->")
+      end
+    end
+  end
+
+  describe "#html_mode_aware?" do
+    it "returns true" do
+      expect(described_class.new.html_mode_aware?).to be true
+    end
   end
 end

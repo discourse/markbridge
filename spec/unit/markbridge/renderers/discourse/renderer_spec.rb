@@ -155,11 +155,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       end
 
       it "wraps an unaware tag's output in blank lines" do
-        # MentionTag is a stub and not html_mode_aware?
-        mention = Markbridge::AST::Mention.new(name: "alice")
+        # EventTag is a stub and not html_mode_aware?
+        event = Markbridge::AST::Event.new(name: "Demo", starts_at: "2026-01-01")
 
-        result = renderer.render(mention, context:)
-        expect(result).to eq("\n\n@alice\n\n")
+        result = renderer.render(event, context:)
+        expect(result).to eq(%(\n\n[event name="Demo" start="2026-01-01"]\n[/event]\n\n\n\n))
       end
     end
 

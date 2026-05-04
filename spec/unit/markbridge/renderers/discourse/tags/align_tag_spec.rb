@@ -7,15 +7,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::AlignTag do
   let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
   describe "#render" do
-    it "wraps content in a div with the alignment attribute when alignment is set" do
-      element = Markbridge::AST::Align.new(alignment: "center")
-      element << Markbridge::AST::Text.new("hi")
+    %w[left right center justify].each do |alignment|
+      it "wraps content in a div styled with text-align: #{alignment}" do
+        element = Markbridge::AST::Align.new(alignment:)
+        element << Markbridge::AST::Text.new("hi")
 
-      expect(tag.render(element, interface)).to eq("<div align=\"center\">hi</div>\n\n")
+        expect(tag.render(element, interface)).to eq(
+          %(<div style="text-align: #{alignment}">hi</div>\n\n),
+        )
+      end
     end
 
     it "returns just the content when no alignment is set" do
       element = Markbridge::AST::Align.new
+      element << Markbridge::AST::Text.new("hi")
+
+      expect(tag.render(element, interface)).to eq("hi")
+    end
+
+    it "drops the wrapper for unknown alignments to avoid CSS injection via inline style" do
+      element =
+        Markbridge::AST::Align.new(alignment: "center; background: url(javascript:alert(1))")
       element << Markbridge::AST::Text.new("hi")
 
       expect(tag.render(element, interface)).to eq("hi")
@@ -31,7 +43,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::AlignTag do
         element = Markbridge::AST::Align.new(alignment: "center")
         element << Markbridge::AST::Text.new("hello")
 
-        expect(tag.render(element, interface)).to eq(%(<div align="center">hello</div>))
+        expect(tag.render(element, interface)).to eq(%(<div style="text-align: center">hello</div>))
       end
     end
   end

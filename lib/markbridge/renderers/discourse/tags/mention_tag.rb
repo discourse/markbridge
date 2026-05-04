@@ -24,8 +24,14 @@ module Markbridge
         #     end
         #   end
         class MentionTag < Tag
+          def html_mode_aware? = true
+
           def render(element, _interface)
-            "@#{element.name}"
+            # Escape unconditionally: realistic Discourse usernames have no
+            # HTML-special characters so the Markdown path is unaffected,
+            # and the html_mode path needs the escape to splice safely into
+            # a raw HTML block.
+            "@#{HtmlEscaper.escape(element.name)}"
           end
         end
       end

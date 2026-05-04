@@ -22,6 +22,10 @@ module Markbridge
         #   library = Markbridge::Renderers::Discourse::TagLibrary.default
         #   library.register(Markbridge::AST::Attachment, MyAttachmentTag.new)
         class AttachmentTag < Tag
+          # Output is a raw HTML comment; safe to splice into an HTML block
+          # verbatim (no need for the renderer's blank-line wrap).
+          def html_mode_aware? = true
+
           def render(element, _interface)
             # Build metadata comment for downstream processing
             metadata = build_metadata(element)

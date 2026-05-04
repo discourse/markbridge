@@ -4,18 +4,25 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Tag for rendering aligned text
-        # Renders as HTML div with align attribute
+        # Tag for rendering aligned text.
+        # Emits an HTML5 `<div style="text-align: …">` (the legacy `align`
+        # attribute is deprecated). Alignment is constrained to a known
+        # CSS keyword set so the inline style is not a freeform CSS
+        # injection surface — anything outside that set falls through to
+        # bare content.
         class AlignTag < Tag
+          ALLOWED_ALIGNMENTS = Set["left", "right", "center", "justify"].freeze
+          private_constant :ALLOWED_ALIGNMENTS
+
           def html_mode_aware? = true
 
           def render(element, interface)
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
 
-            return content unless element.alignment
+            return content unless ALLOWED_ALIGNMENTS.include?(element.alignment)
 
-            wrapper = %(<div align="#{element.alignment}">#{content}</div>)
+            wrapper = %(<div style="text-align: #{element.alignment}">#{content}</div>)
             # Skip the trailing blank line in html_mode: a blank line would
             # terminate the surrounding HTML block (e.g. an enclosing <table>).
             interface.html_mode? ? wrapper : "#{wrapper}\n\n"
