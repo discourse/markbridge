@@ -47,14 +47,23 @@ RSpec.describe Markbridge::AST::Element do
 
       expect { element << children }.to raise_error(
         TypeError,
-        "child must be a Markbridge::AST::Node (got Array)",
+        /\A<< on #{Regexp.escape(test_element_class.to_s)} expected a Markbridge::AST::Node, got Array\z/,
       )
     end
 
     it "raises TypeError for nil child" do
       expect { element << nil }.to raise_error(
         TypeError,
-        "child must be a Markbridge::AST::Node (got nil)",
+        /\A<< on #{Regexp.escape(test_element_class.to_s)} expected a Markbridge::AST::Node, got nil\z/,
+      )
+    end
+
+    it "names the actual receiver class in the error (not just Element)" do
+      doc = Markbridge::AST::Document.new
+
+      expect { doc << nil }.to raise_error(
+        TypeError,
+        "<< on Markbridge::AST::Document expected a Markbridge::AST::Node, got nil",
       )
     end
   end

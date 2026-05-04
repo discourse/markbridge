@@ -31,7 +31,7 @@ module Markbridge
       def <<(child)
         unless child.is_a?(Node)
           actual = child.nil? ? "nil" : child.class
-          raise TypeError, "child must be a #{Node} (got #{actual})"
+          raise TypeError, "<< on #{self.class} expected a #{Node}, got #{actual}"
         end
 
         if child.instance_of?(Text) && children.last.instance_of?(Text)
