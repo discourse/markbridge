@@ -360,6 +360,20 @@ RSpec.describe Markbridge do
     it "coerces non-string input via to_s" do
       expect(described_class.parse_mediawiki(123)).to be_a(Markbridge::AST::Document)
     end
+
+    it "forwards the inline_tag_registry kwarg to the parser" do
+      registry =
+        Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
+          r.register("highlight", :formatting, Markbridge::AST::Bold)
+        end
+
+      doc =
+        described_class.parse_mediawiki("<highlight>x</highlight>", inline_tag_registry: registry)
+      paragraph = doc.children.first
+      # Custom registry maps <highlight> to Bold; default registry doesn't
+      # know the tag and would have left it as literal text.
+      expect(paragraph.children.first).to be_a(Markbridge::AST::Bold)
+    end
   end
 
   describe ".mediawiki_to_markdown" do
@@ -378,6 +392,22 @@ RSpec.describe Markbridge do
       expect(described_class.mediawiki_to_markdown("'''hi'''", tag_library: library)).to eq(
         "BOLDED",
       )
+    end
+
+    it "forwards the inline_tag_registry kwarg through to the parser" do
+      registry =
+        Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
+          r.register("highlight", :formatting, Markbridge::AST::Bold)
+        end
+
+      result =
+        described_class.mediawiki_to_markdown(
+          "<highlight>x</highlight>",
+          inline_tag_registry: registry,
+        )
+      # Custom registry parses <highlight> as Bold, which renders to **x**.
+      # Without forwarding, the tag would survive as literal text.
+      expect(result).to eq("**x**")
     end
   end
 

@@ -462,4 +462,110 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(bold.children.first).to be_a(Markbridge::AST::Url)
     end
   end
+
+  describe "custom inline tag registry" do
+    let(:registry) do
+      Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
+        r.register("mark", :formatting, Markbridge::AST::Bold)
+      end
+    end
+    let(:parser) { described_class.new(inline_tag_registry: registry) }
+
+    it "handles custom registered tags" do
+      doc = parse("<mark>highlighted</mark>")
+      expect(doc.children.first).to be_a(Markbridge::AST::Bold)
+      expect(doc.children.first.children.first.text).to eq("highlighted")
+    end
+
+    it "still handles default tags" do
+      doc = parse("<code>some code</code>")
+      expect(doc.children.first).to be_a(Markbridge::AST::Code)
+    end
+  end
+
+  describe "depth limiting" do
+    let(:nested) { "'''has ''italic'' inside'''" }
+
+    it "stops recursion at @depth = MAX_INLINE_DEPTH-1 and renders inner content as plain text" do
+      parser = described_class.new(depth: described_class::MAX_INLINE_DEPTH - 1)
+      parent = Markbridge::AST::Document.new
+      parser.parse(nested, parent:)
+
+      bold = parent.children.first
+      expect(bold).to be_a(Markbridge::AST::Bold)
+      # parse_inner_content bails: bold's content is plain text, no Italic.
+      expect(bold.children.size).to eq(1)
+      expect(bold.children.first).to be_a(Markbridge::AST::Text)
+      expect(bold.children.first.text).to eq("has ''italic'' inside")
+    end
+
+    it "still recurses one level at @depth = MAX_INLINE_DEPTH-2" do
+      parser = described_class.new(depth: described_class::MAX_INLINE_DEPTH - 2)
+      parent = Markbridge::AST::Document.new
+      parser.parse(nested, parent:)
+
+      bold = parent.children.first
+      expect(bold).to be_a(Markbridge::AST::Bold)
+      # One more level of recursion is allowed: the Italic is parsed.
+      expect(bold.children.any? { |c| c.is_a?(Markbridge::AST::Italic) }).to be true
+    end
+
+    it "still recurses by default (depth starts at 0, content with one nested layer parses fully)" do
+      parser = described_class.new
+      parent = Markbridge::AST::Document.new
+      parser.parse("'''has ''italic'' inside'''", parent:)
+
+      bold = parent.children.first
+      expect(bold).to be_a(Markbridge::AST::Bold)
+      expect(bold.children.any? { |c| c.is_a?(Markbridge::AST::Italic) }).to be true
+    end
+
+    it "still bails when @depth exceeds MAX_INLINE_DEPTH-1 (keeps the >= bound)" do
+      # Pin the boundary against strict-equality variants (`==`, `eql?`,
+      # `equal?`): at @depth = MAX, original bails (MAX+1 >= MAX = true)
+      # and the equality variants don't (MAX+1 != MAX), so the inner
+      # ''italic'' would resurface as an Italic child rather than text.
+      parser = described_class.new(depth: described_class::MAX_INLINE_DEPTH)
+      parent = Markbridge::AST::Document.new
+      parser.parse(nested, parent:)
+
+      bold = parent.children.first
+      expect(bold.children.none? { |c| c.is_a?(Markbridge::AST::Italic) }).to be true
+    end
+
+    it "bumps depth by exactly +1 per recursion (kills +2 / +N off-by-one variants)" do
+      # Start three steps below the boundary and feed three nested layers
+      # (Bold > Italic > Strikethrough). With +1 each layer parses fully,
+      # so the deepest Strikethrough survives. With +2 (or +167) the
+      # second recursion lands at MAX and the inner content bails to
+      # text — the Italic still appears, but it loses its Strikethrough
+      # child, which the assertion below detects.
+      parser = described_class.new(depth: described_class::MAX_INLINE_DEPTH - 3)
+      parent = Markbridge::AST::Document.new
+      parser.parse("'''outer ''italic <s>strike</s> tail'' close'''", parent:)
+
+      bold = parent.children.first
+      expect(bold).to be_a(Markbridge::AST::Bold)
+      italic = bold.children.find { |c| c.is_a?(Markbridge::AST::Italic) }
+      expect(italic).not_to be_nil
+      expect(italic.children.any? { |c| c.is_a?(Markbridge::AST::Strikethrough) }).to be true
+    end
+
+    it "passes the configured registry through inner recursion" do
+      registry =
+        Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
+          r.register("highlight", :formatting, Markbridge::AST::Bold)
+        end
+      parser = described_class.new(inline_tag_registry: registry)
+      parent = Markbridge::AST::Document.new
+      # Outer ''…'' wraps the content in Italic and recurses via
+      # parse_inner_content; the inner <highlight> tag must still resolve
+      # against the custom registry, not against the default.
+      parser.parse("''before <highlight>marked</highlight> after''", parent:)
+
+      italic = parent.children.first
+      expect(italic).to be_a(Markbridge::AST::Italic)
+      expect(italic.children.any? { |c| c.is_a?(Markbridge::AST::Bold) }).to be true
+    end
+  end
 end
