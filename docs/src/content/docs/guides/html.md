@@ -7,7 +7,7 @@ The HTML parser uses Nokogiri to tolerate malformed HTML and produces the same A
 
 ## Requirements
 
-Add `nokogiri` to your Gemfile. It's a runtime dependency only for the HTML parser:
+Add `nokogiri` to your Gemfile. It's a runtime dependency for the HTML parser:
 
 ```ruby
 gem "nokogiri"
