@@ -306,6 +306,80 @@ RSpec.describe Markbridge do
     end
   end
 
+  describe ".discourse_renderer" do
+    it "returns a Renderer that converts BBCode using a custom Tag" do
+      fixed_bold =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_element, _interface)
+            "BOLDED"
+          end
+        end
+
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
+
+      expect(described_class.bbcode_to_markdown("[b]hi[/b]", renderer:).markdown).to eq("BOLDED")
+    end
+
+    it "uses the default library when called without arguments" do
+      renderer = described_class.discourse_renderer
+
+      expect(described_class.bbcode_to_markdown("[b]hi[/b]", renderer:).markdown).to eq("**hi**")
+    end
+
+    it "honors unregister: by falling through to render_children" do
+      renderer = described_class.discourse_renderer(unregister: [Markbridge::AST::Bold])
+
+      # Without a Tag for AST::Bold the renderer falls through to
+      # render_children, so the bold marker disappears entirely.
+      expect(described_class.bbcode_to_markdown("[b]hi[/b]", renderer:).markdown).to eq("hi")
+    end
+
+    it "honors escape_hard_line_breaks: true via the sugar" do
+      renderer = described_class.discourse_renderer(escape_hard_line_breaks: true)
+
+      expect(described_class.bbcode_to_markdown("hello  \nworld", renderer:).markdown).to eq(
+        "hello\nworld",
+      )
+    end
+
+    it "preserves trailing-space hard line breaks by default" do
+      renderer = described_class.discourse_renderer
+
+      expect(described_class.bbcode_to_markdown("hello  \nworld", renderer:).markdown).to eq(
+        "hello  \nworld",
+      )
+    end
+  end
+
+  describe "renderer: kwarg" do
+    it "is honored by html_to_markdown" do
+      fixed_bold =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_element, _interface)
+            "HBOLD"
+          end
+        end
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
+
+      expect(described_class.html_to_markdown("<b>hi</b>", renderer:).markdown).to eq("HBOLD")
+    end
+
+    it "is honored by mediawiki_to_markdown" do
+      fixed_bold =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_element, _interface)
+            "MBOLD"
+          end
+        end
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
+
+      expect(described_class.mediawiki_to_markdown("'''hi'''", renderer:).markdown).to eq("MBOLD")
+    end
+  end
+
   class StringWrapper
     def initialize(s) = @s = s
     def to_s = @s

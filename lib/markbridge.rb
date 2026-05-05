@@ -34,10 +34,12 @@ module Markbridge
     #
     # @param input [String] BBCode source
     # @param handlers [Parsers::BBCode::HandlerRegistry, nil] custom handlers
+    # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
+    #   (build with {.discourse_renderer}); defaults to a fresh default Renderer
     # @return [Conversion]
-    def bbcode_to_markdown(input, handlers: nil)
+    def bbcode_to_markdown(input, handlers: nil, renderer: nil)
       parse = parse_bbcode(input, handlers:)
-      build_conversion(parse)
+      build_conversion(parse, renderer:)
     end
 
     # Parse HTML to AST.
@@ -59,10 +61,11 @@ module Markbridge
     #
     # @param input [String] HTML source
     # @param handlers [Parsers::HTML::HandlerRegistry, nil] custom handlers
+    # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     # @return [Conversion]
-    def html_to_markdown(input, handlers: nil)
+    def html_to_markdown(input, handlers: nil, renderer: nil)
       parse = parse_html(input, handlers:)
-      build_conversion(parse)
+      build_conversion(parse, renderer:)
     end
 
     # Parse s9e/TextFormatter XML to AST.
@@ -90,10 +93,11 @@ module Markbridge
     #
     # @param input [String] XML source
     # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handlers
+    # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     # @return [Conversion]
-    def text_formatter_xml_to_markdown(input, handlers: nil)
+    def text_formatter_xml_to_markdown(input, handlers: nil, renderer: nil)
       parse = parse_text_formatter_xml(input, handlers:)
-      build_conversion(parse)
+      build_conversion(parse, renderer:)
     end
 
     # Parse MediaWiki wikitext to AST.
@@ -114,10 +118,42 @@ module Markbridge
     #
     # @param input [String] MediaWiki source
     # @param handlers [Parsers::MediaWiki::InlineTagRegistry, nil]
+    # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     # @return [Conversion]
-    def mediawiki_to_markdown(input, handlers: nil)
+    def mediawiki_to_markdown(input, handlers: nil, renderer: nil)
       parse = parse_mediawiki(input, handlers:)
-      build_conversion(parse)
+      build_conversion(parse, renderer:)
+    end
+
+    # Build a configured Discourse {Renderers::Discourse::Renderer}
+    # for use with the +renderer:+ kwarg on the +*_to_markdown+
+    # convenience methods.
+    #
+    # @param tags [Hash{Class => Tag, nil}, nil] mappings to merge on
+    #   top of the default library; +nil+ values unregister the class.
+    # @param tag_library [Renderers::Discourse::TagLibrary, nil] base
+    #   library to start from. Defaults to a fresh {TagLibrary.default}.
+    # @param unregister [Array<Class>, nil] AST classes to drop from
+    #   the library so they fall through to +render_children+.
+    # @param escaper [Renderers::Discourse::MarkdownEscaper, nil]
+    # @param escape_hard_line_breaks [Boolean] sugar for
+    #   +escaper: MarkdownEscaper.new(escape_hard_line_breaks: true)+
+    #   when no explicit +escaper:+ is given.
+    # @return [Renderers::Discourse::Renderer]
+    def discourse_renderer(
+      tags: nil,
+      tag_library: nil,
+      unregister: nil,
+      escaper: nil,
+      escape_hard_line_breaks: false
+    )
+      library = tag_library || Renderers::Discourse::TagLibrary.default
+      library.merge(tags) if tags
+      Array(unregister).each { |klass| library.unregister(klass) }
+
+      escaper ||= Renderers::Discourse::MarkdownEscaper.new(escape_hard_line_breaks:)
+
+      Renderers::Discourse::Renderer.new(tag_library: library, escaper:)
     end
 
     private
@@ -130,8 +166,8 @@ module Markbridge
       }
     end
 
-    def build_conversion(parse)
-      renderer = Renderers::Discourse::Renderer.new
+    def build_conversion(parse, renderer: nil)
+      renderer ||= Renderers::Discourse::Renderer.new
       markdown = cleanup_markdown(renderer.render(parse.ast))
 
       Conversion.new(

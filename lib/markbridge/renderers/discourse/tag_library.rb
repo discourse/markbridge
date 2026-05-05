@@ -19,6 +19,30 @@ module Markbridge
           self
         end
 
+        # Remove a tag binding so the renderer falls through to
+        # +render_children+ for that element class. See
+        # +Renderer#render+ for the auto-passthrough path.
+        #
+        # @param element_class [Class]
+        # @return [self]
+        def unregister(element_class)
+          @tags.delete(element_class)
+          self
+        end
+
+        # Merge a Hash of class → Tag mappings on top of this library.
+        # A +nil+ value unregisters the corresponding class (so the
+        # default auto-passthrough kicks in).
+        #
+        # @param mapping [Hash{Class => Tag, nil}]
+        # @return [self]
+        def merge(mapping)
+          mapping.each do |klass, tag|
+            tag.nil? ? unregister(klass) : register(klass, tag)
+          end
+          self
+        end
+
         # Get tag for an element class
         # @param element_class [Class]
         # @return [Tag, nil]
