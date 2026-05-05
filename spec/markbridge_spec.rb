@@ -350,6 +350,40 @@ RSpec.describe Markbridge do
     end
   end
 
+  describe "raise_on_error: kwarg" do
+    let(:exploding_tag) do
+      Class.new(Markbridge::Renderers::Discourse::Tag) do
+        def render(_element, _interface)
+          raise "boom"
+        end
+      end
+    end
+
+    it "raises by default (raise_on_error: true)" do
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => exploding_tag.new })
+
+      expect { described_class.bbcode_to_markdown("[b]hi[/b]", renderer:) }.to raise_error(/boom/)
+    end
+
+    it "swallows the error and surfaces it on Conversion#errors when raise_on_error: false" do
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => exploding_tag.new })
+
+      result = described_class.bbcode_to_markdown("[b]hi[/b]", renderer:, raise_on_error: false)
+
+      expect(result.markdown).to eq("")
+      expect(result.errors.size).to eq(1)
+      expect(result.errors.first.message).to match(/boom/)
+    end
+
+    it "returns an empty errors array when render succeeds" do
+      result = described_class.bbcode_to_markdown("[b]hi[/b]", raise_on_error: false)
+
+      expect(result.errors).to eq([])
+    end
+  end
+
   describe ".convert" do
     it "dispatches :bbcode to bbcode_to_markdown" do
       result = described_class.convert("[b]hi[/b]", format: :bbcode)
