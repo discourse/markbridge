@@ -7,7 +7,7 @@ The TextFormatter parser reads the XML format produced by <a href="https://githu
 
 ## Requirements
 
-Add `nokogiri` to your Gemfile. It's a runtime dependency only for the TextFormatter parser:
+Add `nokogiri` to your Gemfile. It's a runtime dependency for the TextFormatter parser:
 
 ```ruby
 gem "nokogiri"
