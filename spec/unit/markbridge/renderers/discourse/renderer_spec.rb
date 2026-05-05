@@ -43,7 +43,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
     end
 
     it "falls back to Postprocessor::DEFAULT when no postprocessor is provided" do
-      expect(described_class.new.postprocessor).to be(Markbridge::Renderers::Discourse::Postprocessor::DEFAULT)
+      expect(described_class.new.postprocessor).to be(
+        Markbridge::Renderers::Discourse::Postprocessor::DEFAULT,
+      )
     end
 
     it "uses an explicit postprocessor when one is provided" do
@@ -523,7 +525,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       r = described_class.new
       r.render(Markbridge::AST::Document.new) # initialize buffer
 
-      result = r.with_provisional_emissions { |c| c.commit; "the-value" }
+      result =
+        r.with_provisional_emissions do |c|
+          c.commit
+          "the-value"
+        end
 
       expect(result).to eq("the-value")
     end

@@ -262,7 +262,11 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
       )
 
       yielded = nil
-      result = interface.with_provisional_emissions { |c| yielded = c; "block-value" }
+      result =
+        interface.with_provisional_emissions do |c|
+          yielded = c
+          "block-value"
+        end
 
       expect(renderer).to have_received(:with_provisional_emissions)
       expect(yielded).to eq(:controller)
