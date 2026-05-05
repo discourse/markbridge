@@ -362,4 +362,99 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("<s>text~~more</s>")
     end
   end
+
+  describe "emissions" do
+    let(:emitting_tag) do
+      Class.new(Markbridge::Renderers::Discourse::Tag) do
+        def render(_element, interface)
+          interface.emit(:upload, { sha1: "abc" })
+          "<<placeholder>>"
+        end
+      end
+    end
+
+    let(:bold_with_text) do
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("x")
+      Markbridge::AST::Document.new << bold
+    end
+
+    it "records Tag emissions during render and exposes them via #emissions" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.new
+      library.register(Markbridge::AST::Bold, emitting_tag.new)
+      r = described_class.new(tag_library: library)
+
+      result = r.render(bold_with_text)
+
+      expect(result).to eq("<<placeholder>>")
+      expect(r.emissions).to eq(upload: [{ sha1: "abc" }])
+    end
+
+    it "resets the buffer on each top-level render call" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.new
+      library.register(Markbridge::AST::Bold, emitting_tag.new)
+      r = described_class.new(tag_library: library)
+
+      r.render(bold_with_text)
+      r.render(Markbridge::AST::Document.new)
+
+      expect(r.emissions).to eq({})
+    end
+
+    it "ignores emissions made outside a render call" do
+      r = described_class.new
+
+      expect { r.record_emission(:foo, :bar) }.not_to raise_error
+      expect(r.emissions).to eq({})
+    end
+  end
+
+  describe "#with_provisional_emissions" do
+    let(:bold_with_text) do
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("x")
+      Markbridge::AST::Document.new << bold
+    end
+
+    it "rolls back emissions made inside the block when the block does not commit" do
+      probing_tag =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_element, interface)
+            interface.with_provisional_emissions do |_controller|
+              interface.emit(:probe, :inner)
+              "discarded"
+            end
+            interface.emit(:keep, :outer)
+            "kept"
+          end
+        end
+
+      library = Markbridge::Renderers::Discourse::TagLibrary.new
+      library.register(Markbridge::AST::Bold, probing_tag.new)
+      r = described_class.new(tag_library: library)
+      r.render(bold_with_text)
+
+      expect(r.emissions).to eq(keep: [:outer])
+    end
+
+    it "keeps emissions when the block commits" do
+      committing_tag =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_element, interface)
+            interface.with_provisional_emissions do |controller|
+              interface.emit(:probe, :inner)
+              controller.commit
+            end
+            "ok"
+          end
+        end
+
+      library = Markbridge::Renderers::Discourse::TagLibrary.new
+      library.register(Markbridge::AST::Bold, committing_tag.new)
+      r = described_class.new(tag_library: library)
+      r.render(bold_with_text)
+
+      expect(r.emissions).to eq(probe: [:inner])
+    end
+  end
 end
