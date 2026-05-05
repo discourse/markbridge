@@ -150,13 +150,15 @@ tag_library.register(
 
 ## Convention-based auto-registration
 
-If you name your tag class `FooTag` and your AST class `AST::Foo`, you can skip manual registration:
+The Discourse renderer can discover its own built-in tags by naming convention:
 
 ```ruby
 tag_library = Markbridge::Renderers::Discourse::TagLibrary.new
 tag_library.auto_register!
 # Discovers BoldTag → AST::Bold, ItalicTag → AST::Italic, etc.
 ```
+
+`auto_register!` only walks `Markbridge::Renderers::Discourse::Tags::*`, so consumer-defined tag classes aren't picked up automatically — register those explicitly with `tag_library.register(MyAst, MyTag.new)`.
 
 ## When to customize vs. fork
 
