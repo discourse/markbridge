@@ -434,10 +434,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(r.emissions).to eq({})
     end
 
-    it "ignores emissions made outside a render call" do
+    it "discards emissions accumulated before the first render at the start of that render" do
       r = described_class.new
+      r.record_emission(:stale, :before_render)
 
-      expect { r.record_emission(:foo, :bar) }.not_to raise_error
+      r.render(Markbridge::AST::Document.new)
+
       expect(r.emissions).to eq({})
     end
   end
