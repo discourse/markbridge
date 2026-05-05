@@ -258,6 +258,12 @@ RSpec.describe Markbridge do
 
       expect(paragraph.children.first).to be_a(Markbridge::AST::Bold)
     end
+
+    it "exposes unknown HTML-like inline tags via Parse#unknown_tags" do
+      result = described_class.parse_mediawiki("hello <neverknown>world</neverknown>")
+
+      expect(result.unknown_tags["neverknown"]).to eq(1)
+    end
   end
 
   describe ".mediawiki_to_markdown" do

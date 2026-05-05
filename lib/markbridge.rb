@@ -111,7 +111,7 @@ module Markbridge
       parser = Parsers::MediaWiki::Parser.new(handlers:)
       ast = parser.parse(input.to_s)
 
-      Parse.new(ast:, format: :mediawiki, unknown_tags: {}, diagnostics: {})
+      Parse.new(ast:, format: :mediawiki, unknown_tags: parser.unknown_tags.dup, diagnostics: {})
     end
 
     # Convert MediaWiki wikitext to Discourse Markdown.

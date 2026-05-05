@@ -21,6 +21,11 @@ module Markbridge
       #   parser = Markbridge::Parsers::MediaWiki::Parser.new
       #   ast = parser.parse("'''bold''' and ''italic''")
       class Parser
+        # @return [Hash{String => Integer}] tag-name → occurrence count for
+        #   inline HTML-like tags whose names are not registered. Reset at
+        #   the start of every #parse call.
+        attr_reader :unknown_tags
+
         # @param handlers [InlineTagRegistry, nil] custom registry or use default.
         #   Named +handlers:+ for consistency with sibling parsers; the
         #   value is still an +InlineTagRegistry+ instance.
@@ -29,6 +34,7 @@ module Markbridge
           # InlineParser falls back to InlineTagRegistry.default when this is
           # nil, so we don't need to materialise it here.
           @handlers = block_given? ? InlineTagRegistry.build_from_default(&block) : handlers
+          @unknown_tags = Hash.new(0)
         end
 
         # Parse MediaWiki wikitext into an AST Document.
@@ -39,8 +45,9 @@ module Markbridge
           normalized = normalize_line_endings(input)
           lines = normalized.split("\n")
 
+          @unknown_tags.clear
           @document = AST::Document.new
-          @inline_parser = InlineParser.new(handlers: @handlers)
+          @inline_parser = InlineParser.new(handlers: @handlers, unknown_tags: @unknown_tags)
           @list_stack = []
 
           process_lines(lines)

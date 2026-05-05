@@ -15,9 +15,16 @@ module Markbridge
       class InlineParser
         MAX_INLINE_DEPTH = 20
 
-        def initialize(handlers: nil, depth: 0)
+        # @return [Hash{String => Integer}] tag-name → occurrence count for
+        #   HTML-like inline tags whose names are not registered. Shared
+        #   with nested InlineParser instances so depth-recursive parses
+        #   contribute to the same tally.
+        attr_reader :unknown_tags
+
+        def initialize(handlers: nil, depth: 0, unknown_tags: nil)
           @registry = handlers || InlineTagRegistry.default
           @depth = depth
+          @unknown_tags = unknown_tags || Hash.new(0)
         end
 
         # Parse inline markup and append resulting AST nodes to the parent element.
@@ -110,7 +117,9 @@ module Markbridge
             return
           end
 
-          InlineParser.new(handlers: @registry, depth: @depth + 1).parse(content, parent:)
+          InlineParser
+            .new(handlers: @registry, depth: @depth + 1, unknown_tags: @unknown_tags)
+            .parse(content, parent:)
         end
 
         # Collect text until we find n consecutive apostrophes.
@@ -200,9 +209,14 @@ module Markbridge
           self_closing = !tag_match[3].empty?
           tag_name = tag_match[2].downcase
 
-          # Closing/self-closing tags and unknown tags are treated as literal text
+          # Closing/self-closing tags and unknown tags are treated as literal text.
+          # Track *unknown* opening tags so callers can surface them via
+          # Parse/Conversion#unknown_tags. We deliberately don't track
+          # closing/self-closing forms — they often pair up with the
+          # opening tag that's already counted.
           entry = @registry[tag_name]
           if closing || self_closing || !entry
+            @unknown_tags[tag_name] += 1 if !entry && !closing && !self_closing
             advance_as_text(full_match)
             return
           end
