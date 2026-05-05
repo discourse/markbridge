@@ -168,7 +168,8 @@ module Markbridge
 
     def build_conversion(parse, renderer: nil)
       renderer ||= Renderers::Discourse::Renderer.new
-      markdown = cleanup_markdown(renderer.render(parse.ast))
+      raw = renderer.render(parse.ast)
+      markdown = cleanup_markdown(raw)
 
       Conversion.new(
         markdown:,
@@ -176,8 +177,7 @@ module Markbridge
         format: parse.format,
         unknown_tags: parse.unknown_tags,
         diagnostics: parse.diagnostics,
-        emissions: {
-        },
+        emissions: renderer.emissions,
         errors: [],
       )
     end

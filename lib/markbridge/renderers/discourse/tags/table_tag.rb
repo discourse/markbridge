@@ -8,21 +8,34 @@ module Markbridge
         class TableTag < Tag
           def render(element, interface)
             child_context = interface.with_parent(element)
-            rows_data = extract_rows(element, interface, child_context)
 
-            return "" if rows_data.empty?
+            # Render cells provisionally in Markdown mode. Emissions
+            # from this pass are kept only when the Markdown form
+            # survives; if the table is markdown-incompatible we
+            # discard the pass and re-render in html_mode.
+            markdown =
+              interface.with_provisional_emissions do |controller|
+                rows_data = extract_rows(element, interface, child_context)
+                next nil if rows_data.empty? || !markdown_compatible?(rows_data, interface)
 
-            if markdown_compatible?(rows_data, interface)
-              render_markdown(rows_data)
-            else
-              # Re-render cells in html_mode so inline Markdown like **bold** becomes
-              # <strong>bold</strong>; CommonMark would not parse Markdown inside an HTML block.
-              html_rows = extract_rows(element, interface, child_context.with_html_mode(true))
-              render_html(html_rows)
-            end
+                controller.commit
+                render_markdown(rows_data)
+              end
+
+            return markdown if markdown
+            return "" if empty_table?(element)
+
+            # Re-render cells in html_mode so inline Markdown like **bold** becomes
+            # <strong>bold</strong>; CommonMark would not parse Markdown inside an HTML block.
+            html_rows = extract_rows(element, interface, child_context.with_html_mode(true))
+            render_html(html_rows)
           end
 
           private
+
+          def empty_table?(element)
+            element.children.none? { |c| c.instance_of?(AST::TableRow) }
+          end
 
           # Extract rendered cell data from each row
           # @return [Array<Hash>] array of {cells: [{content:, header:}], ...}

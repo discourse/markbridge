@@ -22,6 +22,30 @@ module Markbridge
           @renderer.render_children(element, context:)
         end
 
+        # Append a record to the per-call emission buffer. Returns nil.
+        # Used by Tags that need to surface side data (uploads,
+        # placeholder records, etc.) to the caller via
+        # +Conversion#emissions+. The Tag's render return value is
+        # unaffected.
+        # @param key [Symbol]
+        # @param payload [Object]
+        # @return [nil]
+        def emit(key, payload)
+          @renderer.record_emission(key, payload)
+          nil
+        end
+
+        # Run the block; if the block exits without committing, any
+        # emissions made inside it are rolled back. Used by tags that
+        # speculatively render content they may discard (e.g.
+        # +TableTag+'s Markdown-vs-HTML decision).
+        #
+        # @yieldparam controller [#commit] call +#commit+ to keep emissions
+        # @return [Object] the block's return value
+        def with_provisional_emissions(&)
+          @renderer.with_provisional_emissions(&)
+        end
+
         # Context operations
         def with_parent(element)
           @context.with_parent(element)
