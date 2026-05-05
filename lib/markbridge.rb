@@ -164,7 +164,7 @@ module Markbridge
       raise ArgumentError, "unknown render format #{format.inspect}" unless format == :discourse
 
       renderer ||= Renderers::Discourse::Renderer.new
-      markdown = cleanup_markdown(renderer.render(ast))
+      markdown = renderer.postprocessor.call(renderer.render(ast))
 
       Conversion.new(
         markdown:,
@@ -199,7 +199,8 @@ module Markbridge
       tag_library: nil,
       unregister: nil,
       escaper: nil,
-      escape_hard_line_breaks: false
+      escape_hard_line_breaks: false,
+      postprocessor: nil
     )
       library = tag_library || Renderers::Discourse::TagLibrary.default
       library.merge(tags) if tags
@@ -207,7 +208,7 @@ module Markbridge
 
       escaper ||= Renderers::Discourse::MarkdownEscaper.new(escape_hard_line_breaks:)
 
-      Renderers::Discourse::Renderer.new(tag_library: library, escaper:)
+      Renderers::Discourse::Renderer.new(tag_library: library, escaper:, postprocessor:)
     end
 
     private
@@ -222,8 +223,7 @@ module Markbridge
 
     def build_conversion(parse, renderer: nil)
       renderer ||= Renderers::Discourse::Renderer.new
-      raw = renderer.render(parse.ast)
-      markdown = cleanup_markdown(raw)
+      markdown = renderer.postprocessor.call(renderer.render(parse.ast))
 
       Conversion.new(
         markdown:,
@@ -234,13 +234,6 @@ module Markbridge
         emissions: renderer.emissions,
         errors: [],
       )
-    end
-
-    def cleanup_markdown(text)
-      text
-        .gsub(/\n{3,}/, "\n\n") # Max 2 consecutive newlines
-        .gsub(/^[ \t]+$/, "") # Remove whitespace-only lines
-        .strip # Trim leading/trailing whitespace
     end
   end
 end

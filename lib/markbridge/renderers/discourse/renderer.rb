@@ -5,10 +5,13 @@ module Markbridge
     module Discourse
       # Renders AST to Discourse-flavored Markdown in-memory.
       class Renderer
-        def initialize(tag_library: nil, escaper: nil, html_escaper: nil)
+        attr_reader :postprocessor
+
+        def initialize(tag_library: nil, escaper: nil, html_escaper: nil, postprocessor: nil)
           @tag_library = tag_library || TagLibrary.default
           @escaper = escaper || MarkdownEscaper.new
           @html_escaper = html_escaper || HtmlEscaper
+          @postprocessor = postprocessor || Postprocessor::DEFAULT
           # @interface_cache and @emission_buffer are lazily initialized
           # in #render's top-level call and reset to nil after the call
           # completes. No init needed here — unset ivars return nil
