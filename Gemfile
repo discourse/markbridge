@@ -4,7 +4,9 @@ source "https://rubygems.org"
 
 gemspec
 
+gem "benchmark"
 gem "benchmark-ips"
+gem "csv"
 gem "commonmarker", install_if: -> { RUBY_ENGINE == "ruby" }
 gem "lefthook"
 gem "nokogiri"
