@@ -30,7 +30,7 @@ gem install markbridge
 ## Quick start
 
 ```ruby
-require "markbridge/all"
+require "markbridge/bbcode"
 
 bbcode = "[b]Hello[/b] [url=https://example.com]world[/url]!"
 markdown = Markbridge.bbcode_to_markdown(bbcode)
