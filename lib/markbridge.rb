@@ -125,6 +125,60 @@ module Markbridge
       build_conversion(parse, renderer:)
     end
 
+    # Convert input in the given format. Thin dispatcher over the
+    # four +*_to_markdown+ methods; useful when the format is data-
+    # driven (e.g. iterating posts whose +:format+ column varies).
+    #
+    # @param input [String]
+    # @param format [Symbol] one of +:bbcode+, +:html+,
+    #   +:text_formatter_xml+, +:mediawiki+
+    # @param kwargs [Hash] forwarded to the underlying convenience method
+    #   (e.g. +handlers:+, +renderer:+, +raise_on_error:+).
+    # @return [Conversion]
+    def convert(input, format:, **kwargs)
+      case format
+      when :bbcode
+        bbcode_to_markdown(input, **kwargs)
+      when :html
+        html_to_markdown(input, **kwargs)
+      when :text_formatter_xml
+        text_formatter_xml_to_markdown(input, **kwargs)
+      when :mediawiki
+        mediawiki_to_markdown(input, **kwargs)
+      else
+        raise ArgumentError,
+              "unknown format #{format.inspect} " \
+                "(expected :bbcode, :html, :text_formatter_xml, or :mediawiki)"
+      end
+    end
+
+    # Render an existing AST to Discourse Markdown. Useful when the
+    # caller already has the AST in hand (e.g. modified after parsing,
+    # or built programmatically).
+    #
+    # @param ast [AST::Node]
+    # @param format [Symbol] :discourse (only renderer currently shipped)
+    # @param renderer [Renderers::Discourse::Renderer, nil]
+    # @return [Conversion]
+    def render(ast, format: :discourse, renderer: nil)
+      raise ArgumentError, "unknown render format #{format.inspect}" unless format == :discourse
+
+      renderer ||= Renderers::Discourse::Renderer.new
+      markdown = cleanup_markdown(renderer.render(ast))
+
+      Conversion.new(
+        markdown:,
+        ast:,
+        format: :discourse,
+        unknown_tags: {
+        },
+        diagnostics: {
+        },
+        emissions: renderer.emissions,
+        errors: [],
+      )
+    end
+
     # Build a configured Discourse {Renderers::Discourse::Renderer}
     # for use with the +renderer:+ kwarg on the +*_to_markdown+
     # convenience methods.

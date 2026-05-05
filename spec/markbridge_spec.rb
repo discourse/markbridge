@@ -312,6 +312,83 @@ RSpec.describe Markbridge do
     end
   end
 
+  describe ".convert" do
+    it "dispatches :bbcode to bbcode_to_markdown" do
+      result = described_class.convert("[b]hi[/b]", format: :bbcode)
+
+      expect(result.markdown).to eq("**hi**")
+      expect(result.format).to eq(:bbcode)
+    end
+
+    it "dispatches :html to html_to_markdown" do
+      expect(described_class.convert("<b>hi</b>", format: :html).markdown).to eq("**hi**")
+    end
+
+    it "dispatches :text_formatter_xml to text_formatter_xml_to_markdown" do
+      xml = "<r><B><s>[b]</s>hi<e>[/b]</e></B></r>"
+
+      expect(described_class.convert(xml, format: :text_formatter_xml).markdown).to eq("**hi**")
+    end
+
+    it "dispatches :mediawiki to mediawiki_to_markdown" do
+      expect(described_class.convert("'''hi'''", format: :mediawiki).markdown).to eq("**hi**")
+    end
+
+    it "raises ArgumentError for unknown formats" do
+      expect { described_class.convert("x", format: :unknown) }.to raise_error(
+        ArgumentError,
+        /unknown format/,
+      )
+    end
+
+    it "forwards renderer: kwarg to the dispatched method" do
+      fixed_bold =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            "B"
+          end
+        end
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
+
+      expect(described_class.convert("[b]x[/b]", format: :bbcode, renderer:).markdown).to eq("B")
+    end
+  end
+
+  describe ".render" do
+    it "renders a Document AST through the default Discourse renderer" do
+      doc = described_class.parse_bbcode("[b]hi[/b]").ast
+
+      result = described_class.render(doc)
+
+      expect(result).to be_a(Markbridge::Conversion)
+      expect(result.markdown).to eq("**hi**")
+      expect(result.format).to eq(:discourse)
+    end
+
+    it "honors a custom renderer:" do
+      doc = described_class.parse_bbcode("[b]hi[/b]").ast
+      fixed_bold =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            "BB"
+          end
+        end
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
+
+      expect(described_class.render(doc, renderer:).markdown).to eq("BB")
+    end
+
+    it "raises ArgumentError for unknown render format" do
+      doc = Markbridge::AST::Document.new
+      expect { described_class.render(doc, format: :weird) }.to raise_error(
+        ArgumentError,
+        /unknown render format/,
+      )
+    end
+  end
+
   describe ".discourse_renderer" do
     it "returns a Renderer that converts BBCode using a custom Tag" do
       fixed_bold =
