@@ -5,7 +5,7 @@
 # This demonstrates how to organize custom BBCode handlers into reusable modules
 # that can be easily loaded into a parser.
 
-require "markbridge"
+require "markbridge/bbcode"
 
 # Example 1: Simple Quote Tag Plugin
 module QuotePlugin

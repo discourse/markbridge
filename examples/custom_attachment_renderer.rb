@@ -11,7 +11,7 @@
 # and generate the correct URLs for your attachments.
 
 require "bundler/setup"
-require "markbridge/all"
+require "markbridge/bbcode"
 
 # Example 1: Simple ID-based attachment lookup
 # Assumes you have a method to look up attachment URLs by ID

@@ -7,7 +7,7 @@
 # to handle custom XML elements or change the default behavior.
 
 require "bundler/setup"
-require "markbridge"
+require "markbridge/textformatter"
 
 # Example 1: Add a custom element mapping using a lambda
 # =======================================================

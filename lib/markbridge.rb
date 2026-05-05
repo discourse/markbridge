@@ -5,8 +5,6 @@ require_relative "markbridge/configuration"
 
 require_relative "markbridge/ast"
 require_relative "markbridge/renderers/discourse"
-require_relative "markbridge/parsers/media_wiki"
-require_relative "markbridge/parsers/text_formatter"
 require_relative "markbridge/processors"
 
 module Markbridge

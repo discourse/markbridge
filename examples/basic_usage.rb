@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../lib/markbridge"
+require_relative "../lib/markbridge/bbcode"
 
 # Example 1: Basic formatting
 bbcode = "[b]Bold[/b] and [i]italic[/i] text"
