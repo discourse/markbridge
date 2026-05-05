@@ -203,4 +203,40 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       expect(registry["b"]).to be_a(Markbridge::Parsers::HTML::Handlers::SimpleHandler)
     end
   end
+
+  describe "#overlay" do
+    let(:registry) { described_class.default }
+
+    it "yields the previously bound handler" do
+      seen = nil
+      registry.overlay("a") { |p| seen = p }
+      expect(seen).to be_a(Markbridge::Parsers::HTML::Handlers::UrlHandler)
+    end
+
+    it "yields nil for unbound names" do
+      seen = :unset
+      registry.overlay("never-seen") do |p|
+        seen = p
+        Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Bold)
+      end
+      expect(seen).to be_nil
+    end
+
+    it "registers whatever the block returns" do
+      replacement = Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+      registry.overlay("a") { |_| replacement }
+      expect(registry["a"]).to be(replacement)
+    end
+
+    it "iterates over an Array of names" do
+      replacement = Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+      registry.overlay(%w[a b]) { |_| replacement }
+      expect(registry["a"]).to be(replacement)
+      expect(registry["b"]).to be(replacement)
+    end
+
+    it "returns self for chaining" do
+      expect(registry.overlay("a") { |p| p }).to be(registry)
+    end
+  end
 end

@@ -43,6 +43,28 @@ module Markbridge
           @mappings[element_name.upcase] = handler
         end
 
+        # Look up the handler for an element name (case-insensitive).
+        # @param element_name [String]
+        # @return [#process, nil]
+        def [](element_name)
+          @mappings[element_name.upcase]
+        end
+
+        # Replace the handler bound to one or more element names by
+        # yielding the previously-bound handler (which may be +nil+)
+        # and registering whatever the block returns.
+        #
+        # @param element_names [String, Array<String>]
+        # @yieldparam previous [#process, nil]
+        # @return [self]
+        def overlay(element_names)
+          Array(element_names).each do |name|
+            previous = self[name]
+            register(name, yield(previous))
+          end
+          self
+        end
+
         # Check if a handler is registered for an element
         # @param element_name [String] XML element name
         # @return [Boolean] true if handler is registered

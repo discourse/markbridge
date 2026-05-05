@@ -460,4 +460,53 @@ RSpec.describe Markbridge::Parsers::BBCode::HandlerRegistry do
       expect(reconciler.instance_variable_get(:@registry)).to eq(registry)
     end
   end
+
+  describe "#overlay" do
+    let(:registry) { described_class.default }
+
+    it "yields the previously bound handler so a wrapper can delegate to it" do
+      seen = nil
+      registry.overlay("url") do |previous|
+        seen = previous
+        previous
+      end
+
+      expect(seen).to be_a(Markbridge::Parsers::BBCode::Handlers::UrlHandler)
+    end
+
+    it "yields nil when no handler was previously bound" do
+      seen = :unset
+      registry.overlay("brand-new-tag") do |previous|
+        seen = previous
+        Markbridge::Parsers::BBCode::Handlers::SimpleHandler.new(Markbridge::AST::Bold)
+      end
+
+      expect(seen).to be_nil
+    end
+
+    it "registers whatever the block returns" do
+      replacement =
+        Markbridge::Parsers::BBCode::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+
+      registry.overlay("url") { |_| replacement }
+
+      expect(registry["url"]).to be(replacement)
+    end
+
+    it "applies to every tag name in the array" do
+      replacement =
+        Markbridge::Parsers::BBCode::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+
+      registry.overlay(%w[url link iurl]) { |_| replacement }
+
+      expect(registry["url"]).to be(replacement)
+      expect(registry["link"]).to be(replacement)
+      expect(registry["iurl"]).to be(replacement)
+    end
+
+    it "returns self for chaining" do
+      result = registry.overlay("url") { |p| p }
+      expect(result).to be(registry)
+    end
+  end
 end

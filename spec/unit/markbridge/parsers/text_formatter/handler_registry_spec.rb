@@ -306,4 +306,58 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       expect(registry.has_handler?("B")).to be true
     end
   end
+
+  describe "#[]" do
+    it "returns the handler bound to an element name (case-insensitive)" do
+      registry = described_class.default
+      expect(registry["b"]).to be_a(Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler)
+      expect(registry["B"]).to be(registry["b"])
+    end
+
+    it "returns nil when no handler is bound" do
+      expect(described_class.new["never-seen"]).to be_nil
+    end
+  end
+
+  describe "#overlay" do
+    let(:registry) { described_class.default }
+
+    it "yields the previously bound handler" do
+      seen = nil
+      registry.overlay("URL") { |p| seen = p }
+      expect(seen).to be_a(Markbridge::Parsers::TextFormatter::Handlers::UrlHandler)
+    end
+
+    it "yields nil for unbound names" do
+      seen = :unset
+      registry.overlay("NEVER-SEEN") do |p|
+        seen = p
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Bold)
+      end
+      expect(seen).to be_nil
+    end
+
+    it "registers whatever the block returns" do
+      replacement =
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+
+      registry.overlay("URL") { |_| replacement }
+
+      expect(registry["URL"]).to be(replacement)
+    end
+
+    it "iterates over an Array of names" do
+      replacement =
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+
+      registry.overlay(%w[URL EMAIL]) { |_| replacement }
+
+      expect(registry["URL"]).to be(replacement)
+      expect(registry["EMAIL"]).to be(replacement)
+    end
+
+    it "returns self for chaining" do
+      expect(registry.overlay("URL") { |p| p }).to be(registry)
+    end
+  end
 end
