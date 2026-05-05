@@ -1,132 +1,23 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge do
-  after { described_class.reset_defaults! }
-
-  fixed_output_tag =
-    Class.new(Markbridge::Renderers::Discourse::Tag) do
-      def initialize(output)
-        super()
-        @output = output
-      end
-
-      def render(_element, _interface, **_kwargs)
-        @output
-      end
-    end
-
   it "has a version number" do
-    expect(Markbridge::VERSION).not_to be nil
-  end
-
-  describe ".configuration" do
-    it "returns a Configuration instance" do
-      expect(described_class.configuration).to be_a(Markbridge::Configuration)
-    end
-
-    it "memoizes the configuration" do
-      expect(described_class.configuration).to be(described_class.configuration)
-    end
-  end
-
-  describe ".configure" do
-    it "yields the configuration" do
-      yielded = nil
-      described_class.configure { |config| yielded = config }
-
-      expect(yielded).to be(described_class.configuration)
-    end
-  end
-
-  describe ".reset_defaults!" do
-    it "resets the configuration" do
-      old_config = described_class.configuration
-      described_class.reset_defaults!
-      expect(described_class.configuration).not_to be(old_config)
-    end
-
-    it "resets the default handlers" do
-      old = described_class.default_handlers
-      described_class.reset_defaults!
-      expect(described_class.default_handlers).not_to be(old)
-    end
-
-    it "resets the default HTML handlers" do
-      old = described_class.default_html_handlers
-      described_class.reset_defaults!
-      expect(described_class.default_html_handlers).not_to be(old)
-    end
-
-    it "resets the default tag library" do
-      old = described_class.default_tag_library
-      described_class.reset_defaults!
-      expect(described_class.default_tag_library).not_to be(old)
-    end
-
-    it "resets the default text formatter handlers" do
-      old = described_class.default_text_formatter_handlers
-      described_class.reset_defaults!
-      expect(described_class.default_text_formatter_handlers).not_to be(old)
-    end
-  end
-
-  describe ".default_handlers" do
-    it "returns a BBCode HandlerRegistry" do
-      expect(described_class.default_handlers).to be_a(Markbridge::Parsers::BBCode::HandlerRegistry)
-    end
-
-    it "memoizes the registry across calls" do
-      expect(described_class.default_handlers).to be(described_class.default_handlers)
-    end
-  end
-
-  describe ".default_html_handlers" do
-    it "returns an HTML HandlerRegistry" do
-      expect(described_class.default_html_handlers).to be_a(
-        Markbridge::Parsers::HTML::HandlerRegistry,
-      )
-    end
-
-    it "memoizes the registry across calls" do
-      expect(described_class.default_html_handlers).to be(described_class.default_html_handlers)
-    end
-  end
-
-  describe ".default_tag_library" do
-    it "returns a Discourse TagLibrary" do
-      expect(described_class.default_tag_library).to be_a(
-        Markbridge::Renderers::Discourse::TagLibrary,
-      )
-    end
-
-    it "memoizes the library across calls" do
-      expect(described_class.default_tag_library).to be(described_class.default_tag_library)
-    end
-  end
-
-  describe ".default_text_formatter_handlers" do
-    it "returns a TextFormatter HandlerRegistry" do
-      expect(described_class.default_text_formatter_handlers).to be_a(
-        Markbridge::Parsers::TextFormatter::HandlerRegistry,
-      )
-    end
-
-    it "memoizes the registry across calls" do
-      expect(described_class.default_text_formatter_handlers).to be(
-        described_class.default_text_formatter_handlers,
-      )
-    end
+    expect(Markbridge::VERSION).not_to be_nil
   end
 
   describe ".parse_bbcode" do
-    it "returns an AST::Document" do
-      expect(described_class.parse_bbcode("[b]hi[/b]")).to be_a(Markbridge::AST::Document)
+    it "returns a Parse with format :bbcode" do
+      result = described_class.parse_bbcode("[b]hi[/b]")
+
+      expect(result).to be_a(Markbridge::Parse)
+      expect(result.format).to eq(:bbcode)
     end
 
-    it "produces children that reflect the input" do
-      doc = described_class.parse_bbcode("[b]hi[/b]")
+    it "produces an AST that reflects the input" do
+      result = described_class.parse_bbcode("[b]hi[/b]")
 
-      expect(doc.children.first).to be_a(Markbridge::AST::Bold)
+      expect(result.ast).to be_a(Markbridge::AST::Document)
+      expect(result.ast.children.first).to be_a(Markbridge::AST::Bold)
     end
 
     it "raises ArgumentError on nil input" do
@@ -137,20 +28,7 @@ RSpec.describe Markbridge do
     end
 
     it "coerces non-string input via to_s" do
-      expect(described_class.parse_bbcode(123)).to be_a(Markbridge::AST::Document)
-    end
-
-    it "uses Markbridge.default_handlers when handlers not provided" do
-      # Register a custom tag on the shared default registry; it must be
-      # picked up by parse_bbcode (proves the default is reused, not re-built)
-      described_class.default_handlers.register(
-        "customtag",
-        Markbridge::Parsers::BBCode::Handlers::SimpleHandler.new(Markbridge::AST::Bold),
-      )
-
-      doc = described_class.parse_bbcode("[customtag]x[/customtag]")
-
-      expect(doc.children.first).to be_a(Markbridge::AST::Bold)
+      expect(described_class.parse_bbcode(123).ast).to be_a(Markbridge::AST::Document)
     end
 
     it "uses the provided handler registry" do
@@ -160,15 +38,38 @@ RSpec.describe Markbridge do
         Markbridge::Parsers::BBCode::Handlers::SimpleHandler.new(Markbridge::AST::Italic),
       )
 
-      doc = described_class.parse_bbcode("[weird]x[/weird]", handlers: registry)
+      result = described_class.parse_bbcode("[weird]x[/weird]", handlers: registry)
 
-      expect(doc.children.first).to be_a(Markbridge::AST::Italic)
+      expect(result.ast.children.first).to be_a(Markbridge::AST::Italic)
+    end
+
+    it "exposes unknown_tags from the parser" do
+      result = described_class.parse_bbcode("[neverknown]x[/neverknown]")
+
+      expect(result.unknown_tags["neverknown"]).to eq(2)
+    end
+
+    it "exposes BBCode diagnostics" do
+      result = described_class.parse_bbcode("[b]hi[/b]")
+
+      expect(result.diagnostics).to include(
+        :auto_closed_tags_count,
+        :depth_exceeded_count,
+        :unclosed_raw_tags,
+      )
     end
   end
 
   describe ".bbcode_to_markdown" do
-    it "renders BBCode to markdown" do
-      expect(described_class.bbcode_to_markdown("[b]hi[/b]")).to eq("**hi**")
+    it "returns a Conversion whose markdown reflects the input" do
+      result = described_class.bbcode_to_markdown("[b]hi[/b]")
+
+      expect(result).to be_a(Markbridge::Conversion)
+      expect(result.markdown).to eq("**hi**")
+    end
+
+    it "delegates to_s to markdown for string-coercion contexts" do
+      expect("got #{described_class.bbcode_to_markdown("[b]hi[/b]")}").to eq("got **hi**")
     end
 
     it "passes the provided handler registry through to the parser" do
@@ -178,58 +79,42 @@ RSpec.describe Markbridge do
         Markbridge::Parsers::BBCode::Handlers::SimpleHandler.new(Markbridge::AST::Italic),
       )
 
-      # Custom registry maps [b] to italic; markdown output uses *_*
-      expect(described_class.bbcode_to_markdown("[b]hi[/b]", handlers: registry)).to eq("*hi*")
+      result = described_class.bbcode_to_markdown("[b]hi[/b]", handlers: registry)
+
+      expect(result.markdown).to eq("*hi*")
     end
 
     it "raises ArgumentError on nil input" do
       expect { described_class.bbcode_to_markdown(nil) }.to raise_error(ArgumentError)
     end
 
-    it "respects escape_hard_line_breaks configuration" do
-      described_class.configure { |c| c.escape_hard_line_breaks = true }
+    it "exposes unknown_tags on the Conversion" do
+      result = described_class.bbcode_to_markdown("[neverknown]x[/neverknown]")
 
-      result = described_class.bbcode_to_markdown("hello  \nworld")
-      expect(result).to eq("hello\nworld")
+      expect(result.unknown_tags["neverknown"]).to eq(2)
     end
 
-    it "preserves trailing-space hard line breaks when escape_hard_line_breaks is false (default)" do
-      # Default config keeps trailing spaces; build_renderer must read .escape_hard_line_breaks,
-      # not the Configuration object itself (which is always truthy)
-      result = described_class.bbcode_to_markdown("hello  \nworld")
-      expect(result).to eq("hello  \nworld")
+    it "returns an empty emissions hash by default" do
+      result = described_class.bbcode_to_markdown("[b]hi[/b]")
+
+      expect(result.emissions).to eq({})
+      expect(result.emitted(:upload)).to eq([])
     end
 
-    it "uses the provided tag library to render" do
-      library = Markbridge::Renderers::Discourse::TagLibrary.new
-      library.register(Markbridge::AST::Bold, fixed_output_tag.new("BOLDED"))
-
-      expect(described_class.bbcode_to_markdown("[b]hi[/b]", tag_library: library)).to eq("BOLDED")
-    end
-
-    it "uses Markbridge.default_tag_library when tag_library not provided" do
-      # Customize the shared default library; output must reflect the customization
-      described_class.default_tag_library.register(
-        Markbridge::AST::Bold,
-        fixed_output_tag.new("OUTPUT_FROM_CUSTOMIZED_DEFAULT"),
-      )
-
-      expect(described_class.bbcode_to_markdown("[b]hi[/b]")).to eq(
-        "OUTPUT_FROM_CUSTOMIZED_DEFAULT",
-      )
+    it "returns an empty errors array by default" do
+      expect(described_class.bbcode_to_markdown("[b]hi[/b]").errors).to eq([])
     end
 
     it "collapses three or more consecutive newlines to exactly two" do
-      # BBCode -> markdown -> cleanup turns runs of blank lines into a single blank line
-      expect(described_class.bbcode_to_markdown("a\n\n\n\nb")).to eq("a\n\nb")
+      expect(described_class.bbcode_to_markdown("a\n\n\n\nb").markdown).to eq("a\n\nb")
     end
 
     it "removes whitespace-only lines" do
-      expect(described_class.bbcode_to_markdown("a\n   \nb")).to eq("a\n\nb")
+      expect(described_class.bbcode_to_markdown("a\n   \nb").markdown).to eq("a\n\nb")
     end
 
     it "strips leading and trailing whitespace from the final output" do
-      expect(described_class.bbcode_to_markdown("   hi   ")).to eq("hi")
+      expect(described_class.bbcode_to_markdown("   hi   ").markdown).to eq("hi")
     end
 
     it "preserves trailing invisible characters by default (config flag off)" do
@@ -272,8 +157,12 @@ RSpec.describe Markbridge do
   end
 
   describe ".parse_html" do
-    it "returns an AST::Document" do
-      expect(described_class.parse_html("<b>hi</b>")).to be_a(Markbridge::AST::Document)
+    it "returns a Parse with format :html" do
+      result = described_class.parse_html("<b>hi</b>")
+
+      expect(result).to be_a(Markbridge::Parse)
+      expect(result.format).to eq(:html)
+      expect(result.ast).to be_a(Markbridge::AST::Document)
     end
 
     it "raises ArgumentError on nil input" do
@@ -283,22 +172,25 @@ RSpec.describe Markbridge do
       )
     end
 
-    it "uses Markbridge.default_html_handlers when handlers not provided" do
-      # Register a custom handler on the shared default registry
-      described_class.default_html_handlers.register(
+    it "uses the provided handler registry" do
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.new
+      registry.register(
         "b",
         Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Italic),
       )
 
-      doc = described_class.parse_html("<b>hi</b>")
+      result = described_class.parse_html("<b>hi</b>", handlers: registry)
 
-      expect(doc.children.first).to be_a(Markbridge::AST::Italic)
+      expect(result.ast.children.first).to be_a(Markbridge::AST::Italic)
     end
   end
 
   describe ".html_to_markdown" do
-    it "renders HTML to markdown" do
-      expect(described_class.html_to_markdown("<b>hi</b>")).to eq("**hi**")
+    it "renders HTML to a Conversion" do
+      result = described_class.html_to_markdown("<b>hi</b>")
+
+      expect(result).to be_a(Markbridge::Conversion)
+      expect(result.markdown).to eq("**hi**")
     end
 
     it "raises ArgumentError on nil input" do
@@ -312,23 +204,20 @@ RSpec.describe Markbridge do
         Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Italic),
       )
 
-      # With a custom registry mapping <b> to italic, the markdown output uses *_*
-      expect(described_class.html_to_markdown("<b>hi</b>", handlers: registry)).to eq("*hi*")
-    end
+      result = described_class.html_to_markdown("<b>hi</b>", handlers: registry)
 
-    it "uses the provided tag library to render" do
-      library = Markbridge::Renderers::Discourse::TagLibrary.new
-      library.register(Markbridge::AST::Bold, fixed_output_tag.new("BOLDED"))
-
-      expect(described_class.html_to_markdown("<b>hi</b>", tag_library: library)).to eq("BOLDED")
+      expect(result.markdown).to eq("*hi*")
     end
   end
 
   describe ".parse_text_formatter_xml" do
     let(:xml) { "<r><B><s>[b]</s>hi<e>[/b]</e></B></r>" }
 
-    it "returns an AST::Document" do
-      expect(described_class.parse_text_formatter_xml(xml)).to be_a(Markbridge::AST::Document)
+    it "returns a Parse with format :text_formatter_xml" do
+      result = described_class.parse_text_formatter_xml(xml)
+
+      expect(result).to be_a(Markbridge::Parse)
+      expect(result.format).to eq(:text_formatter_xml)
     end
 
     it "raises ArgumentError on nil input" do
@@ -338,25 +227,26 @@ RSpec.describe Markbridge do
       )
     end
 
-    it "uses Markbridge.default_text_formatter_handlers when handlers not provided" do
-      # Register a custom handler on the shared default registry; it must be
-      # picked up by parse_text_formatter_xml (proves the default is reused)
-      described_class.default_text_formatter_handlers.register(
+    it "uses the provided handler registry" do
+      registry = Markbridge::Parsers::TextFormatter::HandlerRegistry.new
+      registry.register(
         "B",
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Italic),
       )
 
-      doc = described_class.parse_text_formatter_xml(xml)
+      result = described_class.parse_text_formatter_xml(xml, handlers: registry)
 
-      expect(doc.children.first).to be_a(Markbridge::AST::Italic)
+      expect(result.ast.children.first).to be_a(Markbridge::AST::Italic)
     end
   end
 
   describe ".text_formatter_xml_to_markdown" do
     let(:xml) { "<r><B><s>[b]</s>hi<e>[/b]</e></B></r>" }
 
-    it "renders TextFormatter XML to markdown" do
-      expect(described_class.text_formatter_xml_to_markdown(xml)).to eq("**hi**")
+    it "renders TextFormatter XML to a Conversion" do
+      result = described_class.text_formatter_xml_to_markdown(xml)
+
+      expect(result.markdown).to eq("**hi**")
     end
 
     it "raises ArgumentError on nil input" do
@@ -370,22 +260,18 @@ RSpec.describe Markbridge do
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Italic),
       )
 
-      expect(described_class.text_formatter_xml_to_markdown(xml, handlers: registry)).to eq("*hi*")
-    end
+      result = described_class.text_formatter_xml_to_markdown(xml, handlers: registry)
 
-    it "uses the provided tag library to render" do
-      library = Markbridge::Renderers::Discourse::TagLibrary.new
-      library.register(Markbridge::AST::Bold, fixed_output_tag.new("BOLDED"))
-
-      expect(described_class.text_formatter_xml_to_markdown(xml, tag_library: library)).to eq(
-        "BOLDED",
-      )
+      expect(result.markdown).to eq("*hi*")
     end
   end
 
   describe ".parse_mediawiki" do
-    it "returns an AST::Document" do
-      expect(described_class.parse_mediawiki("'''hi'''")).to be_a(Markbridge::AST::Document)
+    it "returns a Parse with format :mediawiki" do
+      result = described_class.parse_mediawiki("'''hi'''")
+
+      expect(result).to be_a(Markbridge::Parse)
+      expect(result.format).to eq(:mediawiki)
     end
 
     it "raises ArgumentError on nil input" do
@@ -396,7 +282,7 @@ RSpec.describe Markbridge do
     end
 
     it "coerces non-string input via to_s" do
-      expect(described_class.parse_mediawiki(123)).to be_a(Markbridge::AST::Document)
+      expect(described_class.parse_mediawiki(123).ast).to be_a(Markbridge::AST::Document)
     end
 
     it "forwards the inline_tag_registry kwarg to the parser" do
@@ -405,31 +291,21 @@ RSpec.describe Markbridge do
           r.register("highlight", :formatting, Markbridge::AST::Bold)
         end
 
-      doc =
+      result =
         described_class.parse_mediawiki("<highlight>x</highlight>", inline_tag_registry: registry)
-      paragraph = doc.children.first
-      # Custom registry maps <highlight> to Bold; default registry doesn't
-      # know the tag and would have left it as literal text.
+      paragraph = result.ast.children.first
+
       expect(paragraph.children.first).to be_a(Markbridge::AST::Bold)
     end
   end
 
   describe ".mediawiki_to_markdown" do
-    it "renders MediaWiki to markdown" do
-      expect(described_class.mediawiki_to_markdown("'''hi'''")).to eq("**hi**")
+    it "renders MediaWiki to a Conversion" do
+      expect(described_class.mediawiki_to_markdown("'''hi'''").markdown).to eq("**hi**")
     end
 
     it "raises ArgumentError on nil input" do
       expect { described_class.mediawiki_to_markdown(nil) }.to raise_error(ArgumentError)
-    end
-
-    it "uses the provided tag library to render" do
-      library = Markbridge::Renderers::Discourse::TagLibrary.new
-      library.register(Markbridge::AST::Bold, fixed_output_tag.new("BOLDED"))
-
-      expect(described_class.mediawiki_to_markdown("'''hi'''", tag_library: library)).to eq(
-        "BOLDED",
-      )
     end
 
     it "forwards the inline_tag_registry kwarg through to the parser" do
@@ -443,25 +319,22 @@ RSpec.describe Markbridge do
           "<highlight>x</highlight>",
           inline_tag_registry: registry,
         )
-      # Custom registry parses <highlight> as Bold, which renders to **x**.
-      # Without forwarding, the tag would survive as literal text.
-      expect(result).to eq("**x**")
+
+      expect(result.markdown).to eq("**x**")
     end
   end
 
   describe "cleanup behavior in *_to_markdown methods" do
     it "removes whitespace-only lines (preserving multiple of them)" do
-      # gsub vs sub: with sub only the first occurrence is replaced; gsub catches them all
-      expect(described_class.bbcode_to_markdown("a\n   \nb\n\t\nc")).to eq("a\n\nb\n\nc")
+      expect(described_class.bbcode_to_markdown("a\n   \nb\n\t\nc").markdown).to eq("a\n\nb\n\nc")
     end
 
     it "collapses every run of 3+ newlines, not just the first" do
-      # Two distinct runs of 3+ newlines must both be reduced
-      expect(described_class.bbcode_to_markdown("a\n\n\nb\n\n\nc")).to eq("a\n\nb\n\nc")
+      expect(described_class.bbcode_to_markdown("a\n\n\nb\n\n\nc").markdown).to eq("a\n\nb\n\nc")
     end
 
     it "preserves paragraph breaks (single blank line) without collapsing" do
-      expect(described_class.bbcode_to_markdown("a\n\nb")).to eq("a\n\nb")
+      expect(described_class.bbcode_to_markdown("a\n\nb").markdown).to eq("a\n\nb")
     end
   end
 
@@ -469,12 +342,10 @@ RSpec.describe Markbridge do
     it "calls to_s on the input (not on Markbridge itself)" do
       wrapper = StringWrapper.new("'''hi'''")
 
-      doc = described_class.parse_mediawiki(wrapper)
+      result = described_class.parse_mediawiki(wrapper)
 
-      # If `input.to_s` were replaced with `self.to_s`, the parsed document would
-      # contain the literal text "Markbridge" instead of a Bold inside a Paragraph
-      expect(doc.children.first).to be_a(Markbridge::AST::Paragraph)
-      expect(doc.children.first.children.first).to be_a(Markbridge::AST::Bold)
+      expect(result.ast.children.first).to be_a(Markbridge::AST::Paragraph)
+      expect(result.ast.children.first.children.first).to be_a(Markbridge::AST::Bold)
     end
   end
 

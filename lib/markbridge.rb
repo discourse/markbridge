@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "markbridge/version"
-require_relative "markbridge/configuration"
+require_relative "markbridge/parse"
+require_relative "markbridge/conversion"
 
 require_relative "markbridge/ast"
 require_relative "markbridge/renderers/discourse"
@@ -9,151 +10,140 @@ require_relative "markbridge/processors"
 
 module Markbridge
   class << self
-    # Parse BBCode to AST
+    # Parse BBCode to AST.
+    #
     # @param input [String] BBCode source
-    # @param handlers [HandlerRegistry, nil] custom handler registry or use default
-    # @return [AST::Document]
+    # @param handlers [Parsers::BBCode::HandlerRegistry, nil] custom handlers (defaults to .default)
+    # @return [Parse]
     def parse_bbcode(input, handlers: nil)
-      handlers ||= default_handlers
-      parse_with(Parsers::BBCode::Parser, input, handlers:)
+      raise ArgumentError, "input cannot be nil" if input.nil?
+
+      handlers ||= Parsers::BBCode::HandlerRegistry.default
+      parser = Parsers::BBCode::Parser.new(handlers:)
+      ast = parser.parse(input.to_s)
+
+      Parse.new(
+        ast:,
+        format: :bbcode,
+        unknown_tags: parser.unknown_tags.dup,
+        diagnostics: bbcode_diagnostics(parser),
+      )
     end
 
-    # Convert BBCode to Discourse Markdown
+    # Convert BBCode to Discourse Markdown.
+    #
     # @param input [String] BBCode source
-    # @param handlers [HandlerRegistry, nil] custom handler registry or use default
-    # @param tag_library [TagLibrary, nil] custom tag library or use default
-    # @return [String] Markdown output
-    def bbcode_to_markdown(input, handlers: nil, tag_library: nil)
-      ast = parse_bbcode(input, handlers:)
-      render_to_markdown(ast, tag_library:)
+    # @param handlers [Parsers::BBCode::HandlerRegistry, nil] custom handlers
+    # @return [Conversion]
+    def bbcode_to_markdown(input, handlers: nil)
+      parse = parse_bbcode(input, handlers:)
+      build_conversion(parse)
     end
 
-    # Parse HTML to AST
+    # Parse HTML to AST.
+    #
     # @param input [String] HTML source
-    # @param handlers [HandlerRegistry, nil] custom handler registry or use default
-    # @return [AST::Document]
+    # @param handlers [Parsers::HTML::HandlerRegistry, nil] custom handlers
+    # @return [Parse]
     def parse_html(input, handlers: nil)
-      handlers ||= default_html_handlers
-      parse_with(Parsers::HTML::Parser, input, handlers:)
+      raise ArgumentError, "input cannot be nil" if input.nil?
+
+      handlers ||= Parsers::HTML::HandlerRegistry.default
+      parser = Parsers::HTML::Parser.new(handlers:)
+      ast = parser.parse(input.to_s)
+
+      Parse.new(ast:, format: :html, unknown_tags: parser.unknown_tags.dup, diagnostics: {})
     end
 
-    # Convert HTML to Discourse Markdown
+    # Convert HTML to Discourse Markdown.
+    #
     # @param input [String] HTML source
-    # @param handlers [HandlerRegistry, nil] custom handler registry or use default
-    # @param tag_library [TagLibrary, nil] custom tag library or use default
-    # @return [String] Markdown output
-    def html_to_markdown(input, handlers: nil, tag_library: nil)
-      ast = parse_html(input, handlers:)
-      render_to_markdown(ast, tag_library:)
+    # @param handlers [Parsers::HTML::HandlerRegistry, nil] custom handlers
+    # @return [Conversion]
+    def html_to_markdown(input, handlers: nil)
+      parse = parse_html(input, handlers:)
+      build_conversion(parse)
     end
 
-    # Parse s9e/TextFormatter XML to AST
-    # @param input [String] XML source in s9e/TextFormatter format
-    # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handler registry or use default
-    # @return [AST::Document]
+    # Parse s9e/TextFormatter XML to AST.
+    #
+    # @param input [String] XML source
+    # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handlers
+    # @return [Parse]
     def parse_text_formatter_xml(input, handlers: nil)
-      handlers ||= default_text_formatter_handlers
-      parse_with(Parsers::TextFormatter::Parser, input, handlers:)
+      raise ArgumentError, "input cannot be nil" if input.nil?
+
+      handlers ||= Parsers::TextFormatter::HandlerRegistry.default
+      parser = Parsers::TextFormatter::Parser.new(handlers:)
+      ast = parser.parse(input.to_s)
+
+      Parse.new(
+        ast:,
+        format: :text_formatter_xml,
+        unknown_tags: parser.unknown_tags.dup,
+        diagnostics: {
+        },
+      )
     end
 
-    # Convert s9e/TextFormatter XML to Discourse Markdown
-    # @param input [String] XML source in s9e/TextFormatter format
-    # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handler registry or use default
-    # @param tag_library [TagLibrary, nil] custom tag library or use default
-    # @return [String] Markdown output
-    def text_formatter_xml_to_markdown(input, handlers: nil, tag_library: nil)
-      ast = parse_text_formatter_xml(input, handlers:)
-      render_to_markdown(ast, tag_library:)
+    # Convert s9e/TextFormatter XML to Discourse Markdown.
+    #
+    # @param input [String] XML source
+    # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handlers
+    # @return [Conversion]
+    def text_formatter_xml_to_markdown(input, handlers: nil)
+      parse = parse_text_formatter_xml(input, handlers:)
+      build_conversion(parse)
     end
 
-    # Parse MediaWiki wikitext to AST
+    # Parse MediaWiki wikitext to AST.
+    #
     # @param input [String] MediaWiki source
-    # @param inline_tag_registry [Parsers::MediaWiki::InlineTagRegistry, nil] custom registry
-    # @return [AST::Document]
+    # @param inline_tag_registry [Parsers::MediaWiki::InlineTagRegistry, nil]
+    # @return [Parse]
     def parse_mediawiki(input, inline_tag_registry: nil)
       raise ArgumentError, "input cannot be nil" if input.nil?
 
-      input = input.to_s
       parser = Parsers::MediaWiki::Parser.new(inline_tag_registry:)
-      parser.parse(input)
+      ast = parser.parse(input.to_s)
+
+      Parse.new(ast:, format: :mediawiki, unknown_tags: {}, diagnostics: {})
     end
 
-    # Convert MediaWiki wikitext to Discourse Markdown
+    # Convert MediaWiki wikitext to Discourse Markdown.
+    #
     # @param input [String] MediaWiki source
-    # @param inline_tag_registry [Parsers::MediaWiki::InlineTagRegistry, nil] custom registry
-    # @param tag_library [TagLibrary, nil] custom tag library or use default
-    # @return [String] Markdown output
-    def mediawiki_to_markdown(input, inline_tag_registry: nil, tag_library: nil)
-      ast = parse_mediawiki(input, inline_tag_registry:)
-      render_to_markdown(ast, tag_library:)
-    end
-
-    # Get default handler registry
-    # @return [Parsers::BBCode::HandlerRegistry]
-    def default_handlers
-      @default_handlers ||= Parsers::BBCode::HandlerRegistry.default
-    end
-
-    # Get default HTML handler registry
-    # @return [Parsers::HTML::HandlerRegistry]
-    def default_html_handlers
-      @default_html_handlers ||= Parsers::HTML::HandlerRegistry.default
-    end
-
-    # Get default tag library
-    # @return [Renderers::Discourse::TagLibrary]
-    def default_tag_library
-      @default_tag_library ||= Renderers::Discourse::TagLibrary.default
-    end
-
-    # Get default s9e/TextFormatter handler registry
-    # @return [Parsers::TextFormatter::HandlerRegistry]
-    def default_text_formatter_handlers
-      @default_text_formatter_handlers ||= Parsers::TextFormatter::HandlerRegistry.default
-    end
-
-    # Get the global configuration
-    # @return [Configuration]
-    def configuration
-      @configuration ||= Configuration.new
-    end
-
-    # Configure Markbridge with a block
-    # @yield [Configuration]
-    def configure
-      yield configuration
-    end
-
-    # Reset defaults (useful for testing)
-    def reset_defaults!
-      @default_handlers = nil
-      @default_html_handlers = nil
-      @default_tag_library = nil
-      @default_text_formatter_handlers = nil
-      @configuration = nil
+    # @param inline_tag_registry [Parsers::MediaWiki::InlineTagRegistry, nil]
+    # @return [Conversion]
+    def mediawiki_to_markdown(input, inline_tag_registry: nil)
+      parse = parse_mediawiki(input, inline_tag_registry:)
+      build_conversion(parse)
     end
 
     private
 
-    def parse_with(parser_class, input, handlers:)
-      raise ArgumentError, "input cannot be nil" if input.nil?
-
-      parser = parser_class.new(handlers:)
-      parser.parse(input.to_s)
+    def bbcode_diagnostics(parser)
+      {
+        auto_closed_tags_count: parser.auto_closed_tags_count,
+        depth_exceeded_count: parser.depth_exceeded_count,
+        unclosed_raw_tags: parser.unclosed_raw_tags.dup,
+      }
     end
 
-    def render_to_markdown(ast, tag_library:)
-      tag_library ||= default_tag_library
-      renderer = build_renderer(tag_library:)
-      cleanup_markdown(renderer.render(ast))
-    end
+    def build_conversion(parse)
+      renderer = Renderers::Discourse::Renderer.new
+      markdown = cleanup_markdown(renderer.render(parse.ast))
 
-    def build_renderer(tag_library:)
-      escaper =
-        Renderers::Discourse::MarkdownEscaper.new(
-          escape_hard_line_breaks: configuration.escape_hard_line_breaks,
-        )
-      Renderers::Discourse::Renderer.new(tag_library:, escaper:)
+      Conversion.new(
+        markdown:,
+        ast: parse.ast,
+        format: parse.format,
+        unknown_tags: parse.unknown_tags,
+        diagnostics: parse.diagnostics,
+        emissions: {
+        },
+        errors: [],
+      )
     end
 
     # Trailing-invisibles set, applied only when opted into via

@@ -59,8 +59,7 @@ module Markbridge
         # Create the default tag library for Discourse Markdown.
         #
         # Each call returns a *fresh* instance — mutations made to one will
-        # not be visible to another. If you want a process-wide singleton,
-        # use {Markbridge.default_tag_library} instead, which memoizes.
+        # not be visible to another.
         #
         # @return [TagLibrary]
         def self.default
