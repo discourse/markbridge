@@ -40,7 +40,7 @@ Exceeding the max nesting depth raises `MaxDepthExceededError`. The auto-close d
 Markbridge targets Ruby 3.3+ on CRuby, and also runs on the latest TruffleRuby and JRuby (their own JITs cover the hot paths). On CRuby, enabling YJIT gives a consistent speedup on the parsing and rendering hot paths:
 
 ```bash
-ruby --yjit -Ilib -rmarkbridge/all your_script.rb
+ruby --yjit your_script.rb
 ```
 
 Or in-process:
@@ -74,7 +74,7 @@ The numbers that matter are from your data. A minimal script:
 
 ```ruby
 require "benchmark"
-require "markbridge/all"
+require "markbridge/bbcode"
 
 inputs = File.readlines("corpus.txt", chomp: true)
 
