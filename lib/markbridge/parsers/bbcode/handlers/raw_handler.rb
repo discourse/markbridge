@@ -32,10 +32,25 @@ module Markbridge
           private
 
           def create_element(token:, content:)
-            language = token.attrs[:lang] || token.attrs[:option]
-            element = @element_class.new(language:)
+            element =
+              if accepts_language?
+                @element_class.new(language: token.attrs[:lang] || token.attrs[:option])
+              else
+                @element_class.new
+              end
             element << AST::Text.new(content) unless content.empty?
             element
+          end
+
+          # Cache the introspection — the AST class doesn't change for
+          # the lifetime of this handler.
+          def accepts_language?
+            return @accepts_language if defined?(@accepts_language)
+
+            @accepts_language =
+              @element_class.instance_method(:initialize).parameters.any? do |_kind, name|
+                name == :language
+              end
           end
         end
       end
