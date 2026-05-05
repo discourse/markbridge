@@ -53,6 +53,14 @@ RubyVM::YJIT.enable if defined?(RubyVM::YJIT)
 
 Markbridge renders fully in memory — no streaming API. For a single post this is negligible; for a batch of millions, stream at the caller:
 
+<!-- spec:before
+require "csv"
+csv_data = "id,body\n1,[b]hi[/b]\n"
+CSV.define_singleton_method(:foreach) do |_path, **opts, &block|
+  CSV.parse(csv_data, **opts, &block)
+end
+output_db = Class.new { def insert(*); end }.new
+-->
 ```ruby
 CSV.foreach("posts.csv", headers: true) do |row|
   markdown = Markbridge.bbcode_to_markdown(row["body"])
@@ -72,6 +80,9 @@ If you pass a custom `handlers:` or `tag_library:`, build it once outside the lo
 
 The numbers that matter are from your data. A minimal script:
 
+<!-- spec:before
+File.define_singleton_method(:readlines) { |_path, **| ["[b]hi[/b]", "[i]world[/i]"] }
+-->
 ```ruby
 require "benchmark"
 require "markbridge/bbcode"
