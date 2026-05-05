@@ -101,7 +101,7 @@ module Markbridge
 
           # Process element with registered handler
           # Handler returns element if children should be processed, nil otherwise
-          result_element = @handlers.process_element(element, ast_parent)
+          result_element = @handlers.process_element(element, ast_parent, self)
 
           if result_element
             # Handler succeeded and returned element - process children into it

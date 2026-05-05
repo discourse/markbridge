@@ -113,7 +113,7 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
     it "does not track a registered handler as unknown even when it returns nil" do
       void_handler =
         Class.new(Markbridge::Parsers::TextFormatter::Handlers::BaseHandler) do
-          def process(element:, parent:)
+          def process(element:, parent:, processor: nil)
             nil
           end
         end
@@ -164,6 +164,29 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
       parser.process_children(xml, parent)
 
       expect(parent.children.map(&:class)).to eq([Markbridge::AST::Text, Markbridge::AST::Bold])
+    end
+  end
+
+  describe "lambda handlers" do
+    it "passes element:, parent:, processor: to lambda handlers and lets them recurse via processor.process_children" do
+      parser =
+        described_class.new do |r|
+          r.register(
+            "WRAP",
+            ->(element:, parent:, processor:) do
+              wrapper = Markbridge::AST::Bold.new
+              parent << wrapper
+              processor.process_children(element, wrapper)
+              nil # signal "no further processing"
+            end,
+          )
+        end
+
+      doc = parser.parse("<r><WRAP><I>x</I></WRAP></r>")
+      wrap = doc.children.first
+
+      expect(wrap).to be_a(Markbridge::AST::Bold)
+      expect(wrap.children.first).to be_a(Markbridge::AST::Italic)
     end
   end
 end

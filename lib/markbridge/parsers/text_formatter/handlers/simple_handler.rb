@@ -21,7 +21,7 @@ module Markbridge
           # Process the element by creating an AST node and processing children
           # @param element [Nokogiri::XML::Element]
           # @param parent [AST::Element]
-          def process(element:, parent:)
+          def process(element:, parent:, processor: nil)
             node = @element_class.new
             parent << node
 

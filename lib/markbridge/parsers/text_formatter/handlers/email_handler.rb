@@ -10,7 +10,7 @@ module Markbridge
             @element_class = AST::Email
           end
 
-          def process(element:, parent:)
+          def process(element:, parent:, processor: nil)
             attrs = extract_attributes(element)
             node = AST::Email.new(address: attrs[:email])
             parent << node
