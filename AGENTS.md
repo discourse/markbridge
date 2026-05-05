@@ -47,5 +47,7 @@ is fine). Prefer adding tests over refactoring when behavior is equivalent.
 
 - `docs/` — architecture, AST, parsers, renderers, extending, performance.
 - `examples/` — runnable end-to-end examples.
-- `spec/` — executable documentation. Three tiers: `spec/unit/`, `spec/integration/`,
-  `spec/system/`.
+- `spec/` — executable documentation. Tiers: `spec/unit/` (class isolation),
+  `spec/integration/` (component interactions), `spec/system/` (end-to-end
+  format → Markdown), `spec/docs/` (cross-checks between code and the docs site,
+  e.g. AST class coverage).
