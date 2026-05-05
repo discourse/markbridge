@@ -5,7 +5,9 @@ require "nokogiri"
 RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
   let(:registry) { described_class.default }
   let(:parent) { Markbridge::AST::Document.new }
-  let(:processor) { instance_double(Markbridge::Parsers::TextFormatter::Parser, process_children: nil) }
+  let(:processor) do
+    instance_double(Markbridge::Parsers::TextFormatter::Parser, process_children: nil)
+  end
 
   def process_and_get_node(xml_string)
     xml = Nokogiri.XML(xml_string).root
@@ -19,7 +21,9 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       xml = Nokogiri.XML("<custom/>").root
       fake_node = Markbridge::AST::Text.new("x")
       registry.register("custom", handler)
-      allow(handler).to receive(:process).with(element: xml, parent:, processor:).and_return(fake_node)
+      allow(handler).to receive(:process).with(element: xml, parent:, processor:).and_return(
+        fake_node,
+      )
 
       expect(registry.process_element(xml, parent, processor)).to eq(fake_node)
     end
@@ -33,7 +37,10 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
     it "calls a Proc/lambda handler with element:, parent:, processor:" do
       xml = Nokogiri.XML("<custom/>").root
       seen = nil
-      registry.register("custom", ->(element:, parent:, processor:) { seen = [element, parent, processor] })
+      registry.register(
+        "custom",
+        ->(element:, parent:, processor:) { seen = [element, parent, processor] },
+      )
 
       registry.process_element(xml, parent, processor)
 
@@ -184,7 +191,9 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       xml = Nokogiri.XML("<B/>").root
       replacement = Markbridge::AST::Text.new("replaced")
       registry.register("B", new_handler)
-      allow(new_handler).to receive(:process).with(element: xml, parent:, processor:).and_return(replacement)
+      allow(new_handler).to receive(:process).with(element: xml, parent:, processor:).and_return(
+        replacement,
+      )
 
       expect(registry.process_element(xml, parent, processor)).to eq(replacement)
     end

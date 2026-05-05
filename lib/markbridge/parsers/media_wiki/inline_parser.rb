@@ -117,9 +117,11 @@ module Markbridge
             return
           end
 
-          InlineParser
-            .new(handlers: @registry, depth: @depth + 1, unknown_tags: @unknown_tags)
-            .parse(content, parent:)
+          InlineParser.new(
+            handlers: @registry,
+            depth: @depth + 1,
+            unknown_tags: @unknown_tags,
+          ).parse(content, parent:)
         end
 
         # Collect text until we find n consecutive apostrophes.

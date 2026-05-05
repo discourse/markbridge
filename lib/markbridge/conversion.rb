@@ -20,15 +20,7 @@ module Markbridge
   #   @return [Array<StandardError>] render-time errors collected when
   #     +raise_on_error: false+ was passed; empty otherwise.
   Conversion =
-    Data.define(
-      :markdown,
-      :ast,
-      :format,
-      :unknown_tags,
-      :diagnostics,
-      :emissions,
-      :errors,
-    ) do
+    Data.define(:markdown, :ast, :format, :unknown_tags, :diagnostics, :emissions, :errors) do
       # Allows +puts result+ and +"text: #{result}"+ to work seamlessly.
       def to_s
         markdown

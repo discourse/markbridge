@@ -37,9 +37,7 @@ module Markbridge
         # @param mapping [Hash{Class => Tag, nil}]
         # @return [self]
         def merge(mapping)
-          mapping.each do |klass, tag|
-            tag.nil? ? unregister(klass) : register(klass, tag)
-          end
+          mapping.each { |klass, tag| tag.nil? ? unregister(klass) : register(klass, tag) }
           self
         end
 

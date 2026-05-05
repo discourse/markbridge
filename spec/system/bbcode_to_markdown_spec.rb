@@ -370,7 +370,9 @@ RSpec.describe "BBCode to Markdown Conversion" do
 
     it "separates two consecutive named quotes with a blank line" do
       result = Markbridge.bbcode_to_markdown("[quote=A]first[/quote][quote=B]second[/quote]")
-      expect(result.markdown).to eq("[quote=\"A\"]\nfirst\n[/quote]\n\n[quote=\"B\"]\nsecond\n[/quote]")
+      expect(result.markdown).to eq(
+        "[quote=\"A\"]\nfirst\n[/quote]\n\n[quote=\"B\"]\nsecond\n[/quote]",
+      )
     end
 
     it "separates a plain quote from trailing text with a blank line" do

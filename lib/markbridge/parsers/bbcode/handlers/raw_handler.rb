@@ -48,9 +48,10 @@ module Markbridge
             return @accepts_language if defined?(@accepts_language)
 
             @accepts_language =
-              @element_class.instance_method(:initialize).parameters.any? do |_kind, name|
-                name == :language
-              end
+              @element_class
+                .instance_method(:initialize)
+                .parameters
+                .any? { |_kind, name| name == :language }
           end
         end
       end
