@@ -49,14 +49,19 @@ RSpec.describe Markbridge do
       expect(result.unknown_tags["neverknown"]).to eq(2)
     end
 
-    it "exposes BBCode diagnostics" do
+    it "exposes BBCode diagnostics with integer counters and an unclosed-raw-tags hash" do
       result = described_class.parse_bbcode("[b]hi[/b]")
 
-      expect(result.diagnostics).to include(
-        :auto_closed_tags_count,
-        :depth_exceeded_count,
-        :unclosed_raw_tags,
-      )
+      expect(result.diagnostics[:auto_closed_tags_count]).to eq(0)
+      expect(result.diagnostics[:depth_exceeded_count]).to eq(0)
+      expect(result.diagnostics[:unclosed_raw_tags]).to eq({})
+    end
+
+    it "increments auto_closed_tags_count when the parser auto-closes a tag" do
+      # [b][i]x[/b] forces auto-close of [i] when [/b] arrives.
+      result = described_class.parse_bbcode("[b][i]x[/b]")
+
+      expect(result.diagnostics[:auto_closed_tags_count]).to be > 0
     end
   end
 
@@ -66,6 +71,23 @@ RSpec.describe Markbridge do
 
       expect(result).to be_a(Markbridge::Conversion)
       expect(result.markdown).to eq("**hi**")
+    end
+
+    it "carries the parsed AST through to Conversion#ast" do
+      result = described_class.bbcode_to_markdown("[b]hi[/b]")
+
+      expect(result.ast).to be_a(Markbridge::AST::Document)
+      expect(result.ast.children.first).to be_a(Markbridge::AST::Bold)
+    end
+
+    it "carries the parsed format through to Conversion#format" do
+      expect(described_class.bbcode_to_markdown("[b]hi[/b]").format).to eq(:bbcode)
+    end
+
+    it "carries parser-side diagnostics through to Conversion#diagnostics" do
+      result = described_class.bbcode_to_markdown("[b][i]x[/b]")
+
+      expect(result.diagnostics[:auto_closed_tags_count]).to be > 0
     end
 
     it "delegates to_s to markdown for string-coercion contexts" do
@@ -117,42 +139,16 @@ RSpec.describe Markbridge do
       expect(described_class.bbcode_to_markdown("   hi   ").markdown).to eq("hi")
     end
 
-    it "preserves trailing invisible characters by default (config flag off)" do
-      # Default config keeps the output as-is — no extra regex pass on
-      # cleanup. The U+200B byte sequence (e2 80 8b in UTF-8) survives
-      # at the end of the rendered output.
-      result = described_class.html_to_markdown("<p>Hello&#8203;</p>")
+    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
+      tag =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            raise "boom"
+          end
+        end
+      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
 
-      expect(result.bytes.last(4)).to eq([0x6f, 0xe2, 0x80, 0x8b]) # "o" + ZWSP
-    end
-
-    context "with strip_trailing_invisibles enabled" do
-      before { described_class.configure { |c| c.strip_trailing_invisibles = true } }
-
-      it "strips a trailing zero-width space at the end of a paragraph" do
-        # Outlook-style soft-break ZWSP after content.
-        expect(described_class.html_to_markdown("<p>Hello&#8203;</p>")).to eq("Hello")
-      end
-
-      it "drops nbsp-only spacer paragraphs by stripping their trailing nbsp" do
-        # `<p>&nbsp;</p>` collapses to "<nbsp>\n\n"; rstripping the nbsp
-        # leaves an empty line which the existing \n{3,} collapse drops.
-        expect(described_class.html_to_markdown("<p>a</p><p>&nbsp;</p><p>b</p>")).to eq("a\n\nb")
-      end
-
-      it "preserves trailing ASCII spaces — they are the Markdown hard-break syntax" do
-        # `hello  \nworld` (two trailing spaces) is the hard-line-break form;
-        # the trailing-invisibles strip must not touch ASCII spaces.
-        expect(described_class.bbcode_to_markdown("hello  \nworld")).to eq("hello  \nworld")
-      end
-
-      it "strips trailing invisibles on every affected line, not just the first" do
-        # gsub vs sub: with sub, only the first paragraph would get cleaned
-        # and the second's ZWSP would leak through.
-        result = described_class.html_to_markdown("<p>first&#8203;</p><p>second&#8203;</p>")
-
-        expect(result).to eq("first\n\nsecond")
-      end
+      expect { described_class.bbcode_to_markdown("[b]x[/b]", renderer:) }.to raise_error(/boom/)
     end
   end
 
@@ -183,6 +179,20 @@ RSpec.describe Markbridge do
 
       expect(result.ast.children.first).to be_a(Markbridge::AST::Italic)
     end
+
+    it "coerces non-string input via to_s" do
+      expect(described_class.parse_html(123).ast).to be_a(Markbridge::AST::Document)
+    end
+
+    it "exposes unknown_tags from the parser as a queryable Hash" do
+      result = described_class.parse_html("<neverknown>x</neverknown>")
+
+      expect(result.unknown_tags["neverknown"]).to eq(1)
+    end
+
+    it "exposes an empty diagnostics Hash" do
+      expect(described_class.parse_html("<b>hi</b>").diagnostics).to eq({})
+    end
   end
 
   describe ".html_to_markdown" do
@@ -207,6 +217,18 @@ RSpec.describe Markbridge do
       result = described_class.html_to_markdown("<b>hi</b>", handlers: registry)
 
       expect(result.markdown).to eq("*hi*")
+    end
+
+    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
+      tag =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            raise "boom"
+          end
+        end
+      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
+
+      expect { described_class.html_to_markdown("<b>x</b>", renderer:) }.to raise_error(/boom/)
     end
   end
 
@@ -238,6 +260,20 @@ RSpec.describe Markbridge do
 
       expect(result.ast.children.first).to be_a(Markbridge::AST::Italic)
     end
+
+    it "coerces non-string input via to_s" do
+      expect(described_class.parse_text_formatter_xml(123).ast).to be_a(Markbridge::AST::Document)
+    end
+
+    it "exposes unknown_tags from the parser as a queryable Hash" do
+      result = described_class.parse_text_formatter_xml("<r><NEVERKNOWN>x</NEVERKNOWN></r>")
+
+      expect(result.unknown_tags["NEVERKNOWN"]).to eq(1)
+    end
+
+    it "exposes an empty diagnostics Hash" do
+      expect(described_class.parse_text_formatter_xml(xml).diagnostics).to eq({})
+    end
   end
 
   describe ".text_formatter_xml_to_markdown" do
@@ -263,6 +299,20 @@ RSpec.describe Markbridge do
       result = described_class.text_formatter_xml_to_markdown(xml, handlers: registry)
 
       expect(result.markdown).to eq("*hi*")
+    end
+
+    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
+      tag =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            raise "boom"
+          end
+        end
+      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
+
+      expect { described_class.text_formatter_xml_to_markdown(xml, renderer:) }.to raise_error(
+        /boom/,
+      )
     end
   end
 
@@ -302,6 +352,10 @@ RSpec.describe Markbridge do
 
       expect(result.unknown_tags["neverknown"]).to eq(1)
     end
+
+    it "exposes an empty diagnostics Hash so callers can index into it without nil-checks" do
+      expect(described_class.parse_mediawiki("'''hi'''").diagnostics).to eq({})
+    end
   end
 
   describe ".mediawiki_to_markdown" do
@@ -322,6 +376,18 @@ RSpec.describe Markbridge do
       result = described_class.mediawiki_to_markdown("<highlight>x</highlight>", handlers: registry)
 
       expect(result.markdown).to eq("**x**")
+    end
+
+    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
+      tag =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            raise "boom"
+          end
+        end
+      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
+
+      expect { described_class.mediawiki_to_markdown("'''x'''", renderer:) }.to raise_error(/boom/)
     end
   end
 

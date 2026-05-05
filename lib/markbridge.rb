@@ -18,14 +18,13 @@ module Markbridge
     def parse_bbcode(input, handlers: nil)
       raise ArgumentError, "input cannot be nil" if input.nil?
 
-      handlers ||= Parsers::BBCode::HandlerRegistry.default
       parser = Parsers::BBCode::Parser.new(handlers:)
       ast = parser.parse(input.to_s)
 
       Parse.new(
         ast:,
         format: :bbcode,
-        unknown_tags: parser.unknown_tags.dup,
+        unknown_tags: parser.unknown_tags,
         diagnostics: bbcode_diagnostics(parser),
       )
     end
@@ -54,11 +53,10 @@ module Markbridge
     def parse_html(input, handlers: nil)
       raise ArgumentError, "input cannot be nil" if input.nil?
 
-      handlers ||= Parsers::HTML::HandlerRegistry.default
       parser = Parsers::HTML::Parser.new(handlers:)
       ast = parser.parse(input.to_s)
 
-      Parse.new(ast:, format: :html, unknown_tags: parser.unknown_tags.dup, diagnostics: {})
+      Parse.new(ast:, format: :html, unknown_tags: parser.unknown_tags, diagnostics: {})
     end
 
     # Convert HTML to Discourse Markdown.
@@ -81,14 +79,13 @@ module Markbridge
     def parse_text_formatter_xml(input, handlers: nil)
       raise ArgumentError, "input cannot be nil" if input.nil?
 
-      handlers ||= Parsers::TextFormatter::HandlerRegistry.default
       parser = Parsers::TextFormatter::Parser.new(handlers:)
       ast = parser.parse(input.to_s)
 
       Parse.new(
         ast:,
         format: :text_formatter_xml,
-        unknown_tags: parser.unknown_tags.dup,
+        unknown_tags: parser.unknown_tags,
         diagnostics: {
         },
       )
@@ -117,7 +114,7 @@ module Markbridge
       parser = Parsers::MediaWiki::Parser.new(handlers:)
       ast = parser.parse(input.to_s)
 
-      Parse.new(ast:, format: :mediawiki, unknown_tags: parser.unknown_tags.dup, diagnostics: {})
+      Parse.new(ast:, format: :mediawiki, unknown_tags: parser.unknown_tags, diagnostics: {})
     end
 
     # Convert MediaWiki wikitext to Discourse Markdown.
@@ -224,11 +221,11 @@ module Markbridge
       {
         auto_closed_tags_count: parser.auto_closed_tags_count,
         depth_exceeded_count: parser.depth_exceeded_count,
-        unclosed_raw_tags: parser.unclosed_raw_tags.dup,
+        unclosed_raw_tags: parser.unclosed_raw_tags,
       }
     end
 
-    def build_conversion(parse, renderer: nil, raise_on_error: true)
+    def build_conversion(parse, renderer:, raise_on_error:)
       renderer ||= Renderers::Discourse::Renderer.new
       markdown, errors = render_through(renderer, parse.ast, raise_on_error:)
 
