@@ -42,16 +42,11 @@ module Markbridge
             element
           end
 
-          # Cache the introspection — the AST class doesn't change for
-          # the lifetime of this handler.
           def accepts_language?
-            return @accepts_language if defined?(@accepts_language)
-
-            @accepts_language =
-              @element_class
-                .instance_method(:initialize)
-                .parameters
-                .any? { |_kind, name| name == :language }
+            @element_class
+              .instance_method(:initialize)
+              .parameters
+              .any? { |_kind, name| name == :language }
           end
         end
       end

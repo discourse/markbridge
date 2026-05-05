@@ -504,6 +504,19 @@ RSpec.describe Markbridge::Parsers::BBCode::HandlerRegistry do
       expect(registry["iurl"]).to be(replacement)
     end
 
+    it "yields each name's previously-bound handler when called with an Array" do
+      yielded = []
+      registry.overlay(%w[url link iurl]) do |previous|
+        yielded << previous
+        previous
+      end
+
+      expect(yielded.size).to eq(3)
+      yielded.each do |handler|
+        expect(handler).to be_a(Markbridge::Parsers::BBCode::Handlers::UrlHandler)
+      end
+    end
+
     it "returns self for chaining" do
       result = registry.overlay("url") { |p| p }
       expect(result).to be(registry)

@@ -646,6 +646,19 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
     end
   end
 
+  describe "with rows-less children" do
+    it "returns the empty string for a table whose children are all non-Row" do
+      # The render method's empty_table? predicate must check that no
+      # child is an AST::TableRow specifically — not just that the
+      # children list is non-empty. A bare Text child is not a row,
+      # so the table is effectively empty.
+      table = Markbridge::AST::Table.new
+      table << Markbridge::AST::Text.new("stray")
+
+      expect(tag.render(table, interface)).to eq("")
+    end
+  end
+
   describe "emission scoping" do
     let(:emitting_bold) do
       Class.new(Markbridge::Renderers::Discourse::Tag) do

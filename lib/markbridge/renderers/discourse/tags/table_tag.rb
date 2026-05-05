@@ -16,7 +16,7 @@ module Markbridge
             markdown =
               interface.with_provisional_emissions do |controller|
                 rows_data = extract_rows(element, interface, child_context)
-                next nil if rows_data.empty? || !markdown_compatible?(rows_data, interface)
+                next if rows_data.empty? || !markdown_compatible?(rows_data, interface)
 
                 controller.commit
                 render_markdown(rows_data)

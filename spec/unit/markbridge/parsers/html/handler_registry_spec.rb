@@ -235,6 +235,18 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       expect(registry["b"]).to be(replacement)
     end
 
+    it "yields each name's previously-bound handler when called with an Array" do
+      yielded = []
+      registry.overlay(%w[a img]) do |previous|
+        yielded << previous
+        previous
+      end
+
+      expect(yielded.size).to eq(2)
+      expect(yielded.first).to be_a(Markbridge::Parsers::HTML::Handlers::UrlHandler)
+      expect(yielded.last).to be_a(Markbridge::Parsers::HTML::Handlers::ImageHandler)
+    end
+
     it "returns self for chaining" do
       expect(registry.overlay("a") { |p| p }).to be(registry)
     end

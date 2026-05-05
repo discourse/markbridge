@@ -210,6 +210,16 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
       expect(library[Markbridge::AST::Bold]).to be_nil
     end
 
+    it "removes the class from iteration when given a nil value (vs. registering nil)" do
+      library.register(Markbridge::AST::Bold, bold_tag)
+
+      library.merge(Markbridge::AST::Bold => nil)
+
+      # Iteration must reflect deletion — registering `nil` would leave the
+      # class as a key with a nil value.
+      expect(library.map { |klass, _| klass }).not_to include(Markbridge::AST::Bold)
+    end
+
     it "returns self for chaining" do
       expect(library.merge({})).to be(library)
     end

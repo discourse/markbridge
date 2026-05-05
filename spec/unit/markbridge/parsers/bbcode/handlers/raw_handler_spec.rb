@@ -289,4 +289,40 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::RawHandler do
       expect(document.children.first).to be_an_instance_of(bare_class)
     end
   end
+
+  describe "with an AST class that takes a non-:language kwarg" do
+    let(:other_class) do
+      Class.new(Markbridge::AST::Element) do
+        def initialize(other: nil)
+          super()
+          @other = other
+        end
+      end
+    end
+
+    it "does not pass the lang attr through (the AST class would raise on unknown :language)" do
+      handler = described_class.new(other_class)
+      document = Markbridge::AST::Document.new
+      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+      registry = Markbridge::Parsers::BBCode::HandlerRegistry.new
+
+      open_token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "x",
+          attrs: {
+            lang: "ruby",
+          },
+          pos: 0,
+          source: "[x lang=ruby]",
+        )
+      close_token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "x", pos: 0, source: "[/x]")
+      scanner = MockScanner.new([close_token])
+
+      expect {
+        handler.on_open(token: open_token, context:, registry:, tokens: scanner)
+      }.not_to raise_error
+
+      expect(document.children.first).to be_an_instance_of(other_class)
+    end
+  end
 end

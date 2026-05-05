@@ -79,8 +79,7 @@ module Markbridge
         #   so they can call back into +process_children+ for nested content
         # @return [AST::Element, nil] the created element if children should be processed, nil otherwise
         def process_element(element, parent, processor)
-          tag_name = element.name.upcase
-          handler = @mappings[tag_name]
+          handler = self[element.name]
           return nil unless handler
 
           if handler.respond_to?(:process)
