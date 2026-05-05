@@ -99,7 +99,7 @@ ast = parser.parse("<mark>highlighted</mark>")
 registry = Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
   r.register("mark", :formatting, Markbridge::AST::Bold)
 end
-parser = Markbridge::Parsers::MediaWiki::Parser.new(inline_tag_registry: registry)
+parser = Markbridge::Parsers::MediaWiki::Parser.new(handlers: registry)
 ```
 
 ### Via Top-Level API

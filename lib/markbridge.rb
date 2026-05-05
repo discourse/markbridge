@@ -99,12 +99,12 @@ module Markbridge
     # Parse MediaWiki wikitext to AST.
     #
     # @param input [String] MediaWiki source
-    # @param inline_tag_registry [Parsers::MediaWiki::InlineTagRegistry, nil]
+    # @param handlers [Parsers::MediaWiki::InlineTagRegistry, nil] custom inline-tag registry
     # @return [Parse]
-    def parse_mediawiki(input, inline_tag_registry: nil)
+    def parse_mediawiki(input, handlers: nil)
       raise ArgumentError, "input cannot be nil" if input.nil?
 
-      parser = Parsers::MediaWiki::Parser.new(inline_tag_registry:)
+      parser = Parsers::MediaWiki::Parser.new(handlers:)
       ast = parser.parse(input.to_s)
 
       Parse.new(ast:, format: :mediawiki, unknown_tags: {}, diagnostics: {})
@@ -113,10 +113,10 @@ module Markbridge
     # Convert MediaWiki wikitext to Discourse Markdown.
     #
     # @param input [String] MediaWiki source
-    # @param inline_tag_registry [Parsers::MediaWiki::InlineTagRegistry, nil]
+    # @param handlers [Parsers::MediaWiki::InlineTagRegistry, nil]
     # @return [Conversion]
-    def mediawiki_to_markdown(input, inline_tag_registry: nil)
-      parse = parse_mediawiki(input, inline_tag_registry:)
+    def mediawiki_to_markdown(input, handlers: nil)
+      parse = parse_mediawiki(input, handlers:)
       build_conversion(parse)
     end
 

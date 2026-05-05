@@ -21,13 +21,14 @@ module Markbridge
       #   parser = Markbridge::Parsers::MediaWiki::Parser.new
       #   ast = parser.parse("'''bold''' and ''italic''")
       class Parser
-        # @param inline_tag_registry [InlineTagRegistry, nil] custom registry or use default
+        # @param handlers [InlineTagRegistry, nil] custom registry or use default.
+        #   Named +handlers:+ for consistency with sibling parsers; the
+        #   value is still an +InlineTagRegistry+ instance.
         # @yield [InlineTagRegistry] optional block to customize the default registry
-        def initialize(inline_tag_registry: nil, &block)
+        def initialize(handlers: nil, &block)
           # InlineParser falls back to InlineTagRegistry.default when this is
           # nil, so we don't need to materialise it here.
-          @inline_tag_registry =
-            block_given? ? InlineTagRegistry.build_from_default(&block) : inline_tag_registry
+          @handlers = block_given? ? InlineTagRegistry.build_from_default(&block) : handlers
         end
 
         # Parse MediaWiki wikitext into an AST Document.
@@ -39,7 +40,7 @@ module Markbridge
           lines = normalized.split("\n")
 
           @document = AST::Document.new
-          @inline_parser = InlineParser.new(inline_tag_registry: @inline_tag_registry)
+          @inline_parser = InlineParser.new(handlers: @handlers)
           @list_stack = []
 
           process_lines(lines)
