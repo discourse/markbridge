@@ -27,14 +27,14 @@ gem install markbridge
 ## Your first conversion
 
 ```ruby
-require "markbridge/all"
+require "markbridge/bbcode"
 
 bbcode = "[b]Hello[/b] [url=https://example.com]world[/url]!"
 puts Markbridge.bbcode_to_markdown(bbcode)
 # => **Hello** [world](https://example.com)!
 ```
 
-`require "markbridge/all"` loads every parser and the Discourse renderer. If you only need one format, require it directly — `markbridge/bbcode`, `markbridge/html`, `markbridge/mediawiki`, or `markbridge/textformatter`. Each pulls in the renderer plus that one parser, so HTML and TextFormatter only load Nokogiri when you actually need them.
+`require "markbridge/bbcode"` loads the BBCode parser plus the Discourse renderer. Swap `bbcode` for `html`, `mediawiki`, or `textformatter` for the other formats, or use `markbridge/all` to load all four at once. HTML and TextFormatter pull in Nokogiri; BBCode and MediaWiki don't.
 
 ## The four formats
 
