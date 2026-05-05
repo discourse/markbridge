@@ -12,7 +12,7 @@ The TextFormatter parser reads the XML format produced by <a href="https://githu
 ## Quick start
 
 ```ruby
-require "markbridge/all"
+require "markbridge/textformatter"
 
 xml = "<r><B><s>[b]</s>Hello<e>[/b]</e></B> world!</r>"
 Markbridge.text_formatter_xml_to_markdown(xml)
