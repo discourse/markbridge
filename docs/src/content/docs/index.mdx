@@ -31,7 +31,8 @@ bundle add markbridge
 ## See it in action
 
 ```ruby
-require "markbridge/all"
+require "markbridge/bbcode"
+require "markbridge/html"
 
 Markbridge.bbcode_to_markdown("[b]Hello[/b] [url=https://example.com]world[/url]!")
 # => "**Hello** [world](https://example.com)!"
