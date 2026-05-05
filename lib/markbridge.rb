@@ -36,10 +36,14 @@ module Markbridge
     # @param handlers [Parsers::BBCode::HandlerRegistry, nil] custom handlers
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     #   (build with {.discourse_renderer}); defaults to a fresh default Renderer
+    # @param raise_on_error [Boolean] when true (default), let render-time
+    #   exceptions propagate; when false, swallow them, return whatever
+    #   the renderer produced before failing, and surface them via
+    #   {Conversion#errors}.
     # @return [Conversion]
-    def bbcode_to_markdown(input, handlers: nil, renderer: nil)
+    def bbcode_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
       parse = parse_bbcode(input, handlers:)
-      build_conversion(parse, renderer:)
+      build_conversion(parse, renderer:, raise_on_error:)
     end
 
     # Parse HTML to AST.
@@ -62,10 +66,11 @@ module Markbridge
     # @param input [String] HTML source
     # @param handlers [Parsers::HTML::HandlerRegistry, nil] custom handlers
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
+    # @param raise_on_error [Boolean]
     # @return [Conversion]
-    def html_to_markdown(input, handlers: nil, renderer: nil)
+    def html_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
       parse = parse_html(input, handlers:)
-      build_conversion(parse, renderer:)
+      build_conversion(parse, renderer:, raise_on_error:)
     end
 
     # Parse s9e/TextFormatter XML to AST.
@@ -94,10 +99,11 @@ module Markbridge
     # @param input [String] XML source
     # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handlers
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
+    # @param raise_on_error [Boolean]
     # @return [Conversion]
-    def text_formatter_xml_to_markdown(input, handlers: nil, renderer: nil)
+    def text_formatter_xml_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
       parse = parse_text_formatter_xml(input, handlers:)
-      build_conversion(parse, renderer:)
+      build_conversion(parse, renderer:, raise_on_error:)
     end
 
     # Parse MediaWiki wikitext to AST.
@@ -119,10 +125,11 @@ module Markbridge
     # @param input [String] MediaWiki source
     # @param handlers [Parsers::MediaWiki::InlineTagRegistry, nil]
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
+    # @param raise_on_error [Boolean]
     # @return [Conversion]
-    def mediawiki_to_markdown(input, handlers: nil, renderer: nil)
+    def mediawiki_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
       parse = parse_mediawiki(input, handlers:)
-      build_conversion(parse, renderer:)
+      build_conversion(parse, renderer:, raise_on_error:)
     end
 
     # Convert input in the given format. Thin dispatcher over the
@@ -160,11 +167,11 @@ module Markbridge
     # @param format [Symbol] :discourse (only renderer currently shipped)
     # @param renderer [Renderers::Discourse::Renderer, nil]
     # @return [Conversion]
-    def render(ast, format: :discourse, renderer: nil)
+    def render(ast, format: :discourse, renderer: nil, raise_on_error: true)
       raise ArgumentError, "unknown render format #{format.inspect}" unless format == :discourse
 
       renderer ||= Renderers::Discourse::Renderer.new
-      markdown = renderer.postprocessor.call(renderer.render(ast))
+      markdown, errors = render_through(renderer, ast, raise_on_error:)
 
       Conversion.new(
         markdown:,
@@ -175,7 +182,7 @@ module Markbridge
         diagnostics: {
         },
         emissions: renderer.emissions,
-        errors: [],
+        errors:,
       )
     end
 
@@ -221,9 +228,9 @@ module Markbridge
       }
     end
 
-    def build_conversion(parse, renderer: nil)
+    def build_conversion(parse, renderer: nil, raise_on_error: true)
       renderer ||= Renderers::Discourse::Renderer.new
-      markdown = renderer.postprocessor.call(renderer.render(parse.ast))
+      markdown, errors = render_through(renderer, parse.ast, raise_on_error:)
 
       Conversion.new(
         markdown:,
@@ -232,8 +239,16 @@ module Markbridge
         unknown_tags: parse.unknown_tags,
         diagnostics: parse.diagnostics,
         emissions: renderer.emissions,
-        errors: [],
+        errors:,
       )
+    end
+
+    def render_through(renderer, ast, raise_on_error:)
+      raw = renderer.render(ast)
+      [renderer.postprocessor.call(raw), []]
+    rescue StandardError => e
+      raise if raise_on_error
+      ["", [e]]
     end
   end
 end
