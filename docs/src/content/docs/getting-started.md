@@ -7,7 +7,7 @@ Markbridge converts markup to Discourse-flavored Markdown through a parse → AS
 
 ## Requirements
 
-- Ruby 3.3 or newer
+- Ruby 3.3 or newer (CRuby, or the latest TruffleRuby or JRuby)
 - Bundler
 
 ## Install

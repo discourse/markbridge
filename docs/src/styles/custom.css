@@ -18,3 +18,7 @@
 .nowrap {
   white-space: nowrap;
 }
+
+.site-title {
+  color: var(--sl-color-white);
+}
