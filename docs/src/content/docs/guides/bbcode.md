@@ -105,7 +105,7 @@ renderer.render(ast)
 
 BBCode inputs from real forums often have mismatched or out-of-order tags. Markbridge ships with two strategies:
 
-- **Reordering** (default) — looks ahead up to 5 tokens to reconcile sequences like `[b][i]text[/b][/i]` as `Bold(Italic("text"))`.
+- **Reordering** (default) — reconciles sequences of up to 5 mismatched closing tags, e.g. `[b][i]text[/b][/i]` → `Bold(Italic("text"))`.
 - **Strict** — only auto-closes; won't reorder. More predictable, more likely to reject input.
 
 ```ruby
@@ -135,8 +135,7 @@ Unknown tag counts are available on the parser instance when you call it directl
 ## Limits
 
 - **Max nesting depth**: 100. Exceeding raises `MaxDepthExceededError`.
-- **Max auto-close depth**: 5 levels — guards against runaway auto-closing.
-- **Max peek-ahead** (Reordering): 5 tokens.
+- **Max auto-close depth**: 5 levels — also bounds how deep `Reordering` will look for a matching opener.
 
 ## Customizing
 
