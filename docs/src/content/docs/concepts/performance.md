@@ -31,10 +31,9 @@ A few hard caps prevent pathological input from hanging the parser:
 | Limit | Value | Location |
 |---|---|---|
 | Max nesting depth | 100 | `ParserState` |
-| Max auto-close depth | 5 | `ClosingStrategies::Base` |
-| Max peek-ahead | 5 | `ClosingStrategies::Reordering` |
+| Max auto-close depth | 5 | `ClosingStrategies::TagReconciler` |
 
-Exceeding the max depth raises `MaxDepthExceededError`. The other limits fail quietly — the parser recovers by stopping the auto-close / peek-ahead and continuing.
+Exceeding the max nesting depth raises `MaxDepthExceededError`. The auto-close depth fails quietly — the parser stops searching for a matching opener and continues. The same bound limits how far `Reordering` will peek ahead when reconciling mismatched closes.
 
 ## Ruby version and YJIT
 

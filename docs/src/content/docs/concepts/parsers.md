@@ -17,7 +17,7 @@ A hand-written, two-stage parser:
 **Unique to BBCode:** closing strategies. Real-world BBCode often has mismatched tags (`[b][i]text[/b][/i]`). A `ClosingStrategy` decides how to recover:
 
 - `Strict` — auto-close only.
-- `Reordering` (default) — look ahead up to 5 tokens to match sequences.
+- `Reordering` (default) — reconciles sequences of up to 5 mismatched closing tags by peeking ahead.
 
 **Handler API:** stateful. Handlers push/pop elements on the parser state stack via `on_open` / `on_close` callbacks.
 
