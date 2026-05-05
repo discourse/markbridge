@@ -7,7 +7,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("Hello **world**!\n[example](https://example.com)")
+      expect(result.markdown).to eq("Hello **world**!\n[example](https://example.com)")
     end
 
     it "renders Discourse quote markup when attribution is present" do
@@ -15,7 +15,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("[quote=\"alice, post:123, topic:456\"]\nQuoted text\n[/quote]")
+      expect(result.markdown).to eq("[quote=\"alice, post:123, topic:456\"]\nQuoted text\n[/quote]")
     end
 
     it "renders ordered lists with proper spacing" do
@@ -23,7 +23,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("1. First\n1. Second")
+      expect(result.markdown).to eq("1. First\n1. Second")
     end
 
     it "renders multi-line code blocks with fences" do
@@ -31,22 +31,22 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("```ruby\nputs 'hello'\nputs 'world'\n```")
+      expect(result.markdown).to eq("```ruby\nputs 'hello'\nputs 'world'\n```")
     end
 
     it "converts italic text" do
       result = Markbridge.text_formatter_xml_to_markdown("<r><I>italic</I></r>")
-      expect(result).to eq("*italic*")
+      expect(result.markdown).to eq("*italic*")
     end
 
     it "converts underline text" do
       result = Markbridge.text_formatter_xml_to_markdown("<r><U>underlined</U></r>")
-      expect(result).to eq("[u]underlined[/u]")
+      expect(result.markdown).to eq("[u]underlined[/u]")
     end
 
     it "converts strikethrough text" do
       result = Markbridge.text_formatter_xml_to_markdown("<r><S>deleted</S></r>")
-      expect(result).to eq("~~deleted~~")
+      expect(result.markdown).to eq("~~deleted~~")
     end
 
     it "converts unordered lists" do
@@ -54,7 +54,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("- One\n- Two")
+      expect(result.markdown).to eq("- One\n- Two")
     end
 
     it "converts images" do
@@ -62,7 +62,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("![](https://example.com/photo.jpg)")
+      expect(result.markdown).to eq("![](https://example.com/photo.jpg)")
     end
 
     it "converts email links" do
@@ -70,7 +70,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("[Contact us](mailto:user@example.com)")
+      expect(result.markdown).to eq("[Contact us](mailto:user@example.com)")
     end
 
     it "converts inline code" do
@@ -78,7 +78,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("`var x = 1`")
+      expect(result.markdown).to eq("`var x = 1`")
     end
 
     it "converts nested formatting" do
@@ -86,17 +86,17 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("***bold italic***")
+      expect(result.markdown).to eq("***bold italic***")
     end
 
     it "handles plain text without XML wrapper" do
       result = Markbridge.text_formatter_xml_to_markdown("Just plain text")
-      expect(result).to eq("Just plain text")
+      expect(result.markdown).to eq("Just plain text")
     end
 
     it "handles empty input" do
       result = Markbridge.text_formatter_xml_to_markdown("")
-      expect(result).to eq("")
+      expect(result.markdown).to eq("")
     end
 
     it "converts spoiler tags" do
@@ -104,7 +104,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("[spoiler=Reveal]hidden content[/spoiler]")
+      expect(result.markdown).to eq("[spoiler=Reveal]hidden content[/spoiler]")
     end
 
     it "converts color tags" do
@@ -112,7 +112,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq('<span style="color: red">red text</span>')
+      expect(result.markdown).to eq('<span style="color: red">red text</span>')
     end
 
     it "converts size tags" do
@@ -120,7 +120,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq('<span style="font-size: 20px">big text</span>')
+      expect(result.markdown).to eq('<span style="font-size: 20px">big text</span>')
     end
   end
 
@@ -131,7 +131,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
+      expect(result.markdown).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
     end
 
     it "falls back to HTML for uneven rows" do
@@ -139,7 +139,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result).to include("<table>")
+      expect(result.markdown).to include("<table>")
     end
   end
 end

@@ -7,7 +7,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "**bold text**"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts italic text" do
@@ -15,7 +15,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "*italic text*"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts strikethrough text" do
@@ -23,7 +23,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "~~deleted text~~"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts nested formatting" do
@@ -31,7 +31,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "***bold italic***"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -41,7 +41,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "[Click here](https://example.com)"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts link with no text" do
@@ -49,7 +49,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "[](https://example.com)"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -59,7 +59,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "![](https://example.com/photo.jpg)"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts image with dimensions" do
@@ -67,7 +67,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "![|100x200](photo.jpg)"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -88,7 +88,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       MARKDOWN
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts ordered list" do
@@ -107,7 +107,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       MARKDOWN
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts nested lists" do
@@ -133,7 +133,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       MARKDOWN
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -143,7 +143,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "`var x = 1;`"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts code block" do
@@ -151,7 +151,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "```\nfunction hello() {\n  console.log('hi');\n}\n```"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -161,7 +161,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "> Quoted text"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts blockquote with multiple paragraphs" do
@@ -169,7 +169,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "> First paragraph\n> \n> Second paragraph"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -179,7 +179,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "Line 1\nLine 2"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts horizontal rule" do
@@ -187,7 +187,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "Text\n\n---\n\nMore text"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -209,48 +209,48 @@ RSpec.describe "HTML to Markdown Conversion" do
       MARKDOWN
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
   describe "underline" do
     it "converts underline to [u] BBCode" do
       result = Markbridge.html_to_markdown("<u>underlined text</u>")
-      expect(result).to eq("[u]underlined text[/u]")
+      expect(result.markdown).to eq("[u]underlined text[/u]")
     end
   end
 
   describe "superscript and subscript" do
     it "converts superscript" do
       result = Markbridge.html_to_markdown("<sup>2</sup>")
-      expect(result).to eq("<sup>2</sup>")
+      expect(result.markdown).to eq("<sup>2</sup>")
     end
 
     it "converts subscript" do
       result = Markbridge.html_to_markdown("<sub>2</sub>")
-      expect(result).to eq("<sub>2</sub>")
+      expect(result.markdown).to eq("<sub>2</sub>")
     end
 
     it "handles inline superscript" do
       result = Markbridge.html_to_markdown("x<sup>2</sup> + y<sup>3</sup>")
-      expect(result).to eq("x<sup>2</sup> \\+ y<sup>3</sup>")
+      expect(result.markdown).to eq("x<sup>2</sup> \\+ y<sup>3</sup>")
     end
   end
 
   describe "edge cases" do
     it "handles empty input" do
       result = Markbridge.html_to_markdown("")
-      expect(result).to eq("")
+      expect(result.markdown).to eq("")
     end
 
     it "preserves plain text" do
       result = Markbridge.html_to_markdown("Just plain text")
-      expect(result).to eq("Just plain text")
+      expect(result.markdown).to eq("Just plain text")
     end
 
     it "handles deeply nested formatting" do
       result = Markbridge.html_to_markdown("<b><i><u>deep</u></i></b>")
-      expect(result).to eq("***[u]deep[/u]***")
+      expect(result.markdown).to eq("***[u]deep[/u]***")
     end
   end
 
@@ -260,7 +260,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "**strong text**"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "converts em to italic" do
@@ -268,7 +268,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "*emphasized text*"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -278,7 +278,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "One\n\nTwo"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "handles multiple paragraphs" do
@@ -286,7 +286,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "First\n\nSecond\n\nThird"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "handles paragraphs from minified HTML without whitespace" do
@@ -294,7 +294,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "Paragraph one\n\nParagraph two"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "handles paragraphs with formatted content" do
@@ -302,7 +302,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "**Bold** text\n\n*Italic* text"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -312,7 +312,7 @@ RSpec.describe "HTML to Markdown Conversion" do
 
       result = Markbridge.html_to_markdown(html)
 
-      expect(result).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
+      expect(result.markdown).to eq("| Name | Age |\n| --- | --- |\n| Alice | 30 |")
     end
 
     it "handles thead and tbody" do
@@ -321,7 +321,7 @@ RSpec.describe "HTML to Markdown Conversion" do
 
       result = Markbridge.html_to_markdown(html)
 
-      expect(result).to eq("| A | B |\n| --- | --- |\n| 1 | 2 |")
+      expect(result.markdown).to eq("| A | B |\n| --- | --- |\n| 1 | 2 |")
     end
 
     it "falls back to HTML for uneven rows" do
@@ -329,7 +329,7 @@ RSpec.describe "HTML to Markdown Conversion" do
 
       result = Markbridge.html_to_markdown(html)
 
-      expect(result).to include("<table>")
+      expect(result.markdown).to include("<table>")
     end
 
     it "drops the spurious <p> wrapper when a single paragraph fills a cell" do
@@ -341,8 +341,8 @@ RSpec.describe "HTML to Markdown Conversion" do
 
       result = Markbridge.html_to_markdown(html)
 
-      expect(result).to include("<td>line one<br>line two</td>")
-      expect(result).not_to include("<td><p>")
+      expect(result.markdown).to include("<td>line one<br>line two</td>")
+      expect(result.markdown).not_to include("<td><p>")
     end
   end
 end

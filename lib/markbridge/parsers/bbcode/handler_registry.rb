@@ -69,8 +69,10 @@ module Markbridge
         # Create the default handler registry with common BBCode tags.
         #
         # Each call returns a *fresh* instance — mutations made to one will
-        # not be visible to another. If you want a process-wide singleton,
-        # use {Markbridge.default_handlers} instead, which memoizes.
+        # not be visible to another. Convenience methods on +Markbridge+
+        # build a fresh default registry per call when none is supplied;
+        # to share state across calls, build one once and pass it via
+        # the +handlers:+ kwarg.
         #
         # @param closing_strategy [Object, nil] optional closing strategy to apply, defaults to Reordering strategy
         # @return [HandlerRegistry]
