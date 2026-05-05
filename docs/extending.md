@@ -194,6 +194,26 @@ def self.default
 end
 ```
 
+### Auto-passthrough for unregistered AST classes
+
+A custom AST class that has *no* Tag bound to it doesn't need a
+"passthrough" Tag — `Renderer#render` falls through to
+`render_children` automatically (see `lib/markbridge/renderers/discourse/renderer.rb`).
+You only need to register a Tag when the class needs a non-trivial
+rendering. To remove a built-in binding so this passthrough kicks in,
+use `TagLibrary#unregister`:
+
+```ruby
+library.unregister(AST::Color)  # Color now renders as just its children
+library.unregister(AST::Size)   # Size too
+```
+
+Or, more concisely, via the `Markbridge.discourse_renderer` factory:
+
+```ruby
+Markbridge.discourse_renderer(unregister: [AST::Color, AST::Size])
+```
+
 ### Step 6: Add Requires
 
 **File:** `lib/markbridge/ast.rb`
