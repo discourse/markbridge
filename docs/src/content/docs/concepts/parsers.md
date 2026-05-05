@@ -31,8 +31,12 @@ Thin wrapper over `Nokogiri::HTML.fragment` + a handler registry. Walks the DOM 
 
 Lambdas count as callables, which keeps quick customizations terse:
 
+<!-- spec:before
+require "markbridge/html"
+registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+-->
 ```ruby
-registry.register("aside", ->(element:, parent:) { ... })
+registry.register("aside", ->(element:, parent:) { parent })
 ```
 
 Relies on Nokogiri for malformed-HTML recovery — no need for Markbridge to do its own.

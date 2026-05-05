@@ -64,6 +64,13 @@ This immutability is load-bearing: it keeps the renderer side-effect free during
 
 ## TagLibrary
 
+<!-- spec:before
+class MyBoldTag < Markbridge::Renderers::Discourse::Tag
+  def render(element, interface)
+    "**#{interface.render_children(element)}**"
+  end
+end
+-->
 ```ruby
 library = Markbridge::Renderers::Discourse::TagLibrary.default
 # Contains: BoldTag, ItalicTag, CodeTag, ListTag, UrlTag, QuoteTag, ...
