@@ -37,6 +37,27 @@ module Markbridge
           self
         end
 
+        # Replace the handler bound to one or more tag names by yielding
+        # the previously-bound handler (which may be +nil+) and
+        # registering whatever the block returns. Used to install a
+        # delegating handler that wraps the default.
+        #
+        # @example Wrap the default URL handler
+        #   registry.overlay(%w[url link iurl]) do |default|
+        #     LinkifyingUrlHandler.new(default:)
+        #   end
+        #
+        # @param tag_names [String, Array<String>]
+        # @yieldparam previous [BaseHandler, nil] previously bound handler
+        # @return [self]
+        def overlay(tag_names)
+          Array(tag_names).each do |name|
+            previous = self[name]
+            register(name, yield(previous))
+          end
+          self
+        end
+
         # Get handler for a tag name
         # @param tag_name [String]
         # @return [BaseHandler, nil]
