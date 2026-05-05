@@ -37,6 +37,7 @@ parser =
         node = HighlightNode.new(color: attrs[:color] || "yellow")
         parent << node
         processor.process_children(element, node)
+        nil # signal "no further processing"
       end,
     )
   end
@@ -61,7 +62,7 @@ class CustomQuoteHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHan
     @element_class = Markbridge::AST::Quote
   end
 
-  def process(element:, parent:, processor:)
+  def process(element:, parent:, processor: nil)
     attrs = extract_attributes(element)
     # Add custom logic here - for example, default author to "Anonymous"
     quote =
@@ -72,7 +73,7 @@ class CustomQuoteHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHan
         username: attrs[:username],
       )
     parent << quote
-    processor.process_children(element, quote)
+    quote # returning the node lets the parser process children into it
   end
 
   attr_reader :element_class
@@ -104,7 +105,7 @@ parser =
         element.attributes.each { |name, attr| attrs[name.downcase.to_sym] = attr.value }
         node = Markbridge::AST::Spoiler.new(title: attrs[:title] || "Click to reveal")
         parent << node
-        processor.process_children(element, node)
+        node # parser processes children into the returned node
       end,
     )
 
@@ -115,6 +116,7 @@ parser =
         attrs = {}
         element.attributes.each { |name, attr| attrs[name.downcase.to_sym] = attr.value }
         parent << Markbridge::AST::Text.new("[CUSTOM: #{attrs[:value]}]")
+        nil # leaf — no children to process
       end,
     )
 
@@ -125,6 +127,7 @@ parser =
         attrs = {}
         element.attributes.each { |name, attr| attrs[name.downcase.to_sym] = attr.value }
         parent << Markbridge::AST::Text.new("@#{attrs[:username]}")
+        nil # leaf — no children to process
       end,
     )
   end
@@ -147,12 +150,12 @@ class VideoHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHandler
     @element_class = Markbridge::AST::Url
   end
 
-  def process(element:, parent:, processor:)
+  def process(element:, parent:, processor: nil)
     attrs = extract_attributes(element)
     # Map VIDEO to a URL node (could create custom Video node instead)
     node = Markbridge::AST::Url.new(href: attrs[:url])
     parent << node
-    processor.process_children(element, node)
+    node # parser will process children into the returned node
   end
 
   attr_reader :element_class

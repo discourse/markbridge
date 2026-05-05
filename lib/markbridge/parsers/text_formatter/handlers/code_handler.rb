@@ -10,7 +10,7 @@ module Markbridge
             @element_class = AST::Code
           end
 
-          def process(element:, parent:)
+          def process(element:, parent:, processor: nil)
             attrs = extract_attributes(element)
             lang = attrs[:lang] || attrs[:language]
             node = AST::Code.new(language: lang)
