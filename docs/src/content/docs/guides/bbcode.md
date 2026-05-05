@@ -8,7 +8,7 @@ BBCode is Markbridge's most feature-rich input format. The default handler regis
 ## Quick start
 
 ```ruby
-require "markbridge/all"
+require "markbridge/bbcode"
 
 bbcode = "[b]Hello[/b] [url=https://example.com]world[/url]!"
 Markbridge.bbcode_to_markdown(bbcode)
@@ -109,7 +109,7 @@ BBCode inputs from real forums often have mismatched or out-of-order tags. Markb
 - **Strict** — only auto-closes; won't reorder. More predictable, more likely to reject input.
 
 ```ruby
-require "markbridge/parsers/bbcode"
+require "markbridge/bbcode"
 
 strategy = Markbridge::Parsers::BBCode::ClosingStrategies::Strict.new
 

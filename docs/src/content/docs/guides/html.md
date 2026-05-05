@@ -16,7 +16,7 @@ gem "nokogiri"
 ## Quick start
 
 ```ruby
-require "markbridge/all"
+require "markbridge/html"
 
 Markbridge.html_to_markdown("<p>Hello <strong>world</strong>!</p>")
 # => "Hello **world**!"

@@ -34,7 +34,7 @@ puts Markbridge.bbcode_to_markdown(bbcode)
 # => **Hello** [world](https://example.com)!
 ```
 
-`require "markbridge/all"` loads every parser and the Discourse renderer. If you only need one format, you can `require "markbridge"` plus the specific parser — see the format guides.
+`require "markbridge/all"` loads every parser and the Discourse renderer. If you only need one format, require it directly — `markbridge/bbcode`, `markbridge/html`, `markbridge/mediawiki`, or `markbridge/textformatter`. Each pulls in the renderer plus that one parser, so HTML and TextFormatter only load Nokogiri when you actually need them.
 
 ## The four formats
 

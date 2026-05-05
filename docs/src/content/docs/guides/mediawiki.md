@@ -8,7 +8,7 @@ The MediaWiki parser handles the wikitext subset most commonly found in wiki exp
 ## Quick start
 
 ```ruby
-require "markbridge/all"
+require "markbridge/mediawiki"
 
 Markbridge.mediawiki_to_markdown("'''bold''' and ''italic''")
 # => "**bold** and *italic*"
