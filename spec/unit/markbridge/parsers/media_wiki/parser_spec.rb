@@ -746,12 +746,12 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
   end
 
   describe "constructor customization" do
-    it "accepts a custom inline_tag_registry" do
+    it "accepts a custom handlers registry" do
       registry =
         Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
           r.register("mark", :formatting, Markbridge::AST::Bold)
         end
-      parser = described_class.new(inline_tag_registry: registry)
+      parser = described_class.new(handlers: registry)
       doc = parser.parse("<mark>highlighted</mark>")
 
       paragraph = doc.children.first

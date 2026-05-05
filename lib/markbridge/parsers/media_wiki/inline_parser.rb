@@ -11,12 +11,12 @@ module Markbridge
       #   registry = InlineTagRegistry.build_from_default do |r|
       #     r.register("mark", :formatting, AST::Bold)
       #   end
-      #   parser = InlineParser.new(inline_tag_registry: registry)
+      #   parser = InlineParser.new(handlers: registry)
       class InlineParser
         MAX_INLINE_DEPTH = 20
 
-        def initialize(inline_tag_registry: nil, depth: 0)
-          @registry = inline_tag_registry || InlineTagRegistry.default
+        def initialize(handlers: nil, depth: 0)
+          @registry = handlers || InlineTagRegistry.default
           @depth = depth
         end
 
@@ -110,10 +110,7 @@ module Markbridge
             return
           end
 
-          InlineParser.new(inline_tag_registry: @registry, depth: @depth + 1).parse(
-            content,
-            parent:,
-          )
+          InlineParser.new(handlers: @registry, depth: @depth + 1).parse(content, parent:)
         end
 
         # Collect text until we find n consecutive apostrophes.

@@ -247,14 +247,13 @@ RSpec.describe Markbridge do
       expect(described_class.parse_mediawiki(123).ast).to be_a(Markbridge::AST::Document)
     end
 
-    it "forwards the inline_tag_registry kwarg to the parser" do
+    it "forwards the handlers kwarg to the parser" do
       registry =
         Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
           r.register("highlight", :formatting, Markbridge::AST::Bold)
         end
 
-      result =
-        described_class.parse_mediawiki("<highlight>x</highlight>", inline_tag_registry: registry)
+      result = described_class.parse_mediawiki("<highlight>x</highlight>", handlers: registry)
       paragraph = result.ast.children.first
 
       expect(paragraph.children.first).to be_a(Markbridge::AST::Bold)
@@ -270,17 +269,13 @@ RSpec.describe Markbridge do
       expect { described_class.mediawiki_to_markdown(nil) }.to raise_error(ArgumentError)
     end
 
-    it "forwards the inline_tag_registry kwarg through to the parser" do
+    it "forwards the handlers kwarg through to the parser" do
       registry =
         Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
           r.register("highlight", :formatting, Markbridge::AST::Bold)
         end
 
-      result =
-        described_class.mediawiki_to_markdown(
-          "<highlight>x</highlight>",
-          inline_tag_registry: registry,
-        )
+      result = described_class.mediawiki_to_markdown("<highlight>x</highlight>", handlers: registry)
 
       expect(result.markdown).to eq("**x**")
     end
