@@ -22,3 +22,23 @@
 .site-title {
   color: var(--sl-color-white);
 }
+
+.card {
+  border-color: var(--sl-card-border);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -8px var(--sl-card-border);
+}
+
+/* Preserve the CardGrid `stagger` offset on right-column cards while still lifting 2px. */
+@media (min-width: 50rem) {
+  .card-grid.stagger > .card:nth-child(2n):hover {
+    transform: translateY(calc(var(--stagger-height) - 2px));
+  }
+}
