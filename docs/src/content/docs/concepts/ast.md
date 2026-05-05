@@ -9,11 +9,18 @@ The AST is the pipeline's waist: every parser produces it, and the renderer cons
 
 ```
 AST::Node (base)
-├── AST::Text                  — leaf, holds a string
-├── AST::LineBreak             — leaf
-├── AST::HorizontalRule        — leaf
+├── Leaves
+│   ├── AST::Text                  — string content
+│   ├── AST::MarkdownText          — pre-rendered Markdown passthrough
+│   ├── AST::LineBreak
+│   └── AST::HorizontalRule
+├── Discourse-specific leaves
+│   ├── AST::Event                 — calendar event reference
+│   ├── AST::Mention               — @username reference
+│   ├── AST::Poll                  — Discourse poll reference
+│   └── AST::Upload                — uploaded-file reference
 └── AST::Element (container)
-    ├── AST::Document          — root node
+    ├── AST::Document              — root node
     ├── Inline formatting
     │   ├── AST::Bold
     │   ├── AST::Italic
@@ -21,17 +28,20 @@ AST::Node (base)
     │   ├── AST::Strikethrough
     │   ├── AST::Superscript
     │   └── AST::Subscript
-    ├── Content
-    │   ├── AST::Url           — href attribute
-    │   ├── AST::Image         — src, alt attributes
-    │   ├── AST::Attachment
-    │   ├── AST::Code          — optional lang
-    │   ├── AST::Heading       — level
-    │   ├── AST::Color, AST::Size, AST::Align
+    ├── Block-level
+    │   ├── AST::Paragraph
+    │   ├── AST::Heading           — level
     │   ├── AST::Quote
     │   └── AST::Spoiler
+    ├── Content
+    │   ├── AST::Url               — href attribute
+    │   ├── AST::Email             — email address
+    │   ├── AST::Image             — src, alt attributes
+    │   ├── AST::Attachment
+    │   ├── AST::Code              — optional lang
+    │   └── AST::Color, AST::Size, AST::Align
     ├── Lists
-    │   ├── AST::List          — ordered / unordered
+    │   ├── AST::List              — ordered / unordered
     │   └── AST::ListItem
     └── Tables
         ├── AST::Table
