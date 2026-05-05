@@ -80,11 +80,7 @@ export default defineConfig({
               link: 'https://rubydoc.info/gems/markbridge',
               attrs: { target: '_blank', rel: 'noopener' },
             },
-            {
-              label: 'Releases',
-              link: 'https://github.com/discourse/markbridge/releases',
-              attrs: { target: '_blank', rel: 'noopener' },
-            },
+            { label: 'Changelog', slug: 'changelog' },
           ],
         },
       ],
