@@ -17,6 +17,7 @@ Markbridge.bbcode_to_markdown(bbcode)
 
 To get the AST instead of rendered Markdown:
 
+<!-- spec:continue -->
 ```ruby
 ast = Markbridge.parse_bbcode(bbcode)
 # => AST::Document(Bold("Hello"), Text(" "), Url("world", href: "..."))
@@ -111,11 +112,10 @@ BBCode inputs from real forums often have mismatched or out-of-order tags. Markb
 ```ruby
 require "markbridge/bbcode"
 
-strategy = Markbridge::Parsers::BBCode::ClosingStrategies::Strict.new
-
 handlers =
   Markbridge::Parsers::BBCode::HandlerRegistry.build_from_default do |registry|
-    registry.closing_strategy = strategy
+    reconciler = Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler.new(registry:)
+    registry.closing_strategy = Markbridge::Parsers::BBCode::ClosingStrategies::Strict.new(reconciler)
   end
 
 Markbridge.bbcode_to_markdown("[b][i]text[/b][/i]", handlers:)
@@ -141,6 +141,16 @@ Unknown tag counts are available on the parser instance when you call it directl
 
 Register a custom handler to recognize a new tag, or replace the built-in one:
 
+<!-- spec:before
+class MyCalloutHandler < Markbridge::Parsers::BBCode::Handlers::BaseHandler
+  def initialize = (super; @element_class = Markbridge::AST::Element)
+  attr_reader :element_class
+  def on_open(token:, context:, registry:, tokens: nil)
+    context.push(@element_class.new)
+  end
+end
+input = "[callout]hi[/callout]"
+-->
 ```ruby
 handlers =
   Markbridge::Parsers::BBCode::HandlerRegistry.build_from_default do |registry|

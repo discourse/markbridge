@@ -56,6 +56,7 @@ For the exact list, see [`HandlerRegistry.default`](https://github.com/discourse
 
 ## Using the parser directly
 
+<!-- spec:continue -->
 ```ruby
 parser = Markbridge::Parsers::TextFormatter::Parser.new
 ast = parser.parse(xml)

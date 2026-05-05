@@ -34,6 +34,7 @@ end
 
 ### 2. Write the handler
 
+<!-- spec:continue -->
 ```ruby
 module Markbridge
   module Parsers
@@ -59,6 +60,7 @@ end
 
 ### 3. Register the handler
 
+<!-- spec:continue -->
 ```ruby
 handlers =
   Markbridge::Parsers::BBCode::HandlerRegistry.build_from_default do |registry|
@@ -80,6 +82,7 @@ callout_tag =
 
 ### 5. Register the renderer tag
 
+<!-- spec:continue -->
 ```ruby
 tag_library = Markbridge::Renderers::Discourse::TagLibrary.default
 tag_library.register(Markbridge::AST::Callout, callout_tag)
@@ -87,6 +90,7 @@ tag_library.register(Markbridge::AST::Callout, callout_tag)
 
 ### 6. Use it
 
+<!-- spec:continue -->
 ```ruby
 Markbridge.bbcode_to_markdown(
   "[callout=warning]Heads up![/callout]",
@@ -116,6 +120,9 @@ Use `find_parent` / `has_parent?` to render differently inside specific ancestor
 
 Both use a simpler, stateless handler API. A handler is any callable accepting `(element:, parent:)`. Return the node you want children to recurse into, or `nil` to skip them.
 
+<!-- spec:before
+input = "<details>hi</details>"
+-->
 ```ruby
 html_handlers =
   Markbridge::Parsers::HTML::HandlerRegistry.build_from_default do |registry|

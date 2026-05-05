@@ -41,6 +41,11 @@ Markbridge.bbcode_to_markdown("line one   \nline two")
 
 The global configuration is convenient but not the only lever. Every `*_to_markdown` method accepts `handlers:` and `tag_library:` overrides — use those when you need to vary behavior per call rather than globally.
 
+<!-- spec:before
+input = "[b]hi[/b]"
+my_registry = Markbridge::Parsers::BBCode::HandlerRegistry.default
+my_library = Markbridge::Renderers::Discourse::TagLibrary.default
+-->
 ```ruby
 Markbridge.bbcode_to_markdown(input, handlers: my_registry, tag_library: my_library)
 ```
