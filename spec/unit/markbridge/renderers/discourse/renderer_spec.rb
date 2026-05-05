@@ -42,6 +42,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq('a\*b')
     end
 
+    it "falls back to Postprocessor::DEFAULT when no postprocessor is provided" do
+      expect(described_class.new.postprocessor).to be(Markbridge::Renderers::Discourse::Postprocessor::DEFAULT)
+    end
+
+    it "uses an explicit postprocessor when one is provided" do
+      custom = Markbridge::Renderers::Discourse::Postprocessor.new
+
+      expect(described_class.new(postprocessor: custom).postprocessor).to be(custom)
+    end
+
     it "uses an explicit html_escaper when one is provided" do
       html_escaper = class_double(Markbridge::Renderers::Discourse::HtmlEscaper)
       allow(html_escaper).to receive(:escape).and_return("HTML-ESCAPED")
@@ -442,6 +452,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
       expect(r.emissions).to eq({})
     end
+
+    it "returns a deep snapshot — mutating an emitted-payloads array does not affect the buffer" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.new
+      library.register(Markbridge::AST::Bold, emitting_tag.new)
+      r = described_class.new(tag_library: library)
+
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("x")
+      r.render(Markbridge::AST::Document.new << bold)
+
+      first = r.emissions
+      first[:upload].clear
+
+      # A second call returns the original payload — the previous
+      # caller's mutation didn't reach into the buffer.
+      expect(r.emissions[:upload]).to eq([{ sha1: "abc" }])
+    end
   end
 
   describe "#with_provisional_emissions" do
@@ -490,6 +517,41 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       r.render(bold_with_text)
 
       expect(r.emissions).to eq(probe: [:inner])
+    end
+
+    it "returns the block's value so callers can decide based on it" do
+      r = described_class.new
+      r.render(Markbridge::AST::Document.new) # initialize buffer
+
+      result = r.with_provisional_emissions { |c| c.commit; "the-value" }
+
+      expect(result).to eq("the-value")
+    end
+
+    it "snapshots payload arrays deeply so a discarded inner emit does not leak" do
+      # Emit a record before the provisional block; inside the
+      # provisional block emit *more* records into the same key, then
+      # discard. With a shallow snapshot (transform_keys), the inner
+      # emits would persist because the snapshot's array is the same
+      # object as the buffer's.
+      preserving_tag =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_element, interface)
+            interface.emit(:keep, :before)
+            interface.with_provisional_emissions do |_c|
+              interface.emit(:keep, :inner)
+              "discarded"
+            end
+            "kept"
+          end
+        end
+
+      library = Markbridge::Renderers::Discourse::TagLibrary.new
+      library.register(Markbridge::AST::Bold, preserving_tag.new)
+      r = described_class.new(tag_library: library)
+      r.render(bold_with_text)
+
+      expect(r.emissions).to eq(keep: [:before])
     end
   end
 end

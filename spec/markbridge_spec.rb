@@ -491,6 +491,46 @@ RSpec.describe Markbridge do
 
       expect(described_class.convert("[b]x[/b]", format: :bbcode, renderer:).markdown).to eq("B")
     end
+
+    it "forwards renderer: kwarg through the :html branch" do
+      fixed_bold =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            "HB"
+          end
+        end
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
+
+      expect(described_class.convert("<b>x</b>", format: :html, renderer:).markdown).to eq("HB")
+    end
+
+    it "forwards renderer: kwarg through the :mediawiki branch" do
+      fixed_bold =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            "MB"
+          end
+        end
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
+
+      expect(described_class.convert("'''x'''", format: :mediawiki, renderer:).markdown).to eq("MB")
+    end
+
+    it "forwards renderer: kwarg through the :text_formatter_xml branch" do
+      fixed_bold =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            "TB"
+          end
+        end
+      renderer =
+        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
+
+      result = described_class.convert("<r><B>x</B></r>", format: :text_formatter_xml, renderer:)
+      expect(result.markdown).to eq("TB")
+    end
   end
 
   describe ".render" do
@@ -518,12 +558,56 @@ RSpec.describe Markbridge do
       expect(described_class.render(doc, renderer:).markdown).to eq("BB")
     end
 
-    it "raises ArgumentError for unknown render format" do
+    it "raises ArgumentError for unknown render format with the offending format inspected" do
       doc = Markbridge::AST::Document.new
       expect { described_class.render(doc, format: :weird) }.to raise_error(
         ArgumentError,
-        /unknown render format/,
+        "unknown render format :weird",
       )
+    end
+
+    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
+      tag =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_e, _i)
+            raise "boom"
+          end
+        end
+      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
+      doc = described_class.parse_bbcode("[b]x[/b]").ast
+
+      expect { described_class.render(doc, renderer:) }.to raise_error(/boom/)
+    end
+
+    it "carries the AST through to Conversion#ast" do
+      doc = described_class.parse_bbcode("[b]hi[/b]").ast
+
+      expect(described_class.render(doc).ast).to be(doc)
+    end
+
+    it "exposes empty Hashes for unknown_tags and diagnostics (no parser-side data available)" do
+      result = described_class.render(Markbridge::AST::Document.new)
+
+      expect(result.unknown_tags).to eq({})
+      expect(result.diagnostics).to eq({})
+    end
+
+    it "exposes an empty Array for errors when render succeeds" do
+      expect(described_class.render(Markbridge::AST::Document.new).errors).to eq([])
+    end
+
+    it "exposes Conversion#emissions populated from the renderer" do
+      tag =
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def render(_element, interface)
+            interface.emit(:upload, :record)
+            ""
+          end
+        end
+      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
+      doc = described_class.parse_bbcode("[b]x[/b]").ast
+
+      expect(described_class.render(doc, renderer:).emissions).to eq(upload: [:record])
     end
   end
 
@@ -570,6 +654,33 @@ RSpec.describe Markbridge do
       expect(described_class.bbcode_to_markdown("hello  \nworld", renderer:).markdown).to eq(
         "hello  \nworld",
       )
+    end
+
+    it "uses an explicit tag_library: as the base when one is provided" do
+      base = Markbridge::Renderers::Discourse::TagLibrary.new
+      base.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new { |_e, _i| "FROM-BASE" },
+      )
+
+      renderer = described_class.discourse_renderer(tag_library: base)
+
+      # No bold registered in the *default* library would render as "**" markers; the
+      # explicit base is being used (returning the literal "FROM-BASE").
+      expect(described_class.bbcode_to_markdown("[b]x[/b]", renderer:).markdown).to eq("FROM-BASE")
+    end
+
+    it "forwards an explicit postprocessor: through to the Renderer" do
+      shouting =
+        Class.new(Markbridge::Renderers::Discourse::Postprocessor) do
+          def call(text)
+            text.upcase
+          end
+        end
+
+      renderer = described_class.discourse_renderer(postprocessor: shouting.new)
+
+      expect(described_class.bbcode_to_markdown("[b]hi[/b]", renderer:).markdown).to eq("**HI**")
     end
   end
 

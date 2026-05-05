@@ -8,6 +8,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
       expect(postprocessor.call("a\n\n\n\nb")).to eq("a\n\nb")
     end
 
+    it "collapses every run of 3+ newlines, not just the first" do
+      # Two distinct runs — `sub` would only catch the first.
+      expect(postprocessor.call("a\n\n\nb\n\n\nc")).to eq("a\n\nb\n\nc")
+    end
+
     it "removes whitespace-only lines (preserving multiple of them)" do
       expect(postprocessor.call("a\n   \nb\n\t\nc")).to eq("a\n\nb\n\nc")
     end
