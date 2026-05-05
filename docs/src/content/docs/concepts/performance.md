@@ -38,7 +38,7 @@ Exceeding the max depth raises `MaxDepthExceededError`. The other limits fail qu
 
 ## Ruby version and YJIT
 
-Markbridge targets Ruby 3.3+. Enabling YJIT gives a consistent speedup on the parsing and rendering hot paths:
+Markbridge targets Ruby 3.3+ on CRuby, and also runs on the latest TruffleRuby and JRuby (their own JITs cover the hot paths). On CRuby, enabling YJIT gives a consistent speedup on the parsing and rendering hot paths:
 
 ```bash
 ruby --yjit -Ilib -rmarkbridge/all your_script.rb
