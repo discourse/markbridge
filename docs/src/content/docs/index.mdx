@@ -54,8 +54,8 @@ Markbridge.html_to_markdown("<p>Nested <em>is</em> fine.</p>")
     to shape the Markdown output. No monkey-patching.
   </Card>
   <Card title="Performance-conscious" icon="rocket">
-    Single-pass scanner, O(1) parent lookups, minimal allocations.
-    O(n) in the size of the input.
+    Single-pass parsing, O(1) parent lookups during render, minimal allocations
+    on the hot paths. Linear in input size.
   </Card>
   <Card title="Battle-tested" icon="star">
     Powers Discourse forum migrations. Extensive unit, integration, and
@@ -63,6 +63,6 @@ Markbridge.html_to_markdown("<p>Nested <em>is</em> fine.</p>")
   </Card>
   <Card title="Zero runtime gems" icon="download">
     Pure Ruby (3.3+). Runs on CRuby, plus the latest TruffleRuby and JRuby.
-    Nokogiri is only required when you use the HTML parser.
+    Nokogiri is only required for some parsers.
   </Card>
 </CardGrid>
