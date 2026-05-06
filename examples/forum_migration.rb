@@ -187,6 +187,12 @@ POSTS = [
     format: :html,
     body: "<b>html</b> <a href='https://forum.example.com/u/alice'>alice</a>",
   },
+  {
+    id: 5,
+    format: :bbcode,
+    body: "[b]see attachments below[/b]",
+    orphan_attachments: %w[5001 5002],
+  },
 ]
 
 # -- The migration loop ------------------------------------------------------
@@ -195,6 +201,10 @@ stats = { ok: 0, errors: 0 }
 emitted_links = []
 
 POSTS.each do |post|
+  # `Markbridge.convert(..., format:, &block)` yields the parsed AST
+  # between parse and render, so we can append attachments that
+  # weren't in the source post but should appear at the bottom of the
+  # rendered Markdown.
   result =
     Markbridge.convert(
       post[:body],
@@ -202,7 +212,11 @@ POSTS.each do |post|
       handlers: post[:format] == :bbcode ? HANDLERS : nil,
       renderer: RENDERER,
       raise_on_error: false,
-    )
+    ) do |ast|
+      Array(post[:orphan_attachments]).each do |att|
+        ast << Markbridge::AST::Text.new("\n\n[attachment:#{att}]")
+      end
+    end
 
   if result.errors.any?
     stats[:errors] += 1

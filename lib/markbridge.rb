@@ -31,6 +31,11 @@ module Markbridge
 
     # Convert BBCode to Discourse Markdown.
     #
+    # If a block is given, it is called with the parsed AST between
+    # parse and render — the caller can append/remove/replace nodes
+    # before rendering. Mutations to the yielded AST persist in
+    # {Conversion#ast}.
+    #
     # @param input [String] BBCode source
     # @param handlers [Parsers::BBCode::HandlerRegistry, nil] custom handlers
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
@@ -39,9 +44,11 @@ module Markbridge
     #   exceptions propagate; when false, swallow them, return whatever
     #   the renderer produced before failing, and surface them via
     #   {Conversion#errors}.
+    # @yieldparam ast [AST::Document] mutate before rendering (optional)
     # @return [Conversion]
     def bbcode_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
       parse = parse_bbcode(input, handlers:)
+      yield(parse.ast) if block_given?
       build_conversion(parse, renderer:, raise_on_error:)
     end
 
@@ -65,9 +72,11 @@ module Markbridge
     # @param handlers [Parsers::HTML::HandlerRegistry, nil] custom handlers
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     # @param raise_on_error [Boolean]
+    # @yieldparam ast [AST::Document] mutate before rendering (optional)
     # @return [Conversion]
     def html_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
       parse = parse_html(input, handlers:)
+      yield(parse.ast) if block_given?
       build_conversion(parse, renderer:, raise_on_error:)
     end
 
@@ -97,9 +106,11 @@ module Markbridge
     # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handlers
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     # @param raise_on_error [Boolean]
+    # @yieldparam ast [AST::Document] mutate before rendering (optional)
     # @return [Conversion]
     def text_formatter_xml_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
       parse = parse_text_formatter_xml(input, handlers:)
+      yield(parse.ast) if block_given?
       build_conversion(parse, renderer:, raise_on_error:)
     end
 
@@ -123,32 +134,36 @@ module Markbridge
     # @param handlers [Parsers::MediaWiki::InlineTagRegistry, nil]
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     # @param raise_on_error [Boolean]
+    # @yieldparam ast [AST::Document] mutate before rendering (optional)
     # @return [Conversion]
     def mediawiki_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
       parse = parse_mediawiki(input, handlers:)
+      yield(parse.ast) if block_given?
       build_conversion(parse, renderer:, raise_on_error:)
     end
 
     # Convert input in the given format. Thin dispatcher over the
     # four +*_to_markdown+ methods; useful when the format is data-
     # driven (e.g. iterating posts whose +:format+ column varies).
+    # An optional block is forwarded to the dispatched method.
     #
     # @param input [String]
     # @param format [Symbol] one of +:bbcode+, +:html+,
     #   +:text_formatter_xml+, +:mediawiki+
     # @param kwargs [Hash] forwarded to the underlying convenience method
     #   (e.g. +handlers:+, +renderer:+, +raise_on_error:+).
+    # @yieldparam ast [AST::Document] mutate before rendering (optional)
     # @return [Conversion]
-    def convert(input, format:, **kwargs)
+    def convert(input, format:, **kwargs, &block)
       case format
       when :bbcode
-        bbcode_to_markdown(input, **kwargs)
+        bbcode_to_markdown(input, **kwargs, &block)
       when :html
-        html_to_markdown(input, **kwargs)
+        html_to_markdown(input, **kwargs, &block)
       when :text_formatter_xml
-        text_formatter_xml_to_markdown(input, **kwargs)
+        text_formatter_xml_to_markdown(input, **kwargs, &block)
       when :mediawiki
-        mediawiki_to_markdown(input, **kwargs)
+        mediawiki_to_markdown(input, **kwargs, &block)
       else
         raise ArgumentError,
               "unknown format #{format.inspect} " \
@@ -156,31 +171,35 @@ module Markbridge
       end
     end
 
-    # Render an existing AST to Discourse Markdown. Useful when the
-    # caller already has the AST in hand (e.g. modified after parsing,
-    # or built programmatically).
+    # Render a {Parse} or a bare AST node to Discourse Markdown.
+    # Useful when the caller has mutated the AST between parse and
+    # render (e.g. appending attachments not present in the source),
+    # or built an AST programmatically.
     #
-    # @param ast [AST::Node]
+    # When given a {Parse}, the returned {Conversion} carries the
+    # parser's +unknown_tags+, +diagnostics+, and source +format+
+    # forward. When given an AST node, those fields default to empty
+    # and +format+ falls back to +:discourse+.
+    #
+    # @param parse_or_ast [Parse, AST::Node]
     # @param format [Symbol] :discourse (only renderer currently shipped)
     # @param renderer [Renderers::Discourse::Renderer, nil]
+    # @param raise_on_error [Boolean]
     # @return [Conversion]
-    def render(ast, format: :discourse, renderer: nil, raise_on_error: true)
+    def render(parse_or_ast, format: :discourse, renderer: nil, raise_on_error: true)
       raise ArgumentError, "unknown render format #{format.inspect}" unless format == :discourse
 
-      renderer ||= Renderers::Discourse::Renderer.new
-      markdown, errors = render_through(renderer, ast, raise_on_error:)
+      parse =
+        case parse_or_ast
+        when Parse
+          parse_or_ast
+        when AST::Node
+          Parse.new(ast: parse_or_ast, format: :discourse, unknown_tags: {}, diagnostics: {})
+        else
+          raise ArgumentError, "expected Parse or AST::Node, got #{parse_or_ast.class}"
+        end
 
-      Conversion.new(
-        markdown:,
-        ast:,
-        format: :discourse,
-        unknown_tags: {
-        },
-        diagnostics: {
-        },
-        emissions: renderer.emissions,
-        errors:,
-      )
+      build_conversion(parse, renderer:, raise_on_error:)
     end
 
     # Build a configured Discourse {Renderers::Discourse::Renderer}

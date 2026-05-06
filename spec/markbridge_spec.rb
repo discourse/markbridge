@@ -150,6 +150,15 @@ RSpec.describe Markbridge do
 
       expect { described_class.bbcode_to_markdown("[b]x[/b]", renderer:) }.to raise_error(/boom/)
     end
+
+    it "yields the AST to a block between parse and render so callers can mutate it" do
+      result =
+        described_class.bbcode_to_markdown("[b]hi[/b]") do |ast|
+          ast << Markbridge::AST::Text.new(" extra")
+        end
+
+      expect(result.markdown).to eq("**hi** extra")
+    end
   end
 
   describe ".parse_html" do
@@ -229,6 +238,15 @@ RSpec.describe Markbridge do
       renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
 
       expect { described_class.html_to_markdown("<b>x</b>", renderer:) }.to raise_error(/boom/)
+    end
+
+    it "yields the AST to a block between parse and render so callers can mutate it" do
+      result =
+        described_class.html_to_markdown("<b>hi</b>") do |ast|
+          ast << Markbridge::AST::Text.new(" extra")
+        end
+
+      expect(result.markdown).to eq("**hi** extra")
     end
   end
 
@@ -314,6 +332,15 @@ RSpec.describe Markbridge do
         /boom/,
       )
     end
+
+    it "yields the AST to a block between parse and render so callers can mutate it" do
+      result =
+        described_class.text_formatter_xml_to_markdown(xml) do |ast|
+          ast << Markbridge::AST::Text.new(" extra")
+        end
+
+      expect(result.markdown).to eq("**hi** extra")
+    end
   end
 
   describe ".parse_mediawiki" do
@@ -388,6 +415,17 @@ RSpec.describe Markbridge do
       renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
 
       expect { described_class.mediawiki_to_markdown("'''x'''", renderer:) }.to raise_error(/boom/)
+    end
+
+    it "yields the AST to a block between parse and render so callers can mutate it" do
+      result =
+        described_class.mediawiki_to_markdown("'''hi'''") do |ast|
+          ast << Markbridge::AST::Text.new(" extra")
+        end
+
+      # MediaWiki wraps the Bold in a Paragraph, so the appended Text is a
+      # second top-level child and a paragraph break separates them.
+      expect(result.markdown).to eq("**hi**\n\n extra")
     end
   end
 
@@ -531,6 +569,43 @@ RSpec.describe Markbridge do
       result = described_class.convert("<r><B>x</B></r>", format: :text_formatter_xml, renderer:)
       expect(result.markdown).to eq("TB")
     end
+
+    it "forwards a block to the :bbcode branch" do
+      result =
+        described_class.convert("[b]hi[/b]", format: :bbcode) do |ast|
+          ast << Markbridge::AST::Text.new(" extra")
+        end
+
+      expect(result.markdown).to eq("**hi** extra")
+    end
+
+    it "forwards a block to the :html branch" do
+      result =
+        described_class.convert("<b>hi</b>", format: :html) do |ast|
+          ast << Markbridge::AST::Text.new(" extra")
+        end
+
+      expect(result.markdown).to eq("**hi** extra")
+    end
+
+    it "forwards a block to the :text_formatter_xml branch" do
+      result =
+        described_class.convert("<r><B>hi</B></r>", format: :text_formatter_xml) do |ast|
+          ast << Markbridge::AST::Text.new(" extra")
+        end
+
+      expect(result.markdown).to eq("**hi** extra")
+    end
+
+    it "forwards a block to the :mediawiki branch" do
+      result =
+        described_class.convert("'''hi'''", format: :mediawiki) do |ast|
+          ast << Markbridge::AST::Text.new(" extra")
+        end
+
+      # Paragraph wrap puts the appended Text after a blank line.
+      expect(result.markdown).to eq("**hi**\n\n extra")
+    end
   end
 
   describe ".render" do
@@ -608,6 +683,48 @@ RSpec.describe Markbridge do
       doc = described_class.parse_bbcode("[b]x[/b]").ast
 
       expect(described_class.render(doc, renderer:).emissions).to eq(upload: [:record])
+    end
+
+    context "with a Parse argument" do
+      it "renders the Parse's AST" do
+        parse = described_class.parse_bbcode("[b]hi[/b]")
+
+        expect(described_class.render(parse).markdown).to eq("**hi**")
+      end
+
+      it "carries the Parse's source format through to Conversion#format" do
+        parse = described_class.parse_bbcode("[b]hi[/b]")
+
+        expect(described_class.render(parse).format).to eq(:bbcode)
+      end
+
+      it "carries the Parse's unknown_tags forward" do
+        parse = described_class.parse_bbcode("[neverknown]x[/neverknown]")
+
+        expect(described_class.render(parse).unknown_tags["neverknown"]).to eq(2)
+      end
+
+      it "carries the Parse's diagnostics forward" do
+        parse = described_class.parse_bbcode("[b][i]x[/b]")
+
+        expect(described_class.render(parse).diagnostics[:auto_closed_tags_count]).to be > 0
+      end
+
+      it "renders mutations made to the Parse's AST after parsing" do
+        parse = described_class.parse_bbcode("[b]hi[/b]")
+        parse.ast << Markbridge::AST::Text.new(" extra")
+
+        expect(described_class.render(parse).markdown).to eq("**hi** extra")
+      end
+    end
+
+    context "with neither a Parse nor an AST::Node" do
+      it "raises ArgumentError naming the offending class" do
+        expect { described_class.render("a string") }.to raise_error(
+          ArgumentError,
+          /expected Parse or AST::Node, got String/,
+        )
+      end
     end
   end
 

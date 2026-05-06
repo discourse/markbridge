@@ -155,6 +155,29 @@ unused. Now the handler introspects the AST class once and only passes
 you'd previously added a dummy `def initialize(language: nil); super(); end`
 just to satisfy the handler — you can remove it.
 
+### Modifying the AST between parse and render
+
+Two new shapes let you mutate the parsed AST before rendering, e.g.
+to append attachments that weren't in the source post:
+
+```ruby
+# Block form on every *_to_markdown / convert method
+Markbridge.bbcode_to_markdown(input, renderer: RENDERER) do |ast|
+  attachments.each { |a| ast << OrphanAttachment.new(source_id: a.id) }
+end
+
+# Or pass a Parse explicitly to .render
+parse = Markbridge.parse_bbcode(input)
+parse.ast << OrphanAttachment.new(source_id: 7)
+result = Markbridge.render(parse, renderer: RENDERER, raise_on_error: false)
+# result.unknown_tags / .diagnostics / .format are preserved from the Parse.
+```
+
+`Markbridge.render` accepts either a `Parse` (preferred — preserves
+`unknown_tags`/`diagnostics`/source `format`) or a bare AST node
+(fields default to empty / `:discourse`). Mutations made between
+parse and render persist in `Conversion#ast`.
+
 ### Per-row failure isolation
 
 For migration loops, set `raise_on_error: false` to surface render
