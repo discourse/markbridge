@@ -51,7 +51,7 @@ A migration importer typically wants to know more than the rendered string. For 
 | Tag in source | Placeholder string in markdown | Side data the importer needs |
 |---|---|---|
 | `[upload=42]` | `[upload\|42]` | `{ upload_id: 42, path: "..." }` |
-| `[mention]gerhard[/mention]` | `[mention\|gerhard]` | `{ name: "gerhard", source_id: nil }` |
+| `[mention]alice[/mention]` | `[mention\|alice]` | `{ name: "alice", source_id: nil }` |
 | `[url=/topics/old-id-7]` | `[topic\|7]` | `{ source_topic_id: 7 }` |
 
 Custom Tags call `interface.emit(:key, payload)` to record this:
