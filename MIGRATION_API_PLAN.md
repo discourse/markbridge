@@ -9,6 +9,10 @@ This document captures what the next API iteration should make easy. It lives
 on the `docs` branch as a parking place for context — actual API work happens
 on a fresh branch off `main`. No backwards-compatibility constraints.
 
+**Status (2026-05-06):** PR #30 (`claude/refine-local-plan-dMDie`) implements
+§1–§3 below. §4 is rejected. Sections marked **Implemented** describe what
+shipped; the original sketches are preserved for context.
+
 ## The user journey
 
 Source markup (BBCode / HTML / MediaWiki / TextFormatter XML) → AST →
@@ -86,22 +90,32 @@ these patterns:
 
 In rough priority order. None of these are committed yet — they're sketches.
 
-### 1. Result object from convenience methods
+### 1. Result object from convenience methods — Implemented (PR #30)
 
-Make `Markbridge.<format>_to_markdown` return a richer object.
+`Markbridge.<format>_to_markdown` returns a `Conversion`; `parse_<format>`
+returns a `Parse`. Both are immutable `Data.define` value objects.
 
 ```ruby
-result = Markbridge.html_to_markdown(input, handlers:, tag_library:)
-result.markdown                # the rendered string (`result.to_s` too)
-result.unknown_tags            # { "marquee" => 3, "blink" => 1 }
-result.emitted(:uploads)       # whatever Tags emitted under :uploads
-result.emitted(:mentions)
+result = Markbridge.html_to_markdown(input, handlers:, renderer:)
+result.markdown        # rendered string (also via to_s, so puts/interpolation work)
+result.ast             # AST::Document
+result.format          # :html
+result.unknown_tags    # { "marquee" => 3, "blink" => 1 }
+result.diagnostics     # format-specific (BBCode supplies :auto_closed_tags_count, etc.)
+result.emissions       # { uploads: [...], mentions: [...] }
+result.emitted(:uploads)  # convenience: returns [] for missing keys
+result.errors          # [] unless raise_on_error: false swallowed something
 ```
 
-### 2. Tag side-data emission
+Note: the sketch's `tag_library:` parameter became `renderer:` — see the
+"Out-of-band changes" section below for why.
 
-Extend the rendering interface so `Tag#render` can attach metadata without
-threading mutable collaborators through the constructor.
+### 2. Tag side-data emission — Implemented (PR #30)
+
+The rendering interface gained `emit(key, payload)`. Tags call it freely
+during render; the renderer collects emissions and resets between
+top-level calls. `Conversion#emissions` (and `#emitted(key)`) surface
+them.
 
 ```ruby
 class UploadTag < Markbridge::Renderers::Discourse::Tag
@@ -112,24 +126,30 @@ class UploadTag < Markbridge::Renderers::Discourse::Tag
 end
 ```
 
-The renderer collects emissions; the result object surfaces them by key.
+Emission keys are open-ended symbols; payloads are arbitrary. Zero
+overhead on the no-emit path so the same `Renderer` instance is safe to
+reuse across thousands of posts.
 
-### 3. Overlay registration / handler chaining
+### 3. Overlay registration / handler chaining — Implemented (PR #30)
 
-`HandlerRegistry#register` returns the previously-registered handler, or a
-new `overlay` method exposes the delegate.
+`HandlerRegistry#overlay` (BBCode, HTML, TextFormatter) replaces the
+handler bound to one or more tag names by yielding the previously-bound
+handler (which may be `nil`) and registering whatever the block returns.
 
 ```ruby
-registry.overlay("a") do |delegate|
-  Anchor.new(default: delegate, prefix:, root:, ...)
+registry.overlay(%w[url link iurl]) do |default|
+  LinkifyingUrlHandler.new(default:)
 end
 ```
 
-Or a middleware-style API where `process` receives the delegate as an arg.
+Chosen over the middleware-style `process(..., delegate:)` shape because
+overlay keeps handlers as plain objects — the delegate is captured at
+registration time, not pushed through every call.
 
-### 4. Built-in placeholder DSL (optional)
+### 4. Built-in placeholder DSL — considered and rejected
 
-Small DSL so simple placeholder triads don't need three classes.
+Earlier drafts proposed a DSL to collapse the AST + Tag + emit boilerplate
+into a single declarative block:
 
 ```ruby
 Markbridge::Placeholder.define(:upload) do
@@ -140,8 +160,21 @@ Markbridge::Placeholder.define(:upload) do
 end
 ```
 
-The handler still has to construct it (resolution is project-specific), but
-the AST + Tag + emit boilerplate is gone.
+Rejected once §1–§3 landed, for these reasons:
+
+- **Bounded win**: the triad is already small (a few lines of AST, a few
+  lines of Tag) once `interface.emit` and `overlay` exist. Saves maybe
+  ~15 lines per placeholder over ~7 placeholders.
+- **Discoverability cost**: synthesized classes don't show up in `grep`.
+  Stack traces reference `Markbridge::Placeholder::Upload` with no source
+  file to jump to.
+- **Edge cases re-introduce the classes**: html_mode output (per the
+  contract in `CLAUDE.md`), multiple emits per placeholder, custom AST
+  equality / pattern-matching — each of these wants an escape hatch back
+  to a hand-written class, which dilutes the DSL's payoff.
+- **The handler stays hand-written either way**: resolution logic is
+  project-specific (DB lookup, ID map, slug rewrite). The DSL would only
+  ever cover the two mechanical sides, which aren't the painful sides.
 
 ## Docs reorganization that follows
 
@@ -170,20 +203,44 @@ Each `migrating/*` recipe is runnable end-to-end. The new pages drive the
 API design — anywhere the recipe gets verbose is a hint that the API needs
 work.
 
-## Open questions
+## Out-of-band changes in PR #30
 
-- Should the existing `*_to_markdown` methods change shape (breaking) or
-  live alongside `*_to_result` companions? Likely change shape — no
-  backwards-compat constraint.
-- Side-data emission keys: open-ended symbols, or a fixed enum? Open-ended
-  is simpler; fixed enum gives more type-safety.
-- Default-handler chaining via `super` in the handler class, or a
-  block-passed `delegate` parameter?
-- Should the result object expose timing / counts (handlers invoked,
-  AST node count) for benchmarking?
+PR #30 also made changes that weren't called out in the original plan but
+fall out of the same redesign:
+
+- **Removed `Markbridge::Configuration`**. The global singleton + per-process
+  default registries are gone. Customization is now explicit per call
+  (`handlers:`, `renderer:`), which makes parallel/forked workers safe.
+- **`Markbridge.discourse_renderer(...)` factory**. Builds a reusable
+  `Renderer` from `tags:`, `escape_hard_line_breaks:`, `escaper:`,
+  `html_escaper:`, `postprocessor:`. Replaces per-call `tag_library:`,
+  `escaper:`, `escape_hard_line_breaks:` parameters — build once, reuse
+  across thousands of posts.
+- **`TagLibrary#unregister`** + **auto-passthrough** for unregistered AST
+  classes — eliminates boilerplate "passthrough" Tags.
+- **`Postprocessor`** that collapses excess newlines, strips
+  whitespace-only lines, and trims document edges.
+- **`raise_on_error: false`** on `*_to_markdown`/`convert` — swallows
+  render-time errors and surfaces them via `Conversion#errors` so a
+  batch migration can isolate per-row failures.
+- **MediaWiki API parity**: `inline_tag_registry:` parameter renamed to
+  `handlers:`.
+- **TextFormatter handler signature**: handlers now accept `processor:`
+  for consistency with the other parsers.
+
+## Open questions — resolutions
+
+- *Change shape vs. add `*_to_result` companions?* → Changed shape.
+  Breaking, no compat shim.
+- *Emission keys: open-ended or fixed enum?* → Open-ended symbols.
+- *Chaining via `super` or block-passed delegate?* → Block-passed
+  delegate (`overlay`).
+- *Timing/counts on the result object?* → Not exposed. `Conversion`
+  carries `ast`, `unknown_tags`, `diagnostics`, `emissions`, `errors`
+  only. Benchmarking lives outside the result.
 
 ## Working branch
 
-Implementation lands on `migration-api` (off `main`). Once the API
-stabilizes, the `docs` branch picks up the new shape and writes the
-`migrating/` guides on top.
+Implementation lives on `claude/refine-local-plan-dMDie` (PR #30). Once
+that merges to `main`, the `docs` branch will pick up the new API shape
+and the `migrating/*` guides described above can be written against it.

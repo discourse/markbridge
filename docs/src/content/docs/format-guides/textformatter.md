@@ -19,7 +19,8 @@ gem "nokogiri"
 require "markbridge/textformatter"
 
 xml = "<r><B><s>[b]</s>Hello<e>[/b]</e></B> world!</r>"
-Markbridge.text_formatter_xml_to_markdown(xml)
+result = Markbridge.text_formatter_xml_to_markdown(xml)
+result.markdown
 # => "**Hello** world!"
 ```
 
@@ -69,8 +70,8 @@ renderer.render(ast)
 
 - **Invalid XML** falls back to treating the input as plain text instead of raising.
 - **Unknown elements** are skipped — their children are still processed.
-- **Stateless handler API**: like the HTML parser, handlers are callables receiving `(element:, parent:)`. Lambdas are accepted.
+- **Stateless handler API**: like the HTML parser, handlers are callables receiving `(element:, parent:, processor:)`. The `processor:` argument is the parser instance and exposes `process_children(xml_element, ast_node)` for handlers that want to recurse manually. Lambdas are accepted.
 
 ## When to use this vs. the BBCode parser
 
-If you're migrating **from** phpBB 3.2+ and already have the stored XML, use this parser — it's both faster and closer to the source of truth than re-parsing the BBCode. For plain BBCode from other forums, use the [BBCode parser](/guides/bbcode/).
+If you're migrating **from** phpBB 3.2+ and already have the stored XML, use this parser — it's both faster and closer to the source of truth than re-parsing the BBCode. For plain BBCode from other forums, use the [BBCode parser](/format-guides/bbcode/).

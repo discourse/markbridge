@@ -70,11 +70,25 @@ end
 
 Don't accumulate ASTs or rendered output across iterations — let Ruby GC them as you go.
 
-## Reusing the default registries
+## Reusing handlers and renderers
 
-`HandlerRegistry.default` and `TagLibrary.default` are memoized on the `Markbridge` module. The first call builds them; subsequent calls reuse the cached instance. Calling `Markbridge.*_to_markdown` in a loop doesn't pay the registry construction cost per call.
+There is no per-process default cache for handler registries or renderers — every `*_to_markdown` call without a `handlers:` or `renderer:` kwarg builds a fresh default. That's fine for one-off use, but in a tight loop it pays the construction cost on every iteration.
 
-If you pass a custom `handlers:` or `tag_library:`, build it once outside the loop and reuse it.
+For batch workloads, build once outside the loop and pass with each call:
+
+```ruby
+HANDLERS = Markbridge::Parsers::BBCode::HandlerRegistry.default
+RENDERER = Markbridge.discourse_renderer(
+  escape_hard_line_breaks: true,
+  # custom tags, unregistered tags, custom escaper, etc.
+)
+
+posts.each do |post|
+  Markbridge.bbcode_to_markdown(post.body, handlers: HANDLERS, renderer: RENDERER)
+end
+```
+
+The `Renderer` is safe to reuse across thousands of posts — its emission buffer resets at the start of every top-level render call.
 
 ## Measuring on your workload
 

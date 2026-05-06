@@ -11,15 +11,19 @@ BBCode is Markbridge's most feature-rich input format. The default handler regis
 require "markbridge/bbcode"
 
 bbcode = "[b]Hello[/b] [url=https://example.com]world[/url]!"
-Markbridge.bbcode_to_markdown(bbcode)
+result = Markbridge.bbcode_to_markdown(bbcode)
+result.markdown
 # => "**Hello** [world](https://example.com)!"
 ```
+
+`result` is a [`Markbridge::Conversion`](/migrating/overview/) — `.markdown` is the rendered string, and the same object also exposes `.unknown_tags`, `.diagnostics` (auto-closed counts, depth-exceeded counts, unclosed raw-tag list), `.emissions`, and `.errors`.
 
 To get the AST instead of rendered Markdown:
 
 <!-- spec:continue -->
 ```ruby
-ast = Markbridge.parse_bbcode(bbcode)
+parse = Markbridge.parse_bbcode(bbcode)
+parse.ast
 # => AST::Document(Bold("Hello"), Text(" "), Url("world", href: "..."))
 ```
 
@@ -102,6 +106,8 @@ renderer.render(ast)
 # => "**bold** with mystery"
 ```
 
+For most callers, `parse_bbcode` is the better entry point — it returns a `Parse` object that already exposes `.unknown_tags` and `.diagnostics` without reaching for the parser instance.
+
 ## Closing strategies
 
 BBCode inputs from real forums often have mismatched or out-of-order tags. Markbridge ships with two strategies:
@@ -130,7 +136,7 @@ Markbridge.bbcode_to_markdown("[unknown]inner text[/unknown]")
 # => "inner text"
 ```
 
-Unknown tag counts are available on the parser instance when you call it directly (see above).
+Unknown tag counts are surfaced on `Conversion#unknown_tags` (and `Parse#unknown_tags`) — no need to drop to the parser instance.
 
 ## Limits
 
@@ -160,4 +166,4 @@ handlers =
 Markbridge.bbcode_to_markdown(input, handlers:)
 ```
 
-See [Extending Markbridge](/guides/extending/) for a full walkthrough.
+See [Extending Markbridge](/customization/extending/) for a full walkthrough, or [Wrapping a default handler](/customization/extending/#wrapping-a-default-handler) for `HandlerRegistry#overlay` — the cleanest way to delegate to the default for the cases your handler doesn't need to change.
