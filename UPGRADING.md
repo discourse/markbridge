@@ -155,6 +155,55 @@ unused. Now the handler introspects the AST class once and only passes
 you'd previously added a dummy `def initialize(language: nil); super(); end`
 just to satisfy the handler — you can remove it.
 
+### Selective Markdown escaping (`allow:`)
+
+Importers that want list markers (or other block-level constructs)
+to survive escaping no longer need to subclass `MarkdownEscaper`:
+
+```ruby
+# Before
+class ListPermissiveEscaper < Markbridge::Renderers::Discourse::MarkdownEscaper
+  private
+  def escape_block_level(content, prev_was_paragraph)
+    case content.getbyte(0)
+    when 0x2D, 0x2A, 0x2B then return content, false if content.match?(/\A[-*+]\s/)
+    when 0x30..0x39       then return content, false if content.match?(/\A\d+[.)]\s/)
+    end
+    super
+  end
+end
+RENDERER = Markbridge.discourse_renderer(escaper: ListPermissiveEscaper.new)
+
+# After
+RENDERER = Markbridge.discourse_renderer(allow: :lists)
+```
+
+Recognised keys: `:bullet_list`, `:ordered_list`, `:atx_heading`,
+`:block_quote`. Aliases: `:lists` → `[:bullet_list, :ordered_list]`.
+Unknown keys raise `ArgumentError`. Thematic breaks (`---`, `***`)
+and setext underlines (`===`) are still escaped — the kwarg
+allow-lists specific block markers, not whole sections of the
+escaper.
+
+### Disabling Markdown escaping wholesale
+
+For migration paths where the source content is already trusted
+Markdown:
+
+```ruby
+NO_ESCAPE = Markbridge.discourse_renderer(escape: false)
+Markbridge.bbcode_to_markdown(input, renderer: NO_ESCAPE)
+```
+
+Internally this swaps in `Markbridge::Renderers::Discourse::IdentityEscaper`
+(a tiny `#escape(text) → text || ""` class). `escape: false` is
+mutually exclusive with `escape_hard_line_breaks:` / `allow:` —
+those configure `MarkdownEscaper`, which `escape: false` replaces
+wholesale. An explicit `escaper:` always wins over either.
+
+For *per-AST-node* opt-out, `AST::MarkdownText` already exists and
+bypasses the escaper for that node only.
+
 ### Modifying the AST between parse and render
 
 Two new shapes let you mutate the parsed AST before rendering, e.g.

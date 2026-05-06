@@ -212,24 +212,34 @@ module Markbridge
     #   library to start from. Defaults to a fresh {TagLibrary.default}.
     # @param unregister [Array<Class>, nil] AST classes to drop from
     #   the library so they fall through to +render_children+.
-    # @param escaper [Renderers::Discourse::MarkdownEscaper, nil]
-    # @param escape_hard_line_breaks [Boolean] sugar for
-    #   +escaper: MarkdownEscaper.new(escape_hard_line_breaks: true)+
-    #   when no explicit +escaper:+ is given.
+    # @param escaper [#escape, nil] when given, used as-is; +escape:+,
+    #   +escape_hard_line_breaks:+, and +allow:+ are then ignored.
+    # @param escape [Boolean] when +false+, the renderer is built with
+    #   {Renderers::Discourse::IdentityEscaper} (no Markdown escaping).
+    #   Mutually exclusive with +escape_hard_line_breaks:+ / +allow:+.
+    # @param escape_hard_line_breaks [Boolean] forwarded to a fresh
+    #   {MarkdownEscaper} when no explicit +escaper:+ is given.
+    # @param allow [Symbol, Array<Symbol>, nil] block-level constructs to
+    #   pass through unescaped (e.g. +:lists+, +:bullet_list+,
+    #   +:ordered_list+, +:atx_heading+, +:block_quote+); forwarded to a
+    #   fresh {MarkdownEscaper}.
+    # @param postprocessor [Renderers::Discourse::Postprocessor, nil]
     # @return [Renderers::Discourse::Renderer]
     def discourse_renderer(
       tags: nil,
       tag_library: nil,
       unregister: nil,
       escaper: nil,
+      escape: true,
       escape_hard_line_breaks: false,
+      allow: nil,
       postprocessor: nil
     )
       library = tag_library || Renderers::Discourse::TagLibrary.default
       library.merge(tags) if tags
       Array(unregister).each { |klass| library.unregister(klass) }
 
-      escaper ||= Renderers::Discourse::MarkdownEscaper.new(escape_hard_line_breaks:)
+      escaper ||= build_escaper(escape:, escape_hard_line_breaks:, allow:)
 
       Renderers::Discourse::Renderer.new(tag_library: library, escaper:, postprocessor:)
     end
@@ -257,6 +267,20 @@ module Markbridge
         emissions: renderer.emissions,
         errors:,
       )
+    end
+
+    def build_escaper(escape:, escape_hard_line_breaks:, allow:)
+      if escape == false
+        if escape_hard_line_breaks || allow
+          raise ArgumentError,
+                "escape: false is mutually exclusive with " \
+                  "escape_hard_line_breaks: / allow: (those configure " \
+                  "MarkdownEscaper, which escape: false replaces wholesale)"
+        end
+        Renderers::Discourse::IdentityEscaper.new
+      else
+        Renderers::Discourse::MarkdownEscaper.new(escape_hard_line_breaks:, allow:)
+      end
     end
 
     def render_through(renderer, ast, raise_on_error:)

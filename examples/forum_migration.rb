@@ -100,26 +100,12 @@ class PlaceholderUrlTag < Markbridge::Renderers::Discourse::Tag
   end
 end
 
-# -- Custom escaper that allows list markers through -------------------------
-#
-# Markdown forum posts using "1. item" / "- item" syntax need their
-# leading markers preserved when rendered (the default escaper would
-# escape them). This is the Liferay/Wolfram pattern.
-class ListPermissiveEscaper < Markbridge::Renderers::Discourse::MarkdownEscaper
-  private
-
-  def escape_block_level(content, prev_was_paragraph)
-    case content.getbyte(0)
-    when 0x2D, 0x2A, 0x2B # '-', '*', '+'
-      return content, false if content.match?(/\A[-*+]\s/)
-    when 0x30..0x39
-      return content, false if content.match?(/\A\d+[.)]\s/)
-    end
-    super
-  end
-end
-
 # -- Build the importer's reusable parts (handlers + renderer) --------------
+#
+# Forum posts using "1. item" / "- item" syntax need their leading
+# markers preserved (the default escaper would escape them as
+# `\- item`). Pass `allow: :lists` to the renderer factory — no
+# subclassing required.
 
 class LoggingUrlHandler < Markbridge::Parsers::BBCode::Handlers::BaseHandler
   def initialize(default:)
@@ -161,7 +147,7 @@ RENDERER =
     # posts often use [color]/[size]/[u] decoratively; importers
     # typically don't want those bytes in the migrated Markdown.
     unregister: [Markbridge::AST::Color, Markbridge::AST::Size, Markbridge::AST::Underline],
-    escaper: ListPermissiveEscaper.new,
+    allow: :lists,
   )
 
 # -- Sample posts to migrate ------------------------------------------------

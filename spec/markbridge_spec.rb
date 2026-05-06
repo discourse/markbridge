@@ -799,6 +799,45 @@ RSpec.describe Markbridge do
 
       expect(described_class.bbcode_to_markdown("[b]hi[/b]", renderer:).markdown).to eq("**HI**")
     end
+
+    it "forwards :allow to the constructed escaper (lists alias)" do
+      renderer = described_class.discourse_renderer(allow: :lists)
+
+      # The `-` and `1.` markers would normally be escaped to `\-`
+      # and `1\.`. With allow: :lists they pass through verbatim.
+      expect(renderer.render(Markbridge::AST::Text.new("- item"))).to eq("- item")
+      expect(renderer.render(Markbridge::AST::Text.new("1. item"))).to eq("1. item")
+    end
+
+    it "uses IdentityEscaper when escape: false" do
+      renderer = described_class.discourse_renderer(escape: false)
+
+      # `*raw*` would normally be escaped to `\*raw\*`. With
+      # IdentityEscaper, it survives.
+      result = described_class.html_to_markdown("*raw*", renderer:)
+      expect(result.markdown).to eq("*raw*")
+    end
+
+    it "raises when escape: false is combined with escape_hard_line_breaks: true" do
+      expect {
+        described_class.discourse_renderer(escape: false, escape_hard_line_breaks: true)
+      }.to raise_error(ArgumentError, /mutually exclusive/)
+    end
+
+    it "raises when escape: false is combined with allow:" do
+      expect { described_class.discourse_renderer(escape: false, allow: :lists) }.to raise_error(
+        ArgumentError,
+        /mutually exclusive/,
+      )
+    end
+
+    it "lets an explicit escaper: win even when escape: false is given" do
+      explicit = Markbridge::Renderers::Discourse::MarkdownEscaper.new
+      renderer = described_class.discourse_renderer(escaper: explicit, escape: false)
+
+      result = described_class.html_to_markdown("a*b", renderer:)
+      expect(result.markdown).to eq('a\*b')
+    end
   end
 
   describe "renderer: kwarg" do
