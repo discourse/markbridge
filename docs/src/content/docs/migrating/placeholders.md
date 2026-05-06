@@ -115,7 +115,7 @@ A common worry: "if my placeholder contains `[`, won't the Markdown escaper mang
 
 Markbridge escapes only `AST::Text` nodes — the textual content from the source document. A Tag's return value is spliced into its parent's output with no transformation. Whatever you return from `Tag#render` is exactly what appears in the surrounding Markdown.
 
-This is what makes placeholders safe. `"[upload|42]"`, `"@@MENTION:gerhard@@"`, `"<<TOPIC:7>>"` all reach the output untouched. Pick whatever sigil pattern your importer parses cleanly downstream.
+This is what makes placeholders safe. `"[upload|42]"`, `"@@MENTION:alice@@"`, `"<<TOPIC:7>>"` all reach the output untouched. Pick whatever sigil pattern your importer parses cleanly downstream.
 
 The one twist is HTML mode (next section).
 
