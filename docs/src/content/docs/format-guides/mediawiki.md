@@ -10,9 +10,12 @@ The MediaWiki parser handles the wikitext subset most commonly found in wiki exp
 ```ruby
 require "markbridge/mediawiki"
 
-Markbridge.mediawiki_to_markdown("'''bold''' and ''italic''")
+result = Markbridge.mediawiki_to_markdown("'''bold''' and ''italic''")
+result.markdown
 # => "**bold** and *italic*"
 ```
+
+Like the other parsers, the convenience method returns a [`Markbridge::Conversion`](/migrating/overview/).
 
 ## Supported syntax
 
@@ -57,7 +60,18 @@ renderer.render(ast)
 # => "## Section\n\n- one\n- two"
 ```
 
-Unlike BBCode and HTML, the MediaWiki parser has no handler registry — it's a fixed-syntax parser. If you need to customize the output for a specific wikitext element, transform the AST after parsing or register a different renderer tag.
+MediaWiki's block syntax is fixed — there's no handler registry for headings, lists, tables, etc. Inline HTML-like tags (`<nowiki>`, `<code>`, `<sup>`, etc.) go through an `InlineTagRegistry` you can customize via the `handlers:` kwarg:
+
+```ruby
+registry = Markbridge::Parsers::MediaWiki::InlineTagRegistry.default
+registry.register("custom", :raw, MyCustomNode)
+
+Markbridge.mediawiki_to_markdown(input, handlers: registry)
+```
+
+`type` is one of `:raw` (content preserved verbatim, not re-parsed), `:formatting` (content re-parsed), or `:self_closing` (leaf with no content).
+
+For block-level customization, transform the AST after parsing, or register a different renderer tag via [`Markbridge.discourse_renderer(tags:)`](/customization/customizing-renderer/).
 
 ## Limitations
 

@@ -18,14 +18,18 @@ gem "nokogiri"
 ```ruby
 require "markbridge/html"
 
-Markbridge.html_to_markdown("<p>Hello <strong>world</strong>!</p>")
+result = Markbridge.html_to_markdown("<p>Hello <strong>world</strong>!</p>")
+result.markdown
 # => "Hello **world**!"
 ```
+
+`result` is a [`Markbridge::Conversion`](/migrating/overview/) — `.markdown`, plus `.unknown_tags`, `.emissions`, `.errors` for migration use.
 
 To get the AST:
 
 ```ruby
-ast = Markbridge.parse_html("<a href='https://example.com'>link</a>")
+parse = Markbridge.parse_html("<a href='https://example.com'>link</a>")
+parse.ast
 # => AST::Document(Url("link", href: "https://example.com"))
 ```
 
@@ -88,4 +92,4 @@ The default registry is intentionally scoped to the Discourse-facing subset. Not
 
 - Inline styles and `<span>`/`<div>` without handlers pass through transparently (children only).
 - `<script>`, `<style>`, `<iframe>` and similar tags are not registered; children are still processed.
-- If you need semantic mappings for something richer (for example `<details>` → spoiler), register a handler — see [Extending Markbridge](/guides/extending/).
+- If you need semantic mappings for something richer (for example `<details>` → spoiler), register a handler — see [Extending Markbridge](/customization/extending/).

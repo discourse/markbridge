@@ -53,6 +53,8 @@ end
 | `count_parents(klass)` | How deep a specific ancestor is (nested lists, quotes) |
 | `wrap_inline(content, markers)` | Wrap inline content with collapsing markers |
 | `block_context?(element)` | Block vs. inline position |
+| `html_mode?` | True inside a CommonMark HTML block — Tag must emit raw HTML or wrap output as a Markdown island (`\n\n…\n\n`) |
+| `emit(key, payload)` | Record side data for the caller to retrieve via `Conversion#emissions`. Used for migration placeholders (uploads, mentions, links). |
 
 The interface decouples tags from the renderer: you could write a second renderer (HTML, plain text, JSON) and reuse every tag by providing a compatible interface.
 
@@ -64,34 +66,30 @@ This immutability is load-bearing: it keeps the renderer side-effect free during
 
 ## TagLibrary
 
-<!-- spec:before
-class MyBoldTag < Markbridge::Renderers::Discourse::Tag
-  def render(element, interface)
-    "**#{interface.render_children(element)}**"
-  end
-end
--->
+The Discourse renderer ships with a default library mapping each built-in AST class to its Tag. `TagLibrary.default` returns a fresh copy each call (mutating it doesn't affect other callers).
+
+For most customization, prefer the `Markbridge.discourse_renderer(tags:, unregister:)` factory over hand-mutating a library — it gives you a complete, reusable Renderer:
+
 ```ruby
-library = Markbridge::Renderers::Discourse::TagLibrary.default
-# Contains: BoldTag, ItalicTag, CodeTag, ListTag, UrlTag, QuoteTag, ...
-
-library.register(AST::Bold, MyBoldTag.new)  # override
-
-library2 = Markbridge::Renderers::Discourse::TagLibrary.new
-library2.auto_register!  # convention-based: BoldTag → AST::Bold, ItalicTag → AST::Italic, ...
+RENDERER = Markbridge.discourse_renderer(
+  tags: { Markbridge::AST::Url => MyUrlTag.new },     # override
+  unregister: [Markbridge::AST::Color],               # drop entirely
+)
 ```
 
-Unknown AST classes fall through to a default pass-through tag, so an AST node without a registered tag won't crash rendering — it'll render its children only.
+Unknown AST classes (and unregistered ones) fall through to `render_children`, so a node with no registered tag won't crash rendering — it renders its children only, with the surrounding markup discarded.
+
+For lower-level use, `TagLibrary.new.auto_register!` discovers convention-paired classes (`BoldTag` → `AST::Bold`, etc.) under `Markbridge::Renderers::Discourse::Tags::*`. Consumer-defined tag classes still need explicit registration.
 
 ## Output cleanup
 
-After the tree walk, the top-level `Markbridge.*_to_markdown` methods apply a small cleanup pass:
+After the tree walk, the renderer's `Postprocessor` runs a small cleanup pass on the joined output:
 
 - Collapse runs of 3+ newlines to 2.
 - Strip whitespace-only lines.
 - Trim leading/trailing whitespace.
 
-If you call `Renderer#render` directly, you skip cleanup. That's fine when you're composing Markbridge into a larger pipeline and want to apply your own normalization.
+The default postprocessor is `Markbridge::Renderers::Discourse::Postprocessor::DEFAULT`. Pass a custom one (or a subclass) via `Markbridge.discourse_renderer(postprocessor:)` to change or extend the cleanup. Calling `Renderer#render` directly returns the *un*-postprocessed string.
 
 ## Writing a new renderer
 

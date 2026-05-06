@@ -59,9 +59,9 @@ Invalid XML falls back to treating the input as plain text.
 
 **Path:** `Markbridge::Parsers::MediaWiki::Parser`
 
-Unlike the others, there's no handler registry — wikitext is fixed-syntax. The parser is line-based: it classifies each line (heading, list, table, preformatted, blank, plain) and dispatches accordingly. An `InlineParser` handles intra-line formatting (`'''bold'''`, `[[links]]`, etc.).
+Unlike the others, MediaWiki's block syntax is fixed — wikitext lines are classified (heading, list, table, preformatted, blank, plain) and dispatched without a handler registry. An `InlineParser` handles intra-line formatting (`'''bold'''`, `[[links]]`, etc.).
 
-Customization for MediaWiki is typically post-parse: transform the AST or register a custom renderer tag. There's no parser-level extension point.
+The one parser-level extension point is `InlineTagRegistry` for HTML-like inline tags (`<nowiki>`, `<code>`, `<sup>`, etc.). Pass a customized registry via the `handlers:` kwarg. Block-level customization is post-parse: transform the AST or register a different renderer tag.
 
 ## Shared traits
 
@@ -69,7 +69,7 @@ All four parsers:
 
 - **Don't raise on bad input.** Unknown tags/elements are skipped (children still processed).
 - **Return an `AST::Document`.** The root is always a `Document` containing children.
-- **Track unknown tags** (on BBCode/HTML/TextFormatter) so you can audit migrations.
+- **Track unknown tags** so you can audit migrations. Surfaced via `Parse#unknown_tags` and `Conversion#unknown_tags` as `Hash{String => Integer}`.
 - **Normalize line endings** (CRLF → LF) before parsing.
 
 ## Picking one
