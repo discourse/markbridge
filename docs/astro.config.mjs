@@ -52,14 +52,27 @@ export default defineConfig({
       sidebar: [
         { label: 'Getting Started', slug: 'getting-started' },
         {
-          label: 'Guides',
+          label: 'Migrating to Discourse',
           items: [
-            { label: 'BBCode → Markdown', slug: 'guides/bbcode' },
-            { label: 'HTML → Markdown', slug: 'guides/html' },
-            { label: 'MediaWiki → Markdown', slug: 'guides/mediawiki' },
-            { label: 'TextFormatter → Markdown', slug: 'guides/textformatter' },
-            { label: 'Extending Markbridge', slug: 'guides/extending' },
-            { label: 'Configuration', slug: 'guides/configuration' },
+            { label: 'Overview', slug: 'migrating/overview' },
+            { label: 'Placeholders', slug: 'migrating/placeholders' },
+            { label: 'Full walkthrough', slug: 'migrating/full-walkthrough' },
+          ],
+        },
+        {
+          label: 'Format guides',
+          items: [
+            { label: 'BBCode → Markdown', slug: 'format-guides/bbcode' },
+            { label: 'HTML → Markdown', slug: 'format-guides/html' },
+            { label: 'MediaWiki → Markdown', slug: 'format-guides/mediawiki' },
+            { label: 'TextFormatter → Markdown', slug: 'format-guides/textformatter' },
+          ],
+        },
+        {
+          label: 'Customization',
+          items: [
+            { label: 'Customizing the renderer', slug: 'customization/customizing-renderer' },
+            { label: 'Extending Markbridge', slug: 'customization/extending' },
           ],
         },
         {
@@ -75,6 +88,7 @@ export default defineConfig({
         {
           label: 'Reference',
           items: [
+            { label: 'Upgrading', slug: 'reference/upgrading' },
             {
               label: 'API docs (rubydoc.info)',
               link: 'https://rubydoc.info/gems/markbridge',

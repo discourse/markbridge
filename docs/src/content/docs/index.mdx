@@ -1,19 +1,24 @@
 ---
 title: Markbridge
-description: Extensible Ruby pipeline that turns BBCode, HTML, and other markup into Discourse-ready Markdown via a parse → AST → render flow.
+description: Convert BBCode, HTML, MediaWiki, and TextFormatter XML into Discourse-flavored Markdown — built for forum migrations.
 template: splash
 hero:
   tagline: |
-    Convert markup in multiple formats to Discourse-ready Markdown —
-    via a predictable parse → AST → render pipeline.
+    Convert BBCode, HTML, MediaWiki, and TextFormatter XML into
+    Discourse-flavored Markdown. Built for forum migrations:
+    placeholder-friendly, side-data-emitting, unknown-tag-aware.
   image:
     file: ../../assets/markbridge-icon.svg
     alt: Markbridge logo
   actions:
+    - text: Migrating to Discourse
+      link: /migrating/overview/
+      icon: right-arrow
+      variant: primary
     - text: Get started
       link: /getting-started/
       icon: right-arrow
-      variant: primary
+      variant: secondary
     - text: View on GitHub
       link: https://github.com/discourse/markbridge
       icon: external
@@ -22,48 +27,39 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Install
-
-```bash
-bundle add markbridge
-```
-
 ## See it in action
 
 ```ruby
 require "markbridge/bbcode"
-require "markbridge/html"
 
-Markbridge.bbcode_to_markdown("[b]Hello[/b] [url=https://example.com]world[/url]!")
-# => "**Hello** [world](https://example.com)!"
+result = Markbridge.bbcode_to_markdown(
+  "[b]Hello[/b] [url=https://example.com]world[/url] [unknown]oops[/unknown]"
+)
 
-Markbridge.html_to_markdown("<p>Nested <em>is</em> fine.</p>")
-# => "Nested *is* fine."
+result.markdown        # => "**Hello** [world](https://example.com) oops"
+result.unknown_tags    # => {"unknown" => 2}
+result.emissions       # => {} (custom Tags can populate this for the importer)
 ```
 
+`*_to_markdown` returns a `Conversion` value object — the rendered string is on `.markdown`, side data and unknown tags ride alongside.
+
 <CardGrid stagger>
+  <Card title="Forum migrations, first-class" icon="rocket">
+    The recurring placeholder triad — AST node + parser handler + renderer Tag — is the canonical migration shape. Tags emit side data via `interface.emit`; the importer reads `Conversion#emissions` to resolve uploads, mentions, and links downstream.
+  </Card>
   <Card title="Four input formats" icon="random">
-    BBCode, HTML, MediaWiki wikitext, and <span class="nowrap">s9e/TextFormatter</span> XML.
-    One AST, one Markdown renderer — pick the entry point that fits your source.
+    BBCode, HTML, MediaWiki wikitext, and <span class="nowrap">s9e/TextFormatter</span> XML. One AST, one Discourse Markdown renderer — pick the entry point that fits your source. `Markbridge.convert(input, format:)` dispatches when the format isn't fixed at the call site.
   </Card>
   <Card title="Graceful degradation" icon="approve-check-circle">
-    Unknown tags don't crash — they're preserved or skipped while parsing continues.
-    Built for the messy reality of forum migrations.
+    Unknown tags don't crash — they're tracked and surfaced via `Conversion#unknown_tags` so a migration can audit, drop, or fail per its own policy. Malformed input degrades to plain text instead of raising.
   </Card>
-  <Card title="Extensible" icon="puzzle">
-    Register custom handlers to recognize new tags; register custom renderer tags
-    to shape the Markdown output. No monkey-patching.
+  <Card title="Extensible without monkey-patching" icon="puzzle">
+    Register custom handlers to recognize new tags. `HandlerRegistry#overlay` wraps the default for delegation. Build a custom `Renderer` once with `Markbridge.discourse_renderer(...)` and reuse across thousands of posts.
   </Card>
-  <Card title="Performance-conscious" icon="rocket">
-    Single-pass parsing, O(1) parent lookups during render, minimal allocations
-    on the hot paths. Linear in input size.
+  <Card title="Performance-conscious" icon="setting">
+    Single-pass parsing, O(1) parent lookups during render, minimal allocations on the hot paths. Linear in input size. Reusable Renderer with zero overhead on the no-emit path.
   </Card>
   <Card title="Battle-tested" icon="star">
-    Powers Discourse forum migrations. Extensive unit, integration, and
-    end-to-end system tests keep real-world inputs covered.
-  </Card>
-  <Card title="Zero runtime gems" icon="download">
-    Pure Ruby (3.3+). Runs on CRuby, plus the latest TruffleRuby and JRuby.
-    Nokogiri is only required for some parsers.
+    Powers Discourse forum migrations. Extensive unit, integration, and end-to-end system tests keep real-world inputs covered.
   </Card>
 </CardGrid>

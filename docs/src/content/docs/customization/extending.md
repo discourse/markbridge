@@ -80,23 +80,27 @@ callout_tag =
   end
 ```
 
-### 5. Register the renderer tag
+### 5. Build a renderer with the tag
 
 <!-- spec:continue -->
 ```ruby
-tag_library = Markbridge::Renderers::Discourse::TagLibrary.default
-tag_library.register(Markbridge::AST::Callout, callout_tag)
+renderer = Markbridge.discourse_renderer(
+  tags: { Markbridge::AST::Callout => callout_tag },
+)
 ```
+
+`tags:` merges on top of the default library, so every other AST class keeps its built-in rendering. See [Customizing the renderer](/customization/customizing-renderer/) for the full set of factory options.
 
 ### 6. Use it
 
 <!-- spec:continue -->
 ```ruby
-Markbridge.bbcode_to_markdown(
+result = Markbridge.bbcode_to_markdown(
   "[callout=warning]Heads up![/callout]",
   handlers:,
-  tag_library:,
+  renderer:,
 )
+result.markdown
 # => "> [!WARNING]\n> Heads up!\n"
 ```
 
@@ -113,6 +117,8 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 | `count_parents(klass)` | Depth of a specific ancestor type (useful for nested lists) |
 | `wrap_inline(content, markers)` | Wrap inline content, collapsing adjacent markers cleanly |
 | `block_context?(element)` | True if the current position is a block context |
+| `html_mode?` | True inside a CommonMark HTML block — the Tag must emit raw HTML or wrap output as a Markdown island |
+| `emit(key, payload)` | Record side data the caller will read off `Conversion#emissions` (see [Placeholders](/migrating/placeholders/)) |
 
 Use `find_parent` / `has_parent?` to render differently inside specific ancestors (e.g. a code span inside a table cell).
 
@@ -140,35 +146,75 @@ The TextFormatter registry works the same way, but element names are **UPPERCASE
 
 ## Replacing a built-in renderer tag
 
-You don't need a new AST node — you can re-render an existing one however you like:
+You don't need a new AST node — re-render an existing one however you like by passing it through `tags:`:
 
 ```ruby
-tag_library = Markbridge::Renderers::Discourse::TagLibrary.default
-
-tag_library.register(
-  Markbridge::AST::Url,
-  Markbridge::Renderers::Discourse::Tag.new do |element, interface|
-    # Custom link rendering — e.g., prefix internal links
-    href = element.href.start_with?("/") ? "https://forum.example.com#{element.href}" : element.href
-    "[#{interface.render_children(element)}](#{href})"
-  end,
+renderer = Markbridge.discourse_renderer(
+  tags: {
+    Markbridge::AST::Url =>
+      Markbridge::Renderers::Discourse::Tag.new do |element, interface|
+        # Custom link rendering — e.g., prefix internal links
+        href = element.href.start_with?("/") ? "https://forum.example.com#{element.href}" : element.href
+        "[#{interface.render_children(element)}](#{href})"
+      end,
+  }
 )
+```
+
+## Wrapping a default handler
+
+`HandlerRegistry#overlay` replaces a tag's binding by yielding the previous handler — useful when you want to delegate to the default for the easy cases and only customize the awkward ones:
+
+<!-- spec:before
+class LoggingUrlHandler
+  def initialize(default:); @default = default; end
+  def auto_closeable?; @default.auto_closeable?; end
+  def element_class; @default.element_class; end
+  def on_open(token:, context:, registry:, tokens: nil)
+    @default.on_open(token:, context:, registry:, tokens:)
+  end
+  def on_close(token:, context:, registry:, tokens: nil)
+    @default.on_close(token:, context:, registry:, tokens:)
+  end
+end
+-->
+```ruby
+handlers = Markbridge::Parsers::BBCode::HandlerRegistry.default
+handlers.overlay("quote") do |default|
+  LoggingQuoteHandler.new(default:)
+end
+```
+
+`overlay` is available on the BBCode, HTML, and TextFormatter `HandlerRegistry`. The yielded `default` is `nil` if nothing was previously registered. (MediaWiki's `InlineTagRegistry` has a different shape — see [Format guides → MediaWiki](/format-guides/mediawiki/).)
+
+When several tag names share one AST class (e.g. `url`/`link`/`iurl` all build `AST::Url`), the wrapper has to be a *single* instance so the closing strategy's element-to-handler lookup matches on both sides. Use plain `register` for that, not `overlay`:
+
+```ruby
+default_url = handlers["url"]
+handlers.register(%w[url link iurl], LoggingUrlHandler.new(default: default_url))
 ```
 
 ## Convention-based auto-registration
 
-If you name your tag class `FooTag` and your AST class `AST::Foo`, you can skip manual registration:
+`TagLibrary.new.auto_register!` discovers Markbridge's built-in tags by naming convention:
 
 ```ruby
-tag_library = Markbridge::Renderers::Discourse::TagLibrary.new
-tag_library.auto_register!
+library = Markbridge::Renderers::Discourse::TagLibrary.new
+library.auto_register!
 # Discovers BoldTag → AST::Bold, ItalicTag → AST::Italic, etc.
 ```
+
+`auto_register!` only walks `Markbridge::Renderers::Discourse::Tags::*`, so consumer-defined tag classes aren't picked up automatically — register those explicitly via `Markbridge.discourse_renderer(tags: { MyAst => MyTag.new })` or by calling `library.register(MyAst, MyTag.new)` before passing it as `tag_library:` to the factory.
+
+## Migration use cases
+
+When you're extending Markbridge to feed a Discourse migration — links to be resolved later, uploads to be tracked, mentions to be looked up — the same triad applies, but the renderer Tag also calls `interface.emit(:key, payload)` to record side data the importer reads back from `Conversion#emissions`. See [Migrating to Discourse → Placeholders](/migrating/placeholders/).
 
 ## When to customize vs. fork
 
 - **Unknown tag** in input → register a handler.
-- **Known tag, different output** → register a new renderer tag for the same AST node.
-- **New output format** (not Discourse Markdown) → write a new renderer that walks the AST — the parsers and AST are renderer-agnostic.
+- **Known tag, different output** → pass `tags: { ASTClass => MyTag.new }` to `discourse_renderer`.
+- **Wrap default behavior** → `HandlerRegistry#overlay` for parser-side; `tags:` overrides for renderer-side.
+- **New output format** (not Discourse Markdown) → write a new renderer that walks the AST. The parsers and AST are renderer-agnostic.
 
 See [`examples/`](https://github.com/discourse/markbridge/tree/main/examples) for working versions of all of these.
