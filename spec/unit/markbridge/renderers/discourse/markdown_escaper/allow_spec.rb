@@ -1,6 +1,17 @@
 # frozen_string_literal: true
 
-RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper, "#initialize allow:" do
+RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper, "#initialize" do
+  describe "escape_hard_line_breaks:" do
+    it "defaults to false (preserves trailing-space hard breaks)" do
+      expect(described_class.new.escape("foo  \nbar")).to eq("foo  \nbar")
+    end
+
+    it "when true, strips trailing spaces before newlines" do
+      expect(described_class.new(escape_hard_line_breaks: true).escape("foo  \nbar")).to eq(
+        "foo\nbar",
+      )
+    end
+  end
   describe "default behavior (allow: nil)" do
     let(:escaper) { described_class.new }
 
