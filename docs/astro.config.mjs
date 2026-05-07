@@ -36,6 +36,10 @@ export default defineConfig({
           tag: 'meta',
           attrs: { name: 'twitter:card', content: 'summary_large_image' },
         },
+        {
+          tag: 'script',
+          attrs: { src: '/diagram-zoom.js', defer: true },
+        },
       ],
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/discourse/markbridge' },
