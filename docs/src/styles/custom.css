@@ -42,3 +42,44 @@
     transform: translateY(calc(var(--stagger-height) - 2px));
   }
 }
+
+/* --- Excalidraw diagrams ----------------------------------------------- */
+
+/* Each diagram has a `-light` and `-dark` SVG; the muted arrow labels and
+ * arrow strokes flip between dark grey (on light surface) and light grey
+ * (on dark surface). The card surface is a soft tint of the page bg so the
+ * diagram has a visual frame without slamming a bright white island into
+ * dark mode. */
+figure.diagram {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+[data-theme='dark'] figure.diagram {
+  background: #1e2230;
+  border-color: #2a3040;
+}
+
+figure.diagram img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Show the right SVG variant per theme. Both are present in the DOM; we
+ * hide the one that doesn't match. */
+figure.diagram .diagram-dark {
+  display: none;
+}
+
+[data-theme='dark'] figure.diagram .diagram-light {
+  display: none;
+}
+
+[data-theme='dark'] figure.diagram .diagram-dark {
+  display: block;
+}

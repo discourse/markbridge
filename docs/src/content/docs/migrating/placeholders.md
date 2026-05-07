@@ -7,17 +7,10 @@ A *placeholder* is a short literal string in the rendered Markdown that the Disc
 
 The pattern looks like this:
 
-```
-[upload=42] in the source
-        ↓                   parser handler builds your custom AST node
-                            ForumUpload(source_id: 42, ...)
-        ↓                   renderer Tag emits {source_id: 42, ...} on :uploads
-                            and returns "[upload|42]"
-"[upload|42]"               ← spliced verbatim into the Markdown output
-emissions: {                ← collected on Conversion#emissions
-  uploads: [{source_id: 42, filename: "..."}]
-}
-```
+<figure class="diagram">
+  <img class="diagram-light" src="/diagrams/placeholders.svg" alt="Placeholder triad: source [upload=42] tag becomes UploadPlaceholder AST node, which the renderer Tag splits into a [upload|42] string in the Markdown output and an emissions record on Conversion#emissions">
+  <img class="diagram-dark" src="/diagrams/placeholders-dark.svg" alt="Placeholder triad: source [upload=42] tag becomes UploadPlaceholder AST node, which the renderer Tag splits into a [upload|42] string in the Markdown output and an emissions record on Conversion#emissions">
+</figure>
 
 Every placeholder concept follows the same triad: an **AST node** to carry the parsed data, a **parser handler** to construct it, and a **renderer Tag** to format the placeholder and emit the side data.
 
