@@ -12,6 +12,7 @@ module Markbridge
           def render(element, interface)
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
+            return content unless content.match?(/[^[:space:]]/)
 
             if interface.html_mode?
               %(<span class="bbcode-u">#{content}</span>)
