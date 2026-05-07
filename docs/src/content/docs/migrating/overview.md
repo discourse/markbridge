@@ -9,12 +9,10 @@ This page is the mental model. The next two pages — [Placeholders](/migrating/
 
 ## Four stages
 
-```
-source markup ─▶ Parse ─▶ AST ─▶ Render ─▶ Conversion
-                                  ▲
-                                  └── interface.emit(:key, payload)
-                                      side data collected per call
-```
+<figure class="diagram">
+  <img class="diagram-light" src="/diagrams/overview.svg" alt="Five-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with interface.emit feeding side data per call into Render from above">
+  <img class="diagram-dark" src="/diagrams/overview-dark.svg" alt="Five-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with interface.emit feeding side data per call into Render from above">
+</figure>
 
 1. **Parse**. The format-specific parser tokenizes the input and builds an `AST::Document`. Unknown tags are tracked but never raise — the parser is resilient by design.
 2. **AST**. A renderer-agnostic tree of `Text`, `Element`, and leaf nodes (`LineBreak`, `HorizontalRule`). Custom AST nodes (Upload, Mention, InternalLink) live alongside the built-ins.

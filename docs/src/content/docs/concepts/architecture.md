@@ -5,17 +5,10 @@ description: The three-phase pipeline that turns markup into Markdown.
 
 Markbridge is built around a **Parse → AST → Render** pipeline. Each phase has a single responsibility and doesn't know about the others.
 
-```
-┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│   Input     │  →   │     AST     │  →   │  Markdown   │
-│ (BBCode/... │      │    tree     │      │   output    │
-└─────────────┘      └─────────────┘      └─────────────┘
-      │                     │                     │
-   Parser              Document              Renderer
-   Scanner               Nodes                  Tags
-   Handlers             Elements              Context
-   Registry                                   Library
-```
+<figure class="diagram">
+  <img class="diagram-light" src="/diagrams/architecture.svg" alt="Three-phase pipeline: Input (BBCode / HTML / MediaWiki / XML) → AST (Document tree) → Discourse Markdown">
+  <img class="diagram-dark" src="/diagrams/architecture-dark.svg" alt="Three-phase pipeline: Input (BBCode / HTML / MediaWiki / XML) → AST (Document tree) → Discourse Markdown">
+</figure>
 
 ## Phase 1 — parse
 
