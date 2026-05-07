@@ -106,6 +106,18 @@ matcher:
     # rather than process crashes on 3.4.9+.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_char_run
 
+    # MarkdownEscaper#escape_text's `text.include?("\r") ?` fast-path
+    # ternary. Both branches produce byte-identical lines for any
+    # input: `text.split(/\r?\n/, -1)` consumes any CRLF terminator,
+    # and `text.split("\n", -1)` is correct for LF-only input. The
+    # guard exists purely to keep the LF case on the cheaper string
+    # split — regex split is ~19% slower on the indented-code hot
+    # path per /tmp/bench_escaper.rb. All 5 alive mutations
+    # (`if true`, `if text`, `if "\r"`, `if text.include?("")`, and
+    # collapse-if to always-regex) shift work to the regex branch
+    # without changing observable output. Bucket A.
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_text
+
     # CodeBlockTracker helpers `check_inline_boundary` /
     # `skip_leading_spaces`: `input[pos] != " "` / `!= "`"` vs
     # `!input[pos].eql?(" ")` / `!.eql?("`")`. `!=` and `!eql?` are
