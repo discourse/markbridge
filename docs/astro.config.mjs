@@ -4,6 +4,18 @@ import starlight from '@astrojs/starlight';
 
 export default defineConfig({
   site: 'https://markbridge.dev',
+  vite: {
+    server: {
+      // Force fresh fetches in dev so updated SVGs / CSS / JS in public/
+      // appear without restarting the dev server. Without this, Vite's
+      // static-file middleware lets the browser cache `public/` assets
+      // aggressively and even hard-refresh keeps the stale copy.
+      headers: { 'Cache-Control': 'no-store' },
+      // inotify isn't reliable on every filesystem (containers, mounted
+      // volumes); poll instead so file changes are picked up everywhere.
+      watch: { usePolling: true, interval: 200 },
+    },
+  },
   integrations: [
     starlight({
       title: 'Markbridge',
