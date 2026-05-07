@@ -132,7 +132,14 @@ module Markbridge
         private
 
         def escape_text(text)
-          lines = text.split("\n", -1)
+          # On CRLF input, consume `\r` as part of the line terminator instead
+          # of leaving it on the line. A trailing `\r` breaks line-end anchored
+          # regexes (e.g. SETEXT_UNDERLINE_*) and the `ws_end >= line_length`
+          # early-out in escape_indented_code, leaking NBSPs onto
+          # whitespace-only CRLF lines. The `include?` guard keeps the
+          # LF-only fast path on a string split (regex split is ~20% slower
+          # on the indented-code hot path).
+          lines = text.include?("\r") ? text.split(/\r?\n/, -1) : text.split("\n", -1)
           return escape_line(lines[0], false) if lines.size == 1
 
           # Pre-allocate result buffer
