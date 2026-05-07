@@ -58,6 +58,7 @@ module Markbridge
             registry.register("tr", Handlers::TableRowHandler.new)
             registry.register(%w[td th], Handlers::TableCellHandler.new)
             registry.register("p", Handlers::ParagraphHandler.new)
+            registry.register("span", Handlers::SpanHandler.new)
           end
         end
 
