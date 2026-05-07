@@ -94,6 +94,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # bin/generate-release-notes needs prior tags and the commits
+          # between them to build the changelog.
+          fetch-depth: 0
       - name: Release Gem
         uses: discourse/publish-rubygems-action@v3
         env:
