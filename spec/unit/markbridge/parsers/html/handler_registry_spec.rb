@@ -115,6 +115,15 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       end
     end
 
+    # SpanHandler is conditional on the style attribute, so it has no
+    # fixed element_class — it can't be slotted into the data-driven
+    # table above.
+    it "registers SpanHandler for <span>" do
+      registered = default_registry["span"]
+
+      expect(registered).to be_a(Markbridge::Parsers::HTML::Handlers::SpanHandler)
+    end
+
     # br and hr are inline lambdas, not handler instances
     it "registers a lambda for <br> that emits a LineBreak and returns nil" do
       parent = Markbridge::AST::Paragraph.new
