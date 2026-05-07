@@ -131,5 +131,32 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(result).to include("#{nbsp * 8}indented under list")
       end
     end
+
+    # CRLF input (e.g. SharePoint HTML exports) used to leak past the
+    # `ws_end >= line_length` early-out in escape_indented_code because
+    # `\r` was counted as content, not whitespace. The leading spaces were
+    # then converted to NBSPs, producing whitespace-only lines that
+    # cleanup_markdown couldn't strip.
+    context "with CRLF line endings" do
+      it "treats a CRLF whitespace-only indented line as whitespace" do
+        result = escaper.escape("    \r\n")
+        expect(result).not_to include(nbsp)
+      end
+
+      it "does not produce NBSP for a wall of CRLF whitespace-only lines" do
+        input = "    \r\n    \r\n    \r\nhello"
+        result = escaper.escape(input)
+        expect(result).not_to include(nbsp)
+        expect(result).to include("hello")
+      end
+
+      it "still converts genuine CRLF-terminated indented code to NBSP" do
+        input = "    code line\r\n    next line"
+        result = escaper.escape(input)
+        expect(result).to include("#{nbsp * 4}code line")
+        expect(result).to include("#{nbsp * 4}next line")
+        expect(result).not_to match(/\A {4}/)
+      end
+    end
   end
 end
