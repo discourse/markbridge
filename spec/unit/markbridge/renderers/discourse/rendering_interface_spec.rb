@@ -170,12 +170,27 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
       expect(interface.wrap_inline("   ", "**")).to eq("   ")
     end
 
+    it "returns content unchanged when content is Unicode whitespace (e.g. nbsp)" do
+      # CommonMark treats U+00A0 as whitespace, so `** **` would not
+      # parse as bold (the closing `**` is not right-flanking). Match
+      # CommonMark's whitespace definition rather than Ruby's ASCII-only \S.
+      expect(interface.wrap_inline(" ", "**")).to eq(" ")
+    end
+
     it "returns content unchanged when content is empty" do
       expect(interface.wrap_inline("", "**")).to eq("")
     end
 
     it "preserves leading and trailing whitespace inside the wrap" do
       expect(interface.wrap_inline("  text  ", "**")).to eq("  **text**  ")
+    end
+
+    it "preserves leading and trailing Unicode whitespace (e.g. nbsp) outside the wrap" do
+      # CommonMark requires the closing delimiter to be right-flanking
+      # (not preceded by Unicode whitespace), so nbsp must be hoisted
+      # outside the wrap just like ASCII space.
+      nbsp = " "
+      expect(interface.wrap_inline("#{nbsp}text#{nbsp}", "**")).to eq("#{nbsp}**text**#{nbsp}")
     end
 
     it "preserves leading and trailing whitespace independently when they differ" do
