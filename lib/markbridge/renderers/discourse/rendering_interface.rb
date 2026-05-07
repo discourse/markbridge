@@ -67,7 +67,7 @@ module Markbridge
         # Handles edge cases like existing markers and whitespace
         def wrap_inline(content, open_marker, close_marker = nil)
           close_marker ||= open_marker
-          return content unless content.match?(/\S/)
+          return content unless content.match?(/[^[:space:]]/)
 
           # Handle conflicts with existing markers
           if content.include?(open_marker) || content.include?(close_marker)
@@ -82,8 +82,9 @@ module Markbridge
             end
           end
 
-          # Preserve leading/trailing whitespace
-          content.sub(/\A(\s*)(.+?)(\s*)\z/m) do
+          # Preserve leading/trailing whitespace (Unicode-aware, since
+          # CommonMark's flanking rules treat e.g. nbsp as whitespace).
+          content.sub(/\A([[:space:]]*)(.+?)([[:space:]]*)\z/m) do
             match = Regexp.last_match
             "#{match[1]}#{open_marker}#{match[2]}#{close_marker}#{match[3]}"
           end
