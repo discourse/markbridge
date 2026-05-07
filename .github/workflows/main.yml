@@ -77,7 +77,19 @@ jobs:
       # On PR: mutate subjects changed since main.
       # On push to main: mutate subjects changed by this push.
       - name: Run mutant
-        run: bin/mutant run --since "${{ github.event_name == 'pull_request' && 'origin/main' || github.event.before }}"
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            since="origin/main"
+          else
+            since="${{ github.event.before }}"
+            # A force-push leaves `github.event.before` pointing to an
+            # unreachable commit; fall back to the previous commit on main.
+            if ! git cat-file -e "${since}^{commit}" 2>/dev/null; then
+              echo "Base ${since} not reachable; falling back to HEAD^"
+              since="HEAD^"
+            fi
+          fi
+          bin/mutant run --since "${since}"
 
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
