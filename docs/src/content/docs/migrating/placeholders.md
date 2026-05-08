@@ -8,64 +8,68 @@ A *placeholder* is a short literal string in the rendered Markdown that the Disc
 The pattern looks like this:
 
 <figure class="diagram">
-  <img class="diagram-light" src="/diagrams/placeholders.svg" alt="Placeholder triad: source [upload=42] tag becomes UploadPlaceholder AST node, which the renderer Tag splits into a [upload|42] string in the Markdown output and an emissions record on Conversion#emissions">
-  <img class="diagram-dark" src="/diagrams/placeholders-dark.svg" alt="Placeholder triad: source [upload=42] tag becomes UploadPlaceholder AST node, which the renderer Tag splits into a [upload|42] string in the Markdown output and an emissions record on Conversion#emissions">
+  <img class="diagram-light" src="/diagrams/placeholders.svg" alt="Placeholder triad: source [attachment=0] tag becomes AttachmentPlaceholder AST node, which the renderer Tag splits into a [attachment|0] string in the Markdown output and an emissions record on Conversion#emissions">
+  <img class="diagram-dark" src="/diagrams/placeholders-dark.svg" alt="Placeholder triad: source [attachment=0] tag becomes AttachmentPlaceholder AST node, which the renderer Tag splits into a [attachment|0] string in the Markdown output and an emissions record on Conversion#emissions">
 </figure>
 
 Every placeholder concept follows the same triad: an **AST node** to carry the parsed data, a **parser handler** to construct it, and a **renderer Tag** to format the placeholder and emit the side data.
 
-> Markbridge ships with a built-in `Markbridge::AST::Upload` for *resolved* uploads (it carries a Discourse-side `sha1:`). For *placeholders*, define your own AST class — the source-forum upload ID isn't an upload yet, just a reference the importer will resolve.
+> Markbridge ships with a built-in `Markbridge::AST::Attachment` that maps to Discourse's resolved upload syntax. For migrations the source post doesn't *have* a Discourse upload yet — it has a reference to a row in the source forum's attachments table. Define your own AST class so the importer can resolve those references after the rendering pass.
 
 ## The placeholder triad, end to end
 
-Concrete worked example: `[upload=42]filename.jpg[/upload]` becomes `[upload|42]` in the output, with `{source_id: 42, filename: "filename.jpg"}` recorded on `result.emitted(:uploads)`.
+Worked example for **phpBB3**, which emits attachments as `[attachment=N]filename[/attachment]` where `N` is the **position index** of the attachment within the post (zero-based). The actual file lives in `phpbb_attachments` joined to the post; the BBCode just points at slot N.
+
+The pipeline below turns `[attachment=0]filename.jpg[/attachment]` into `[attachment|0]` in the output, with `{position: 0, filename: "filename.jpg"}` recorded on `result.emitted(:attachments)` so the importer can swap the placeholder for a real Discourse upload reference once it has resolved the source row.
+
+(vBulletin's `[ATTACH]N[/ATTACH]` and IPB's `[attachment=N:filename]` follow the same shape — the example below adapts to either by tweaking the handler.)
 
 ### 1. The AST node
 
 ```ruby
 module ForumMigration
-  class UploadPlaceholder < Markbridge::AST::Element
-    attr_reader :source_id
+  class AttachmentPlaceholder < Markbridge::AST::Element
+    attr_reader :position
 
-    def initialize(source_id:)
+    def initialize(position:)
       super()
-      @source_id = source_id
+      @position = position
     end
   end
 end
 ```
 
-`Element` lets it accept children (the filename text). `attr_reader` keeps it immutable. Pick whatever class name maps to your domain — `ForumMigration::UploadPlaceholder`, `Migration::SourceUpload`, anything that won't collide with built-in AST classes.
+`Element` lets it accept children (the filename text). `attr_reader` keeps it immutable. Pick whatever class name maps to your domain — `ForumMigration::AttachmentPlaceholder`, `Migration::SourceAttachment`, anything that won't collide with built-in AST classes.
 
 ### 2. The parser handler
 
 ```ruby
 module ForumMigration
-  class UploadHandler < Markbridge::Parsers::BBCode::Handlers::BaseHandler
+  class AttachmentHandler < Markbridge::Parsers::BBCode::Handlers::BaseHandler
     def initialize
-      @element_class = UploadPlaceholder
+      @element_class = AttachmentPlaceholder
     end
 
     attr_reader :element_class
 
     def on_open(token:, context:, registry:, tokens: nil)
-      source_id = Integer(token.attrs[:option] || token.attrs[:id])
-      context.push(UploadPlaceholder.new(source_id:))
+      position = Integer(token.attrs[:option] || token.attrs[:id])
+      context.push(AttachmentPlaceholder.new(position:))
     end
   end
 end
 ```
 
-The handler reads `[upload=42]`'s attribute and constructs the AST node. The default `on_close` from `BaseHandler` handles `[/upload]`. If your source forum stores upload IDs differently (paths, slugs, hash references), this is where you translate — the rest of the pipeline just deals with the resolved AST node.
+The handler reads `[attachment=0]`'s attribute and constructs the AST node. The default `on_close` from `BaseHandler` handles `[/attachment]`. Markbridge ships a handler for `[attachment]` / `[attach]` already (it builds `AST::Attachment`); registering this one overrides the defaults so they go through your migration-aware path.
 
 ### 3. The renderer Tag
 
 ```ruby
-class UploadPlaceholderTag < Markbridge::Renderers::Discourse::Tag
+class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
   def render(element, interface)
     filename = interface.render_children(element)
-    interface.emit(:uploads, source_id: element.source_id, filename:)
-    "[upload|#{element.source_id}]"
+    interface.emit(:attachments, position: element.position, filename:)
+    "[attachment|#{element.position}]"
   end
 end
 ```
@@ -77,30 +81,34 @@ Three lines doing the meaningful work: collect any nested content, emit the side
 ```ruby
 HANDLERS =
   Markbridge::Parsers::BBCode::HandlerRegistry.default.tap do |r|
-    r.register(%w[upload attach attachment], ForumMigration::UploadHandler.new)
+    r.register(%w[attachment attach], ForumMigration::AttachmentHandler.new)
   end
 
 RENDERER =
-  Markbridge.discourse_renderer(tags: { ForumMigration::UploadPlaceholder => UploadPlaceholderTag.new })
+  Markbridge.discourse_renderer(
+    tags: { ForumMigration::AttachmentPlaceholder => AttachmentPlaceholderTag.new },
+  )
 ```
+
+A single `.new` is registered under both `[attachment]` and `[attach]` so the closing strategy finds the same handler instance on both sides — see [Extending Markbridge → Wrapping a default handler](/customization/extending/#wrapping-a-default-handler) for why this matters when one handler covers multiple aliases.
 
 ### 5. Use it
 
 ```ruby
 result = Markbridge.bbcode_to_markdown(
-  "Here is [upload=42]photo.jpg[/upload], take a look.",
+  "Screenshot: [attachment=0]screenshot.png[/attachment] — see what I mean?",
   handlers: HANDLERS,
   renderer: RENDERER,
 )
 
 result.markdown
-# => "Here is [upload|42], take a look."
+# => "Screenshot: [attachment|0] — see what I mean?"
 
-result.emitted(:uploads)
-# => [{source_id: 42, filename: "photo.jpg"}]
+result.emitted(:attachments)
+# => [{position: 0, filename: "screenshot.png"}]
 ```
 
-The importer's job from here: walk `result.emitted(:uploads)`, store an upload row keyed by `source_id`, and trust that the placeholder `[upload|42]` will be substituted in the post body downstream.
+The importer's job from here: pull the source post's attachment rows (ordered by their natural ID), match each by position to the emitted records, store the new uploads, and substitute `[attachment|N]` placeholders for resolved Discourse upload references in the post body.
 
 ## Placeholder strings pass through verbatim
 
@@ -108,7 +116,7 @@ A common worry: "if my placeholder contains `[`, won't the Markdown escaper mang
 
 Markbridge escapes only `AST::Text` nodes — the textual content from the source document. A Tag's return value is spliced into its parent's output with no transformation. Whatever you return from `Tag#render` is exactly what appears in the surrounding Markdown.
 
-This is what makes placeholders safe. `"[upload|42]"`, `"@@MENTION:alice@@"`, `"<<TOPIC:7>>"` all reach the output untouched. Pick whatever sigil pattern your importer parses cleanly downstream.
+This is what makes placeholders safe. `"[attachment|0]"`, `"@@MENTION:alice@@"`, `"<<TOPIC:7>>"` all reach the output untouched. Pick whatever sigil pattern your importer parses cleanly downstream.
 
 The one twist is HTML mode (next section).
 
@@ -119,14 +127,14 @@ When a parent renders an HTML block — currently only `TableTag` doing its HTML
 **Raw HTML.** If your placeholder has a natural HTML form, emit it directly:
 
 ```ruby
-class UploadTag < Markbridge::Renderers::Discourse::Tag
+class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
   def render(element, interface)
-    interface.emit(:uploads, id: element.upload_id)
+    interface.emit(:attachments, position: element.position)
 
     if interface.html_mode?
-      %(<a href="upload://#{element.upload_id}">attachment</a>)
+      %(<a href="attachment://#{element.position}">attachment</a>)
     else
-      "[upload|#{element.upload_id}]"
+      "[attachment|#{element.position}]"
     end
   end
 end
@@ -135,7 +143,7 @@ end
 **Markdown island.** If your placeholder is an opaque sigil that downstream tooling parses regardless of context, wrap it in blank lines so CommonMark closes the HTML block, parses your placeholder as Markdown, and re-opens it:
 
 ```ruby
-"\n\n[upload|#{element.upload_id}]\n\n"
+"\n\n[attachment|#{element.position}]\n\n"
 ```
 
 The blank lines force a paragraph break around the placeholder, which is fine for block-level placeholders (uploads in tables tend to want their own row anyway) but unsightly for inline ones (mentions, links). Prefer the raw-HTML form for inline placeholders that can land inside tables.
