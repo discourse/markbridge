@@ -20,7 +20,7 @@ Every placeholder concept follows the same triad: an **AST node** to carry the p
 
 Worked example for **phpBB3**, which emits attachments as `[attachment=N]filename[/attachment]` where `N` is the **position index** of the attachment within the post (zero-based). The actual file lives in `phpbb_attachments` joined to the post; the BBCode just points at slot N.
 
-The pipeline below turns `[attachment=0]filename.jpg[/attachment]` into `[upload|<sha1>]` in the output — Discourse's upload-marker shape, with the SHA-1 looked up from the source post's attachment rows. The hash and source data are also recorded on `result.emitted(:attachments)` so the importer can write its own bookkeeping.
+The pipeline below turns `[attachment=0]filename.jpg[/attachment]` into `[upload|<upload_id>]` in the output — Discourse's upload-marker shape, with the upload identifier looked up from the source post's attachment rows. The `upload_id` is whatever stable identifier the importer's converter framework derives from the source filename/path (not the file's content hash) so each placeholder maps unambiguously to one source-side row. The full record is also emitted on `result.emitted(:attachments)` so the importer can do its own bookkeeping.
 
 (vBulletin's `[ATTACH]N[/ATTACH]` and IPB's `[attachment=N:filename]` follow the same shape — the example below adapts to either by tweaking the handler.)
 
@@ -64,7 +64,7 @@ The handler reads `[attachment=0]`'s attribute and constructs the AST node. The 
 
 ### 3. The renderer Tag
 
-The Tag needs the post's attachment list at render time so it can map a position to a SHA-1. Pass it through the constructor:
+The Tag needs the post's attachment list at render time so it can map a position to an `upload_id`. Pass it through the constructor:
 
 ```ruby
 class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
@@ -78,15 +78,15 @@ class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
     interface.emit(
       :attachments,
       position: element.position,
-      sha1: attachment.sha1,
+      upload_id: attachment.upload_id,
       filename:,
     )
-    "[upload|#{attachment.sha1}]"
+    "[upload|#{attachment.upload_id}]"
   end
 end
 ```
 
-`[upload|HASH]` is Discourse's upload-marker shape — the importer recognizes it and substitutes a real `upload://HASH.ext` URL once the file has been ingested. The emission gives the importer the same data plus the source-side position for cross-referencing.
+`[upload|<id>]` is the upload-marker shape Discourse importers recognize — they substitute a real `upload://...` URL once the file has been ingested. The emission gives the importer the same identifier plus the source-side position for cross-referencing.
 
 ### 4. Wire it up
 
@@ -120,7 +120,7 @@ Constructing the renderer per post breaks the build-once-reuse-many pattern, but
 ### 5. What you get
 
 ```ruby
-attachments = [SourceAttachment.new(sha1: "abc123def456", filename: "screenshot.png")]
+attachments = [SourceAttachment.new(upload_id: "u_screenshot_png_3a7c2", filename: "screenshot.png")]
 renderer = Markbridge.discourse_renderer(
   tags: { ForumMigration::AttachmentPlaceholder => AttachmentPlaceholderTag.new(attachments:) },
 )
@@ -132,13 +132,13 @@ result = Markbridge.bbcode_to_markdown(
 )
 
 result.markdown
-# => "Screenshot: [upload|abc123def456] — see what I mean?"
+# => "Screenshot: [upload|u_screenshot_png_3a7c2] — see what I mean?"
 
 result.emitted(:attachments)
-# => [{position: 0, sha1: "abc123def456", filename: "screenshot.png"}]
+# => [{position: 0, upload_id: "u_screenshot_png_3a7c2", filename: "screenshot.png"}]
 ```
 
-The importer downstream substitutes `[upload|abc123def456]` for the resolved `upload://abc123def456.png` URL once the file is ingested into Discourse's upload store.
+The importer downstream substitutes `[upload|u_screenshot_png_3a7c2]` for the resolved `upload://...` URL once the file is ingested into Discourse's upload store.
 
 ## Placeholder strings pass through verbatim
 
@@ -146,7 +146,7 @@ A common worry: "if my placeholder contains `[`, won't the Markdown escaper mang
 
 Markbridge escapes only `AST::Text` nodes — the textual content from the source document. A Tag's return value is spliced into its parent's output with no transformation. Whatever you return from `Tag#render` is exactly what appears in the surrounding Markdown.
 
-This is what makes placeholders safe. `"[upload|abc123]"`, `"@@MENTION:alice@@"`, `"<<TOPIC:7>>"` all reach the output untouched. Pick whatever sigil pattern your importer parses cleanly downstream.
+This is what makes placeholders safe. `"[upload|u_screenshot_png_3a7c2]"`, `"@@MENTION:alice@@"`, `"<<TOPIC:7>>"` all reach the output untouched. Pick whatever sigil pattern your importer parses cleanly downstream.
 
 The one twist is HTML mode (next section).
 
@@ -160,12 +160,12 @@ When a parent renders an HTML block — currently only `TableTag` doing its HTML
 class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
   def render(element, interface)
     attachment = @attachments[element.position]
-    interface.emit(:attachments, position: element.position, sha1: attachment.sha1)
+    interface.emit(:attachments, position: element.position, upload_id: attachment.upload_id)
 
     if interface.html_mode?
-      %(<a href="upload://#{attachment.sha1}">attachment</a>)
+      %(<a href="upload://#{attachment.upload_id}">attachment</a>)
     else
-      "[upload|#{attachment.sha1}]"
+      "[upload|#{attachment.upload_id}]"
     end
   end
 end
@@ -174,7 +174,7 @@ end
 **Markdown island.** If your placeholder is an opaque sigil that downstream tooling parses regardless of context, wrap it in blank lines so CommonMark closes the HTML block, parses your placeholder as Markdown, and re-opens it:
 
 ```ruby
-"\n\n[upload|#{attachment.sha1}]\n\n"
+"\n\n[upload|#{attachment.upload_id}]\n\n"
 ```
 
 The blank lines force a paragraph break around the placeholder, which is fine for block-level placeholders (uploads in tables tend to want their own row anyway) but unsightly for inline ones (mentions, links). Prefer the raw-HTML form for inline placeholders that can land inside tables.
