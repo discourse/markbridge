@@ -20,7 +20,7 @@ Every placeholder concept follows the same triad: an **AST node** to carry the p
 
 Worked example for **phpBB3**, which emits attachments as `[attachment=N]filename[/attachment]` where `N` is the **position index** of the attachment within the post (zero-based). The actual file lives in `phpbb_attachments` joined to the post; the BBCode just points at slot N.
 
-The pipeline below turns `[attachment=0]filename.jpg[/attachment]` into `[upload|<upload_id>]` in the output — Discourse's upload-marker shape, with the upload identifier looked up from the source post's attachment rows. The `upload_id` is whatever stable identifier the importer's converter framework derives from the source filename/path (not the file's content hash) so each placeholder maps unambiguously to one source-side row. The full record is also emitted on `result.emitted(:attachments)` so the importer can do its own bookkeeping.
+The pipeline below turns `[attachment=0]filename.jpg[/attachment]` into `[upload|<upload_id>]` in the output — Discourse's upload-marker shape, with the upload identifier looked up from the source post's attachment rows. The `upload_id` is whatever stable identifier the importer's converter framework derives from the source filename/path (not the file's content hash) so each placeholder maps unambiguously to one source-side row. The full record is also emitted on `result.emitted(:uploads)` so the importer can do its own bookkeeping.
 
 (vBulletin's `[ATTACH]N[/ATTACH]` and IPB's `[attachment=N:filename]` follow the same shape — the example below adapts to either by tweaking the handler.)
 
@@ -28,18 +28,18 @@ The pipeline below turns `[attachment=0]filename.jpg[/attachment]` into `[upload
 
 ```ruby
 module ForumMigration
-  class AttachmentPlaceholder < Markbridge::AST::Element
-    attr_reader :position
+  class AttachmentPlaceholder < Markbridge::AST::Node
+    attr_reader :position, :filename
 
-    def initialize(position:)
-      super()
+    def initialize(position:, filename: nil)
       @position = position
+      @filename = filename
     end
   end
 end
 ```
 
-`Element` lets it accept children (the filename text). `attr_reader` keeps it immutable. Pick whatever class name maps to your domain — `ForumMigration::AttachmentPlaceholder`, `Migration::SourceAttachment`, anything that won't collide with built-in AST classes.
+`Node` (rather than `Element`) makes it a leaf — the filename comes from the BBCode body but the handler captures it at parse time and pins it on the node, so there are no children to render. Pick whatever class name maps to your domain — `ForumMigration::AttachmentPlaceholder`, `Migration::SourceAttachment`, anything that won't collide with built-in AST classes.
 
 ### 2. The parser handler
 
@@ -48,19 +48,33 @@ module ForumMigration
   class AttachmentHandler < Markbridge::Parsers::BBCode::Handlers::BaseHandler
     def initialize
       @element_class = AttachmentPlaceholder
+      @collector = Markbridge::Parsers::BBCode::RawContentCollector.new
     end
 
     attr_reader :element_class
 
     def on_open(token:, context:, registry:, tokens: nil)
       position = Integer(token.attrs[:option] || token.attrs[:id])
-      context.push(AttachmentPlaceholder.new(position:))
+      filename = tokens && @collector.collect(token.tag, tokens).content
+      context.add_child(AttachmentPlaceholder.new(position:, filename: presence(filename)))
+    end
+
+    # The collector consumes the closing tag; if one slips through, render it as literal text.
+    def on_close(token:, context:, registry:, tokens: nil)
+      context.add_child(Markbridge::AST::Text.new(token.source))
+    end
+
+    private
+
+    def presence(string)
+      stripped = string&.strip
+      stripped unless stripped.nil? || stripped.empty?
     end
   end
 end
 ```
 
-The handler reads `[attachment=0]`'s attribute and constructs the AST node. The default `on_close` from `BaseHandler` handles `[/attachment]`. Markbridge ships a handler for `[attachment]` / `[attach]` already (it builds `AST::Attachment`); registering this one overrides the defaults so they go through your migration-aware path.
+`RawContentCollector` is the same helper Markbridge's built-in `AttachmentHandler` uses to grab the body between `[attachment=0]` and `[/attachment]` as a literal string. Storing the filename on the node directly means the renderer Tag doesn't have to call `render_children` later. Markbridge ships a handler for `[attachment]` / `[attach]` already (it builds `AST::Attachment`); registering this one overrides the defaults so they go through your migration-aware path.
 
 ### 3. The renderer Tag
 
@@ -74,12 +88,11 @@ class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
 
   def render(element, interface)
     attachment = @attachments[element.position]
-    filename = interface.render_children(element)
     interface.emit(
-      :attachments,
+      :uploads,
       position: element.position,
       upload_id: attachment.upload_id,
-      filename:,
+      filename: element.filename,
     )
     "[upload|#{attachment.upload_id}]"
   end
@@ -109,7 +122,7 @@ posts.each do |post|
     )
 
   result = Markbridge.bbcode_to_markdown(post.body, handlers: HANDLERS, renderer:)
-  store(post, result.markdown, result.emitted(:attachments))
+  store(post, result.markdown, result.emitted(:uploads))
 end
 ```
 
@@ -134,7 +147,7 @@ result = Markbridge.bbcode_to_markdown(
 result.markdown
 # => "Screenshot: [upload|u_screenshot_png_3a7c2] — see what I mean?"
 
-result.emitted(:attachments)
+result.emitted(:uploads)
 # => [{position: 0, upload_id: "u_screenshot_png_3a7c2", filename: "screenshot.png"}]
 ```
 
@@ -160,7 +173,7 @@ When a parent renders an HTML block — currently only `TableTag` doing its HTML
 class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
   def render(element, interface)
     attachment = @attachments[element.position]
-    interface.emit(:attachments, position: element.position, upload_id: attachment.upload_id)
+    interface.emit(:uploads, position: element.position, upload_id: attachment.upload_id)
 
     if interface.html_mode?
       %(<a href="upload://#{attachment.upload_id}">attachment</a>)
