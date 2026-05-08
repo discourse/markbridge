@@ -4,10 +4,11 @@ module Markbridge
   module Parsers
     module HTML
       module Handlers
-        # Handler for void HTML elements (no children, no attributes consumed).
-        # Mirrors SimpleHandler but returns nil from #process so the parser
-        # skips child traversal — appropriate for tags like <br> and <hr>.
-        class VoidHandler < BaseHandler
+        # Handler for self-closing leaf tags (br, hr, etc.). Creates
+        # an instance of +element_class+, appends it to +parent+, and
+        # returns nil so the parser does not try to recurse into
+        # children.
+        class SelfClosingHandler < BaseHandler
           def initialize(element_class)
             @element_class = element_class
           end

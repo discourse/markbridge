@@ -166,18 +166,26 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       expect(registered).to be_a(Markbridge::Parsers::HTML::Handlers::SpanHandler)
     end
 
-    it "registers VoidHandler for <br> producing AST::LineBreak" do
-      registered = default_registry["br"]
+    it "registers a SelfClosingHandler for <br> that emits a LineBreak and returns nil" do
+      parent = Markbridge::AST::Paragraph.new
+      result = default_registry["br"].process(element: nil, parent:)
 
-      expect(registered).to be_a(Markbridge::Parsers::HTML::Handlers::VoidHandler)
-      expect(registered.element_class).to eq(Markbridge::AST::LineBreak)
+      expect(parent.children.size).to eq(1)
+      expect(parent.children.first).to be_a(Markbridge::AST::LineBreak)
+      # Not a HorizontalRule — kills cross-handler element_class swaps.
+      expect(parent.children.first).not_to be_a(Markbridge::AST::HorizontalRule)
+      # Returns nil so the parser does NOT descend into children.
+      expect(result).to be_nil
     end
 
-    it "registers VoidHandler for <hr> producing AST::HorizontalRule" do
-      registered = default_registry["hr"]
+    it "registers a SelfClosingHandler for <hr> that emits a HorizontalRule and returns nil" do
+      parent = Markbridge::AST::Paragraph.new
+      result = default_registry["hr"].process(element: nil, parent:)
 
-      expect(registered).to be_a(Markbridge::Parsers::HTML::Handlers::VoidHandler)
-      expect(registered.element_class).to eq(Markbridge::AST::HorizontalRule)
+      expect(parent.children.size).to eq(1)
+      expect(parent.children.first).to be_a(Markbridge::AST::HorizontalRule)
+      expect(parent.children.first).not_to be_a(Markbridge::AST::LineBreak)
+      expect(result).to be_nil
     end
   end
 

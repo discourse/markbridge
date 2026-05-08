@@ -334,14 +334,6 @@ mutation:
     - "send{receiver=send{receiver=self selector=class} selector=new}"
     - "index{receiver=lvar{value=new_cache}}"
 
-    # HTML::Parser#process_element_node's `handler.call(element: node,
-    # parent:)` is the lambda-dispatch path, used only by the `br` /
-    # `hr` handlers in HandlerRegistry.default. Neither lambda reads
-    # `element:` — both just emit a void AST node into `parent`. So
-    # `element: nil` is equivalent for every registered caller.
-    # Bucket A.
-    - "send{receiver=lvar{value=handler} selector=call}"
-
 # MarkdownEscaper#block_construct?'s `when DIGIT_0..DIGIT_9` range.
     # Mutations `when DIGIT_0..nil` / `when nil..DIGIT_9` extend the
     # range to unbounded, but the body is `ORDERED_LIST.match?(content)`

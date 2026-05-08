@@ -108,12 +108,7 @@ module Markbridge
           return handle_unknown_tag(node, parent) unless handler
 
           # Handler returns element if children should be processed, nil otherwise
-          ast_element =
-            if handler.respond_to?(:process)
-              handler.process(element: node, parent:)
-            else
-              handler.call(element: node, parent:)
-            end
+          ast_element = handler.process(element: node, parent:)
 
           return unless ast_element
 
