@@ -244,3 +244,183 @@ fall out of the same redesign:
 Implementation lives on `claude/refine-local-plan-dMDie` (PR #30). Once
 that merges to `main`, the `docs` branch will pick up the new API shape
 and the `migrating/*` guides described above can be written against it.
+
+## §5. Resolution architecture (post-implementation refinement)
+
+A design pass after PR #30 was drafted concluded that placeholder
+*resolution* — the position-to-upload-id, name-to-user-id, slug-to-
+topic-id translations a migration needs — should happen at **parse
+time inside custom handlers**, not at render time inside Tags. That
+flips two assumptions in §1–§3 and obsoletes §2 entirely.
+
+### The shape
+
+A converter framework (separate library, sits *above* Markbridge) owns
+the resolution layer:
+
+- **Markbridge** provides parser/handler/AST/renderer primitives.
+- **Converter framework** provides resolution-aware base handlers
+  (`BaseAttachmentHandler`, `BaseMentionHandler`, …), the placeholder
+  AST classes they construct, and trivial render Tags. Owns the
+  `[upload|<id>]` placeholder convention.
+- **Per-format converters** (phpBB, vBulletin, SMF, IPB, XenForo)
+  subclass the base handlers via a template-method pattern, overriding
+  only source-ref extraction. Same AST class, same Tag, three converters
+  share the resolution logic.
+- **Importer** is the downstream layer that consumes converted output
+  and substitutes `[upload|<id>]` for the real `upload://...` reference
+  once the file is ingested.
+
+### Why parse-time resolution
+
+The resolution isn't a pure lookup — it's a *write*. The handler stores
+the source attachment in Discourse's upload store (idempotent on source
+hash), receives an `upload_id`, and pins it on the AST node. The
+storing side effect wants to happen once per source attachment, which
+parse-time resolution gives for free. Render-time resolution would
+re-store on every render or require an in-Tag cache.
+
+Consequences:
+
+1. **AST nodes carry resolved data.** `AttachmentPlaceholder(upload_id:)`
+   is enough; no `position`/`filename` needed beyond what the handler
+   used to do its work.
+2. **Render Tags are trivial.** `def render(element, _) =
+   "[upload|#{element.upload_id}]"`. No state, no per-post wiring.
+   The renderer can be a singleton.
+3. **Parse failures surface early.** Missing position, DB write error,
+   etc. bubble up at parse time, attributable to the source post.
+4. **AST loses the "renderer-agnostic" property.** It's resolved to
+   Discourse-specific identifiers. Acceptable trade because the
+   converter framework is Discourse-only by definition.
+5. **Per-post wiring shifts to handlers**, not renderers. Same total
+   work, different layer.
+
+### `interface.emit` becomes unnecessary
+
+`interface.emit` and `Conversion#emissions` (§2) were designed for
+render-time side-data tracking. With resolution moved to parse time:
+
+- The data the importer needs is already on the AST (handler-resolved).
+- Walking the AST or recording side effects in the handler covers
+  every "what did this post reference?" question.
+- No render-time-only context needs to flow back to the caller.
+
+§2 is therefore obsoleted. PR #30 should remove the emit API before
+merge — see "PR #30 change list" below.
+
+### Per-format handler reuse
+
+Template-method shape lives in the converter framework:
+
+```ruby
+class BaseAttachmentHandler < Markbridge::Parsers::BBCode::Handlers::BaseHandler
+  def initialize(attachment_store:)
+    @attachment_store = attachment_store
+    @element_class = AttachmentPlaceholder
+    @collector = Markbridge::Parsers::BBCode::RawContentCollector.new
+  end
+  attr_reader :element_class
+
+  def on_open(token:, context:, registry:, tokens: nil)
+    source_ref = extract_source_ref(token, tokens)
+    return context.add_child(fallback_for(token)) unless source_ref
+
+    upload_id = @attachment_store.store_or_lookup(source_ref)
+    context.add_child(AttachmentPlaceholder.new(upload_id:))
+  end
+
+  def extract_source_ref(token, tokens) = raise NotImplementedError
+  def fallback_for(token) = Markbridge::AST::Text.new(token.source)
+end
+
+# phpBB: position into per-post attachments table
+class PhpBB::AttachmentHandler < BaseAttachmentHandler
+  def extract_source_ref(token, tokens)
+    SourceRef.new(post_id: ..., position: Integer(token.attrs[:option]),
+                  filename: @collector.collect(token.tag, tokens).content)
+  end
+end
+
+# vBulletin: absolute attach_id
+class VBulletin::AttachmentHandler < BaseAttachmentHandler
+  def extract_source_ref(token, tokens)
+    SourceRef.new(attach_id: Integer(token.attrs[:option]))
+  end
+end
+```
+
+The same pattern applies to mentions, polls, events, links. Markbridge
+contributes the parser primitives (`BaseHandler`, `RawContentCollector`,
+AST primitives like `Element`/`Node`/`Text`); the converter framework
+contributes the resolution-aware base classes and the placeholder AST
+classes.
+
+### Idempotency and failure-mode invariants
+
+The converter framework's base handlers have a small implicit contract:
+
+- `attachment_store.store_or_lookup(source_ref)` is **idempotent** on a
+  source-side identifier (most often a content hash). Two posts that
+  reference the same source attachment must produce the same
+  `upload_id`. A re-run of the converter must not duplicate uploads.
+- Within a single converter run, the store should **memoize** so common
+  attachments (avatars, signatures) aren't fetched repeatedly.
+- The handler must define a **fallback** for resolution failure — most
+  natural is an `AST::Text` with the raw source token, so the
+  unresolved markup survives in the rendered output for human review.
+
+### PR #30 change list (gem branch)
+
+Concrete edits to make in `claude/refine-local-plan-dMDie` before
+merge to undo §2:
+
+1. `lib/markbridge/renderers/discourse/rendering_interface.rb` — remove
+   the `#emit` method.
+2. `lib/markbridge/renderers/discourse/renderer.rb` — remove
+   `@emission_buffer`, `#emissions`, `#record_emission`,
+   `#with_provisional_emissions`, `#snapshot_emissions`,
+   `#rollback_emissions`, and the buffer reset in `#render`.
+3. `lib/markbridge/conversion.rb` — drop the `emissions` field from
+   `Data.define` and the `#emitted(key)` accessor.
+4. `lib/markbridge.rb` — remove `emissions: renderer.emissions` (or
+   equivalent) from `build_conversion` and any sibling Conversion
+   constructions.
+5. `examples/forum_migration.rb` — drop the `interface.emit(:link, ...)`
+   call from `PlaceholderUrlTag`. Either resolve in a custom handler
+   or drop the side-data tracking entirely (the example can still
+   demonstrate the renderer factory, custom escaper, etc.).
+6. `UPGRADING.md` — remove the "Tag side-data: use `interface.emit`"
+   section. Replace with a brief note that resolution lives in
+   handler subclasses (per the converter-framework architecture).
+7. Specs — drop emission-related tests across:
+   `spec/unit/markbridge/conversion_spec.rb`,
+   `spec/unit/markbridge/renderers/discourse/renderer_spec.rb`,
+   `spec/unit/markbridge/renderers/discourse/rendering_interface_spec.rb`.
+   Verify nothing else references emissions.
+8. Verify `bundle exec rake` and `bin/mutant` are green after.
+
+### Docs branch follow-up
+
+Once §5 is reflected in PR #30, the docs need a pass to match:
+
+- `migrating/placeholders.md` — rewrite the worked example around
+  handler-side resolution. AST node carries `upload_id`; Tag is
+  trivial; remove the `interface.emit` references; remove the
+  per-post renderer construction (handler holds per-post state
+  instead).
+- `migrating/overview.md` — drop the `interface.emit` side-channel
+  callout from the four-stage description and the diagram.
+- `migrating/full-walkthrough.md` — re-narrate `examples/forum_migration.rb`
+  after the §2 removal lands.
+- `placeholders.excalidraw` and its rendered SVGs — drop the
+  emissions arrow from the triad diagram. The triad becomes
+  source → handler → AST → Tag → placeholder string. No side channel.
+- `customization/extending.md` — remove the `emit` row from the
+  rendering-interface table.
+- `concepts/renderers.md` — same.
+- `reference/upgrading.md` — sync with PR #30's `UPGRADING.md`
+  changes.
+
+These are mechanical removals; happy to do them as a follow-up
+commit on the `docs` branch once PR #30 lands the §2 removal.
