@@ -9,13 +9,21 @@
 #   - Custom AST node + BBCode handler ([font])
 #   - Handler delegation via `overlay` (custom <a>-style URL handler
 #     wrapping the default)
-#   - Custom Tags emitting side data via `interface.emit`
 #   - `Markbridge.discourse_renderer(...)` factory
-#   - `tags:` Hash, `unregister:` Array, custom escaper (subclass of
-#     MarkdownEscaper), custom postprocessor
-#   - `Conversion#emissions` / `Conversion#errors` / `Conversion#unknown_tags`
+#   - `tags:` Hash, `unregister:` Array, `allow: :lists` for selective
+#     escaper passthrough
+#   - The AST-mutation block on `Markbridge.convert` (append orphan
+#     attachments before rendering)
+#   - `Conversion#errors` / `Conversion#unknown_tags`
 #   - `raise_on_error: false` for per-row failure isolation
 #   - `Markbridge.convert(input, format:)` dispatch
+#
+# Note: this example deliberately keeps the converter side trivial.
+# Real importers put placeholder resolution (uploads, mentions,
+# internal links) in custom handler subclasses at parse time, with
+# the AST node carrying the resolved identifier — render Tags then
+# stay one-line output formatters. That layer lives in the
+# converter framework, not Markbridge.
 #
 # Run it:  bundle exec ruby examples/forum_migration.rb
 
@@ -68,38 +76,6 @@ FONT_TAG =
     end
   end
 
-# -- Custom URL Tag emitting placeholder records ----------------------------
-
-# Real importers swap [url=…] payloads for placeholders that get
-# resolved later (after the destination posts have IDs). The Tag
-# emits a side-channel record so the importer can pick it up after
-# rendering — no mutable hash injected into the Tag constructor.
-class PlaceholderUrlTag < Markbridge::Renderers::Discourse::Tag
-  def render(element, interface)
-    href = element.href
-    text = interface.render_children(element, context: interface.with_parent(element))
-
-    if internal_link?(href)
-      placeholder = "[[link:#{next_id}]]"
-      interface.emit(:link, { url: href, text:, placeholder: })
-      placeholder
-    else
-      "[#{text}](#{href})"
-    end
-  end
-
-  private
-
-  def internal_link?(href)
-    href&.start_with?("https://forum.example.com/")
-  end
-
-  def next_id
-    @counter ||= 0
-    @counter += 1
-  end
-end
-
 # -- Build the importer's reusable parts (handlers + renderer) --------------
 #
 # Forum posts using "1. item" / "- item" syntax need their leading
@@ -140,7 +116,6 @@ HANDLERS =
 RENDERER =
   Markbridge.discourse_renderer(
     tags: {
-      Markbridge::AST::Url => PlaceholderUrlTag.new,
       FontNode => FONT_TAG,
     },
     # Drop built-ins so they fall through to render_children. Forum
@@ -184,7 +159,6 @@ POSTS = [
 # -- The migration loop ------------------------------------------------------
 
 stats = { ok: 0, errors: 0 }
-emitted_links = []
 
 POSTS.each do |post|
   # `Markbridge.convert(..., format:, &block)` yields the parsed AST
@@ -211,8 +185,6 @@ POSTS.each do |post|
   end
 
   stats[:ok] += 1
-  emitted_links.concat(result.emitted(:link))
-
   puts "post ##{post[:id]} (#{post[:format]}): #{result.markdown.inspect}"
   puts "  unknown_tags: #{result.unknown_tags}" if result.unknown_tags.any?
 end
@@ -221,5 +193,3 @@ puts
 puts "Migration complete:"
 puts "  ok: #{stats[:ok]}"
 puts "  errors: #{stats[:errors]}"
-puts "  link placeholders emitted: #{emitted_links.size}"
-emitted_links.each { |l| puts "    #{l[:placeholder]} -> #{l[:url]}" }

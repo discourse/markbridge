@@ -116,13 +116,6 @@ RSpec.describe Markbridge do
       expect(result.unknown_tags["neverknown"]).to eq(2)
     end
 
-    it "returns an empty emissions hash by default" do
-      result = described_class.bbcode_to_markdown("[b]hi[/b]")
-
-      expect(result.emissions).to eq({})
-      expect(result.emitted(:upload)).to eq([])
-    end
-
     it "returns an empty errors array by default" do
       expect(described_class.bbcode_to_markdown("[b]hi[/b]").errors).to eq([])
     end
@@ -669,20 +662,6 @@ RSpec.describe Markbridge do
 
     it "exposes an empty Array for errors when render succeeds" do
       expect(described_class.render(Markbridge::AST::Document.new).errors).to eq([])
-    end
-
-    it "exposes Conversion#emissions populated from the renderer" do
-      tag =
-        Class.new(Markbridge::Renderers::Discourse::Tag) do
-          def render(_element, interface)
-            interface.emit(:upload, :record)
-            ""
-          end
-        end
-      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
-      doc = described_class.parse_bbcode("[b]x[/b]").ast
-
-      expect(described_class.render(doc, renderer:).emissions).to eq(upload: [:record])
     end
 
     context "with a Parse argument" do

@@ -60,7 +60,7 @@ Markbridge.bbcode_to_markdown(input, renderer: RENDERER)
 ```
 
 Build the renderer once outside your migration loop and reuse it
-across thousands of posts; the no-emit path adds zero overhead.
+across thousands of posts.
 
 ### `tags:`, `tag_library:`, `escaper:`, `escape_hard_line_breaks:` removed from per-call signature
 
@@ -142,39 +142,47 @@ The `BBCode` parser has always required class handlers (its
 `on_open`/`on_close` lifecycle doesn't fit the lambda shape). All
 three parsers now follow the same rule.
 
-### Tag side-data: use `interface.emit` instead of mutating ctor-injected hashes
+### Resolution lives in handlers, not Tags
 
-The textbook before/after for importers' Tags that build placeholders:
+The migration use case resolves placeholders (uploads, mentions,
+internal links) at parse time via custom handler subclasses. The
+handler stores the source-side reference in the converter's
+upload/user/topic store, gets back a stable identifier, and pins
+it on the AST node directly. Renderer Tags remain trivial output
+formatting — no per-post state, no side-channel.
 
 ```ruby
-# Before
-class UrlTag < Markbridge::Renderers::Discourse::Tag
-  def initialize(placeholders:)
-    @placeholders = placeholders
-  end
-
-  def render(element, interface)
-    link = build_link(element)
-    @placeholders[:links] << link        # mutates ctor-injected array
-    link[:placeholder]
-  end
+# Custom AST node carrying the resolved id
+class AttachmentPlaceholder < Markbridge::AST::Node
+  attr_reader :upload_id
+  def initialize(upload_id:); super(); @upload_id = upload_id; end
 end
-# Importer pre-allocates @placeholders, passes to Tag, reads it after.
 
-# After
-class UrlTag < Markbridge::Renderers::Discourse::Tag
-  def render(element, interface)
-    link = build_link(element)
-    interface.emit(:link, link)          # routed to Conversion#emissions
-    link[:placeholder]
+# Handler: resolves at parse, pins id on the node
+class AttachmentHandler < Markbridge::Parsers::BBCode::Handlers::BaseHandler
+  def initialize(uploads:); @uploads = uploads; end
+  def on_open(token:, context:, registry:, tokens: nil)
+    upload = @uploads.store_or_lookup(token.attrs[:option])
+    context.add_child(AttachmentPlaceholder.new(upload_id: upload.id))
   end
+  def element_class; AttachmentPlaceholder; end
 end
-# Importer reads: result.emitted(:link).each { |l| ... }
+
+# Tag: trivial output formatter, no state
+class AttachmentTag < Markbridge::Renderers::Discourse::Tag
+  def render(element, _interface) = "[upload|#{element.upload_id}]"
+end
+
+RENDERER = Markbridge.discourse_renderer(
+  tags: { AttachmentPlaceholder => AttachmentTag.new },
+)
 ```
 
-Pure lookup tables (`uploads:`, `repository:`) injected into Tag
-constructors are still fine — only *mutation during render* migrates
-to `emit`.
+`interface.emit` and `Conversion#emissions` (intermediate API in
+earlier drafts of this redesign) are not part of the shipped API.
+Resolution-aware base handlers belong in the converter framework
+that wraps Markbridge; per-format converters (phpBB, vBulletin,
+SMF, IPB attachment handlers) subclass them.
 
 ### `RawHandler` no longer requires `language:` on the AST class
 
@@ -281,6 +289,6 @@ behavior of letting exceptions propagate.
 
 - `examples/forum_migration.rb` — canonical end-to-end importer shape
   exercising every new path: `discourse_renderer` factory, `tags:`,
-  `unregister:`, custom escaper, `interface.emit`, `Conversion#emissions`,
+  `unregister:`, `allow: :lists`, the AST-mutation block,
   `raise_on_error: false`, `Markbridge.convert(format:)` dispatch.
 - `docs/extending.md` — how to add custom tags and handlers.

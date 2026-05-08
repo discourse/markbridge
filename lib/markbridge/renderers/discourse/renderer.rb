@@ -12,10 +12,6 @@ module Markbridge
           @escaper = escaper || MarkdownEscaper.new
           @html_escaper = html_escaper || HtmlEscaper
           @postprocessor = postprocessor || Postprocessor::DEFAULT
-          # @emission_buffer is always present so emit/with_provisional
-          # callers don't need a nil-check; cleared at the start of
-          # each root render call.
-          @emission_buffer = {}
           # @interface_cache is lazily initialized in #render's top-level
           # call and reset to nil after the call completes.
         end
@@ -26,10 +22,7 @@ module Markbridge
         # @return [String]
         def render(node, context: RenderContext.new)
           root_call = @interface_cache.nil?
-          if root_call
-            @interface_cache = {}
-            @emission_buffer.clear
-          end
+          @interface_cache = {} if root_call
 
           tag = @tag_library[node.class]
           if tag
@@ -48,52 +41,7 @@ module Markbridge
             ""
           end
         ensure
-          # Drop the per-call interface cache; keep @emission_buffer so
-          # callers can drain it via #emissions after render returns.
-          # The buffer is reset on the next root call.
           @interface_cache = nil if root_call
-        end
-
-        # Append a record to the emission buffer for the current
-        # render call. Called by Tags through
-        # +RenderingInterface#emit+.
-        # @param key [Symbol]
-        # @param payload [Object]
-        def record_emission(key, payload)
-          (@emission_buffer[key] ||= []) << payload
-        end
-
-        # Snapshot the emission buffer, run the block, and roll back
-        # to the snapshot if the block exits without committing. Used
-        # by tags that perform a throwaway render pass
-        # (e.g. +TableTag+'s Markdown-then-HTML fallback).
-        #
-        # The block decides whether to keep emissions by calling
-        # +commit+ on the yielded controller. If the block exits
-        # without committing, emissions made inside the block are
-        # discarded.
-        #
-        # Must be called from within a render call (so the buffer is
-        # set up). Calling outside a render is undefined.
-        #
-        # @yieldparam controller [#commit]
-        # @return [Object] the block's return value
-        def with_provisional_emissions
-          snapshot = @emission_buffer.transform_values(&:dup)
-          committed = false
-          controller = ProvisionalController.new(-> { committed = true })
-
-          result = yield(controller)
-          @emission_buffer.replace(snapshot) unless committed
-          result
-        end
-
-        # Drain the emission buffer for the *most recent* root render
-        # call. Returns a fresh hash; mutating it does not affect
-        # subsequent renders.
-        # @return [Hash{Symbol => Array}]
-        def emissions
-          @emission_buffer.transform_values(&:dup)
         end
 
         # Render all children of a node
@@ -119,16 +67,6 @@ module Markbridge
         end
 
         private
-
-        # Yielded by +#with_provisional_emissions+; calling +commit+
-        # tells the renderer to keep emissions made inside the block.
-        ProvisionalController =
-          Struct.new(:commit_proc) do
-            def commit
-              commit_proc.call
-            end
-          end
-        private_constant :ProvisionalController
 
         # Inserted between sibling outputs when their adjacent characters
         # would merge into a longer Markdown emphasis delimiter run (e.g.

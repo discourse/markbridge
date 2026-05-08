@@ -239,38 +239,4 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
-  describe "#emit" do
-    it "delegates to renderer.record_emission with the key and payload, in that order" do
-      allow(renderer).to receive(:record_emission)
-
-      interface.emit(:upload, { sha1: "abc" })
-
-      expect(renderer).to have_received(:record_emission).with(:upload, { sha1: "abc" })
-    end
-
-    it "returns nil regardless of what record_emission returns" do
-      allow(renderer).to receive(:record_emission).and_return("not nil")
-
-      expect(interface.emit(:upload, :payload)).to be_nil
-    end
-  end
-
-  describe "#with_provisional_emissions" do
-    it "delegates to renderer.with_provisional_emissions, forwarding the block" do
-      allow(renderer).to receive(:with_provisional_emissions).and_yield(:controller).and_return(
-        "result",
-      )
-
-      yielded = nil
-      result =
-        interface.with_provisional_emissions do |c|
-          yielded = c
-          "block-value"
-        end
-
-      expect(renderer).to have_received(:with_provisional_emissions)
-      expect(yielded).to eq(:controller)
-      expect(result).to eq("result")
-    end
-  end
 end

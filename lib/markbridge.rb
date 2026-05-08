@@ -264,7 +264,6 @@ module Markbridge
         format: parse.format,
         unknown_tags: parse.unknown_tags,
         diagnostics: parse.diagnostics,
-        emissions: renderer.emissions,
         errors:,
       )
     end
