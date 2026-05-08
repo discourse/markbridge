@@ -75,18 +75,12 @@ module Markbridge
         # Process an XML element using the registered handler
         # @param element [Nokogiri::XML::Element]
         # @param parent [AST::Element] parent node to add children to
-        # @param processor [Parser] the parser, exposed to handlers/lambdas
-        #   so they can call back into +process_children+ for nested content
+        # @param processor [Parser] the parser, exposed to handlers so
+        #   they can call back into +process_children+ for nested content
         # @return [AST::Element, nil] the created element if children should be processed, nil otherwise
         def process_element(element, parent, processor)
           handler = self[element.name]
-          return nil unless handler
-
-          if handler.respond_to?(:process)
-            handler.process(element:, parent:, processor:)
-          else
-            handler.call(element:, parent:, processor:)
-          end
+          handler&.process(element:, parent:, processor:)
         end
 
         # Register all default s9e/TextFormatter element mappings

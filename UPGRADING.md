@@ -105,11 +105,42 @@ handler tree. The `processor:` argument is the parser instance and
 exposes `process_children(xml_element, ast_node)` for handlers that
 want to recurse into children manually.
 
-Lambda handlers now receive the same kwargs:
+### Proc/lambda handlers no longer supported
+
+Both HTML and TextFormatter previously accepted a `Proc`/lambda as a
+handler. They now accept only objects responding to `#process(...)`.
+Existing default handlers were already class-based; the only places
+this affected built-in code were `<br>`/`<hr>` lambdas (now
+`HTML::Handlers::SelfClosingHandler`) and the
+`examples/custom_text_formatter_mappings.rb` lambdas (now Handler
+classes).
+
+Migration: define a tiny class extending the parser's `BaseHandler`
+and move your lambda body into `#process(element:, parent:[, processor:])`.
 
 ```ruby
-registry.register("CUSTOM", ->(element:, parent:, processor:) { ... })
+# Before
+registry.register("HIGHLIGHT", ->(element:, parent:, processor:) {
+  parent << HighlightNode.new(...)
+  nil
+})
+
+# After
+class HighlightHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHandler
+  def initialize; @element_class = HighlightNode; end
+  attr_reader :element_class
+
+  def process(element:, parent:, processor:)
+    parent << HighlightNode.new(...)
+    nil
+  end
+end
+registry.register("HIGHLIGHT", HighlightHandler.new)
 ```
+
+The `BBCode` parser has always required class handlers (its
+`on_open`/`on_close` lifecycle doesn't fit the lambda shape). All
+three parsers now follow the same rule.
 
 ### Tag side-data: use `interface.emit` instead of mutating ctor-injected hashes
 

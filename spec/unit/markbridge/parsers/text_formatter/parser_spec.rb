@@ -167,20 +167,24 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
     end
   end
 
-  describe "lambda handlers" do
-    it "passes element:, parent:, processor: to lambda handlers and lets them recurse via processor.process_children" do
-      parser =
-        described_class.new do |r|
-          r.register(
-            "WRAP",
-            ->(element:, parent:, processor:) do
-              wrapper = Markbridge::AST::Bold.new
-              parent << wrapper
-              processor.process_children(element, wrapper)
-              nil # signal "no further processing"
-            end,
-          )
+  describe "custom handlers that recurse manually" do
+    it "passes element:, parent:, processor: and lets a handler recurse via processor.process_children" do
+      wrap_handler =
+        Class.new(Markbridge::Parsers::TextFormatter::Handlers::BaseHandler) do
+          def initialize
+            @element_class = Markbridge::AST::Bold
+          end
+          attr_reader :element_class
+
+          def process(element:, parent:, processor:)
+            wrapper = Markbridge::AST::Bold.new
+            parent << wrapper
+            processor.process_children(element, wrapper)
+            nil # we recursed manually; don't double-process
+          end
         end
+
+      parser = described_class.new { |r| r.register("WRAP", wrap_handler.new) }
 
       doc = parser.parse("<r><WRAP><I>x</I></WRAP></r>")
       wrap = doc.children.first

@@ -34,19 +34,6 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       expect(registry.process_element(xml, parent, processor)).to be_nil
     end
 
-    it "calls a Proc/lambda handler with element:, parent:, processor:" do
-      xml = Nokogiri.XML("<custom/>").root
-      seen = nil
-      registry.register(
-        "custom",
-        ->(element:, parent:, processor:) { seen = [element, parent, processor] },
-      )
-
-      registry.process_element(xml, parent, processor)
-
-      expect(seen).to eq([xml, parent, processor])
-    end
-
     context "with default handlers" do
       it "dispatches B to a Bold-producing handler" do
         expect(process_and_get_node("<B>text</B>")).to be_a(Markbridge::AST::Bold)

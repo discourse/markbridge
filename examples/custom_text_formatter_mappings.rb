@@ -3,19 +3,24 @@
 
 # Example: Customizing the s9e/TextFormatter XML parser
 #
-# This demonstrates how to extend or override element mappings in the s9e/TextFormatter parser
-# to handle custom XML elements or change the default behavior.
+# Demonstrates how to extend or override element mappings in the
+# s9e/TextFormatter parser by registering Handler classes. Every
+# handler must respond to `#process(element:, parent:, processor:)`
+# and return either an AST element (parser recurses into children)
+# or nil (leaf — no further processing).
 
 require "bundler/setup"
 require "markbridge/textformatter"
 
-# Example 1: Add a custom element mapping using a lambda
-# =======================================================
+# ----------------------------------------------------------------
+# Example 1: Add a custom element mapping
+# ----------------------------------------------------------------
 #
-# Suppose your forum uses a custom BBCode plugin that adds a <HIGHLIGHT> element
-# to the s9e/TextFormatter XML output.
+# Suppose your forum uses a custom BBCode plugin that adds a
+# <HIGHLIGHT> element to the s9e/TextFormatter XML output. Provide
+# a Handler that constructs your AST node and recurses into the
+# element's children.
 
-# Create a custom AST node (or reuse existing one)
 class HighlightNode < Markbridge::AST::Element
   attr_reader :color
 
@@ -25,37 +30,43 @@ class HighlightNode < Markbridge::AST::Element
   end
 end
 
-# Create parser with custom lambda handler
-parser =
-  Markbridge::Parsers::TextFormatter::Parser.new do |registry|
-    # Add lambda handler for custom HIGHLIGHT element
-    registry.register(
-      "HIGHLIGHT",
-      lambda do |element:, parent:, processor:|
-        attrs = {}
-        element.attributes.each { |name, attr| attrs[name.downcase.to_sym] = attr.value }
-        node = HighlightNode.new(color: attrs[:color] || "yellow")
-        parent << node
-        processor.process_children(element, node)
-        nil # signal "no further processing"
-      end,
-    )
+class HighlightHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHandler
+  def initialize
+    @element_class = HighlightNode
   end
 
-# Parse XML with custom element
+  def process(element:, parent:, processor:)
+    attrs = extract_attributes(element)
+    node = HighlightNode.new(color: attrs[:color] || "yellow")
+    parent << node
+    processor.process_children(element, node)
+    nil # we recursed manually; don't double-process
+  end
+
+  attr_reader :element_class
+end
+
+parser =
+  Markbridge::Parsers::TextFormatter::Parser.new do |registry|
+    registry.register("HIGHLIGHT", HighlightHandler.new)
+  end
+
 xml = '<r>Normal text <HIGHLIGHT color="green">highlighted text</HIGHLIGHT> more text</r>'
 ast = parser.parse(xml)
 
-puts "Example 1: Custom element mapping with lambda"
+puts "Example 1: Custom element mapping"
 puts "AST contains #{ast.children.length} elements"
 highlight = ast.children.find { |c| c.is_a?(HighlightNode) }
 puts "Highlight color: #{highlight&.color}"
 puts
 
-# Example 2: Override default element mapping with a handler class
-# ==================================================================
+# ----------------------------------------------------------------
+# Example 2: Override a default mapping with a custom handler class
+# ----------------------------------------------------------------
 #
-# You can override default mappings by creating custom handler classes.
+# Just register your handler under the same name; it overwrites the
+# default. Returning the constructed element lets the parser recurse
+# into children automatically.
 
 class CustomQuoteHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHandler
   def initialize
@@ -64,7 +75,6 @@ class CustomQuoteHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHan
 
   def process(element:, parent:, processor: nil)
     attrs = extract_attributes(element)
-    # Add custom logic here - for example, default author to "Anonymous"
     quote =
       Markbridge::AST::Quote.new(
         author: attrs[:author] || "Anonymous",
@@ -81,70 +91,87 @@ end
 
 parser =
   Markbridge::Parsers::TextFormatter::Parser.new do |registry|
-    # Override the default QUOTE handler with our custom handler
     registry.register("QUOTE", CustomQuoteHandler.new)
   end
 
 xml = '<r><QUOTE author="John">Custom quote handling</QUOTE></r>'
 ast = parser.parse(xml)
 
-puts "Example 2: Override default mapping with handler class"
+puts "Example 2: Override default mapping"
 puts "Quote author: #{ast.children.first.author}"
 puts
 
-# Example 3: Building from defaults with multiple customizations using lambdas
-# ==============================================================================
+# ----------------------------------------------------------------
+# Example 3: Multiple customizations on top of the defaults
+# ----------------------------------------------------------------
+#
+# A leaf-node handler returns nil; the parser does not recurse.
+# A wrapping handler returns the AST node it just appended.
+
+class CustomSpoilerHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHandler
+  def initialize
+    @element_class = Markbridge::AST::Spoiler
+  end
+
+  def process(element:, parent:, processor: nil)
+    attrs = extract_attributes(element)
+    node = Markbridge::AST::Spoiler.new(title: attrs[:title] || "Click to reveal")
+    parent << node
+    node
+  end
+
+  attr_reader :element_class
+end
+
+class CustomTextHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHandler
+  def initialize
+    @element_class = Markbridge::AST::Text
+  end
+
+  def process(element:, parent:, processor: nil)
+    attrs = extract_attributes(element)
+    parent << Markbridge::AST::Text.new("[CUSTOM: #{attrs[:value]}]")
+    nil # leaf
+  end
+
+  attr_reader :element_class
+end
+
+class MentionHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHandler
+  def initialize
+    @element_class = Markbridge::AST::Text
+  end
+
+  def process(element:, parent:, processor: nil)
+    attrs = extract_attributes(element)
+    parent << Markbridge::AST::Text.new("@#{attrs[:username]}")
+    nil # leaf
+  end
+
+  attr_reader :element_class
+end
 
 parser =
   Markbridge::Parsers::TextFormatter::Parser.new do |registry|
-    # Override default spoiler with lambda
-    registry.register(
-      "SPOILER",
-      lambda do |element:, parent:, processor:|
-        attrs = {}
-        element.attributes.each { |name, attr| attrs[name.downcase.to_sym] = attr.value }
-        node = Markbridge::AST::Spoiler.new(title: attrs[:title] || "Click to reveal")
-        parent << node
-        node # parser processes children into the returned node
-      end,
-    )
-
-    # Map unknown custom element to text (leaf node, no children)
-    registry.register(
-      "CUSTOM",
-      lambda do |element:, parent:, processor:|
-        attrs = {}
-        element.attributes.each { |name, attr| attrs[name.downcase.to_sym] = attr.value }
-        parent << Markbridge::AST::Text.new("[CUSTOM: #{attrs[:value]}]")
-        nil # leaf — no children to process
-      end,
-    )
-
-    # Add support for user mentions (leaf node)
-    registry.register(
-      "MENTION",
-      lambda do |element:, parent:, processor:|
-        attrs = {}
-        element.attributes.each { |name, attr| attrs[name.downcase.to_sym] = attr.value }
-        parent << Markbridge::AST::Text.new("@#{attrs[:username]}")
-        nil # leaf — no children to process
-      end,
-    )
+    registry.register("SPOILER", CustomSpoilerHandler.new)
+    registry.register("CUSTOM", CustomTextHandler.new)
+    registry.register("MENTION", MentionHandler.new)
   end
 
 xml = '<r><SPOILER title="Secret">Hidden</SPOILER> <MENTION username="Alice"/></r>'
 ast = parser.parse(xml)
 
-puts "Example 3: Multiple customizations with lambdas"
+puts "Example 3: Multiple customizations"
 puts "AST has #{ast.children.length} top-level elements"
 puts
 
-# Example 4: Using HandlerRegistry directly with handler objects
-# ================================================================
+# ----------------------------------------------------------------
+# Example 4: Building a HandlerRegistry directly
+# ----------------------------------------------------------------
 #
-# For more control, you can create a custom registry and pass it to the parser.
+# For more control, build the registry yourself and pass it via
+# `handlers:` instead of using the block form.
 
-# Create a handler class for VIDEO elements
 class VideoHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHandler
   def initialize
     @element_class = Markbridge::AST::Url
@@ -152,7 +179,6 @@ class VideoHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHandler
 
   def process(element:, parent:, processor: nil)
     attrs = extract_attributes(element)
-    # Map VIDEO to a URL node (could create custom Video node instead)
     node = Markbridge::AST::Url.new(href: attrs[:url])
     parent << node
     node # parser will process children into the returned node
@@ -163,24 +189,24 @@ end
 
 registry = Markbridge::Parsers::TextFormatter::HandlerRegistry.new
 registry.register_defaults # Load default handlers
-
-# Add custom handler
 registry.register("VIDEO", VideoHandler.new)
 
-# Create parser with custom registry
 parser = Markbridge::Parsers::TextFormatter::Parser.new(handlers: registry)
 
 xml = '<r><VIDEO url="https://example.com/video.mp4">Watch video</VIDEO></r>'
 ast = parser.parse(xml)
 
-puts "Example 4: Custom handler registry with handler objects"
+puts "Example 4: Custom handler registry"
 puts "Parsed video as URL: #{ast.children.first.href}"
 puts
 
-# Example 5: Preserving unknown elements vs. custom handling
-# ===========================================================
+# ----------------------------------------------------------------
+# Example 5: Unknown elements
+# ----------------------------------------------------------------
+#
+# By default, unknown elements are preserved as text and tracked
+# in `parser.unknown_tags`.
 
-# By default, unknown elements are preserved as text
 default_parser = Markbridge::Parsers::TextFormatter::Parser.new
 
 xml = '<r><UNKNOWN attr="value">content</UNKNOWN></r>'
