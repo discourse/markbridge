@@ -12,6 +12,8 @@ module Markbridge
     #   list = AST::List.new(ordered: true)
     #   list << AST::ListItem.new
     class List < Element
+      include Block
+
       # Add content to this list.
       # - ListItem children are added directly
       # - Other nodes are wrapped in an implicit ListItem

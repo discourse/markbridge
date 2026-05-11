@@ -10,6 +10,14 @@ module Markbridge
         # JavaScript, or document metadata that shouldn't appear in output.
         IGNORED_TAGS = %w[style script head title noscript template].freeze
 
+        # Tags whose default rendering preserves source whitespace (per the
+        # CSS `white-space: pre*` family). Text nodes inside these are passed
+        # through verbatim; outside them, `\s+` runs collapse to a single space
+        # to match HTML's normal whitespace handling.
+        WHITESPACE_PRESERVING_TAGS = %w[pre code textarea tt].freeze
+
+        WHITESPACE_RUN = /[ \t\r\n\f]+/
+
         attr_reader :unknown_tags
 
         # Create a new parser with optional custom handlers
@@ -43,6 +51,7 @@ module Markbridge
 
           # Process all nodes
           doc.children.each { |node| process_node(node, document) }
+          trim_trailing_whitespace(document)
 
           document
         end
@@ -72,7 +81,19 @@ module Markbridge
         # @param node [Nokogiri::XML::Text]
         # @param parent [AST::Element]
         def process_text_node(node, parent)
-          parent << AST::Text.new(node.text)
+          if preserves_whitespace?(node)
+            parent << AST::Text.new(node.text)
+            return
+          end
+
+          text = node.text.gsub(WHITESPACE_RUN, " ")
+          # Drop leading whitespace at the start of an element's content,
+          # matching the browser rule that whitespace at the beginning of a
+          # block (or before any inline content) is collapsed away.
+          text = text.lstrip if parent.children.empty?
+          return if text.empty?
+
+          parent << AST::Text.new(text)
         end
 
         # Process an element node
@@ -85,6 +106,12 @@ module Markbridge
           handler = @handlers[tag_name]
 
           if handler
+            # Drop whitespace that sits between content and the start of a
+            # block-level AST node, matching browser behavior where such
+            # whitespace collapses against the block boundary. Block-ness is
+            # marked on the produced AST class via `include AST::Block`.
+            trim_trailing_whitespace(parent) if produces_block?(handler)
+
             # Handler returns element if children should be processed, nil otherwise
             ast_element =
               if handler.respond_to?(:process)
@@ -94,7 +121,12 @@ module Markbridge
               end
 
             # Automatically process children if handler returned element
-            process_children(node, ast_element) if ast_element
+            if ast_element
+              process_children(node, ast_element)
+              unless WHITESPACE_PRESERVING_TAGS.include?(tag_name)
+                trim_trailing_whitespace(ast_element)
+              end
+            end
           else
             handle_unknown_tag(node, parent)
           end
@@ -107,6 +139,37 @@ module Markbridge
         def handle_unknown_tag(node, parent)
           @unknown_tags[node.name] += 1
           process_children(node, parent)
+        end
+
+        # Whether `node` is inside a tag that preserves source whitespace.
+        # @param node [Nokogiri::XML::Node]
+        # @return [Boolean]
+        def preserves_whitespace?(node)
+          node.ancestors.any? { |ancestor| WHITESPACE_PRESERVING_TAGS.include?(ancestor.name) }
+        end
+
+        # Whether the handler produces a block-level AST node. Returns false
+        # for Proc handlers, which don't advertise their element class.
+        # @param handler [BaseHandler, Proc]
+        # @return [Boolean]
+        def produces_block?(handler)
+          return false unless handler.respond_to?(:element_class)
+
+          element_class = handler.element_class
+          !element_class.nil? && element_class < AST::Block
+        end
+
+        # Strip trailing whitespace from the last Text child of `element`.
+        # Removes the child entirely if it becomes empty. No-op if the last
+        # child is not a Text node.
+        # @param element [AST::Element]
+        def trim_trailing_whitespace(element)
+          last = element.children.last
+          return unless last.instance_of?(AST::Text)
+
+          trimmed = last.text.rstrip
+          element.children.pop
+          element << AST::Text.new(trimmed) unless trimmed.empty?
         end
       end
     end
