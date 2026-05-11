@@ -233,6 +233,14 @@ RSpec.describe "HTML to Markdown Conversion" do
       result = Markbridge.html_to_markdown(html)
       expect(result).to eq(expected)
     end
+
+    it "drops trailing whitespace before a block-level <hr>" do
+      html = "foo  \n<hr>bar"
+      expected = "foo\n\n---\n\nbar"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
   end
 
   describe "complex combinations" do

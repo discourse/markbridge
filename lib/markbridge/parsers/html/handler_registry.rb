@@ -38,20 +38,8 @@ module Markbridge
             registry.register("a", Handlers::UrlHandler.new)
             registry.register("img", Handlers::ImageHandler.new)
             registry.register("blockquote", Handlers::QuoteHandler.new)
-            registry.register(
-              "br",
-              lambda do |element:, parent:|
-                parent << AST::LineBreak.new
-                nil
-              end,
-            )
-            registry.register(
-              "hr",
-              lambda do |element:, parent:|
-                parent << AST::HorizontalRule.new
-                nil
-              end,
-            )
+            registry.register("br", Handlers::VoidHandler.new(AST::LineBreak))
+            registry.register("hr", Handlers::VoidHandler.new(AST::HorizontalRule))
             registry.register(%w[ul ol], Handlers::ListHandler.new)
             registry.register("li", Handlers::ListItemHandler.new)
             registry.register("table", Handlers::TableHandler.new)
