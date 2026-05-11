@@ -28,11 +28,13 @@ module Markbridge
             "`#{content}`"
           end
 
-          # Trailing blank line keeps an adjacent fence on the next block from
-          # being parsed as a continuation of this one.
+          # Leading and trailing blank lines: the trailing one keeps an
+          # adjacent fence on the next block from being parsed as a
+          # continuation of this one; the leading one separates the fence
+          # from prior raw text or inline content.
           def render_block(content, language)
             fence = calculate_fence(content)
-            "#{fence}#{language}\n#{content}\n#{fence}\n\n"
+            "\n\n#{fence}#{language}\n#{content}\n#{fence}\n\n"
           end
 
           def render_html_block(content, language)

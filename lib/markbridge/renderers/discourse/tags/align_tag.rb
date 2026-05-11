@@ -21,9 +21,9 @@ module Markbridge
             return content unless ALLOWED_ALIGNMENTS.include?(element.alignment)
 
             wrapper = %(<div align="#{element.alignment}">#{content}</div>)
-            # Skip the trailing blank line in html_mode: a blank line would
+            # Skip the blank-line bracketing in html_mode: a blank line would
             # terminate the surrounding HTML block (e.g. an enclosing <table>).
-            interface.html_mode? ? wrapper : "#{wrapper}\n\n"
+            interface.html_mode? ? wrapper : "\n\n#{wrapper}\n\n"
           end
         end
       end
