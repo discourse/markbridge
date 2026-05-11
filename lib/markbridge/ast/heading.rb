@@ -8,6 +8,8 @@ module Markbridge
     #   heading = AST::Heading.new(level: 2)
     #   heading << AST::Text.new("Section Title")
     class Heading < Element
+      include Block
+
       # @return [Integer] the heading level (1-6)
       attr_reader :level
 

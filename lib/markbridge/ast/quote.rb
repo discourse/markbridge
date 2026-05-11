@@ -16,6 +16,8 @@ module Markbridge
     #   quote = AST::Quote.new(author: "John", post: "123", topic: "456", username: "john123")
     #   quote << AST::Text.new("quoted text")
     class Quote < Element
+      include Block
+
       # @return [String, nil] the author/username of the quote
       attr_reader :author
 
