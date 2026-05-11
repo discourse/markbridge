@@ -16,9 +16,20 @@ module Markbridge
       #   Markbridge.bbcode_to_markdown(post.body, renderer:)
       class IdentityEscaper
         # @param text [String, nil]
-        # @return [String] +text+ unchanged, or +""+ when +text+ is nil
-        def escape(text)
-          text || ""
+        # @param in_link_label [Boolean] when true, escape +]+ so the
+        #   text can be spliced into a Markdown link label
+        #   +[text](url)+ without terminating it early. Mirrors
+        #   {MarkdownEscaper#escape}'s +in_link_label:+. This isn't a
+        #   stylistic escape — without it, trusted-Markdown content
+        #   containing +]+ inside a +Url+/+Email+ ancestor produces a
+        #   broken link.
+        # @return [String] +text+ with +]+ optionally escaped, or
+        #   +""+ when +text+ is nil
+        def escape(text, in_link_label: false)
+          return "" if text.nil?
+          return text.gsub("]", "\\]") if in_link_label && text.include?("]")
+
+          text
         end
       end
     end

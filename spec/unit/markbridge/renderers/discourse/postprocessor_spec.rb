@@ -24,6 +24,57 @@ RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
     it "leaves a single blank line between paragraphs alone" do
       expect(postprocessor.call("a\n\nb")).to eq("a\n\nb")
     end
+
+    context "with the default strip_trailing_invisibles: false" do
+      it "keeps trailing ZWSP at line ends" do
+        # U+200B is a real character in the output; default Postprocessor
+        # leaves it alone.
+        zwsp = "​"
+        expect(postprocessor.call("hello#{zwsp}\nworld")).to eq("hello#{zwsp}\nworld")
+      end
+
+      it "keeps trailing NBSP at line ends" do
+        nbsp = " "
+        expect(postprocessor.call("hello#{nbsp}\nworld")).to eq("hello#{nbsp}\nworld")
+      end
+    end
+
+    context "with strip_trailing_invisibles: true" do
+      let(:postprocessor) { described_class.new(strip_trailing_invisibles: true) }
+
+      it "strips trailing zero-width space at the end of a line" do
+        zwsp = "​"
+        expect(postprocessor.call("hello#{zwsp}\nworld")).to eq("hello\nworld")
+      end
+
+      it "strips trailing nbsp at the end of a line" do
+        nbsp = " "
+        expect(postprocessor.call("hello#{nbsp}\nworld")).to eq("hello\nworld")
+      end
+
+      it "strips every recognised invisible (ZWSP, ZWNJ, ZWJ, WJ, ZWNBSP) at end of line" do
+        # All five zero-width format chars covered by TRAILING_INVISIBLE_RE.
+        invisibles = "​‌‍⁠﻿"
+        expect(postprocessor.call("hello#{invisibles}\nworld")).to eq("hello\nworld")
+      end
+
+      it "preserves trailing ASCII spaces — they encode Markdown hard line breaks" do
+        # `hello  \nworld` (two trailing spaces) is the hard-line-break form;
+        # the trailing-invisibles strip must not touch ASCII spaces.
+        expect(postprocessor.call("hello  \nworld")).to eq("hello  \nworld")
+      end
+
+      it "preserves invisibles in the middle of content (only end-of-line is stripped)" do
+        zwsp = "​"
+        expect(postprocessor.call("before#{zwsp}inside")).to eq("before#{zwsp}inside")
+      end
+
+      it "strips trailing invisibles on every affected line, not just the first" do
+        # gsub vs sub: with sub, only the first line's ZWSP gets cleaned.
+        zwsp = "​"
+        expect(postprocessor.call("first#{zwsp}\nsecond#{zwsp}")).to eq("first\nsecond")
+      end
+    end
   end
 
   describe "DEFAULT" do

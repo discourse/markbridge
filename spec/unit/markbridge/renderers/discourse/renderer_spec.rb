@@ -407,5 +407,4 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("<s>text~~more</s>")
     end
   end
-
 end

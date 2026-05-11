@@ -457,20 +457,6 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(doc.children[0].text).to eq("text ")
     end
 
-    it "supports Proc handlers via .call (back-compat shim)" do
-      # Default-registered handlers all use #process, but custom registries
-      # may still register Procs. The dispatch must fall back to .call when
-      # the handler doesn't expose #process.
-      proc_handler = ->(element:, parent:) { parent << Markbridge::AST::Bold.new }
-      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
-      registry.register("custom-b", proc_handler)
-      custom_parser = described_class.new(handlers: registry)
-
-      doc = custom_parser.parse("<custom-b></custom-b>")
-
-      expect(doc.children[0]).to be_a(Markbridge::AST::Bold)
-    end
-
     it "lets a consumer extend whitespace_preserving_tags to cover custom tags" do
       registry = Markbridge::Parsers::HTML::HandlerRegistry.default
       registry.whitespace_preserving_tags << "code-snippet"

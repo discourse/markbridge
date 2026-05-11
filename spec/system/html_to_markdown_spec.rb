@@ -199,7 +199,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "[Twitter](https://twitter.com/lamresearch)"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "drops a trailing newline after nested content inside a link" do
@@ -207,7 +207,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "[Twitter](https://example.com)"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "collapses runs of whitespace within text to a single space" do
@@ -215,7 +215,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "Click [here for info](https://example.com) now"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "preserves whitespace inside <pre>" do
@@ -223,7 +223,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "```\nline1\nline2\n  indented\n```"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "preserves whitespace inside inline <code>" do
@@ -231,7 +231,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "`fn  call`"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "drops trailing whitespace before a block-level <hr>" do
@@ -239,7 +239,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "foo\n\n---\n\nbar"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
@@ -249,7 +249,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "some loose text\n\nreal paragraph"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "separates raw text from a following <blockquote> with a blank line" do
@@ -257,7 +257,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "intro\n\n> quoted"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "separates raw text from a following <pre> block with a blank line" do
@@ -265,7 +265,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "intro\n\n```\ncode\nblock\n```"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "still separates consecutive paragraphs cleanly" do
@@ -273,7 +273,7 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "first\n\nsecond"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
 
     it "still nests lists tightly" do
@@ -282,37 +282,32 @@ RSpec.describe "HTML to Markdown Conversion" do
       expected = "- parent\n  - child"
 
       result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(expected)
+      expect(result.markdown).to eq(expected)
     end
   end
 
   describe "trailing invisible characters with strip_trailing_invisibles" do
-    around do |example|
-      Markbridge.configure { |c| c.strip_trailing_invisibles = true }
-      example.run
-    ensure
-      Markbridge.reset_defaults!
-    end
+    let(:renderer) { Markbridge.discourse_renderer(strip_trailing_invisibles: true) }
 
     it "strips trailing zero-width space at the end of a paragraph" do
       html = "<p>Hello Specialist&#8203;</p><p>Our customer are unhappy</p>"
 
-      result = Markbridge.html_to_markdown(html)
-      expect(result).to eq("Hello Specialist\n\nOur customer are unhappy")
+      result = Markbridge.html_to_markdown(html, renderer:)
+      expect(result.markdown).to eq("Hello Specialist\n\nOur customer are unhappy")
     end
 
     it "drops an Outlook-style nbsp-only spacer paragraph between content" do
       html = '<p>before</p><p class="MsoNormal">&nbsp;</p><p>after</p>'
 
-      result = Markbridge.html_to_markdown(html)
-      expect(result).to eq("before\n\nafter")
+      result = Markbridge.html_to_markdown(html, renderer:)
+      expect(result.markdown).to eq("before\n\nafter")
     end
 
     it "preserves leading nbsp (author intent — used as indentation)" do
       html = "<p>&nbsp;Hello</p>"
 
-      result = Markbridge.html_to_markdown(html)
-      expect(result).to eq(" Hello")
+      result = Markbridge.html_to_markdown(html, renderer:)
+      expect(result.markdown).to eq(" Hello")
     end
 
     it "preserves invisibles in the middle of content" do
@@ -320,8 +315,8 @@ RSpec.describe "HTML to Markdown Conversion" do
       # only line-end invisibles get stripped.
       html = "<p>before​inline​text</p>"
 
-      result = Markbridge.html_to_markdown(html)
-      expect(result).to eq("before​inline​text")
+      result = Markbridge.html_to_markdown(html, renderer:)
+      expect(result.markdown).to eq("before​inline​text")
     end
   end
 

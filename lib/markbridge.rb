@@ -223,7 +223,12 @@ module Markbridge
     #   pass through unescaped (e.g. +:lists+, +:bullet_list+,
     #   +:ordered_list+, +:atx_heading+, +:block_quote+); forwarded to a
     #   fresh {MarkdownEscaper}.
-    # @param postprocessor [Renderers::Discourse::Postprocessor, nil]
+    # @param postprocessor [Renderers::Discourse::Postprocessor, nil] when given,
+    #   used as-is; +strip_trailing_invisibles:+ is then ignored.
+    # @param strip_trailing_invisibles [Boolean] forwarded to a fresh
+    #   {Renderers::Discourse::Postprocessor} when no explicit
+    #   +postprocessor:+ is given. Strips NBSP and zero-width format
+    #   characters from the end of each line.
     # @return [Renderers::Discourse::Renderer]
     def discourse_renderer(
       tags: nil,
@@ -233,13 +238,15 @@ module Markbridge
       escape: true,
       escape_hard_line_breaks: false,
       allow: nil,
-      postprocessor: nil
+      postprocessor: nil,
+      strip_trailing_invisibles: false
     )
       library = tag_library || Renderers::Discourse::TagLibrary.default
       library.merge(tags) if tags
       Array(unregister).each { |klass| library.unregister(klass) }
 
       escaper ||= build_escaper(escape:, escape_hard_line_breaks:, allow:)
+      postprocessor ||= Renderers::Discourse::Postprocessor.new(strip_trailing_invisibles:)
 
       Renderers::Discourse::Renderer.new(tag_library: library, escaper:, postprocessor:)
     end

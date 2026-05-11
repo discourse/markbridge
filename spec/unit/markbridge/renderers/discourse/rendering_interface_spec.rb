@@ -238,5 +238,4 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
       end
     end
   end
-
 end

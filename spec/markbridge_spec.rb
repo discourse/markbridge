@@ -779,6 +779,24 @@ RSpec.describe Markbridge do
       expect(described_class.bbcode_to_markdown("[b]hi[/b]", renderer:).markdown).to eq("**HI**")
     end
 
+    it "forwards :strip_trailing_invisibles to the constructed Postprocessor" do
+      zwsp = "​"
+      renderer = described_class.discourse_renderer(strip_trailing_invisibles: true)
+
+      result = described_class.html_to_markdown("<p>hello#{zwsp}</p>", renderer:)
+
+      expect(result.markdown).to eq("hello")
+    end
+
+    it "defaults strip_trailing_invisibles to false (invisibles survive)" do
+      zwsp = "​"
+      renderer = described_class.discourse_renderer
+
+      result = described_class.html_to_markdown("<p>hello#{zwsp}</p>", renderer:)
+
+      expect(result.markdown).to eq("hello#{zwsp}")
+    end
+
     it "forwards :allow to the constructed escaper (lists alias)" do
       renderer = described_class.discourse_renderer(allow: :lists)
 

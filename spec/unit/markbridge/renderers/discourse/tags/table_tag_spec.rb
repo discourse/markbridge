@@ -658,5 +658,4 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(tag.render(table, interface)).to eq("")
     end
   end
-
 end

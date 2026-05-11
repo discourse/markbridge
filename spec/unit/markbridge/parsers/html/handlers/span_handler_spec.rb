@@ -229,7 +229,7 @@ RSpec.describe Markbridge::Parsers::HTML::Handlers::SpanHandler do
             '<span style="text-decoration: underline"><strong>X</strong></span>',
           )
 
-        expect(result).to eq("[u]**X**[/u]")
+        expect(result.markdown).to eq("[u]**X**[/u]")
       end
     end
   end

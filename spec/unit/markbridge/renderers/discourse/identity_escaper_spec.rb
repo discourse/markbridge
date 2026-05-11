@@ -21,6 +21,32 @@ RSpec.describe Markbridge::Renderers::Discourse::IdentityEscaper do
     it "returns an empty string for nil (parity with MarkdownEscaper#escape)" do
       expect(escaper.escape(nil)).to eq("")
     end
+
+    context "with in_link_label: true" do
+      it "escapes ] so it does not terminate the surrounding link label" do
+        expect(escaper.escape("a]b", in_link_label: true)).to eq('a\]b')
+      end
+
+      it "escapes every ] in the content, not just the first" do
+        # gsub vs sub: with sub, only the first ] would be escaped.
+        expect(escaper.escape("a]b]c", in_link_label: true)).to eq('a\]b\]c')
+      end
+
+      it "leaves text without ] unchanged (returns the same object)" do
+        input = +"plain text"
+        expect(escaper.escape(input, in_link_label: true)).to be(input)
+      end
+
+      it "returns an empty string for nil even when in_link_label: true" do
+        expect(escaper.escape(nil, in_link_label: true)).to eq("")
+      end
+    end
+
+    context "with in_link_label: false (default)" do
+      it "leaves ] alone — only the in_link_label path escapes it" do
+        expect(escaper.escape("a]b")).to eq("a]b")
+      end
+    end
   end
 
   describe "as plumbed through Markbridge.discourse_renderer(escape: false)" do
