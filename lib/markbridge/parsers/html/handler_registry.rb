@@ -3,10 +3,84 @@
 module Markbridge
   module Parsers
     module HTML
-      # Registry of HTML tag handlers
+      # Registry of HTML tag handlers and per-tag-name parser configuration.
+      #
+      # Handlers map a tag name to a handler instance. `block_level_tags` and
+      # `whitespace_preserving_tags` configure parser whitespace behavior by
+      # tag name, independent of whether a handler is registered — so unknown
+      # tags like <div> or <section> still trigger boundary collapsing and
+      # <pre>/<code> still pass through verbatim. Both sets are mutable, so
+      # downstream consumers can add or remove tags freely:
+      #
+      #     registry = HandlerRegistry.default
+      #     registry.block_level_tags << "my-block"
+      #     registry.whitespace_preserving_tags.delete("tt")
       class HandlerRegistry
+        # HTML5 block-level elements (per MDN). The trim-before-block rule
+        # applies to these regardless of whether a handler is registered.
+        DEFAULT_BLOCK_LEVEL_TAGS = %w[
+          address
+          article
+          aside
+          blockquote
+          canvas
+          dd
+          details
+          dialog
+          div
+          dl
+          dt
+          fieldset
+          figcaption
+          figure
+          footer
+          form
+          h1
+          h2
+          h3
+          h4
+          h5
+          h6
+          header
+          hgroup
+          hr
+          html
+          li
+          main
+          nav
+          noscript
+          ol
+          output
+          p
+          pre
+          section
+          table
+          tbody
+          td
+          tfoot
+          th
+          thead
+          tr
+          ul
+          video
+        ].freeze
+
+        # Tags whose default CSS preserves source whitespace
+        # (`white-space: pre*`). Text inside these is passed through
+        # verbatim; outside, `\s+` runs collapse to a single space.
+        DEFAULT_WHITESPACE_PRESERVING_TAGS = %w[pre code textarea tt].freeze
+
+        # @return [Set<String>] mutable set of tag names treated as block-level.
+        attr_reader :block_level_tags
+
+        # @return [Set<String>] mutable set of tag names whose contents
+        #   preserve source whitespace.
+        attr_reader :whitespace_preserving_tags
+
         def initialize
           @handlers = {}
+          @block_level_tags = Set.new(DEFAULT_BLOCK_LEVEL_TAGS)
+          @whitespace_preserving_tags = Set.new(DEFAULT_WHITESPACE_PRESERVING_TAGS)
         end
 
         # Register a handler for one or more tag names
