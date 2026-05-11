@@ -156,8 +156,18 @@ module Markbridge
       Renderers::Discourse::Renderer.new(tag_library:, escaper:)
     end
 
+    # Trailing-invisibles set: NBSP (U+00A0) plus the zero-width format
+    # chars that render as nothing — ZWSP U+200B, ZWNJ U+200C, ZWJ U+200D,
+    # WJ U+2060, ZWNBSP/BOM U+FEFF. Deliberately excludes ASCII space
+    # and tab so Markdown's "two trailing spaces = hard line break" rule
+    # still works. The `$` anchors to end-of-line (default Ruby regex
+    # mode), so this strips per line without consuming the line break.
+    TRAILING_INVISIBLE_RE = /[ ​‌‍⁠﻿]+$/
+    private_constant :TRAILING_INVISIBLE_RE
+
     def cleanup_markdown(text)
       text
+        .gsub(TRAILING_INVISIBLE_RE, "") # Strip trailing invisible chars at each line end
         .gsub(/\n{3,}/, "\n\n") # Max 2 consecutive newlines
         .gsub(/^[ \t]+$/, "") # Remove whitespace-only lines
         .strip # Trim leading/trailing whitespace

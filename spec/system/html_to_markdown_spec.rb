@@ -286,6 +286,38 @@ RSpec.describe "HTML to Markdown Conversion" do
     end
   end
 
+  describe "trailing invisible characters" do
+    it "strips trailing zero-width space at the end of a paragraph" do
+      html = "<p>Hello Specialist&#8203;</p><p>Our customer are unhappy</p>"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq("Hello Specialist\n\nOur customer are unhappy")
+    end
+
+    it "drops an Outlook-style nbsp-only spacer paragraph between content" do
+      html = '<p>before</p><p class="MsoNormal">&nbsp;</p><p>after</p>'
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq("before\n\nafter")
+    end
+
+    it "preserves leading nbsp (author intent — used as indentation)" do
+      html = "<p>&nbsp;Hello</p>"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(" Hello")
+    end
+
+    it "preserves invisibles in the middle of content" do
+      # Mid-content ZWSP is a meaningful soft-break hint (long URLs, CJK),
+      # only line-end invisibles get stripped.
+      html = "<p>before​inline​text</p>"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq("before​inline​text")
+    end
+  end
+
   describe "complex combinations" do
     it "converts mixed content" do
       html = <<~HTML
