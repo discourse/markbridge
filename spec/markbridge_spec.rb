@@ -231,6 +231,44 @@ RSpec.describe Markbridge do
     it "strips leading and trailing whitespace from the final output" do
       expect(described_class.bbcode_to_markdown("   hi   ")).to eq("hi")
     end
+
+    it "preserves trailing invisible characters by default (config flag off)" do
+      # Default config keeps the output as-is — no extra regex pass on
+      # cleanup. The U+200B byte sequence (e2 80 8b in UTF-8) survives
+      # at the end of the rendered output.
+      result = described_class.html_to_markdown("<p>Hello&#8203;</p>")
+
+      expect(result.bytes.last(4)).to eq([0x6f, 0xe2, 0x80, 0x8b]) # "o" + ZWSP
+    end
+
+    context "with strip_trailing_invisibles enabled" do
+      before { described_class.configure { |c| c.strip_trailing_invisibles = true } }
+
+      it "strips a trailing zero-width space at the end of a paragraph" do
+        # Outlook-style soft-break ZWSP after content.
+        expect(described_class.html_to_markdown("<p>Hello&#8203;</p>")).to eq("Hello")
+      end
+
+      it "drops nbsp-only spacer paragraphs by stripping their trailing nbsp" do
+        # `<p>&nbsp;</p>` collapses to "<nbsp>\n\n"; rstripping the nbsp
+        # leaves an empty line which the existing \n{3,} collapse drops.
+        expect(described_class.html_to_markdown("<p>a</p><p>&nbsp;</p><p>b</p>")).to eq("a\n\nb")
+      end
+
+      it "preserves trailing ASCII spaces — they are the Markdown hard-break syntax" do
+        # `hello  \nworld` (two trailing spaces) is the hard-line-break form;
+        # the trailing-invisibles strip must not touch ASCII spaces.
+        expect(described_class.bbcode_to_markdown("hello  \nworld")).to eq("hello  \nworld")
+      end
+
+      it "strips trailing invisibles on every affected line, not just the first" do
+        # gsub vs sub: with sub, only the first paragraph would get cleaned
+        # and the second's ZWSP would leak through.
+        result = described_class.html_to_markdown("<p>first&#8203;</p><p>second&#8203;</p>")
+
+        expect(result).to eq("first\n\nsecond")
+      end
+    end
   end
 
   describe ".parse_html" do
