@@ -360,6 +360,12 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(doc.children[0].text).to eq("text")
     end
 
+    it "drops trailing whitespace before a block-level <hr>" do
+      doc = parser.parse("text   <hr>")
+
+      expect(doc.children[0].text).to eq("text")
+    end
+
     it "drops trailing whitespace before a block-level <ul>" do
       doc = parser.parse("text   <ul><li>x</li></ul>")
 
