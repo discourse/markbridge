@@ -7,7 +7,6 @@ module Markbridge
     # @example
     #   hr = AST::HorizontalRule.new
     class HorizontalRule < Node
-      include Block
     end
   end
 end

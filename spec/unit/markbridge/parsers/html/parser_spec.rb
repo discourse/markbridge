@@ -406,27 +406,81 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(pre.children[0].text).to eq("foo   ")
     end
 
-    it "treats a handler with nil element_class as non-block" do
-      # SpanHandler inherits `attr_reader :element_class` but never sets it,
-      # so produces_block? must guard against the nil — otherwise comparing
-      # nil < AST::Block would raise.
-      expect { parser.parse('text   <span style="font-weight:bold">x</span>') }.not_to raise_error
+    it "trims trailing whitespace before an unknown block-level tag like <div>" do
+      # <div> has no handler in the default registry but is in
+      # block_level_tags, so the boundary trim still fires. Realistic
+      # Outlook output: <p>after</p>\n<div>raw</div><p>following</p>.
+      # Without the trim, the "\n" between </p> and <div> survives as a
+      # leading space on "raw".
+      doc = parser.parse("<p>before</p>\n<div>raw</div><p>after</p>")
+
+      expect(doc.children.size).to eq(3)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
+      expect(doc.children[1]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[1].text).to eq("raw")
+      expect(doc.children[2]).to be_a(Markbridge::AST::Paragraph)
     end
 
-    it "drops a Proc handler's pre-trim because it does not advertise an element class" do
-      # Proc handlers don't expose element_class; produces_block? returns
-      # false for them, so trailing whitespace is left intact even though
-      # the Proc emits a HorizontalRule.
-      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
-      registry.register(
-        "hr",
-        ->(element:, parent:) { parent << Markbridge::AST::HorizontalRule.new },
-      )
-      proc_parser = described_class.new(handlers: registry)
+    it "does not trim trailing whitespace before an inline tag like <span>" do
+      # <span> is not in block_level_tags, so its preceding whitespace is
+      # preserved as part of the inline flow.
+      doc = parser.parse('text <span style="font-weight:bold">x</span>')
 
-      doc = proc_parser.parse("text <hr>")
+      expect(doc.children[0]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[0].text).to eq("text ")
+    end
+
+    it "lets a consumer extend block_level_tags to cover custom tags" do
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.block_level_tags << "my-block"
+      custom_parser = described_class.new(handlers: registry)
+
+      # Same shape as the <div> test: leading-space-before-block context.
+      doc = custom_parser.parse("<p>before</p>\n<my-block>raw</my-block>")
+
+      expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
+      # No leading space on "raw" — the "\n" between </p> and <my-block>
+      # got trimmed via the customized block_level_tags.
+      expect(doc.children[1]).to be_a(Markbridge::AST::Text)
+      expect(doc.children[1].text).to eq("raw")
+    end
+
+    it "lets a consumer remove a tag from block_level_tags" do
+      # Removing <hr> from block_level_tags makes it behave like an
+      # inline tag for whitespace purposes — the preceding space stays.
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.block_level_tags.delete("hr")
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("text <hr>")
 
       expect(doc.children[0].text).to eq("text ")
+    end
+
+    it "supports Proc handlers via .call (back-compat shim)" do
+      # Default-registered handlers all use #process, but custom registries
+      # may still register Procs. The dispatch must fall back to .call when
+      # the handler doesn't expose #process.
+      proc_handler = ->(element:, parent:) { parent << Markbridge::AST::Bold.new }
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register("custom-b", proc_handler)
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<custom-b></custom-b>")
+
+      expect(doc.children[0]).to be_a(Markbridge::AST::Bold)
+    end
+
+    it "lets a consumer extend whitespace_preserving_tags to cover custom tags" do
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.whitespace_preserving_tags << "code-snippet"
+      custom_parser = described_class.new(handlers: registry)
+
+      # <code-snippet> has no handler, so handle_unknown_tag recurses; the
+      # ancestor walk in preserves_whitespace? finds it on the chain.
+      doc = custom_parser.parse("<code-snippet>a   b</code-snippet>")
+
+      expect(doc.children[0].text).to eq("a   b")
     end
   end
 

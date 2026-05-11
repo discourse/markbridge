@@ -8,7 +8,6 @@ module Markbridge
     #   paragraph = AST::Paragraph.new
     #   paragraph << AST::Text.new("This is a paragraph.")
     class Paragraph < Element
-      include Block
     end
   end
 end

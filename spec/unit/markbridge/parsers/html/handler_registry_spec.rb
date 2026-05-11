@@ -4,6 +4,48 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
   let(:registry) { described_class.new }
   let(:handler) { instance_double(Markbridge::Parsers::HTML::Handlers::BaseHandler) }
 
+  describe "#block_level_tags" do
+    it "seeds with HTML5 block-level tags" do
+      expect(registry.block_level_tags).to include("p", "div", "blockquote", "h1", "ul", "table")
+    end
+
+    it "exposes a mutable Set that consumers can extend" do
+      registry.block_level_tags << "my-block"
+
+      expect(registry.block_level_tags).to include("my-block")
+    end
+
+    it "exposes a mutable Set that consumers can prune" do
+      registry.block_level_tags.delete("hr")
+
+      expect(registry.block_level_tags).not_to include("hr")
+    end
+
+    it "isolates instances — mutating one registry does not affect another" do
+      registry.block_level_tags << "my-block"
+
+      expect(described_class.new.block_level_tags).not_to include("my-block")
+    end
+  end
+
+  describe "#whitespace_preserving_tags" do
+    it "seeds with HTML's whitespace-preserving tags" do
+      expect(registry.whitespace_preserving_tags).to include("pre", "code", "textarea", "tt")
+    end
+
+    it "exposes a mutable Set that consumers can extend" do
+      registry.whitespace_preserving_tags << "code-snippet"
+
+      expect(registry.whitespace_preserving_tags).to include("code-snippet")
+    end
+
+    it "isolates instances — mutating one registry does not affect another" do
+      registry.whitespace_preserving_tags << "code-snippet"
+
+      expect(described_class.new.whitespace_preserving_tags).not_to include("code-snippet")
+    end
+  end
+
   describe "#register" do
     it "registers a handler for a single tag" do
       registry.register("b", handler)
