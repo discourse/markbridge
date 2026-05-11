@@ -181,19 +181,19 @@ module Markbridge
         # Strip trailing whitespace from the Text child immediately preceding
         # the last (just-appended) child of `element`. Removes the Text child
         # entirely if it becomes empty. No-op if the preceding child isn't
-        # Text or if `element` has fewer than two children.
+        # Text. (When `element` has fewer than two children, `children[-2]`
+        # returns nil and the `instance_of?(AST::Text)` guard handles it.)
         # @param element [AST::Element]
         def trim_text_before_last(element)
-          return if element.children.length < 2
-
-          prev = element.children[-2]
+          children = element.children
+          prev = children[-2]
           return unless prev.instance_of?(AST::Text)
 
           trimmed = prev.text.rstrip
           if trimmed.empty?
-            element.children.delete_at(-2)
-          elsif trimmed != prev.text
-            element.children[-2] = AST::Text.new(trimmed)
+            children.delete_at(-2)
+          else
+            children[-2] = AST::Text.new(trimmed)
           end
         end
       end

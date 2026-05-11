@@ -232,6 +232,15 @@ matcher:
     # observable difference in parser output for identical inputs.
     - Markbridge::Parsers::MediaWiki::Parser#initialize
 
+    # HTML::Parser#process_element_node's `!declared_block` guard on the
+    # post-handler block-detection fallback. Pre-handler trim already
+    # rstripped the trailing Text when the handler was declared_block;
+    # dropping the guard makes the post-handler trim re-rstrip the same
+    # Text — a no-op since it's already stripped. The `!declared_block`
+    # is a perf guard against redundant work, not a correctness
+    # invariant. Bucket A.
+    - Markbridge::Parsers::HTML::Parser#process_element_node
+
 mutation:
   ignore_patterns:
     # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,
@@ -307,6 +316,12 @@ mutation:
     # trailing empties so the last line is never empty), so `[]` /
     # `.at` / `.fetch` all return the same value. Bucket A.
     - "index{receiver=lvar{value=continuation_lines}}"
+
+    # HTML Parser#trim_text_before_last's `children[-2]` reads and writes.
+    # `[]` vs `.at` vs `.fetch` is observably identical on this method's
+    # input range: the `prev.instance_of?(AST::Text)` guard already handles
+    # the nil-returning out-of-range case before any further use. Bucket A.
+    - "index{receiver=lvar{value=children}}"
 
 # CodeTag#calculate_fence's `... || 0` default for empty scan.
     # When no backticks / tildes are in content, scan.map returns []
