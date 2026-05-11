@@ -413,6 +413,58 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect { parser.parse('text   <span style="font-weight:bold">x</span>') }.not_to raise_error
     end
 
+    it "leaves a non-Text sibling untouched when it precedes the appended Block" do
+      # When the second-to-last child is a non-Text element (e.g. an
+      # Italic), trim_text_before_last must short-circuit on the
+      # `instance_of?(AST::Text)` guard rather than calling `.text` on it.
+      custom_handler =
+        Class
+          .new(Markbridge::Parsers::HTML::Handlers::BaseHandler) do
+            def process(element:, parent:)
+              paragraph = Markbridge::AST::Paragraph.new
+              parent << paragraph
+              paragraph
+            end
+          end
+          .new
+
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register("custom-p", custom_handler)
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<blockquote><i></i><custom-p></custom-p></blockquote>")
+
+      quote = doc.children[0]
+      expect(quote.children.size).to eq(2)
+      expect(quote.children[0]).to be_a(Markbridge::AST::Italic)
+      expect(quote.children[1]).to be_a(Markbridge::AST::Paragraph)
+    end
+
+    it "leaves parent untouched when a Block is the first child" do
+      # When the appended Block has no preceding sibling, trim_text_before_last
+      # gets a nil prev and must short-circuit cleanly. The guard against a
+      # missing prev is exercised only at this boundary.
+      custom_handler =
+        Class
+          .new(Markbridge::Parsers::HTML::Handlers::BaseHandler) do
+            def process(element:, parent:)
+              paragraph = Markbridge::AST::Paragraph.new
+              parent << paragraph
+              paragraph
+            end
+          end
+          .new
+
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register("custom-p", custom_handler)
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<custom-p></custom-p>")
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
+    end
+
     it "trims trailing whitespace before a Block node emitted by an undeclared handler" do
       # Custom handler that picks the AST class at runtime (so it can't
       # advertise `element_class` upfront). When the appended node is Block
@@ -471,6 +523,34 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(quote.children[0].text).to eq("a ")
       expect(quote.children[1]).to be_a(Markbridge::AST::Italic)
       expect(quote.children[2].text).to eq("!")
+    end
+
+    it "drops a whitespace-only Text sibling entirely when it precedes a Block" do
+      # Exercises the empty-after-rstrip branch in trim_text_before_last:
+      # the lone space before the Block becomes "" after rstrip, so the Text
+      # is dropped entirely from the parent's children.
+      custom_handler =
+        Class
+          .new(Markbridge::Parsers::HTML::Handlers::BaseHandler) do
+            def process(element:, parent:)
+              paragraph = Markbridge::AST::Paragraph.new
+              parent << paragraph
+              paragraph
+            end
+          end
+          .new
+
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register("custom-p", custom_handler)
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<blockquote>before<i></i>   <custom-p></custom-p></blockquote>")
+
+      quote = doc.children[0]
+      expect(quote.children.size).to eq(3)
+      expect(quote.children[0].text).to eq("before")
+      expect(quote.children[1]).to be_a(Markbridge::AST::Italic)
+      expect(quote.children[2]).to be_a(Markbridge::AST::Paragraph)
     end
 
     it "preserves leading whitespace on the trimmed Text — only trailing is stripped" do
