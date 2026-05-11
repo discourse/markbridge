@@ -10,6 +10,7 @@ require_relative "../ast"
 # Handlers
 require_relative "html/handlers/base_handler"
 require_relative "html/handlers/simple_handler"
+require_relative "html/handlers/void_handler"
 require_relative "html/handlers/raw_handler"
 require_relative "html/handlers/url_handler"
 require_relative "html/handlers/image_handler"
