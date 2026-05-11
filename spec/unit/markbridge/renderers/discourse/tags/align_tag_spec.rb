@@ -12,7 +12,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::AlignTag do
         element = Markbridge::AST::Align.new(alignment:)
         element << Markbridge::AST::Text.new("hi")
 
-        expect(tag.render(element, interface)).to eq(%(<div align="#{alignment}">hi</div>\n\n))
+        expect(tag.render(element, interface)).to eq(%(\n\n<div align="#{alignment}">hi</div>\n\n))
       end
     end
 

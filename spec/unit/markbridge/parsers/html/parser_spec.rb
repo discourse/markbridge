@@ -413,6 +413,120 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect { parser.parse('text   <span style="font-weight:bold">x</span>') }.not_to raise_error
     end
 
+    it "trims trailing whitespace before a Block node emitted by an undeclared handler" do
+      # Custom handler that picks the AST class at runtime (so it can't
+      # advertise `element_class` upfront). When the appended node is Block
+      # the parser must retroactively trim the Text sibling that preceded it.
+      custom_handler =
+        Class
+          .new(Markbridge::Parsers::HTML::Handlers::BaseHandler) do
+            def process(element:, parent:)
+              paragraph = Markbridge::AST::Paragraph.new
+              parent << paragraph
+              paragraph
+            end
+          end
+          .new
+
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register("custom-p", custom_handler)
+      custom_parser = described_class.new(handlers: registry)
+
+      # Nest inside <blockquote> so the document-level final trim doesn't
+      # mask the per-element trim under test.
+      doc = custom_parser.parse("<blockquote>text   <custom-p></custom-p></blockquote>")
+
+      quote = doc.children[0]
+      expect(quote.children.size).to eq(2)
+      expect(quote.children[0]).to be_a(Markbridge::AST::Text)
+      expect(quote.children[0].text).to eq("text")
+      expect(quote.children[1]).to be_a(Markbridge::AST::Paragraph)
+    end
+
+    it "skips the post-handler trim when the returned Block was not appended to parent" do
+      # Identity check (parent.children.last.equal?(ast_element)) guards
+      # against handlers that return a Block-typed node without actually
+      # adding it to the tree. Setup: the parent already has
+      # [Text("a "), Italic] when the ghost handler fires — if the guard
+      # were missing, Text("a ") at [-2] would be wrongly stripped.
+      custom_handler =
+        Class
+          .new(Markbridge::Parsers::HTML::Handlers::BaseHandler) do
+            def process(element:, parent:)
+              # Returned but intentionally not appended.
+              Markbridge::AST::Paragraph.new
+            end
+          end
+          .new
+
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register("ghost-p", custom_handler)
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<blockquote>a <i>x</i><ghost-p></ghost-p>!</blockquote>")
+
+      quote = doc.children[0]
+      expect(quote.children.size).to eq(3)
+      expect(quote.children[0]).to be_a(Markbridge::AST::Text)
+      expect(quote.children[0].text).to eq("a ")
+      expect(quote.children[1]).to be_a(Markbridge::AST::Italic)
+      expect(quote.children[2].text).to eq("!")
+    end
+
+    it "preserves leading whitespace on the trimmed Text — only trailing is stripped" do
+      # When the Text sibling preceding a Block has leading whitespace
+      # (because it's not the first child of its parent), trim_text_before_last
+      # must rstrip only — strip or lstrip would lose the inline leading
+      # space.
+      custom_handler =
+        Class
+          .new(Markbridge::Parsers::HTML::Handlers::BaseHandler) do
+            def process(element:, parent:)
+              paragraph = Markbridge::AST::Paragraph.new
+              parent << paragraph
+              paragraph
+            end
+          end
+          .new
+
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register("custom-p", custom_handler)
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<blockquote>x<i>y</i>  text  <custom-p></custom-p></blockquote>")
+
+      quote = doc.children[0]
+      # Quote.children: [Text("x"), Italic, Text(" text"), Paragraph]
+      expect(quote.children[-2]).to be_a(Markbridge::AST::Text)
+      expect(quote.children[-2].text).to eq(" text")
+    end
+
+    it "does not trim when the handler's returned node is not a Block" do
+      # A handler may produce an inline AST node and still not advertise
+      # element_class (e.g. SpanHandler picks Bold/Italic/etc. at runtime).
+      # The fallback must skip the trim for inline returns.
+      custom_handler =
+        Class
+          .new(Markbridge::Parsers::HTML::Handlers::BaseHandler) do
+            def process(element:, parent:)
+              bold = Markbridge::AST::Bold.new
+              parent << bold
+              bold
+            end
+          end
+          .new
+
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register("custom-b", custom_handler)
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<blockquote>text   <custom-b></custom-b></blockquote>")
+
+      quote = doc.children[0]
+      expect(quote.children[0]).to be_a(Markbridge::AST::Text)
+      expect(quote.children[0].text).to eq("text ")
+    end
+
     it "drops a Proc handler's pre-trim because it does not advertise an element class" do
       # Proc handlers don't expose element_class; produces_block? returns
       # false for them, so trailing whitespace is left intact even though

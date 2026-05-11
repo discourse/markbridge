@@ -243,6 +243,49 @@ RSpec.describe "HTML to Markdown Conversion" do
     end
   end
 
+  describe "block element boundaries" do
+    it "separates raw text from a following <p> with a blank line" do
+      html = "some loose text<p>real paragraph</p>"
+      expected = "some loose text\n\nreal paragraph"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "separates raw text from a following <blockquote> with a blank line" do
+      html = "intro<blockquote>quoted</blockquote>"
+      expected = "intro\n\n> quoted"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "separates raw text from a following <pre> block with a blank line" do
+      html = "intro<pre>code\nblock</pre>"
+      expected = "intro\n\n```\ncode\nblock\n```"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "still separates consecutive paragraphs cleanly" do
+      html = "<p>first</p><p>second</p>"
+      expected = "first\n\nsecond"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "still nests lists tightly" do
+      # Block-element boundary handling must not loosen tight nested lists.
+      html = "<ul><li>parent<ul><li>child</li></ul></li></ul>"
+      expected = "- parent\n  - child"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
   describe "complex combinations" do
     it "converts mixed content" do
       html = <<~HTML

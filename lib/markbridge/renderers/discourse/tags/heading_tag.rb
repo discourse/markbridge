@@ -16,7 +16,7 @@ module Markbridge
 
             prefix = "#" * element.level
 
-            "#{prefix} #{content}\n\n"
+            "\n\n#{prefix} #{content}\n\n"
           end
         end
       end

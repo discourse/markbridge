@@ -105,31 +105,37 @@ module Markbridge
 
           handler = @handlers[tag_name]
 
-          if handler
-            # Drop whitespace that sits between content and the start of a
-            # block-level AST node, matching browser behavior where such
-            # whitespace collapses against the block boundary. Block-ness is
-            # marked on the produced AST class via `include AST::Block`.
-            trim_trailing_whitespace(parent) if produces_block?(handler)
+          return handle_unknown_tag(node, parent) unless handler
 
-            # Handler returns element if children should be processed, nil otherwise
-            ast_element =
-              if handler.respond_to?(:process)
-                handler.process(element: node, parent:)
-              else
-                handler.call(element: node, parent:)
-              end
+          # Drop whitespace that sits between content and the start of a
+          # block-level AST node, matching browser behavior where such
+          # whitespace collapses against the block boundary. Block-ness is
+          # marked on the produced AST class via `include AST::Block`.
+          declared_block = produces_block?(handler)
+          trim_trailing_whitespace(parent) if declared_block
 
-            # Automatically process children if handler returned element
-            if ast_element
-              process_children(node, ast_element)
-              unless WHITESPACE_PRESERVING_TAGS.include?(tag_name)
-                trim_trailing_whitespace(ast_element)
-              end
+          # Handler returns element if children should be processed, nil otherwise
+          ast_element =
+            if handler.respond_to?(:process)
+              handler.process(element: node, parent:)
+            else
+              handler.call(element: node, parent:)
             end
-          else
-            handle_unknown_tag(node, parent)
+
+          return unless ast_element
+
+          # Fallback for handlers that don't advertise element_class (e.g.
+          # SpanHandler, or custom handlers that pick the AST class
+          # dynamically): if the returned node is Block AND was actually
+          # appended to `parent`, retroactively trim the Text sibling that
+          # preceded it.
+          if !declared_block && parent.children.last.equal?(ast_element) &&
+               ast_element.is_a?(AST::Block)
+            trim_text_before_last(parent)
           end
+
+          process_children(node, ast_element)
+          trim_trailing_whitespace(ast_element) unless WHITESPACE_PRESERVING_TAGS.include?(tag_name)
         end
 
         # Handle unknown tag by tracking it and ignoring the wrapper
@@ -170,6 +176,25 @@ module Markbridge
           trimmed = last.text.rstrip
           element.children.pop
           element << AST::Text.new(trimmed) unless trimmed.empty?
+        end
+
+        # Strip trailing whitespace from the Text child immediately preceding
+        # the last (just-appended) child of `element`. Removes the Text child
+        # entirely if it becomes empty. No-op if the preceding child isn't
+        # Text or if `element` has fewer than two children.
+        # @param element [AST::Element]
+        def trim_text_before_last(element)
+          return if element.children.length < 2
+
+          prev = element.children[-2]
+          return unless prev.instance_of?(AST::Text)
+
+          trimmed = prev.text.rstrip
+          if trimmed.empty?
+            element.children.delete_at(-2)
+          elsif trimmed != prev.text
+            element.children[-2] = AST::Text.new(trimmed)
+          end
         end
       end
     end

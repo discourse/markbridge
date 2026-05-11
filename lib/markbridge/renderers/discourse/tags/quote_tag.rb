@@ -27,9 +27,10 @@ module Markbridge
                 content.split("\n").map { |line| "> #{line}" }.join("\n")
               end
 
-            # Trailing blank line so consecutive quotes don't merge and
-            # following content starts a new paragraph.
-            "#{body}\n\n"
+            # Bracket with leading and trailing blank lines so consecutive
+            # quotes don't merge and adjacent non-block content (raw text,
+            # inline elements) starts a new paragraph against the quote.
+            "\n\n#{body}\n\n"
           end
         end
       end
