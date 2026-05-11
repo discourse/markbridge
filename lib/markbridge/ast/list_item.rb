@@ -8,6 +8,7 @@ module Markbridge
     #   item = AST::ListItem.new
     #   item << AST::Text.new("First item")
     class ListItem < Element
+      include Block
     end
   end
 end

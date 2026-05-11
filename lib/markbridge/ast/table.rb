@@ -8,6 +8,8 @@ module Markbridge
     #   table = AST::Table.new
     #   table << AST::TableRow.new
     class Table < Element
+      include Block
+
       # HTML/BBCode parsers add a Text("\n") child for the whitespace
       # between `<table>` and `<tr>` (and equivalent BBCode). Drop
       # those so the AST contains only TableRow children.
@@ -24,6 +26,8 @@ module Markbridge
     #   row = AST::TableRow.new
     #   row << AST::TableCell.new
     class TableRow < Element
+      include Block
+
       # See Table#<< — same whitespace skip for `<tr>` / `<td>` gaps.
       def <<(child)
         return self if child.instance_of?(Text) && child.text.strip.empty?
@@ -42,6 +46,8 @@ module Markbridge
     #   cell = AST::TableCell.new(header: true)
     #   cell << AST::Text.new("header")
     class TableCell < Element
+      include Block
+
       # Create a new table cell.
       #
       # @param header [Boolean] whether this is a header cell (th)

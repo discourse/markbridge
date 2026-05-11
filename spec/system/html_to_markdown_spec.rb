@@ -164,9 +164,11 @@ RSpec.describe "HTML to Markdown Conversion" do
       expect(result).to eq(expected)
     end
 
-    it "converts blockquote with multiple paragraphs" do
+    it "treats raw newlines in blockquote source as whitespace per HTML spec" do
+      # Per HTML spec, newlines in source HTML are whitespace, not paragraph
+      # breaks. Authors who want paragraphs must use <p> (or <br> for breaks).
       html = "<blockquote>First paragraph\n\nSecond paragraph</blockquote>"
-      expected = "> First paragraph\n> \n> Second paragraph"
+      expected = "> First paragraph Second paragraph"
 
       result = Markbridge.html_to_markdown(html)
       expect(result).to eq(expected)
@@ -185,6 +187,48 @@ RSpec.describe "HTML to Markdown Conversion" do
     it "converts horizontal rule" do
       html = "Text<hr>More text"
       expected = "Text\n\n---\n\nMore text"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+  end
+
+  describe "whitespace collapsing per HTML spec" do
+    it "drops a leading newline before nested content inside a link" do
+      html = %(<a href="https://twitter.com/lamresearch">\n<u>Twitter</u></a>)
+      expected = "[Twitter](https://twitter.com/lamresearch)"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "drops a trailing newline after nested content inside a link" do
+      html = %(<a href="https://example.com"><u>Twitter</u>\n</a>)
+      expected = "[Twitter](https://example.com)"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "collapses runs of whitespace within text to a single space" do
+      html = "<p>Click   <a href=\"https://example.com\">here\nfor\tinfo</a> now</p>"
+      expected = "Click [here for info](https://example.com) now"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "preserves whitespace inside <pre>" do
+      html = "<pre>line1\nline2\n  indented</pre>"
+      expected = "```\nline1\nline2\n  indented\n```"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result).to eq(expected)
+    end
+
+    it "preserves whitespace inside inline <code>" do
+      html = "<code>fn  call</code>"
+      expected = "`fn  call`"
 
       result = Markbridge.html_to_markdown(html)
       expect(result).to eq(expected)

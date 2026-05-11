@@ -9,6 +9,8 @@ module Markbridge
     #   align = AST::Align.new(alignment: "center")
     #   align << AST::Text.new("Centered text")
     class Align < Element
+      include Block
+
       # @return [String, nil] the alignment value (left, center, right, justify)
       attr_reader :alignment
 

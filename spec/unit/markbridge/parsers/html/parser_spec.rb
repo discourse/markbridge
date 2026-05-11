@@ -223,10 +223,210 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(doc.children[0].text).to eq("<b> & \"text\"")
     end
 
-    it "preserves whitespace" do
+    it "collapses runs of whitespace to a single space per HTML spec" do
       doc = parser.parse("hello   world")
 
-      expect(doc.children[0].text).to eq("hello   world")
+      expect(doc.children[0].text).to eq("hello world")
+    end
+  end
+
+  describe "#parse whitespace handling" do
+    it "preserves runs of whitespace inside <pre>" do
+      doc = parser.parse("<pre>a   b</pre>")
+
+      expect(doc.children[0].children[0].text).to eq("a   b")
+    end
+
+    it "preserves newlines inside <pre>" do
+      doc = parser.parse("<pre>a\nb\nc</pre>")
+
+      expect(doc.children[0].children[0].text).to eq("a\nb\nc")
+    end
+
+    it "preserves whitespace inside inline <code>" do
+      doc = parser.parse("<code>a   b</code>")
+
+      expect(doc.children[0].children[0].text).to eq("a   b")
+    end
+
+    it "preserves whitespace inside <textarea> (recursive ancestor walk)" do
+      # <textarea> has no handler, so handle_unknown_tag recurses into
+      # children — preserves_whitespace? finds <textarea> on the ancestor
+      # chain and skips collapse for the text node inside.
+      doc = parser.parse("<textarea>a   b</textarea>")
+
+      expect(doc.children[0].text).to eq("a   b")
+    end
+
+    it "walks the ancestor chain when checking whitespace preservation" do
+      # The text node's direct parent is <b>, but a higher ancestor
+      # (<textarea>) opts into whitespace preservation. The walk must
+      # traverse past <b> to find it.
+      doc = parser.parse("<textarea><b>x   y</b></textarea>")
+
+      bold = doc.children[0]
+      expect(bold).to be_a(Markbridge::AST::Bold)
+      expect(bold.children[0].text).to eq("x   y")
+    end
+
+    it "preserves whitespace inside <tt>" do
+      doc = parser.parse("<tt>a   b</tt>")
+
+      expect(doc.children[0].children[0].text).to eq("a   b")
+    end
+
+    it "collapses tabs and newlines as whitespace" do
+      doc = parser.parse("a\tb\nc")
+
+      expect(doc.children[0].text).to eq("a b c")
+    end
+
+    it "drops leading whitespace at the start of an element's content" do
+      doc = parser.parse("<b>   text</b>")
+
+      expect(doc.children[0].children[0].text).to eq("text")
+    end
+
+    it "does not append an empty Text node when leading whitespace is fully stripped" do
+      # The text node "   " collapses to " ", then lstrip leaves "" — the
+      # parser must skip it entirely rather than appending an empty Text.
+      doc = parser.parse("<b>   <i>x</i></b>")
+
+      bold = doc.children[0]
+      expect(bold.children.size).to eq(1)
+      expect(bold.children[0]).to be_a(Markbridge::AST::Italic)
+    end
+
+    it "trims trailing whitespace at the end of an element's content" do
+      doc = parser.parse("<b>text   </b>")
+
+      expect(doc.children[0].children[0].text).to eq("text")
+    end
+
+    it "preserves leading whitespace within a non-first text child while trimming only the trailing run" do
+      # The "  bar  " text node is not the first child of <b>, so its
+      # leading whitespace is preserved (matching the inline-whitespace
+      # rule). Only trailing whitespace gets stripped.
+      doc = parser.parse("<b>foo<i>x</i>  bar  </b>")
+
+      bold = doc.children[0]
+      expect(bold.children.last.text).to eq(" bar")
+    end
+
+    it "leaves an element's children alone when the last child is not a Text node" do
+      # No trailing-whitespace work to do; a list ending in a <li>
+      # should keep its ListItem as the last child unchanged.
+      doc = parser.parse("<ul><li>x</li></ul>")
+
+      list = doc.children[0]
+      expect(list.children.size).to eq(1)
+      expect(list.children.last).to be_a(Markbridge::AST::ListItem)
+    end
+
+    it "leaves a non-last Text sibling untouched when the last child is an element" do
+      # Inspects the LAST child, not the first. With a non-Text last
+      # child, no trim happens — and the earlier Text sibling keeps any
+      # trailing whitespace it had after collapse.
+      doc = parser.parse("<b>foo  <i>x</i></b>")
+
+      bold = doc.children[0]
+      expect(bold.children.size).to eq(2)
+      expect(bold.children[0]).to be_a(Markbridge::AST::Text)
+      expect(bold.children[0].text).to eq("foo ")
+      expect(bold.children[1]).to be_a(Markbridge::AST::Italic)
+    end
+
+    it "drops a trailing Text child entirely when stripping leaves it empty" do
+      # The "   " text becomes " " after collapse, then rstrip leaves "" —
+      # the Text node must not stay in children as an empty placeholder.
+      doc = parser.parse("<b><i>x</i>   </b>")
+
+      bold = doc.children[0]
+      expect(bold.children.size).to eq(1)
+      expect(bold.children[0]).to be_a(Markbridge::AST::Italic)
+    end
+
+    it "drops a whitespace-only text node entirely at the start of the document" do
+      doc = parser.parse("   hello")
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0].text).to eq("hello")
+    end
+
+    it "drops a whitespace-only text node entirely at the end of the document" do
+      doc = parser.parse("hello   ")
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0].text).to eq("hello")
+    end
+
+    it "drops trailing whitespace before a block-level <p>" do
+      doc = parser.parse("text   <p>para</p>")
+
+      expect(doc.children[0].text).to eq("text")
+    end
+
+    it "drops trailing whitespace before a block-level <ul>" do
+      doc = parser.parse("text   <ul><li>x</li></ul>")
+
+      expect(doc.children[0].text).to eq("text")
+    end
+
+    it "preserves trailing whitespace before an inline <br>" do
+      # <br> is inline (LineBreak is not block-level), so the space before it
+      # stays — matching browser behavior.
+      doc = parser.parse("text <br>more")
+
+      expect(doc.children[0].text).to eq("text ")
+    end
+
+    it "preserves whitespace inside the parent before an inline child" do
+      # The space between text and <b> is meaningful inline whitespace.
+      doc = parser.parse("foo <b>bar</b>")
+
+      expect(doc.children[0].text).to eq("foo ")
+    end
+
+    it "does not trim trailing whitespace for whitespace-preserving tags" do
+      # When a custom registry uses a handler that recurses into children
+      # (returning ast_element) for a whitespace-preserving tag, the
+      # post-recursion trim must skip — otherwise trailing whitespace
+      # inside <pre>/<code>/<tt>/<textarea> would be dropped.
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register(
+        "pre",
+        Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Code),
+      )
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<pre>foo   </pre>")
+
+      pre = doc.children[0]
+      expect(pre).to be_a(Markbridge::AST::Code)
+      expect(pre.children[0].text).to eq("foo   ")
+    end
+
+    it "treats a handler with nil element_class as non-block" do
+      # SpanHandler inherits `attr_reader :element_class` but never sets it,
+      # so produces_block? must guard against the nil — otherwise comparing
+      # nil < AST::Block would raise.
+      expect { parser.parse('text   <span style="font-weight:bold">x</span>') }.not_to raise_error
+    end
+
+    it "drops a Proc handler's pre-trim because it does not advertise an element class" do
+      # Proc handlers don't expose element_class; produces_block? returns
+      # false for them, so trailing whitespace is left intact even though
+      # the Proc emits a HorizontalRule.
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.register(
+        "hr",
+        ->(element:, parent:) { parent << Markbridge::AST::HorizontalRule.new },
+      )
+      proc_parser = described_class.new(handlers: registry)
+
+      doc = proc_parser.parse("text <hr>")
+
+      expect(doc.children[0].text).to eq("text ")
     end
   end
 

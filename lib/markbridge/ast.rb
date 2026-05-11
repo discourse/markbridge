@@ -3,6 +3,7 @@
 # base / dependency order first
 require_relative "ast/node"
 require_relative "ast/element"
+require_relative "ast/block"
 require_relative "ast/document"
 
 require_relative "ast/align"
