@@ -41,5 +41,34 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UnderlineTag do
         expect(tag.render(element, interface)).to eq(%(<span class="bbcode-u">hi</span>))
       end
     end
+
+    # Discourse's BBCode plugin cooks `[u]…[/u]` from Markdown source but does
+    # not re-process BBCode inside Markdown link text — `[[u]X[/u]](url)` stays
+    # literal. Skip the wrapper when rendering inside a link.
+    context "with a link ancestor in the parent chain" do
+      it "returns content unwrapped when nested under Url" do
+        url_parent = Markbridge::AST::Url.new(href: "https://example.com")
+        link_context = Markbridge::Renderers::Discourse::RenderContext.new([url_parent])
+        link_interface =
+          Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, link_context)
+
+        element = element_class.new
+        element << Markbridge::AST::Text.new("Facebook")
+
+        expect(tag.render(element, link_interface)).to eq("Facebook")
+      end
+
+      it "returns content unwrapped when nested under Email" do
+        email_parent = Markbridge::AST::Email.new(address: "user@example.com")
+        link_context = Markbridge::Renderers::Discourse::RenderContext.new([email_parent])
+        link_interface =
+          Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, link_context)
+
+        element = element_class.new
+        element << Markbridge::AST::Text.new("Contact")
+
+        expect(tag.render(element, link_interface)).to eq("Contact")
+      end
+    end
   end
 end

@@ -316,6 +316,17 @@ RSpec.describe "BBCode to Markdown Conversion" do
       result = Markbridge.bbcode_to_markdown("[url=https://example.com][b]Bold link[/b][/url]")
       expect(result).to eq("[**Bold link**](https://example.com)")
     end
+
+    it "drops [u] wrapper inside link text since Discourse does not re-cook BBCode there" do
+      result = Markbridge.bbcode_to_markdown("[url=https://example.com][u]Facebook[/u][/url]")
+      expect(result).to eq("[Facebook](https://example.com)")
+    end
+
+    it "drops [u] wrapper transitively when nested inside other inline formatting in a link" do
+      result =
+        Markbridge.bbcode_to_markdown("[url=https://example.com][b][u]Facebook[/u][/b][/url]")
+      expect(result).to eq("[**Facebook**](https://example.com)")
+    end
   end
 
   describe "images" do
@@ -435,6 +446,11 @@ RSpec.describe "BBCode to Markdown Conversion" do
     it "converts email with content as address" do
       result = Markbridge.bbcode_to_markdown("[email]user@example.com[/email]")
       expect(result).to eq("user@example.com")
+    end
+
+    it "drops [u] wrapper inside email link text" do
+      result = Markbridge.bbcode_to_markdown("[email=user@example.com][u]Contact[/u][/email]")
+      expect(result).to eq("[Contact](mailto:user@example.com)")
     end
   end
 
