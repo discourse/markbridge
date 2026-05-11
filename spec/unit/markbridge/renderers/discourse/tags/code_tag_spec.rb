@@ -38,7 +38,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
 
       result = tag.render(element, interface)
       # Single backticks only need 3-backtick fence (smarter than always using tildes)
-      expect(result).to start_with("```\n")
+      expect(result).to start_with("\n\n```\n")
       expect(result).to end_with("\n```\n\n")
     end
 
@@ -48,7 +48,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
 
       result = tag.render(element, interface)
       # Tildes (3) are more efficient than backticks (4)
-      expect(result).to start_with("~~~\n")
+      expect(result).to start_with("\n\n~~~\n")
       expect(result).to end_with("\n~~~\n\n")
     end
 
@@ -58,7 +58,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
 
       result = tag.render(element, interface)
       # Tildes (3) are more efficient than backticks (6)
-      expect(result).to start_with("~~~\n")
+      expect(result).to start_with("\n\n~~~\n")
       expect(result).to end_with("\n~~~\n\n")
     end
 
@@ -68,7 +68,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
 
       result = tag.render(element, interface)
       # Backticks (3) are more efficient than tildes (4)
-      expect(result).to start_with("```\n")
+      expect(result).to start_with("\n\n```\n")
       expect(result).to end_with("\n```\n\n")
     end
 
@@ -79,7 +79,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       result = tag.render(element, interface)
       # Should use ~~~~ (4 tildes) since it's shorter than ```` (4 backticks)
       # Actually both are equal, so backticks win
-      expect(result).to start_with("````\n")
+      expect(result).to start_with("\n\n````\n")
       expect(result).to end_with("\n````\n\n")
     end
 
@@ -89,7 +89,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       element << Markbridge::AST::Text.new("`a\n``````\nb`")
 
       result = tag.render(element, interface)
-      expect(result).to start_with("~~~\n") # 7 backticks needed; tildes shorter
+      expect(result).to start_with("\n\n~~~\n") # 7 backticks needed; tildes shorter
       expect(result).to end_with("\n~~~\n\n")
     end
 
@@ -99,7 +99,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       element << Markbridge::AST::Text.new("~a\n~~~~~~\nb~")
 
       result = tag.render(element, interface)
-      expect(result).to start_with("```\n") # 7 tildes needed; backticks shorter
+      expect(result).to start_with("\n\n```\n") # 7 tildes needed; backticks shorter
       expect(result).to end_with("\n```\n\n")
     end
 
@@ -108,7 +108,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       element << Markbridge::AST::Text.new("a\nb")
 
       result = tag.render(element, interface)
-      expect(result).to start_with("```\n") # No language between fence and newline
+      expect(result).to start_with("\n\n```\n") # No language between fence and newline
     end
 
     it "needs only run-length+1 tildes when tildes are shorter than backticks" do
@@ -117,7 +117,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       element << Markbridge::AST::Text.new("```\nand\n~~")
 
       result = tag.render(element, interface)
-      expect(result).to start_with("~~~\n")
+      expect(result).to start_with("\n\n~~~\n")
       expect(result).to end_with("\n~~~\n\n")
     end
 
@@ -139,7 +139,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
 
       result = tag.render(element, interface)
       # 4-backtick fence: original backticks max=3 → fence=4.
-      expect(result).to start_with("````\n")
+      expect(result).to start_with("\n\n````\n")
       expect(result).to end_with("\n````\n\n")
     end
 

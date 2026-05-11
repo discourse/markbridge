@@ -7,11 +7,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ParagraphTag do
   let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
   describe "#render" do
-    it "appends two newlines after the content (paragraph break)" do
+    it "brackets content with leading and trailing blank lines" do
       element = Markbridge::AST::Paragraph.new
       element << Markbridge::AST::Text.new("hello")
 
-      expect(tag.render(element, interface)).to eq("hello\n\n")
+      expect(tag.render(element, interface)).to eq("\n\nhello\n\n")
     end
 
     let(:element_class) { Markbridge::AST::Paragraph }

@@ -7,25 +7,25 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::HeadingTag do
   let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
   describe "#render" do
-    it "renders an h1 with one # prefix and a trailing blank line" do
+    it "renders an h1 with one # prefix and blank-line bracketing" do
       element = Markbridge::AST::Heading.new(level: 1)
       element << Markbridge::AST::Text.new("Title")
 
-      expect(tag.render(element, interface)).to eq("# Title\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n# Title\n\n")
     end
 
     it "renders an h6 with six # prefixes" do
       element = Markbridge::AST::Heading.new(level: 6)
       element << Markbridge::AST::Text.new("Title")
 
-      expect(tag.render(element, interface)).to eq("###### Title\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n###### Title\n\n")
     end
 
     it "renders an h3 with exactly three # prefixes" do
       element = Markbridge::AST::Heading.new(level: 3)
       element << Markbridge::AST::Text.new("Title")
 
-      expect(tag.render(element, interface)).to eq("### Title\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n### Title\n\n")
     end
 
     let(:element_class) { Markbridge::AST::Heading }

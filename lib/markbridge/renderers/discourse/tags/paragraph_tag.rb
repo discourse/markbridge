@@ -21,8 +21,11 @@ module Markbridge
               return "<p>#{content}</p>"
             end
 
-            # Paragraph followed by blank line (two newlines)
-            "#{content}\n\n"
+            # Bracket with leading and trailing blank lines so adjacent
+            # non-block content (raw text, inline elements) stays separated
+            # from the paragraph. cleanup_markdown collapses any duplicate
+            # newlines that result when neighbours are themselves block tags.
+            "\n\n#{content}\n\n"
           end
         end
       end
