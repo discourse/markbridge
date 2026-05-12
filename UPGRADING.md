@@ -285,10 +285,86 @@ end
 The default is still `raise_on_error: true`, preserving the prior
 behavior of letting exceptions propagate.
 
+### HTML / TextFormatter parsers accept pre-parsed Nokogiri input
+
+Both Nokogiri-backed parsers now take either a String *or* a
+pre-parsed `Nokogiri::XML::Node`. Importers that already run their
+own DOM preprocessing pass (signature detection, reply-trailer
+stripping, structural classification) can hand the live fragment to
+Markbridge with no serialize → re-parse round-trip in between:
+
+```ruby
+# Before — two Nokogiri parses per post
+processed = MyImporter::SignatureWrapper.wrap(html)   # parse + mutate + to_html
+result    = Markbridge.html_to_markdown(processed)    # parse again
+
+# After — one Nokogiri parse per post
+fragment = Nokogiri::HTML.fragment(html)
+MyImporter::SignatureWrapper.wrap_dom!(fragment)      # in-place mutation
+result   = Markbridge.html_to_markdown(fragment)
+```
+
+Same affordance on TextFormatter:
+
+```ruby
+xml_doc = Nokogiri.XML(input)
+# … inspect / mutate xml_doc …
+result = Markbridge.text_formatter_xml_to_markdown(xml_doc)
+```
+
+Documents are unwrapped via `#root`; any other `Nokogiri::XML::Node`
+(Fragment, Element) is treated as the root directly. String callers
+are unchanged — the `.to_s` fallback covers `Pathname`, `IO`, and
+any other object that historically went through `.to_s` coercion.
+
+The HTML round-trip avoidance also fixes a documented side effect:
+re-serialization percent-encodes non-ASCII bytes in URL attributes.
+
+### AST traversal helpers on `Element`
+
+Three new methods replace the recursive-descent boilerplate every
+consumer was rolling on its own:
+
+```ruby
+# Walk every descendant in depth-first pre-order.
+result.ast.each_descendant { |node| ... }
+
+# Filter by class (uses is_a? — abstract bases match subclasses).
+mentions = result.ast.descendants(MyAst::Mention)
+
+# Swap a direct child in place, preserving index.
+result.ast.replace_child(old_paragraph, new_details_block)
+```
+
+`each_descendant` snapshots the children array of each Element at
+iteration entry, so mid-walk `replace_child` is safe — descent uses
+the pre-replacement reference. Appends to the same array during the
+walk are *not* re-visited (prevents unbounded recursion when a node
+appends another node).
+
+### `Markbridge::AST::Details` + `DetailsTag`
+
+The collapsible Discourse `[details=…]…[/details]` block is now a
+core AST node + auto-registered Tag. Importers can drop any local
+`DetailsBlock` / `DetailsBlockTag` shim:
+
+```ruby
+ast << Markbridge::AST::Details.new(title: "Signature").tap do |block|
+  block << Markbridge::AST::Text.new("--\nAlex Doe")
+end
+# Markdown:   \n\n[details="Signature"]\n--\nAlex Doe\n[/details]\n\n
+# html_mode:  <details><summary>Signature</summary>…</details>
+```
+
+`title` is optional — omitting it produces a bare `[details]` (BBCode
+parser default) and `<summary>Summary</summary>` in html_mode. The
+title is HTML-escaped in the `<summary>` text.
+
 ### See also
 
 - `examples/forum_migration.rb` — canonical end-to-end importer shape
   exercising every new path: `discourse_renderer` factory, `tags:`,
   `unregister:`, `allow: :lists`, the AST-mutation block,
-  `raise_on_error: false`, `Markbridge.convert(format:)` dispatch.
+  `raise_on_error: false`, `Markbridge.convert(format:)` dispatch,
+  pre-parsed Nokogiri input, AST traversal helpers, `AST::Details`.
 - `docs/extending.md` — how to add custom tags and handlers.
