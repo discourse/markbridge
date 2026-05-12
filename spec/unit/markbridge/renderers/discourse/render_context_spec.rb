@@ -28,23 +28,11 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       expect(described_class.new([bold, italic]).depth).to eq(2)
     end
 
-    it "builds the parent_cache from the parents array when none is supplied" do
+    it "exposes the parents array to query methods" do
       bold = Markbridge::AST::Bold.new
       context = described_class.new([bold])
 
       expect(context.find_parent(Markbridge::AST::Bold)).to eq(bold)
-    end
-
-    it "uses an explicit parent_cache when one is supplied (does not rebuild)" do
-      bold = Markbridge::AST::Bold.new
-      sentinel = Markbridge::AST::Italic.new
-      preset_cache = { Markbridge::AST::Italic => [sentinel] }
-
-      context = described_class.new([bold], parent_cache: preset_cache)
-
-      # Cache lookup wins: Italic resolves via the supplied cache; Bold isn't in it.
-      expect(context.find_parent(Markbridge::AST::Italic)).to eq(sentinel)
-      expect(context.find_parent(Markbridge::AST::Bold)).to be_nil
     end
 
     it "defaults html_mode to false" do
@@ -88,14 +76,14 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       expect(final_context.parents).to eq([bold, italic])
     end
 
-    it "caches the new parent under its element class for O(1) find_parent" do
+    it "exposes the added parent via find_parent" do
       bold = Markbridge::AST::Bold.new
       new_context = described_class.new.with_parent(bold)
 
       expect(new_context.find_parent(Markbridge::AST::Bold)).to eq(bold)
     end
 
-    it "appends to the existing cached array when the same class is added twice" do
+    it "tracks repeated additions of the same class" do
       bold1 = Markbridge::AST::Bold.new
       bold2 = Markbridge::AST::Bold.new
       ctx = described_class.new.with_parent(bold1).with_parent(bold2)
@@ -112,7 +100,7 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       ).to eq(2)
     end
 
-    it "does not mutate the original context's cache (functional, not in-place update)" do
+    it "does not mutate the original context (functional, not in-place update)" do
       bold = Markbridge::AST::Bold.new
       original = described_class.new
       original.with_parent(bold)
@@ -160,6 +148,22 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       result = context.find_parent(Markbridge::AST::Bold)
       expect(result).to eq(bold2)
     end
+
+    it "returns a subclass instance when queried by the base class" do
+      custom_url_class = Class.new(Markbridge::AST::Url)
+      instance = custom_url_class.new
+      context = described_class.new([instance])
+
+      expect(context.find_parent(Markbridge::AST::Url)).to equal(instance)
+    end
+
+    it "returns the closest subclass when mixed with exact-class instances" do
+      base = Markbridge::AST::Url.new
+      sub = Class.new(Markbridge::AST::Url).new
+      context = described_class.new([base, sub])
+
+      expect(context.find_parent(Markbridge::AST::Url)).to equal(sub)
+    end
   end
 
   describe "#count_parents" do
@@ -191,6 +195,20 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
 
       expect(context.count_parents(Markbridge::AST::Bold)).to eq(1)
     end
+
+    it "counts subclass instances when queried by base class" do
+      custom_url_class = Class.new(Markbridge::AST::Url)
+      context = described_class.new([custom_url_class.new, custom_url_class.new])
+
+      expect(context.count_parents(Markbridge::AST::Url)).to eq(2)
+    end
+
+    it "sums exact-class and subclass instances when queried by base class" do
+      sub = Class.new(Markbridge::AST::Url)
+      context = described_class.new([Markbridge::AST::Url.new, sub.new, Markbridge::AST::Url.new])
+
+      expect(context.count_parents(Markbridge::AST::Url)).to eq(3)
+    end
   end
 
   describe "#has_parent?" do
@@ -219,6 +237,13 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       context = described_class.new([list1, list2])
 
       expect(context.has_parent?(Markbridge::AST::List)).to be true
+    end
+
+    it "returns true when a subclass of the queried class is in the chain" do
+      custom_url_class = Class.new(Markbridge::AST::Url)
+      context = described_class.new([custom_url_class.new])
+
+      expect(context.has_parent?(Markbridge::AST::Url)).to be true
     end
   end
 
