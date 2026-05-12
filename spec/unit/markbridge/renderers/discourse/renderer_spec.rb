@@ -23,7 +23,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       result = described_class.new(escaper:).render(Markbridge::AST::Text.new("hi"))
 
       expect(result).to eq("ESCAPED")
-      expect(escaper).to have_received(:escape).with("hi")
+      expect(escaper).to have_received(:escape).with("hi", in_link_label: false)
     end
 
     it "falls back to TagLibrary.default when no tag_library is provided" do
@@ -123,6 +123,26 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       bold << Markbridge::AST::Text.new("a*b")
 
       expect(renderer.render(bold)).to include('a\*b')
+    end
+
+    it "escapes ] in Text content when an ancestor is Url (link-label context)" do
+      url = Markbridge::AST::Url.new(href: "https://example.com")
+      url << Markbridge::AST::Text.new("[A]")
+
+      expect(renderer.render(url)).to eq("[\\[A\\]](https://example.com)")
+    end
+
+    it "escapes ] in Text content when an ancestor is Email (link-label context)" do
+      email = Markbridge::AST::Email.new(address: "user@example.com")
+      email << Markbridge::AST::Text.new("[A]")
+
+      expect(renderer.render(email)).to eq("[\\[A\\]](mailto:user@example.com)")
+    end
+
+    it "does not escape ] in Text content when no link ancestor is present" do
+      text = Markbridge::AST::Text.new("plain ] text")
+
+      expect(renderer.render(text)).to eq("plain ] text")
     end
 
     context "in html_mode" do

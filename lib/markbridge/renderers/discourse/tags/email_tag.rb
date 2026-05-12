@@ -16,9 +16,7 @@ module Markbridge
             if interface.html_mode?
               %(<a href="mailto:#{HtmlEscaper.escape(address)}">#{text}</a>)
             else
-              # MarkdownEscaper leaves ] alone in prose, but it's structural
-              # inside a link label — escape it here to prevent early termination.
-              "[#{text.gsub("]") { "\\]" }}](mailto:#{address})"
+              "[#{text}](mailto:#{address})"
             end
           end
         end

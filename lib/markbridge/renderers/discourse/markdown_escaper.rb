@@ -116,17 +116,28 @@ module Markbridge
         # Autolinks (<https://...>, <email@domain>) are intentionally preserved.
         #
         # @param text [String, nil] the text to escape
+        # @param in_link_label [Boolean] when true, also escape `]` so the text
+        #   can be spliced into a Markdown link label `[text](url)` without
+        #   terminating it early. The default leaves `]` alone because a bare
+        #   `]` in prose is harmless (the matching `[` is already escaped).
         # @return [String] the escaped text, or empty string if input is nil
         # @note Multi-line HTML tags and blocks are handled by escaping the opening <
-        def escape(text)
+        def escape(text, in_link_label: false)
           return "" if text.nil?
 
           # Neutralize hard line breaks (trailing 2+ spaces before newline)
           text = text.gsub(/  +\n/, "\n") if @escape_hard_line_breaks && text.include?("  \n")
 
-          return text unless MAYBE_SPECIAL.match?(text) || MAYBE_INDENTED_CODE.match?(text)
+          result =
+            if MAYBE_SPECIAL.match?(text) || MAYBE_INDENTED_CODE.match?(text)
+              escape_text(text)
+            else
+              text
+            end
 
-          escape_text(text)
+          return result unless in_link_label && result.include?("]")
+
+          result.gsub("]") { "\\]" }
         end
 
         private

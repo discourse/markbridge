@@ -108,6 +108,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       expect(result).to eq("[\\[A\\] and \\[B\\]](https://example.com)")
     end
 
+    it "preserves structural ] in child markdown (e.g. an image's empty alt)" do
+      element = Markbridge::AST::Url.new(href: "https://example.com/page")
+      element << Markbridge::AST::Image.new(src: "https://example.com/logo.png")
+
+      result = tag.render(element, interface)
+      expect(result).to eq("[![](https://example.com/logo.png)](https://example.com/page)")
+    end
+
     let(:element_class) { Markbridge::AST::Url }
     let(:element_factory) { Markbridge::AST::Url.new(href: "https://example.com") }
     it_behaves_like "a tag that propagates parent context"
