@@ -35,16 +35,19 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       expect(context.find_parent(Markbridge::AST::Bold)).to eq(bold)
     end
 
-    it "uses an explicit parent_cache when one is supplied (does not rebuild)" do
+    it "uses an explicit parent_cache as the has_parent? fast-path" do
       bold = Markbridge::AST::Bold.new
-      sentinel = Markbridge::AST::Italic.new
-      preset_cache = { Markbridge::AST::Italic => [sentinel] }
+      # The cache is consulted by #has_parent? before any parents scan,
+      # so a cache entry resolves to true without touching @parents.
+      # #find_parent and #count_parents always scan @parents and are
+      # therefore unaffected by a mismatched cache.
+      preset_cache = { Markbridge::AST::Italic => [Markbridge::AST::Italic.new] }
 
       context = described_class.new([bold], parent_cache: preset_cache)
 
-      # Cache lookup wins: Italic resolves via the supplied cache; Bold isn't in it.
-      expect(context.find_parent(Markbridge::AST::Italic)).to eq(sentinel)
-      expect(context.find_parent(Markbridge::AST::Bold)).to be_nil
+      expect(context.has_parent?(Markbridge::AST::Italic)).to be true
+      expect(context.find_parent(Markbridge::AST::Italic)).to be_nil
+      expect(context.find_parent(Markbridge::AST::Bold)).to eq(bold)
     end
 
     it "defaults html_mode to false" do
@@ -160,6 +163,22 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       result = context.find_parent(Markbridge::AST::Bold)
       expect(result).to eq(bold2)
     end
+
+    it "returns a subclass instance when queried by the base class" do
+      custom_url_class = Class.new(Markbridge::AST::Url)
+      instance = custom_url_class.new
+      context = described_class.new([instance])
+
+      expect(context.find_parent(Markbridge::AST::Url)).to equal(instance)
+    end
+
+    it "returns the closest subclass when mixed with exact-class instances" do
+      base = Markbridge::AST::Url.new
+      sub = Class.new(Markbridge::AST::Url).new
+      context = described_class.new([base, sub])
+
+      expect(context.find_parent(Markbridge::AST::Url)).to equal(sub)
+    end
   end
 
   describe "#count_parents" do
@@ -191,6 +210,20 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
 
       expect(context.count_parents(Markbridge::AST::Bold)).to eq(1)
     end
+
+    it "counts subclass instances when queried by base class" do
+      custom_url_class = Class.new(Markbridge::AST::Url)
+      context = described_class.new([custom_url_class.new, custom_url_class.new])
+
+      expect(context.count_parents(Markbridge::AST::Url)).to eq(2)
+    end
+
+    it "sums exact-class and subclass instances when queried by base class" do
+      sub = Class.new(Markbridge::AST::Url)
+      context = described_class.new([Markbridge::AST::Url.new, sub.new, Markbridge::AST::Url.new])
+
+      expect(context.count_parents(Markbridge::AST::Url)).to eq(3)
+    end
   end
 
   describe "#has_parent?" do
@@ -219,6 +252,24 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       context = described_class.new([list1, list2])
 
       expect(context.has_parent?(Markbridge::AST::List)).to be true
+    end
+
+    it "returns true when a subclass of the queried class is in the chain" do
+      custom_url_class = Class.new(Markbridge::AST::Url)
+      context = described_class.new([custom_url_class.new])
+
+      expect(context.has_parent?(Markbridge::AST::Url)).to be true
+    end
+
+    it "returns true via the cache fast-path without scanning @parents" do
+      # The cache key is consulted first and short-circuits the parents
+      # scan. Locks in the early-return so a mutation that lets
+      # execution fall through to the scan (`return true` → `true`)
+      # fails: with no Italic in @parents, the scan would return false.
+      preset_cache = { Markbridge::AST::Italic => [Markbridge::AST::Italic.new] }
+      context = described_class.new([Markbridge::AST::Bold.new], parent_cache: preset_cache)
+
+      expect(context.has_parent?(Markbridge::AST::Italic)).to be true
     end
   end
 

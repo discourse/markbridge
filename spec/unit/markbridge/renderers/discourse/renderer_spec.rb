@@ -145,6 +145,20 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.render(text)).to eq("plain ] text")
     end
 
+    it "escapes ] in Text content when context has a Url-subclass ancestor" do
+      # Custom AST nodes that extend AST::Url inherit the in_link_label
+      # escaping without any registration. (Tag dispatch is a separate
+      # concern — TagLibrary is exact-class; this test exercises only
+      # the renderer's ancestry-driven escape decision.)
+      custom_url_class = Class.new(Markbridge::AST::Url)
+      url = custom_url_class.new(href: "https://example.com")
+      text = Markbridge::AST::Text.new("[A]")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([url])
+
+      expect(renderer.render(text, context:)).to eq("\\[A\\]")
+    end
+
+
     context "in html_mode" do
       it "HTML-escapes text" do
         text = Markbridge::AST::Text.new("a < b")

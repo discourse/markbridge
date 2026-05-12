@@ -47,28 +47,34 @@ module Markbridge
           @html_mode
         end
 
-        # Find closest parent of given type
-        # O(1) hash lookup instead of O(depth) scan
+        # Find closest parent that is_a? klass (handles subclasses).
+        # O(depth) scan over @parents — preserves chain order so subclass
+        # instances mixed with exact-class instances resolve to the closest.
         # @param klass [Class]
         # @return [AST::Element, nil]
         def find_parent(klass)
-          @parent_cache[klass]&.last
+          @parents.reverse_each.find { |parent| parent.is_a?(klass) }
         end
 
-        # Count parents of given type
-        # O(1) instead of O(depth)
+        # Count parents that are is_a? klass (handles subclasses).
+        # O(depth) — same reason as find_parent: the cache is keyed by
+        # exact class so it can't answer polymorphic counts on its own.
         # @param klass [Class]
         # @return [Integer]
         def count_parents(klass)
-          @parent_cache[klass]&.size || 0
+          @parents.count { |parent| parent.is_a?(klass) }
         end
 
-        # Check if parent of type exists
-        # O(1) check
+        # Check if any parent is_a? klass (handles subclasses).
+        # Fast path: O(1) cache hit when an exact-class match exists
+        # (the common case — callers query against built-in AST classes
+        # that are usually instantiated directly).
+        # Fallback: O(depth) scan for the polymorphic case.
         # @param klass [Class]
         # @return [Boolean]
         def has_parent?(klass)
-          !@parent_cache[klass].nil?
+          return true if @parent_cache.key?(klass)
+          @parents.any? { |parent| parent.is_a?(klass) }
         end
 
         # Check if we're at the root (no parents)
