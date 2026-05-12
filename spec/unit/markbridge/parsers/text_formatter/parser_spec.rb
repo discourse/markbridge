@@ -154,6 +154,73 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
       expect(doc.children.map(&:class)).to eq([Markbridge::AST::Text])
       expect(doc.children[0].text).to eq("<malformed")
     end
+
+    context "with pre-parsed Nokogiri input" do
+      it "accepts a Nokogiri::XML::Document and unwraps it via #root" do
+        xml_doc = Nokogiri.XML("<r><B>bold</B></r>")
+        doc = parser.parse(xml_doc)
+
+        expect(doc.children[0]).to be_a(Markbridge::AST::Bold)
+        expect(doc.children[0].children[0].text).to eq("bold")
+      end
+
+      it "accepts a Nokogiri::XML::Element directly as the root" do
+        # Lets a caller hand in a sub-tree without re-wrapping it in a Document.
+        element = Nokogiri.XML("<r><B>x</B></r>").root
+        doc = parser.parse(element)
+
+        expect(doc.children[0]).to be_a(Markbridge::AST::Bold)
+      end
+
+      it "returns an empty document when a Document has no root" do
+        # Edge case: a Document constructed but never given a root.
+        xml_doc = Nokogiri::XML::Document.new
+        doc = parser.parse(xml_doc)
+
+        expect(doc.children).to be_empty
+      end
+
+      it "does not call Nokogiri.XML when given a pre-parsed Document" do
+        # The whole point: hand in a tree the caller already parsed and
+        # potentially mutated. Re-parsing it would defeat the purpose
+        # (and re-introduce the URL-percent-encoding side effect that
+        # importers work around).
+        xml_doc = Nokogiri.XML("<r>x</r>")
+        allow(Nokogiri).to receive(:XML)
+
+        parser.parse(xml_doc)
+
+        expect(Nokogiri).not_to have_received(:XML)
+      end
+
+      it "still coerces non-String, non-Nokogiri inputs via to_s" do
+        coercible =
+          Class.new do
+            def to_s
+              "<r><B>x</B></r>"
+            end
+          end
+        doc = parser.parse(coercible.new)
+
+        expect(doc.children[0]).to be_a(Markbridge::AST::Bold)
+      end
+
+      it "unwraps any Nokogiri::XML::Document subclass via #root, not just exact instances" do
+        # is_a?(Document) matches Nokogiri::HTML::Document (subclass);
+        # instance_of?(Document) would not. Importers that accidentally
+        # feed an HTML-parsed doc to the XML pipeline still get .root
+        # called, rather than process_node-ing a Document (which is
+        # silently a no-op because Document responds false to .element?).
+        html_doc = Nokogiri::HTML.parse("<r/>")
+        expect(html_doc).to be_a(Nokogiri::XML::Document)
+        expect(html_doc).not_to be_instance_of(Nokogiri::XML::Document)
+        allow(html_doc).to receive(:root).and_call_original
+
+        parser.parse(html_doc)
+
+        expect(html_doc).to have_received(:root)
+      end
+    end
   end
 
   describe "#process_children" do

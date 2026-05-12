@@ -38,12 +38,26 @@ module Markbridge
           @unknown_tags = Hash.new(0)
         end
 
-        # Parse s9e/TextFormatter XML into an AST
-        # @param input [String] XML string in s9e/TextFormatter format
+        # Parse s9e/TextFormatter XML into an AST.
+        #
+        # Accepts either a String of XML or a pre-parsed Nokogiri node.
+        # A +Nokogiri::XML::Document+ is unwrapped via +#root+; any
+        # other node is treated as the root itself.
+        #
+        # @param input [String, Nokogiri::XML::Node] XML source or
+        #   pre-parsed Nokogiri tree
         # @return [AST::Document]
         def parse(input)
           @unknown_tags.clear
 
+          if input.is_a?(Nokogiri::XML::Node)
+            root = input.is_a?(Nokogiri::XML::Document) ? input.root : input
+            document = AST::Document.new
+            process_node(root, document) if root
+            return document
+          end
+
+          input = input.to_s
           xml_doc = Nokogiri.XML(input)
           root = xml_doc.root
 

@@ -27,8 +27,16 @@ module Markbridge
           @unknown_tags = Hash.new(0)
         end
 
-        # Parse HTML string into an AST
-        # @param input [String] HTML source
+        # Parse HTML into an AST.
+        #
+        # Accepts either a String of HTML source or a pre-parsed
+        # Nokogiri node (typically a +DocumentFragment+ from
+        # +Nokogiri::HTML.fragment+). Passing a pre-parsed tree lets a
+        # caller run their own Nokogiri-driven pre-processing without
+        # forcing Markbridge to re-parse the same bytes.
+        #
+        # @param input [String, Nokogiri::XML::Node] HTML source or
+        #   pre-parsed Nokogiri tree
         # @return [AST::Document]
         def parse(input)
           @unknown_tags.clear
@@ -38,7 +46,12 @@ module Markbridge
           # (see sparklemotion/nokogiri#2227). Table support treats thead/tbody/tfoot
           # as transparent, so the parse-tree difference (HTML5 auto-inserts tbody,
           # HTML4 does not) has no effect on the AST.
-          doc = Nokogiri::HTML.fragment(input)
+          doc =
+            if input.is_a?(Nokogiri::XML::Node)
+              input
+            else
+              Nokogiri::HTML.fragment(input.to_s)
+            end
 
           # Create root AST document
           document = AST::Document.new

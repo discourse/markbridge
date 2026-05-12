@@ -195,6 +195,13 @@ RSpec.describe Markbridge do
     it "exposes an empty diagnostics Hash" do
       expect(described_class.parse_html("<b>hi</b>").diagnostics).to eq({})
     end
+
+    it "accepts a pre-parsed Nokogiri::HTML::DocumentFragment without re-parsing" do
+      fragment = Nokogiri::HTML.fragment("<p><b>hi</b></p>")
+      result = described_class.parse_html(fragment)
+
+      expect(result.ast.children[0]).to be_a(Markbridge::AST::Paragraph)
+    end
   end
 
   describe ".html_to_markdown" do
@@ -284,6 +291,13 @@ RSpec.describe Markbridge do
 
     it "exposes an empty diagnostics Hash" do
       expect(described_class.parse_text_formatter_xml(xml).diagnostics).to eq({})
+    end
+
+    it "accepts a pre-parsed Nokogiri::XML::Document without re-parsing" do
+      xml_doc = Nokogiri.XML("<r><B>hi</B></r>")
+      result = described_class.parse_text_formatter_xml(xml_doc)
+
+      expect(result.ast.children[0]).to be_a(Markbridge::AST::Bold)
     end
   end
 

@@ -54,14 +54,18 @@ module Markbridge
 
     # Parse HTML to AST.
     #
-    # @param input [String] HTML source
+    # @param input [String, Nokogiri::XML::Node] HTML source or
+    #   pre-parsed Nokogiri tree (e.g. the +DocumentFragment+ returned
+    #   by +Nokogiri::HTML.fragment+). Passing a pre-parsed tree lets
+    #   callers run their own Nokogiri-driven pre-processing without
+    #   forcing Markbridge to re-parse the same bytes.
     # @param handlers [Parsers::HTML::HandlerRegistry, nil] custom handlers
     # @return [Parse]
     def parse_html(input, handlers: nil)
       raise ArgumentError, "input cannot be nil" if input.nil?
 
       parser = Parsers::HTML::Parser.new(handlers:)
-      ast = parser.parse(input.to_s)
+      ast = parser.parse(input)
 
       Parse.new(ast:, format: :html, unknown_tags: parser.unknown_tags, diagnostics: {})
     end
@@ -82,14 +86,16 @@ module Markbridge
 
     # Parse s9e/TextFormatter XML to AST.
     #
-    # @param input [String] XML source
+    # @param input [String, Nokogiri::XML::Node] XML source or
+    #   pre-parsed Nokogiri tree. A +Nokogiri::XML::Document+ is
+    #   unwrapped via +#root+; any other node is treated as the root.
     # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handlers
     # @return [Parse]
     def parse_text_formatter_xml(input, handlers: nil)
       raise ArgumentError, "input cannot be nil" if input.nil?
 
       parser = Parsers::TextFormatter::Parser.new(handlers:)
-      ast = parser.parse(input.to_s)
+      ast = parser.parse(input)
 
       Parse.new(
         ast:,
