@@ -97,8 +97,16 @@ module Markbridge
           elsif context.html_mode?
             @html_escaper.escape(node.text)
           else
-            @escaper.escape(node.text)
+            @escaper.escape(node.text, in_link_label: in_link_label?(context))
           end
+        end
+
+        # `]` is structural inside a Markdown link label, so any plain text
+        # rendered under an Url/Email ancestor must escape it. Tags that emit
+        # their own bracketed markup (ImageTag, UploadTag, etc.) skip this
+        # path entirely, so their structural brackets are preserved.
+        def in_link_label?(context)
+          context.has_parent?(AST::Url) || context.has_parent?(AST::Email)
         end
       end
     end

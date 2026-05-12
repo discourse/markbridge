@@ -130,6 +130,47 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
     end
   end
 
+  describe "#escape with in_link_label: true" do
+    # Wrapped in a `#escape` describe so mutant's subject-by-method-name
+    # test selection picks these up. Without the wrapper, the example
+    # description is e.g. "MarkdownEscaper in_link_label: …" which
+    # doesn't include "#escape" and mutant skips it.
+
+    it "escapes ] so it does not close an enclosing link label" do
+      result = escaper.escape("[ABC-123] foo", in_link_label: true)
+      expect(result).to eq("\\[ABC-123\\] foo")
+    end
+
+    it "escapes every ] (not just the first)" do
+      result = escaper.escape("[A] and [B]", in_link_label: true)
+      expect(result).to eq("\\[A\\] and \\[B\\]")
+    end
+
+    it "escapes a bare ] in otherwise unremarkable text" do
+      result = escaper.escape("foo ]bar", in_link_label: true)
+      expect(result).to eq("foo \\]bar")
+    end
+
+    it "leaves text with no ] untouched" do
+      result = escaper.escape("plain text", in_link_label: true)
+      expect(result).to eq("plain text")
+    end
+
+    it "does not escape ] when the flag is false (default)" do
+      result = escaper.escape("[ABC-123] foo")
+      expect(result).to eq("\\[ABC-123] foo")
+    end
+
+    it "returns the input string instance unchanged when no ] is present" do
+      # Locks in the no-allocation fast path: when in_link_label is set but
+      # the text contains no `]`, escape should return the same object
+      # rather than allocate a gsub copy.
+      text = "plain text with no closing bracket"
+      result = escaper.escape(text, in_link_label: true)
+      expect(result).to equal(text)
+    end
+  end
+
   describe "link reference definitions" do
     context "when [label]: URL pattern at line start (MUST escape)" do
       it "escapes link reference definition" do
