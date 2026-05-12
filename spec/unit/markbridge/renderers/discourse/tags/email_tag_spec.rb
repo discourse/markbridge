@@ -28,6 +28,22 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EmailTag do
       expect(tag.render(element, interface)).to eq("text")
     end
 
+    it "escapes ] in the label so it does not terminate the link early" do
+      element = Markbridge::AST::Email.new(address: "[email protected]")
+      element << Markbridge::AST::Text.new("[ABC-123] contact")
+
+      result = tag.render(element, interface)
+      expect(result).to eq("[\\[ABC-123\\] contact](mailto:[email protected])")
+    end
+
+    it "escapes every ] in the label" do
+      element = Markbridge::AST::Email.new(address: "[email protected]")
+      element << Markbridge::AST::Text.new("[A] and [B]")
+
+      result = tag.render(element, interface)
+      expect(result).to eq("[\\[A\\] and \\[B\\]](mailto:[email protected])")
+    end
+
     let(:element_class) { Markbridge::AST::Email }
     it_behaves_like "a tag that propagates parent context"
 

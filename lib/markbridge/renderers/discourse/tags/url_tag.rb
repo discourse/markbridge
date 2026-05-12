@@ -16,7 +16,9 @@ module Markbridge
             if interface.html_mode?
               %(<a href="#{HtmlEscaper.escape(href)}">#{text}</a>)
             else
-              "[#{text}](#{href})"
+              # MarkdownEscaper leaves ] alone in prose, but it's structural
+              # inside a link label — escape it here to prevent early termination.
+              "[#{text.gsub("]") { "\\]" }}](#{href})"
             end
           end
         end
