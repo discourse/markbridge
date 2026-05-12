@@ -92,6 +92,22 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       expect(tag.render(element, interface)).to eq("Bad Link")
     end
 
+    it "escapes ] in the label so it does not terminate the link early" do
+      element = Markbridge::AST::Url.new(href: "https://example.com")
+      element << Markbridge::AST::Text.new("[ABC-123] some title")
+
+      result = tag.render(element, interface)
+      expect(result).to eq("[\\[ABC-123\\] some title](https://example.com)")
+    end
+
+    it "escapes every ] in the label" do
+      element = Markbridge::AST::Url.new(href: "https://example.com")
+      element << Markbridge::AST::Text.new("[A] and [B]")
+
+      result = tag.render(element, interface)
+      expect(result).to eq("[\\[A\\] and \\[B\\]](https://example.com)")
+    end
+
     let(:element_class) { Markbridge::AST::Url }
     let(:element_factory) { Markbridge::AST::Url.new(href: "https://example.com") }
     it_behaves_like "a tag that propagates parent context"
