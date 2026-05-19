@@ -230,6 +230,82 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
     end
   end
 
+  describe "#parse with pre-parsed Nokogiri input" do
+    it "accepts a Nokogiri DocumentFragment directly without re-parsing" do
+      fragment = Nokogiri::HTML.fragment("<p>hello <b>world</b></p>")
+      doc = parser.parse(fragment)
+
+      paragraph = doc.children[0]
+      expect(paragraph).to be_a(Markbridge::AST::Paragraph)
+      expect(paragraph.children[0].text).to eq("hello ")
+      expect(paragraph.children[1]).to be_a(Markbridge::AST::Bold)
+    end
+
+    it "lets caller pre-mutate the fragment before parsing" do
+      # Demonstrates the importer use case: parse once with Nokogiri,
+      # walk and rewrite the tree, hand the same fragment to Markbridge.
+      fragment = Nokogiri::HTML.fragment("<p>before</p><div>middle</div><p>after</p>")
+      fragment.at_css("div").unlink
+
+      doc = parser.parse(fragment)
+
+      paragraphs = doc.children.select { |c| c.is_a?(Markbridge::AST::Paragraph) }
+      expect(paragraphs.size).to eq(2)
+      expect(paragraphs[0].children[0].text).to eq("before")
+      expect(paragraphs[1].children[0].text).to eq("after")
+    end
+
+    it "iterates the children of a bare Nokogiri::XML::Element (one level down)" do
+      # Same shape as DocumentFragment: process_node is called on each
+      # of the element's direct children. Passing a <div> wrapping a <p>
+      # therefore yields a top-level Paragraph in the AST.
+      element = Nokogiri::HTML.fragment("<div><p>inside</p></div>").at_css("div")
+      doc = parser.parse(element)
+
+      expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
+      expect(doc.children[0].children[0].text).to eq("inside")
+    end
+
+    it "does not re-invoke Nokogiri::HTML.fragment when given a pre-parsed tree" do
+      # The whole point of accepting Nokogiri input: skip the parse +
+      # serialize round-trip that would otherwise re-encode URL bytes
+      # and force callers to short-circuit with marker-based prechecks.
+      fragment = Nokogiri::HTML.fragment("<p>x</p>")
+      allow(Nokogiri::HTML).to receive(:fragment)
+
+      parser.parse(fragment)
+
+      expect(Nokogiri::HTML).not_to have_received(:fragment)
+    end
+
+    it "treats any Nokogiri::XML::Node subclass as pre-parsed input" do
+      # is_a?(Nokogiri::XML::Node) covers all of: DocumentFragment,
+      # Document, Element. instance_of?(Node) would reject every one
+      # of them because none is a bare Node — they're all subclasses.
+      fragment = Nokogiri::HTML.fragment("<p>x</p>")
+      expect(fragment).not_to be_instance_of(Nokogiri::XML::Node)
+      allow(Nokogiri::HTML).to receive(:fragment)
+
+      parser.parse(fragment)
+
+      expect(Nokogiri::HTML).not_to have_received(:fragment)
+    end
+
+    it "still coerces non-String inputs via to_s when they are not Nokogiri nodes" do
+      # Pathname / IO-like objects keep working through the to_s fallback.
+      coercible =
+        Class.new do
+          def to_s
+            "<p>via to_s</p>"
+          end
+        end
+      doc = parser.parse(coercible.new)
+
+      expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
+      expect(doc.children[0].children[0].text).to eq("via to_s")
+    end
+  end
+
   describe "#parse whitespace handling" do
     it "preserves runs of whitespace inside <pre>" do
       doc = parser.parse("<pre>a   b</pre>")
@@ -455,20 +531,6 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       doc = custom_parser.parse("text <hr>")
 
       expect(doc.children[0].text).to eq("text ")
-    end
-
-    it "supports Proc handlers via .call (back-compat shim)" do
-      # Default-registered handlers all use #process, but custom registries
-      # may still register Procs. The dispatch must fall back to .call when
-      # the handler doesn't expose #process.
-      proc_handler = ->(element:, parent:) { parent << Markbridge::AST::Bold.new }
-      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
-      registry.register("custom-b", proc_handler)
-      custom_parser = described_class.new(handlers: registry)
-
-      doc = custom_parser.parse("<custom-b></custom-b>")
-
-      expect(doc.children[0]).to be_a(Markbridge::AST::Bold)
     end
 
     it "lets a consumer extend whitespace_preserving_tags to cover custom tags" do

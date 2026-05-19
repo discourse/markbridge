@@ -19,6 +19,34 @@ module Markbridge
           self
         end
 
+        # Remove a tag binding so the renderer falls through to
+        # +render_children+ for that element class. See
+        # +Renderer#render+ for the auto-passthrough path.
+        #
+        # @param element_class [Class]
+        # @return [self]
+        def unregister(element_class)
+          @tags.delete(element_class)
+          self
+        end
+
+        # Merge a Hash of class → Tag mappings on top of this library.
+        # A +nil+ value unregisters the corresponding class (so the
+        # default auto-passthrough kicks in).
+        #
+        # @param mapping [Hash{Class => Tag, nil}]
+        # @return [self]
+        def merge(mapping)
+          mapping.each_pair do |klass, tag|
+            if tag.nil?
+              unregister(klass)
+            else
+              register(klass, tag)
+            end
+          end
+          self
+        end
+
         # Get tag for an element class
         # @param element_class [Class]
         # @return [Tag, nil]
@@ -59,8 +87,7 @@ module Markbridge
         # Create the default tag library for Discourse Markdown.
         #
         # Each call returns a *fresh* instance — mutations made to one will
-        # not be visible to another. If you want a process-wide singleton,
-        # use {Markbridge.default_tag_library} instead, which memoizes.
+        # not be visible to another.
         #
         # @return [TagLibrary]
         def self.default

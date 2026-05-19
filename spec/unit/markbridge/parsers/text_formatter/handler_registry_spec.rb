@@ -5,10 +5,13 @@ require "nokogiri"
 RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
   let(:registry) { described_class.default }
   let(:parent) { Markbridge::AST::Document.new }
+  let(:processor) do
+    instance_double(Markbridge::Parsers::TextFormatter::Parser, process_children: nil)
+  end
 
   def process_and_get_node(xml_string)
     xml = Nokogiri.XML(xml_string).root
-    registry.process_element(xml, parent)
+    registry.process_element(xml, parent, processor)
     parent.children.last
   end
 
@@ -18,15 +21,17 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       xml = Nokogiri.XML("<custom/>").root
       fake_node = Markbridge::AST::Text.new("x")
       registry.register("custom", handler)
-      allow(handler).to receive(:process).with(element: xml, parent:).and_return(fake_node)
+      allow(handler).to receive(:process).with(element: xml, parent:, processor:).and_return(
+        fake_node,
+      )
 
-      expect(registry.process_element(xml, parent)).to eq(fake_node)
+      expect(registry.process_element(xml, parent, processor)).to eq(fake_node)
     end
 
     it "returns nil when no handler is registered for the element name" do
       xml = Nokogiri.XML("<UNKNOWN/>").root
 
-      expect(registry.process_element(xml, parent)).to be_nil
+      expect(registry.process_element(xml, parent, processor)).to be_nil
     end
 
     context "with default handlers" do
@@ -88,7 +93,7 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       it "dispatches the asterisk element (non-XML name, registered directly) to a ListItem handler" do
         element = instance_double(Nokogiri::XML::Element, name: "*")
 
-        result = registry.process_element(element, parent)
+        result = registry.process_element(element, parent, processor)
 
         expect(result).to be_a(Markbridge::AST::ListItem)
         expect(parent.children.last).to eq(result)
@@ -173,9 +178,11 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       xml = Nokogiri.XML("<B/>").root
       replacement = Markbridge::AST::Text.new("replaced")
       registry.register("B", new_handler)
-      allow(new_handler).to receive(:process).with(element: xml, parent:).and_return(replacement)
+      allow(new_handler).to receive(:process).with(element: xml, parent:, processor:).and_return(
+        replacement,
+      )
 
-      expect(registry.process_element(xml, parent)).to eq(replacement)
+      expect(registry.process_element(xml, parent, processor)).to eq(replacement)
     end
   end
 
@@ -304,6 +311,60 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       registry = described_class.build_from_default
 
       expect(registry.has_handler?("B")).to be true
+    end
+  end
+
+  describe "#[]" do
+    it "returns the handler bound to an element name (case-insensitive)" do
+      registry = described_class.default
+      expect(registry["b"]).to be_a(Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler)
+      expect(registry["B"]).to be(registry["b"])
+    end
+
+    it "returns nil when no handler is bound" do
+      expect(described_class.new["never-seen"]).to be_nil
+    end
+  end
+
+  describe "#overlay" do
+    let(:registry) { described_class.default }
+
+    it "yields the previously bound handler" do
+      seen = nil
+      registry.overlay("URL") { |p| seen = p }
+      expect(seen).to be_a(Markbridge::Parsers::TextFormatter::Handlers::UrlHandler)
+    end
+
+    it "yields nil for unbound names" do
+      seen = :unset
+      registry.overlay("NEVER-SEEN") do |p|
+        seen = p
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Bold)
+      end
+      expect(seen).to be_nil
+    end
+
+    it "registers whatever the block returns" do
+      replacement =
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+
+      registry.overlay("URL") { |_| replacement }
+
+      expect(registry["URL"]).to be(replacement)
+    end
+
+    it "iterates over an Array of names" do
+      replacement =
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+
+      registry.overlay(%w[URL EMAIL]) { |_| replacement }
+
+      expect(registry["URL"]).to be(replacement)
+      expect(registry["EMAIL"]).to be(replacement)
+    end
+
+    it "returns self for chaining" do
+      expect(registry.overlay("URL") { |p| p }).to be(registry)
     end
   end
 end

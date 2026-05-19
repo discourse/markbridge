@@ -10,7 +10,7 @@ module Markbridge
             @element_class = AST::TableCell
           end
 
-          def process(element:, parent:)
+          def process(element:, parent:, processor: nil)
             node = AST::TableCell.new(header: element.name.upcase == "TH")
             parent << node
             node

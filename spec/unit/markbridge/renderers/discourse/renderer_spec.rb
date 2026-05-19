@@ -42,6 +42,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq('a\*b')
     end
 
+    it "falls back to Postprocessor::DEFAULT when no postprocessor is provided" do
+      expect(described_class.new.postprocessor).to be(
+        Markbridge::Renderers::Discourse::Postprocessor::DEFAULT,
+      )
+    end
+
+    it "uses an explicit postprocessor when one is provided" do
+      custom = Markbridge::Renderers::Discourse::Postprocessor.new
+
+      expect(described_class.new(postprocessor: custom).postprocessor).to be(custom)
+    end
+
     it "uses an explicit html_escaper when one is provided" do
       html_escaper = class_double(Markbridge::Renderers::Discourse::HtmlEscaper)
       allow(html_escaper).to receive(:escape).and_return("HTML-ESCAPED")

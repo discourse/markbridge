@@ -10,7 +10,7 @@ module Markbridge
             @element_class = AST::List
           end
 
-          def process(element:, parent:)
+          def process(element:, parent:, processor: nil)
             attrs = extract_attributes(element)
             type_str = attrs[:type]
             # Ordered if type is not empty, disc, circle, or square

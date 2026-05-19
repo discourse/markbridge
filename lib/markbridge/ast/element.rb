@@ -42,6 +42,69 @@ module Markbridge
 
         self
       end
+
+      # Depth-first pre-order traversal yielding every descendant node.
+      # Returns an +Enumerator+ when called without a block so it
+      # composes through +Enumerable+:
+      #
+      #   document.each_descendant.select { |n| n.is_a?(AST::Url) }
+      #
+      # Iteration semantics: each Element snapshots its own +children+
+      # array at the moment iteration enters it, so replacing a child
+      # via {#replace_child} mid-walk is safe — descent uses the
+      # pre-replacement reference. Adding or removing siblings on an
+      # Element you are currently descending into is *not* guaranteed
+      # to be visible to the current walk.
+      #
+      # @yieldparam node [Node] each descendant in document order
+      # @return [Enumerator, Element] +Enumerator+ without a block, +self+ otherwise
+      def each_descendant(&block)
+        return enum_for(:each_descendant) unless block_given?
+
+        @children.dup.each do |child|
+          yield child
+          child.each_descendant(&block) if child.is_a?(Element)
+        end
+        self
+      end
+
+      # Array of descendant nodes, optionally filtered by class.
+      #
+      #   document.descendants                    # every descendant
+      #   document.descendants(AST::Url)          # every Url descendant
+      #
+      # @param klass [Class, nil] when given, only descendants that
+      #   +is_a?(klass)+ are returned
+      # @return [Array<Node>]
+      def descendants(klass = nil)
+        result = each_descendant.to_a
+        return result if klass.nil?
+
+        result.select { |node| node.is_a?(klass) }
+      end
+
+      # Replace a direct child of this Element with a different Node.
+      # Preserves the child's index — useful for AST-mutation passes
+      # that need to swap one Element type for another in place
+      # (e.g. wrapping trailing paragraphs in a +Details+ block).
+      #
+      # @param old_child [Node] the child to remove (matched by +equal?+ via {Array#index})
+      # @param new_child [Node] the replacement
+      # @return [Element] +self+
+      # @raise [ArgumentError] when +old_child+ is not currently a child of this Element
+      # @raise [TypeError] when +new_child+ is not a {Node}
+      def replace_child(old_child, new_child)
+        index = @children.index(old_child)
+        raise ArgumentError, "child not found in #{self.class}" if index.nil?
+
+        unless new_child.is_a?(Node)
+          actual = new_child.nil? ? "nil" : new_child.class
+          raise TypeError, "replace_child on #{self.class} expected a #{Node}, got #{actual}"
+        end
+
+        @children[index] = new_child
+        self
+      end
     end
   end
 end

@@ -85,15 +85,32 @@ module Markbridge
 
         # Register a handler for one or more tag names
         # @param tag_names [String, Array<String>] tag name(s) to register
-        # @param handler [BaseHandler, Proc] the handler instance or proc
+        # @param handler [BaseHandler] the handler instance — must
+        #   respond to +#process(element:, parent:)+
         def register(tag_names, handler)
           Array(tag_names).each { |tag_name| @handlers[tag_name.to_s.downcase] = handler }
           self
         end
 
+        # Replace the handler bound to one or more tag names by yielding
+        # the previously-bound handler (which may be +nil+) and
+        # registering whatever the block returns. Used to install a
+        # delegating handler that wraps the default.
+        #
+        # @param tag_names [String, Array<String>]
+        # @yieldparam previous [BaseHandler, nil] previously bound handler
+        # @return [self]
+        def overlay(tag_names)
+          Array(tag_names).each do |name|
+            previous = self[name]
+            register(name, yield(previous))
+          end
+          self
+        end
+
         # Get handler for a tag name
         # @param tag_name [String]
-        # @return [BaseHandler, Proc, nil]
+        # @return [BaseHandler, nil]
         def [](tag_name)
           @handlers[tag_name.to_s.downcase]
         end
@@ -112,8 +129,8 @@ module Markbridge
             registry.register("a", Handlers::UrlHandler.new)
             registry.register("img", Handlers::ImageHandler.new)
             registry.register("blockquote", Handlers::QuoteHandler.new)
-            registry.register("br", Handlers::VoidHandler.new(AST::LineBreak))
-            registry.register("hr", Handlers::VoidHandler.new(AST::HorizontalRule))
+            registry.register("br", Handlers::SelfClosingHandler.new(AST::LineBreak))
+            registry.register("hr", Handlers::SelfClosingHandler.new(AST::HorizontalRule))
             registry.register(%w[ul ol], Handlers::ListHandler.new)
             registry.register("li", Handlers::ListItemHandler.new)
             registry.register("table", Handlers::TableHandler.new)

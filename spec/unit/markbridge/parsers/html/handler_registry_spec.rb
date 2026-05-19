@@ -166,18 +166,26 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       expect(registered).to be_a(Markbridge::Parsers::HTML::Handlers::SpanHandler)
     end
 
-    it "registers VoidHandler for <br> producing AST::LineBreak" do
-      registered = default_registry["br"]
+    it "registers a SelfClosingHandler for <br> that emits a LineBreak and returns nil" do
+      parent = Markbridge::AST::Paragraph.new
+      result = default_registry["br"].process(element: nil, parent:)
 
-      expect(registered).to be_a(Markbridge::Parsers::HTML::Handlers::VoidHandler)
-      expect(registered.element_class).to eq(Markbridge::AST::LineBreak)
+      expect(parent.children.size).to eq(1)
+      expect(parent.children.first).to be_a(Markbridge::AST::LineBreak)
+      # Not a HorizontalRule — kills cross-handler element_class swaps.
+      expect(parent.children.first).not_to be_a(Markbridge::AST::HorizontalRule)
+      # Returns nil so the parser does NOT descend into children.
+      expect(result).to be_nil
     end
 
-    it "registers VoidHandler for <hr> producing AST::HorizontalRule" do
-      registered = default_registry["hr"]
+    it "registers a SelfClosingHandler for <hr> that emits a HorizontalRule and returns nil" do
+      parent = Markbridge::AST::Paragraph.new
+      result = default_registry["hr"].process(element: nil, parent:)
 
-      expect(registered).to be_a(Markbridge::Parsers::HTML::Handlers::VoidHandler)
-      expect(registered.element_class).to eq(Markbridge::AST::HorizontalRule)
+      expect(parent.children.size).to eq(1)
+      expect(parent.children.first).to be_a(Markbridge::AST::HorizontalRule)
+      expect(parent.children.first).not_to be_a(Markbridge::AST::LineBreak)
+      expect(result).to be_nil
     end
   end
 
@@ -201,6 +209,54 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
 
       expect(registry).to be_a(described_class)
       expect(registry["b"]).to be_a(Markbridge::Parsers::HTML::Handlers::SimpleHandler)
+    end
+  end
+
+  describe "#overlay" do
+    let(:registry) { described_class.default }
+
+    it "yields the previously bound handler" do
+      seen = nil
+      registry.overlay("a") { |p| seen = p }
+      expect(seen).to be_a(Markbridge::Parsers::HTML::Handlers::UrlHandler)
+    end
+
+    it "yields nil for unbound names" do
+      seen = :unset
+      registry.overlay("never-seen") do |p|
+        seen = p
+        Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Bold)
+      end
+      expect(seen).to be_nil
+    end
+
+    it "registers whatever the block returns" do
+      replacement = Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+      registry.overlay("a") { |_| replacement }
+      expect(registry["a"]).to be(replacement)
+    end
+
+    it "iterates over an Array of names" do
+      replacement = Markbridge::Parsers::HTML::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+      registry.overlay(%w[a b]) { |_| replacement }
+      expect(registry["a"]).to be(replacement)
+      expect(registry["b"]).to be(replacement)
+    end
+
+    it "yields each name's previously-bound handler when called with an Array" do
+      yielded = []
+      registry.overlay(%w[a img]) do |previous|
+        yielded << previous
+        previous
+      end
+
+      expect(yielded.size).to eq(2)
+      expect(yielded.first).to be_a(Markbridge::Parsers::HTML::Handlers::UrlHandler)
+      expect(yielded.last).to be_a(Markbridge::Parsers::HTML::Handlers::ImageHandler)
+    end
+
+    it "returns self for chaining" do
+      expect(registry.overlay("a") { |p| p }).to be(registry)
     end
   end
 end

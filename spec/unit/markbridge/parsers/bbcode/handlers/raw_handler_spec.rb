@@ -250,4 +250,79 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::RawHandler do
       expect { handler.on_close(token:, context:, registry:) }.not_to raise_error
     end
   end
+
+  describe "with an AST class that does not accept language:" do
+    let(:bare_class) do
+      Class.new(Markbridge::AST::Element) do
+        def self.name
+          "BareElement"
+        end
+      end
+    end
+
+    let(:bare_handler) { described_class.new(bare_class) }
+
+    it "instantiates the AST class without passing language:" do
+      document = Markbridge::AST::Document.new
+      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+      registry = Markbridge::Parsers::BBCode::HandlerRegistry.new
+
+      open_token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "bare",
+          # lang: "ruby" attr exists but the AST class doesn't accept
+          # language:, so the handler must not forward it.
+          attrs: {
+            lang: "ruby",
+          },
+          pos: 0,
+          source: "[bare lang=ruby]",
+        )
+      close_token =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "bare", pos: 6, source: "[/bare]")
+      scanner = MockScanner.new([close_token])
+
+      expect {
+        bare_handler.on_open(token: open_token, context:, registry:, tokens: scanner)
+      }.not_to raise_error
+
+      expect(document.children.first).to be_an_instance_of(bare_class)
+    end
+  end
+
+  describe "with an AST class that takes a non-:language kwarg" do
+    let(:other_class) do
+      Class.new(Markbridge::AST::Element) do
+        def initialize(other: nil)
+          super()
+          @other = other
+        end
+      end
+    end
+
+    it "does not pass the lang attr through (the AST class would raise on unknown :language)" do
+      handler = described_class.new(other_class)
+      document = Markbridge::AST::Document.new
+      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+      registry = Markbridge::Parsers::BBCode::HandlerRegistry.new
+
+      open_token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "x",
+          attrs: {
+            lang: "ruby",
+          },
+          pos: 0,
+          source: "[x lang=ruby]",
+        )
+      close_token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "x", pos: 0, source: "[/x]")
+      scanner = MockScanner.new([close_token])
+
+      expect {
+        handler.on_open(token: open_token, context:, registry:, tokens: scanner)
+      }.not_to raise_error
+
+      expect(document.children.first).to be_an_instance_of(other_class)
+    end
+  end
 end

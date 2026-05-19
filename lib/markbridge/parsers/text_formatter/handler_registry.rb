@@ -43,6 +43,28 @@ module Markbridge
           @mappings[element_name.upcase] = handler
         end
 
+        # Look up the handler for an element name (case-insensitive).
+        # @param element_name [String]
+        # @return [#process, nil]
+        def [](element_name)
+          @mappings[element_name.upcase]
+        end
+
+        # Replace the handler bound to one or more element names by
+        # yielding the previously-bound handler (which may be +nil+)
+        # and registering whatever the block returns.
+        #
+        # @param element_names [String, Array<String>]
+        # @yieldparam previous [#process, nil]
+        # @return [self]
+        def overlay(element_names)
+          Array(element_names).each do |name|
+            previous = self[name]
+            register(name, yield(previous))
+          end
+          self
+        end
+
         # Check if a handler is registered for an element
         # @param element_name [String] XML element name
         # @return [Boolean] true if handler is registered
@@ -53,11 +75,12 @@ module Markbridge
         # Process an XML element using the registered handler
         # @param element [Nokogiri::XML::Element]
         # @param parent [AST::Element] parent node to add children to
+        # @param processor [Parser] the parser, exposed to handlers so
+        #   they can call back into +process_children+ for nested content
         # @return [AST::Element, nil] the created element if children should be processed, nil otherwise
-        def process_element(element, parent)
-          tag_name = element.name.upcase
-          handler = @mappings[tag_name]
-          handler&.process(element:, parent:)
+        def process_element(element, parent, processor)
+          handler = self[element.name]
+          handler&.process(element:, parent:, processor:)
         end
 
         # Register all default s9e/TextFormatter element mappings
