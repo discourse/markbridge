@@ -31,9 +31,15 @@ module Markbridge
         #
         # Accepts either a String of HTML source or a pre-parsed
         # Nokogiri node (typically a +DocumentFragment+ from
-        # +Nokogiri::HTML.fragment+). Passing a pre-parsed tree lets a
+        # +Nokogiri::HTML.fragment+ or a full +Document+ from
+        # +Nokogiri::HTML.parse+). Passing a pre-parsed tree lets a
         # caller run their own Nokogiri-driven pre-processing without
         # forcing Markbridge to re-parse the same bytes.
+        #
+        # A +Nokogiri::HTML::Document+ is unwrapped to its +<body>+
+        # children so the +<html>+ / +<body>+ / +<head>+ wrappers
+        # don't pollute {#unknown_tags}; fragments and bare elements
+        # iterate their own children directly.
         #
         # @param input [String, Nokogiri::XML::Node] HTML source or
         #   pre-parsed Nokogiri tree
@@ -53,11 +59,13 @@ module Markbridge
               Nokogiri::HTML.fragment(input.to_s)
             end
 
+          children = doc.is_a?(Nokogiri::HTML::Document) ? body_children(doc) : doc.children
+
           # Create root AST document
           document = AST::Document.new
 
           # Process all nodes
-          doc.children.each { |node| process_node(node, document) }
+          children.each { |node| process_node(node, document) }
           trim_trailing_whitespace(document)
 
           document
@@ -147,6 +155,15 @@ module Markbridge
           node.ancestors.any? do |ancestor|
             @handlers.whitespace_preserving_tags.include?(ancestor.name)
           end
+        end
+
+        # Direct children of the +<body>+ element of a full HTML document,
+        # falling back to the document's own children if no +<body>+ exists
+        # (malformed input).
+        # @param doc [Nokogiri::HTML::Document]
+        # @return [Nokogiri::XML::NodeSet]
+        def body_children(doc)
+          (doc.at_css("body") || doc).children
         end
 
         # Strip trailing whitespace from the last Text child of `element`.

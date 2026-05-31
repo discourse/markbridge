@@ -24,8 +24,8 @@ puts result                           # to_s delegates to markdown
 ```
 
 `Conversion` carries `markdown`, `ast`, `format`, `unknown_tags`,
-`diagnostics`, `emissions`, `errors`. It does *not* delegate other
-String methods — `result.gsub(...)` will raise `NoMethodError`. Use
+`diagnostics`, `errors`. It does *not* delegate other String methods —
+`result.gsub(...)` will raise `NoMethodError`. Use
 `result.markdown.gsub(...)`.
 
 ### Singleton config and per-process default registries are gone
@@ -312,10 +312,21 @@ xml_doc = Nokogiri.XML(input)
 result = Markbridge.text_formatter_xml_to_markdown(xml_doc)
 ```
 
-Documents are unwrapped via `#root`; any other `Nokogiri::XML::Node`
-(Fragment, Element) is treated as the root directly. String callers
-are unchanged — the `.to_s` fallback covers `Pathname`, `IO`, and
-any other object that historically went through `.to_s` coercion.
+Input shapes are handled differently by parser:
+
+- **HTML parser.** A `Nokogiri::HTML::Document` (from
+  `Nokogiri::HTML.parse`) is unwrapped to its `<body>` children, so
+  the synthesized `<html>`/`<head>`/`<body>` wrappers don't surface
+  in `Conversion#unknown_tags`. A `Nokogiri::HTML::DocumentFragment`
+  (from `Nokogiri::HTML.fragment`) and bare elements iterate their
+  own children — the natural shape for in-place DOM mutation.
+- **TextFormatter parser.** A `Nokogiri::XML::Document` is unwrapped
+  via `#root` (the single `<r>`/`<t>` element of the s9e/TextFormatter
+  XML schema). Any other node is treated as the root directly.
+
+String callers are unchanged — the `.to_s` fallback covers `Pathname`,
+`IO`, and any other object that historically went through `.to_s`
+coercion.
 
 The HTML round-trip avoidance also fixes a documented side effect:
 re-serialization percent-encodes non-ASCII bytes in URL attributes.

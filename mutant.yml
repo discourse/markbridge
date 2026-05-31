@@ -232,6 +232,22 @@ matcher:
     # observable difference in parser output for identical inputs.
     - Markbridge::Parsers::MediaWiki::Parser#initialize
 
+    # HTML::Parser#parse's `doc.is_a?(Nokogiri::HTML::Document)` swap to
+    # `instance_of?`. Same Bucket A equivalence as TextFormatter's
+    # `is_a?(Nokogiri::XML::Document)`: a `Nokogiri::HTML.parse(...)`
+    # result is *exactly* a `Nokogiri::HTML::Document`, so is_a? and
+    # instance_of? return identical truths for every input we
+    # actually receive. The mutation would only diverge for a
+    # user-defined subclass of `Nokogiri::HTML::Document`, which is
+    # not a documented or realistic shape — testing it would require
+    # contriving a subclass purely to feed the mutation killer.
+    # The four other mutations on the same conditional (always-true
+    # variants: `if true`, `if doc`, `if Nokogiri::HTML::Document`,
+    # and the conditional deletion) are killed by the "DocumentFragment
+    # containing a <body>" spec, which proves that the body-unwrap
+    # path runs only for the Document branch.
+    - Markbridge::Parsers::HTML::Parser#parse
+
 mutation:
   ignore_patterns:
     # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,

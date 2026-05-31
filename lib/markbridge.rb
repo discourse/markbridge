@@ -41,9 +41,9 @@ module Markbridge
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     #   (build with {.discourse_renderer}); defaults to a fresh default Renderer
     # @param raise_on_error [Boolean] when true (default), let render-time
-    #   exceptions propagate; when false, swallow them, return whatever
-    #   the renderer produced before failing, and surface them via
-    #   {Conversion#errors}.
+    #   exceptions propagate; when false, swallow them, return a
+    #   {Conversion} with an empty +markdown+ string, and surface the
+    #   exceptions via {Conversion#errors}.
     # @yieldparam ast [AST::Document] mutate before rendering (optional)
     # @return [Conversion]
     def bbcode_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)

@@ -278,6 +278,44 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(Nokogiri::HTML).not_to have_received(:fragment)
     end
 
+    it "unwraps a full Nokogiri::HTML::Document to its <body> children" do
+      # Nokogiri::HTML.parse returns a full Document with synthesized
+      # <html>/<head>/<body> wrappers. Iterating the document's direct
+      # children would surface <html> as an unknown tag and then re-
+      # descend through <head>/<body>. Unwrap to <body>.children so a
+      # Document behaves like the natural Fragment input.
+      html_doc = Nokogiri::HTML.parse("<html><body><p>hi</p></body></html>")
+      doc = parser.parse(html_doc)
+
+      expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
+      expect(doc.children[0].children[0].text).to eq("hi")
+      expect(parser.unknown_tags).to be_empty
+    end
+
+    it "does not run the <body>-unwrap path for non-HTML::Document inputs" do
+      # The body-unwrap fires for Nokogiri::HTML::Document only. A bare
+      # Nokogiri::XML::Document — even one that *contains* a <body>
+      # element — iterates its own children as-is; the body surfaces in
+      # unknown_tags like any other unrecognised wrapper rather than
+      # being silently treated as the document root.
+      xml_doc = Nokogiri.XML("<root><body><p>x</p></body></root>")
+      parser.parse(xml_doc)
+
+      expect(parser.unknown_tags["root"]).to eq(1)
+      expect(parser.unknown_tags["body"]).to eq(1)
+    end
+
+    it "falls back to the document's own children when a Document has no <body>" do
+      # Malformed: an HTML document without a body. We don't crash; we
+      # iterate the document's direct children so unknown wrappers still
+      # surface in unknown_tags rather than disappearing silently.
+      html_doc = Nokogiri::HTML::Document.new
+      html_doc << Nokogiri::XML::Element.new("p", html_doc).tap { |p| p.content = "stray" }
+      doc = parser.parse(html_doc)
+
+      expect(doc.children).not_to be_empty
+    end
+
     it "treats any Nokogiri::XML::Node subclass as pre-parsed input" do
       # is_a?(Nokogiri::XML::Node) covers all of: DocumentFragment,
       # Document, Element. instance_of?(Node) would reject every one

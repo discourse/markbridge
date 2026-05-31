@@ -621,11 +621,33 @@ end
 
 ## Configuration
 
-Markbridge has no global configuration. Render-side options (custom
-escaper, custom Tags, custom postprocessor) are passed per call via a
-configured `Renderer`. The escaper and postprocessor will become
-configurable in a follow-up step of the API redesign; meanwhile, the
-default Renderer is used for every convenience-method call.
+Markbridge has no global configuration. Render-side options — custom
+Tags, the escaper, the postprocessor — are passed per call via a
+configured `Renderer`. Build one with `Markbridge.discourse_renderer(...)`
+and hand it to the convenience methods through `renderer:`:
+
+```ruby
+RENDERER =
+  Markbridge.discourse_renderer(
+    tags: { MyAst::Banner => MyTag::BannerTag.new },
+    unregister: [Markbridge::AST::Color, Markbridge::AST::Size],
+    allow: :lists,                        # MarkdownEscaper(allow:)
+    escape_hard_line_breaks: true,        # MarkdownEscaper(escape_hard_line_breaks:)
+    escape: false,                        # IdentityEscaper (no-op) — sugar
+    escaper: MyImporter::CustomEscaper.new,         # take it wholesale
+    strip_trailing_invisibles: true,      # Postprocessor(strip_trailing_invisibles:)
+    postprocessor: MyImporter::CustomPostprocessor.new, # take it wholesale
+  )
+
+result = Markbridge.bbcode_to_markdown(input, renderer: RENDERER)
+```
+
+`escape:`/`escape_hard_line_breaks:`/`allow:` are sugar for building a
+fresh `MarkdownEscaper` (or `IdentityEscaper` when `escape: false`).
+Passing `escaper:` explicitly wins. Same precedence rule for
+`strip_trailing_invisibles:` vs. `postprocessor:`. If no `renderer:`
+is given to a convenience method, a fresh default `Renderer` is built
+per call.
 
 ### Using Default Library
 

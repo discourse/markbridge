@@ -16,9 +16,18 @@ module Markbridge
       #
       # Subclass to customize. The +call+ method is the entry point.
       class Postprocessor
-        # NBSP (U+00A0) plus zero-width format chars: ZWSP U+200B,
-        # ZWNJ U+200C, ZWJ U+200D, WJ U+2060, ZWNBSP/BOM U+FEFF.
-        TRAILING_INVISIBLE_RE = /[ ​‌‍⁠﻿]+$/
+        # NBSP plus zero-width format chars. Spelled with explicit
+        # +\u{...}+ escapes rather than the literal characters — the
+        # latter are invisible in editors and easy to corrupt on
+        # encoding-conversion round-trips.
+        #
+        #   U+00A0  NBSP        no-break space
+        #   U+200B  ZWSP        zero-width space
+        #   U+200C  ZWNJ        zero-width non-joiner
+        #   U+200D  ZWJ         zero-width joiner
+        #   U+2060  WJ          word joiner
+        #   U+FEFF  ZWNBSP/BOM  zero-width no-break space / byte-order mark
+        TRAILING_INVISIBLE_RE = /[\u{00A0 200B 200C 200D 2060 FEFF}]+$/
 
         # @param strip_trailing_invisibles [Boolean] when true, strips
         #   trailing invisible characters (NBSP and zero-width format
