@@ -11,6 +11,15 @@ module Markbridge
           @tags = {}
         end
 
+        # When a TagLibrary is +dup+'d / +clone+'d, ensure the
+        # internal +@tags+ Hash is independent of the source. Without
+        # this, both copies would share the same underlying Hash and
+        # mutations to one would silently affect the other.
+        def initialize_copy(other)
+          super
+          @tags = @tags.dup
+        end
+
         # Register a tag for an element class
         # @param element_class [Class] the element class
         # @param tag [Tag] the tag instance
@@ -30,13 +39,17 @@ module Markbridge
           self
         end
 
-        # Merge a Hash of class → Tag mappings on top of this library.
-        # A +nil+ value unregisters the corresponding class (so the
-        # default auto-passthrough kicks in).
+        # Merge a Hash of class → Tag mappings on top of this library
+        # in-place. A +nil+ value unregisters the corresponding class
+        # (so the default auto-passthrough kicks in).
+        #
+        # Named with a trailing +!+ because it mutates +self+ —
+        # mirroring Ruby's Hash#merge / Hash#merge! convention. Use
+        # +dup+ first if you need a non-destructive merge.
         #
         # @param mapping [Hash{Class => Tag, nil}]
         # @return [self]
-        def merge(mapping)
+        def merge!(mapping)
           mapping.each_pair do |klass, tag|
             if tag.nil?
               unregister(klass)

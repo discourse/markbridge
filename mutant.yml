@@ -232,6 +232,16 @@ matcher:
     # observable difference in parser output for identical inputs.
     - Markbridge::Parsers::MediaWiki::Parser#initialize
 
+    # TagLibrary#initialize_copy's `super` call. Ruby's default
+    # Object#initialize_copy is a no-op for our purposes (we re-dup
+    # @tags ourselves on the next line), so `super` is unobservable —
+    # mutant correctly notes it can be removed without breaking any
+    # current test. Keeping it for idiomatic-Ruby reasons: a future
+    # subclass that adds its own copy-init step would expect the
+    # super chain to be intact. Both alive mutations (super → nil,
+    # super deletion) are equivalent.
+    - Markbridge::Renderers::Discourse::TagLibrary#initialize_copy
+
     # HTML::Parser#parse's `doc.is_a?(Nokogiri::HTML::Document)` swap to
     # `instance_of?`. Same Bucket A equivalence as TextFormatter's
     # `is_a?(Nokogiri::XML::Document)`: a `Nokogiri::HTML.parse(...)`

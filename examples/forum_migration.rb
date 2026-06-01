@@ -215,14 +215,24 @@ puts
 puts "Phase 2: HTML pre-processing + AST transform"
 puts "============================================"
 
-HTML_POSTS = [{ id: 100, body: <<~HTML }, { id: 101, body: <<~HTML }]
+# stree-ignore
+HTML_POSTS = [
+  {
+    id: 100,
+    body: <<~HTML,
       <p>Hello team,</p>
       <p>The deploy passed. Shipping it.</p>
       <p>--<br>Alex Doe<br>Engineering</p>
     HTML
+  },
+  {
+    id: 101,
+    body: <<~HTML,
       <p>Reminder: the all-hands is Friday at 3pm.</p>
       <p>RSVP via the calendar invite.</p>
     HTML
+  },
+]
 
 # AST-level signature collapser. Walks the trailing Paragraph children
 # of the Document; if a paragraph starts with "--" (the email-sigdash

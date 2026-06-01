@@ -72,10 +72,19 @@ module Markbridge
 
     # Convert HTML to Discourse Markdown.
     #
-    # @param input [String] HTML source
+    # If a block is given, it is called with the parsed AST between
+    # parse and render — the caller can append/remove/replace nodes
+    # before rendering. Mutations to the yielded AST persist in
+    # {Conversion#ast}.
+    #
+    # @param input [String, Nokogiri::XML::Node] HTML source or
+    #   pre-parsed Nokogiri tree (see {.parse_html})
     # @param handlers [Parsers::HTML::HandlerRegistry, nil] custom handlers
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
-    # @param raise_on_error [Boolean]
+    # @param raise_on_error [Boolean] when true (default), let render-time
+    #   exceptions propagate; when false, swallow them, return a
+    #   {Conversion} with an empty +markdown+ string, and surface the
+    #   exceptions via {Conversion#errors}.
     # @yieldparam ast [AST::Document] mutate before rendering (optional)
     # @return [Conversion]
     def html_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
@@ -97,21 +106,22 @@ module Markbridge
       parser = Parsers::TextFormatter::Parser.new(handlers:)
       ast = parser.parse(input)
 
-      Parse.new(
-        ast:,
-        format: :text_formatter_xml,
-        unknown_tags: parser.unknown_tags,
-        diagnostics: {
-        },
-      )
+      # stree-ignore
+      Parse.new(ast:, format: :text_formatter_xml, unknown_tags: parser.unknown_tags, diagnostics: {})
     end
 
     # Convert s9e/TextFormatter XML to Discourse Markdown.
     #
-    # @param input [String] XML source
+    # If a block is given, it is called with the parsed AST between
+    # parse and render — the caller can append/remove/replace nodes
+    # before rendering. Mutations to the yielded AST persist in
+    # {Conversion#ast}.
+    #
+    # @param input [String, Nokogiri::XML::Node] XML source or
+    #   pre-parsed Nokogiri tree (see {.parse_text_formatter_xml})
     # @param handlers [Parsers::TextFormatter::HandlerRegistry, nil] custom handlers
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
-    # @param raise_on_error [Boolean]
+    # @param raise_on_error [Boolean] see {.bbcode_to_markdown}
     # @yieldparam ast [AST::Document] mutate before rendering (optional)
     # @return [Conversion]
     def text_formatter_xml_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
@@ -136,10 +146,15 @@ module Markbridge
 
     # Convert MediaWiki wikitext to Discourse Markdown.
     #
+    # If a block is given, it is called with the parsed AST between
+    # parse and render — the caller can append/remove/replace nodes
+    # before rendering. Mutations to the yielded AST persist in
+    # {Conversion#ast}.
+    #
     # @param input [String] MediaWiki source
     # @param handlers [Parsers::MediaWiki::InlineTagRegistry, nil]
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
-    # @param raise_on_error [Boolean]
+    # @param raise_on_error [Boolean] see {.bbcode_to_markdown}
     # @yieldparam ast [AST::Document] mutate before rendering (optional)
     # @return [Conversion]
     def mediawiki_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
@@ -153,7 +168,9 @@ module Markbridge
     # driven (e.g. iterating posts whose +:format+ column varies).
     # An optional block is forwarded to the dispatched method.
     #
-    # @param input [String]
+    # @param input [String, Nokogiri::XML::Node] source content; the
+    #   HTML and TextFormatter dispatch targets also accept pre-parsed
+    #   Nokogiri trees.
     # @param format [Symbol] one of +:bbcode+, +:html+,
     #   +:text_formatter_xml+, +:mediawiki+
     # @param kwargs [Hash] forwarded to the underlying convenience method
@@ -216,6 +233,8 @@ module Markbridge
     #   top of the default library; +nil+ values unregister the class.
     # @param tag_library [Renderers::Discourse::TagLibrary, nil] base
     #   library to start from. Defaults to a fresh {TagLibrary.default}.
+    #   When supplied, it is +dup+'d before any +tags:+ / +unregister:+
+    #   mutation, so the caller's library is left untouched.
     # @param unregister [Array<Class>, nil] AST classes to drop from
     #   the library so they fall through to +render_children+.
     # @param escaper [#escape, nil] when given, used as-is; +escape:+,
@@ -247,8 +266,13 @@ module Markbridge
       postprocessor: nil,
       strip_trailing_invisibles: false
     )
-      library = tag_library || Renderers::Discourse::TagLibrary.default
-      library.merge(tags) if tags
+      # Dup the caller's library before mutating so successive
+      # +discourse_renderer+ calls against the same +tag_library:+ don't
+      # see each other's overrides. +TagLibrary.default+ already returns
+      # a fresh instance, so the dup is only needed in the explicit
+      # +tag_library:+ branch.
+      library = tag_library ? tag_library.dup : Renderers::Discourse::TagLibrary.default
+      library.merge!(tags) if tags
       Array(unregister).each { |klass| library.unregister(klass) }
 
       escaper ||= build_escaper(escape:, escape_hard_line_breaks:, allow:)
@@ -271,14 +295,7 @@ module Markbridge
       renderer ||= Renderers::Discourse::Renderer.new
       markdown, errors = render_through(renderer, parse.ast, raise_on_error:)
 
-      Conversion.new(
-        markdown:,
-        ast: parse.ast,
-        format: parse.format,
-        unknown_tags: parse.unknown_tags,
-        diagnostics: parse.diagnostics,
-        errors:,
-      )
+      Conversion.new(parse:, markdown:, errors:)
     end
 
     def build_escaper(escape:, escape_hard_line_breaks:, allow:)

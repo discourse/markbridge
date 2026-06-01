@@ -780,6 +780,26 @@ RSpec.describe Markbridge do
       expect(described_class.bbcode_to_markdown("[b]x[/b]", renderer:).markdown).to eq("FROM-BASE")
     end
 
+    it "dups an explicit tag_library: before mutating, so the caller's library is untouched" do
+      # tags: / unregister: are mutating operations. Without the dup the
+      # factory would silently rewrite the caller's library — surprising
+      # for anyone composing multiple renderers against the same base.
+      base = Markbridge::Renderers::Discourse::TagLibrary.new
+      original_bold = Markbridge::Renderers::Discourse::Tags::BoldTag.new
+      base.register(Markbridge::AST::Bold, original_bold)
+
+      described_class.discourse_renderer(
+        tag_library: base,
+        tags: {
+          Markbridge::AST::Bold =>
+            Markbridge::Renderers::Discourse::Tag.new { |_e, _i| "OVERRIDDEN" },
+        },
+        unregister: [Markbridge::AST::Italic],
+      )
+
+      expect(base[Markbridge::AST::Bold]).to be(original_bold)
+    end
+
     it "forwards an explicit postprocessor: through to the Renderer" do
       shouting =
         Class.new(Markbridge::Renderers::Discourse::Postprocessor) do

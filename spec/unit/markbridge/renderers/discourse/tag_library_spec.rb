@@ -191,12 +191,12 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
     end
   end
 
-  describe "#merge" do
+  describe "#merge!" do
     let(:bold_tag) { Markbridge::Renderers::Discourse::Tag.new { |_, _| "b" } }
     let(:italic_tag) { Markbridge::Renderers::Discourse::Tag.new { |_, _| "i" } }
 
     it "registers each non-nil mapping" do
-      library.merge(Markbridge::AST::Bold => bold_tag, Markbridge::AST::Italic => italic_tag)
+      library.merge!(Markbridge::AST::Bold => bold_tag, Markbridge::AST::Italic => italic_tag)
 
       expect(library[Markbridge::AST::Bold]).to be(bold_tag)
       expect(library[Markbridge::AST::Italic]).to be(italic_tag)
@@ -205,7 +205,7 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
     it "unregisters classes with a nil value" do
       library.register(Markbridge::AST::Bold, bold_tag)
 
-      library.merge(Markbridge::AST::Bold => nil)
+      library.merge!(Markbridge::AST::Bold => nil)
 
       expect(library[Markbridge::AST::Bold]).to be_nil
     end
@@ -213,7 +213,7 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
     it "removes the class from iteration when given a nil value (vs. registering nil)" do
       library.register(Markbridge::AST::Bold, bold_tag)
 
-      library.merge(Markbridge::AST::Bold => nil)
+      library.merge!(Markbridge::AST::Bold => nil)
 
       # Iteration must reflect deletion — registering `nil` would leave the
       # class as a key with a nil value.
@@ -221,7 +221,33 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
     end
 
     it "returns self for chaining" do
-      expect(library.merge({})).to be(library)
+      expect(library.merge!({})).to be(library)
+    end
+  end
+
+  describe "#dup" do
+    let(:tag) { Markbridge::Renderers::Discourse::Tag.new { |_, _| "x" } }
+
+    it "isolates the @tags Hash so mutations on the copy don't leak back" do
+      # Ruby's default Object#dup is a shallow copy — both copies would
+      # share the same @tags Hash and mutations would leak both ways.
+      # TagLibrary#initialize_copy exists specifically to break that.
+      original = described_class.new
+      original.register(Markbridge::AST::Bold, tag)
+
+      copy = original.dup
+      copy.register(Markbridge::AST::Italic, tag)
+      copy.unregister(Markbridge::AST::Bold)
+
+      expect(original[Markbridge::AST::Bold]).to be(tag)
+      expect(original[Markbridge::AST::Italic]).to be_nil
+    end
+
+    it "produces a copy with the same initial bindings" do
+      original = described_class.new
+      original.register(Markbridge::AST::Bold, tag)
+
+      expect(original.dup[Markbridge::AST::Bold]).to be(tag)
     end
   end
 end
