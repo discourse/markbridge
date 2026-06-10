@@ -10,28 +10,28 @@ use:
   ruby:
     versions: [3.3, 3.4, "4.0", jruby]
     default: "4.0"
+  node:
 
 setup:
+  - sudo dnf update -y
   - bundle install
-  - bundle exec lefthook install
-  - (cd docs && pnpm install)
+  - bundle exec lefthook install -f
+  - (cd docs && CI=true pnpm install)
 
 sync:
   - bundle install
-  - (cd docs && pnpm install)
+  - (cd docs && CI=true pnpm install)
 
 update:
   - sudo dnf update -y
   - rv selfupdate
 
-ports:
-  - 4567:4567
-  - 4321:4321
-
 daemons:
   playground:
     cmd: bin/playground
+    ports: ["4567"]
     autostart: true
   docs:
     cmd: bin/docs
+    ports: ["4321"]
     autostart: true
