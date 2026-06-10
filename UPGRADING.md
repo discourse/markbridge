@@ -263,8 +263,11 @@ result = Markbridge.render(parse, renderer: RENDERER, raise_on_error: false)
 
 `Markbridge.render` accepts either a `Parse` (preferred — preserves
 `unknown_tags`/`diagnostics`/source `format`) or a bare AST node
-(fields default to empty / `:discourse`). Mutations made between
-parse and render persist in `Conversion#ast`.
+(fields default to empty, `format` is `nil` since there was no source
+document; a non-`Document` node is wrapped in an `AST::Document` so
+`Conversion#ast` is always one). Mutations made between parse and
+render persist in `Conversion#ast`. The wrapped `Parse` is reachable
+via `Conversion#parsed` for direct re-render.
 
 ### Per-row failure isolation
 

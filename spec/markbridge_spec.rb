@@ -623,7 +623,50 @@ RSpec.describe Markbridge do
 
       expect(result).to be_a(Markbridge::Conversion)
       expect(result.markdown).to eq("**hi**")
-      expect(result.format).to eq(:discourse)
+    end
+
+    it "reports a nil format for bare AST input (no source document was parsed)" do
+      # :format means *source* format everywhere else; a programmatically
+      # built AST has none, and pretending it was :discourse would
+      # conflate the render target with the parse source.
+      doc = described_class.parse_bbcode("[b]hi[/b]").ast
+
+      expect(described_class.render(doc).format).to be_nil
+    end
+
+    it "preserves the original Document identity when given one (no extra wrapping)" do
+      doc = described_class.parse_bbcode("[b]hi[/b]").ast
+
+      expect(described_class.render(doc).ast).to be(doc)
+    end
+
+    it "wraps a bare non-Document node in a Document so Conversion#ast is always one" do
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("hi")
+
+      result = described_class.render(bold)
+
+      expect(result.markdown).to eq("**hi**")
+      expect(result.ast).to be_a(Markbridge::AST::Document)
+      expect(result.ast.children).to eq([bold])
+      # The synthesized Parse carries empty (queryable) hashes, not nil.
+      expect(result.unknown_tags).to eq({})
+      expect(result.diagnostics).to eq({})
+    end
+
+    it "exposes the synthesized Parse via Conversion#parsed" do
+      doc = described_class.parse_bbcode("[b]hi[/b]").ast
+
+      result = described_class.render(doc)
+
+      expect(result.parsed).to be_a(Markbridge::Parse)
+      expect(result.parsed.ast).to be(doc)
+    end
+
+    it "carries the given Parse through to Conversion#parsed unchanged" do
+      parse = described_class.parse_bbcode("[b]hi[/b]")
+
+      expect(described_class.render(parse).parsed).to be(parse)
     end
 
     it "honors a custom renderer:" do

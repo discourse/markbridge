@@ -6,7 +6,9 @@ module Markbridge
   # @!attribute [r] ast
   #   @return [AST::Document]
   # @!attribute [r] format
-  #   @return [Symbol] :bbcode, :html, :text_formatter_xml, or :mediawiki
+  #   @return [Symbol, nil] :bbcode, :html, :text_formatter_xml, or
+  #     :mediawiki. +nil+ when synthesized by {Markbridge.render} from
+  #     a bare AST node — there was no source document to parse.
   # @!attribute [r] unknown_tags
   #   @return [Hash{String => Integer}] tag-name → occurrence count.
   #     Empty for parsers that do not yet track unknown tags.

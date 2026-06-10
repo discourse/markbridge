@@ -202,7 +202,11 @@ module Markbridge
     # When given a {Parse}, the returned {Conversion} carries the
     # parser's +unknown_tags+, +diagnostics+, and source +format+
     # forward. When given an AST node, those fields default to empty
-    # and +format+ falls back to +:discourse+.
+    # and +format+ is +nil+ — there was no source document, so there
+    # is no source format to report. A bare node that isn't already a
+    # {AST::Document} is wrapped in one, so {Conversion#ast} is always
+    # a Document (and tree helpers like +each_descendant+ are always
+    # available on it).
     #
     # @param parse_or_ast [Parse, AST::Node]
     # @param format [Symbol] :discourse (only renderer currently shipped)
@@ -216,8 +220,11 @@ module Markbridge
         case parse_or_ast
         when Parse
           parse_or_ast
+        when AST::Document
+          Parse.new(ast: parse_or_ast, format: nil, unknown_tags: {}, diagnostics: {})
         when AST::Node
-          Parse.new(ast: parse_or_ast, format: :discourse, unknown_tags: {}, diagnostics: {})
+          document = AST::Document.new([parse_or_ast])
+          Parse.new(ast: document, format: nil, unknown_tags: {}, diagnostics: {})
         else
           raise ArgumentError, "expected Parse or AST::Node, got #{parse_or_ast.class}"
         end
@@ -295,7 +302,7 @@ module Markbridge
       renderer ||= Renderers::Discourse::Renderer.new
       markdown, errors = render_through(renderer, parse.ast, raise_on_error:)
 
-      Conversion.new(parse:, markdown:, errors:)
+      Conversion.new(parsed: parse, markdown:, errors:)
     end
 
     def build_escaper(escape:, escape_hard_line_breaks:, allow:)
