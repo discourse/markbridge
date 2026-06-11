@@ -97,6 +97,7 @@ jobs:
     needs:
       - lint
       - test
+      - mutation
 
     runs-on: ubuntu-latest
 
