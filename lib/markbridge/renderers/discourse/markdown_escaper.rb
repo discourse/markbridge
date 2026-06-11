@@ -30,12 +30,29 @@ module Markbridge
       #   escaper.escape("<?php echo 1; ?>")    # => "\\<?php echo 1; ?>"
       #
       class MarkdownEscaper
+        # Block-level constructs that callers can opt into letting
+        # through unescaped via the +allow:+ kwarg. The check fires
+        # only after a line's first byte has matched the relevant
+        # case arm, so this is a cold-path lookup with no measurable
+        # hot-path cost.
+        ALLOW_KEYS = %i[bullet_list ordered_list atx_heading block_quote].freeze
+        ALLOW_ALIASES = { lists: %i[bullet_list ordered_list] }.freeze
+        private_constant :ALLOW_KEYS, :ALLOW_ALIASES
+
         # @param escape_hard_line_breaks [Boolean] when true, strip trailing spaces
         #   before newlines to prevent CommonMark hard line breaks (<br/>).
         #   Defaults to false because Discourse has trailing-space hard line
         #   breaks disabled by default.
-        def initialize(escape_hard_line_breaks: false)
+        # @param allow [Symbol, Array<Symbol>, nil] block-level constructs
+        #   to pass through unescaped. Recognised keys:
+        #   +:bullet_list+, +:ordered_list+, +:atx_heading+,
+        #   +:block_quote+. The alias +:lists+ expands to
+        #   `[:bullet_list, :ordered_list]`. Thematic breaks, setext
+        #   underlines, fenced code, and indented code remain escaped
+        #   even when their first byte matches an allow-listed marker.
+        def initialize(escape_hard_line_breaks: false, allow: nil)
           @escape_hard_line_breaks = escape_hard_line_breaks
+          @allow = resolve_allow(allow)
           # @inline_content / @inline_result / @inline_len are set by
           # escape_inline on every call before any helper reads them;
           # no defensive init needed.
@@ -142,6 +159,24 @@ module Markbridge
 
         private
 
+        def resolve_allow(allow)
+          # `flat_map` flattens Array results and appends scalar
+          # results as-is, so `|| key` keeps non-alias keys without
+          # extra wrapping.
+          keys = Array(allow).flat_map { |key| ALLOW_ALIASES[key] || key }
+          unknown = keys - ALLOW_KEYS
+          unless unknown.empty?
+            raise ArgumentError,
+                  "unknown allow keys: #{unknown.inspect} " \
+                    "(expected #{ALLOW_KEYS.inspect} or alias #{ALLOW_ALIASES.keys.inspect})"
+          end
+          # Array, not Set: with at most 4 keys the linear `include?`
+          # is observably identical to `Set#include?` and avoids the
+          # Set allocation. The array isn't reachable from outside
+          # the escaper, so we don't bother freezing it.
+          keys
+        end
+
         def escape_text(text)
           # On CRLF input, consume `\r` as part of the line terminator instead
           # of leaving it on the line. A trailing `\r` breaks line-end anchored
@@ -235,13 +270,20 @@ module Markbridge
 
           case first_byte
           when HASH
-            return escape_first_char_inline(content, "\\#") if ATX_HEADING.match?(content)
+            if (match = ATX_HEADING.match(content))
+              return pass_marker_inline(content, match[0].length) if @allow.include?(:atx_heading)
+              return escape_first_char_inline(content, "\\#")
+            end
           when GT
+            return pass_first_char_inline(content) if @allow.include?(:block_quote)
             return escape_first_char_inline(content, "\\>")
           when DASH
             return escape_block_dash(content, prev_was_paragraph)
           when PLUS
-            return escape_first_char_inline(content, "\\+") if BULLET_LIST.match?(content)
+            if BULLET_LIST.match?(content)
+              return pass_first_char_inline(content) if @allow.include?(:bullet_list)
+              return escape_first_char_inline(content, "\\+")
+            end
           when STAR
             return escape_block_star(content)
           when UNDERSCORE
@@ -279,22 +321,44 @@ module Markbridge
                (prev_was_paragraph && SETEXT_UNDERLINE_DASH.match?(content))
             return escape_all_chars(content, DASH, "\\-"), true
           end
-          return escape_first_char_inline(content, "\\-") if BULLET_LIST.match?(content)
+          if BULLET_LIST.match?(content)
+            return pass_first_char_inline(content) if @allow.include?(:bullet_list)
+            return escape_first_char_inline(content, "\\-")
+          end
           [content, false]
         end
 
         def escape_block_star(content)
           return escape_all_chars(content, STAR, "\\*"), true if THEMATIC_BREAK_STAR.match?(content)
-          return escape_first_char_inline(content, "\\*") if BULLET_LIST.match?(content)
+          if BULLET_LIST.match?(content)
+            return pass_first_char_inline(content) if @allow.include?(:bullet_list)
+            return escape_first_char_inline(content, "\\*")
+          end
           [content, false]
         end
 
         def escape_block_ordered_list(content)
           if (match = ORDERED_LIST.match(content))
             rest = content[match[0].length..]
+            return pass_marker_inline(content, match[0].length) if @allow.include?(:ordered_list)
+
             return "#{match[1]}\\#{match[2]}#{escape_inline(rest)}", true
           end
           [content, false]
+        end
+
+        # Like {#escape_first_char_inline} but the leading character is
+        # preserved verbatim (used when allow: lets a single-byte
+        # marker like `-`, `+`, `*`, or `>` through).
+        def pass_first_char_inline(content)
+          ["#{content[0]}#{escape_inline(content[1..])}", true]
+        end
+
+        # Preserve a multi-byte marker (e.g. `1.`, `99)`, `##`) and
+        # inline-escape the rest. Used when allow: lets ordered lists
+        # or ATX headings through.
+        def pass_marker_inline(content, marker_length)
+          ["#{content[0, marker_length]}#{escape_inline(content[marker_length..])}", true]
         end
 
         def escape_all_chars(str, byte_val, escaped)

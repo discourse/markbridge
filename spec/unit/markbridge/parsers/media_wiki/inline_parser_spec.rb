@@ -469,7 +469,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
         r.register("mark", :formatting, Markbridge::AST::Bold)
       end
     end
-    let(:parser) { described_class.new(inline_tag_registry: registry) }
+    let(:parser) { described_class.new(handlers: registry) }
 
     it "handles custom registered tags" do
       doc = parse("<mark>highlighted</mark>")
@@ -556,7 +556,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
         Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
           r.register("highlight", :formatting, Markbridge::AST::Bold)
         end
-      parser = described_class.new(inline_tag_registry: registry)
+      parser = described_class.new(handlers: registry)
       parent = Markbridge::AST::Document.new
       # Outer ''…'' wraps the content in Italic and recurses via
       # parse_inner_content; the inner <highlight> tag must still resolve

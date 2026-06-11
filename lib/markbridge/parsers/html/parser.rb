@@ -27,8 +27,22 @@ module Markbridge
           @unknown_tags = Hash.new(0)
         end
 
-        # Parse HTML string into an AST
-        # @param input [String] HTML source
+        # Parse HTML into an AST.
+        #
+        # Accepts either a String of HTML source or a pre-parsed
+        # Nokogiri node (typically a +DocumentFragment+ from
+        # +Nokogiri::HTML.fragment+ or a full +Document+ from
+        # +Nokogiri::HTML.parse+). Passing a pre-parsed tree lets a
+        # caller run their own Nokogiri-driven pre-processing without
+        # forcing Markbridge to re-parse the same bytes.
+        #
+        # A +Nokogiri::HTML::Document+ is unwrapped to its +<body>+
+        # children so the +<html>+ / +<body>+ / +<head>+ wrappers
+        # don't pollute {#unknown_tags}; fragments and bare elements
+        # iterate their own children directly.
+        #
+        # @param input [String, Nokogiri::XML::Node] HTML source or
+        #   pre-parsed Nokogiri tree
         # @return [AST::Document]
         def parse(input)
           @unknown_tags.clear
@@ -38,13 +52,20 @@ module Markbridge
           # (see sparklemotion/nokogiri#2227). Table support treats thead/tbody/tfoot
           # as transparent, so the parse-tree difference (HTML5 auto-inserts tbody,
           # HTML4 does not) has no effect on the AST.
-          doc = Nokogiri::HTML.fragment(input)
+          doc =
+            if input.is_a?(Nokogiri::XML::Node)
+              input
+            else
+              Nokogiri::HTML.fragment(input.to_s)
+            end
+
+          children = doc.is_a?(Nokogiri::HTML::Document) ? body_children(doc) : doc.children
 
           # Create root AST document
           document = AST::Document.new
 
           # Process all nodes
-          doc.children.each { |node| process_node(node, document) }
+          children.each { |node| process_node(node, document) }
           trim_trailing_whitespace(document)
 
           document
@@ -108,12 +129,7 @@ module Markbridge
           return handle_unknown_tag(node, parent) unless handler
 
           # Handler returns element if children should be processed, nil otherwise
-          ast_element =
-            if handler.respond_to?(:process)
-              handler.process(element: node, parent:)
-            else
-              handler.call(element: node, parent:)
-            end
+          ast_element = handler.process(element: node, parent:)
 
           return unless ast_element
 
@@ -139,6 +155,15 @@ module Markbridge
           node.ancestors.any? do |ancestor|
             @handlers.whitespace_preserving_tags.include?(ancestor.name)
           end
+        end
+
+        # Direct children of the +<body>+ element of a full HTML document,
+        # falling back to the document's own children if no +<body>+ exists
+        # (malformed input).
+        # @param doc [Nokogiri::HTML::Document]
+        # @return [Nokogiri::XML::NodeSet]
+        def body_children(doc)
+          (doc.at_css("body") || doc).children
         end
 
         # Strip trailing whitespace from the last Text child of `element`.

@@ -10,7 +10,7 @@ module Markbridge
             @element_class = AST::Quote
           end
 
-          def process(element:, parent:)
+          def process(element:, parent:, processor: nil)
             attrs = extract_attributes(element)
             node =
               AST::Quote.new(

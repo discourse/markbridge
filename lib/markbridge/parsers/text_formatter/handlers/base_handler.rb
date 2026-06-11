@@ -16,7 +16,7 @@ module Markbridge
           # @param element [Nokogiri::XML::Element] the XML element to process
           # @param parent [AST::Element] the parent AST node to add children to
           # @return [AST::Element, nil] the created element if children should be processed, nil otherwise
-          def process(element:, parent:)
+          def process(element:, parent:, processor: nil)
             raise NotImplementedError, "#{self.class} must implement #process"
           end
 

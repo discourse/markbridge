@@ -12,7 +12,7 @@ module Markbridge
             @element_class = AST::Url
           end
 
-          def process(element:, parent:)
+          def process(element:, parent:, processor: nil)
             attrs = extract_attributes(element)
             node = AST::Url.new(href: attrs[:url])
             parent << node

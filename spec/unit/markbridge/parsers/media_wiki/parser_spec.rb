@@ -746,12 +746,12 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
   end
 
   describe "constructor customization" do
-    it "accepts a custom inline_tag_registry" do
+    it "accepts a custom handlers registry" do
       registry =
         Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
           r.register("mark", :formatting, Markbridge::AST::Bold)
         end
-      parser = described_class.new(inline_tag_registry: registry)
+      parser = described_class.new(handlers: registry)
       doc = parser.parse("<mark>highlighted</mark>")
 
       paragraph = doc.children.first
@@ -764,6 +764,45 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
 
       paragraph = doc.children.first
       expect(paragraph.children.first).to be_a(Markbridge::AST::Bold)
+    end
+  end
+
+  describe "#parse" do
+    it "clears unknown_tags from the previous parse so a fresh call has a fresh tally" do
+      parser = described_class.new
+      parser.parse("<neverknown>x</neverknown>")
+      expect(parser.unknown_tags).to eq("neverknown" => 1)
+
+      parser.parse("hello")
+
+      expect(parser.unknown_tags).to eq({})
+    end
+
+    it "forwards the configured handler registry into the inline parser" do
+      registry =
+        Markbridge::Parsers::MediaWiki::InlineTagRegistry.build_from_default do |r|
+          r.register("highlight", :formatting, Markbridge::AST::Bold)
+        end
+
+      doc = described_class.new(handlers: registry).parse("<highlight>x</highlight>")
+      paragraph = doc.children.first
+
+      # The default registry doesn't know <highlight>; the custom one
+      # maps it to Bold. If parse dropped the handlers: kwarg the
+      # InlineParser would fall back to .default and the tag would
+      # survive as literal text.
+      expect(paragraph.children.first).to be_a(Markbridge::AST::Bold)
+    end
+
+    it "normalizes line endings before splitting into lines" do
+      # Use the Unicode line separator (U+2028). split("\n") does NOT
+      # split on it, so without the normalize step the input would
+      # collapse into a single line with a literal separator inside —
+      # producing one paragraph instead of three headings.
+      doc = described_class.new.parse("== H1 == == H2 == == H3 ==")
+
+      headings = doc.children.select { |c| c.is_a?(Markbridge::AST::Heading) }
+      expect(headings.size).to eq(3)
     end
   end
 end
