@@ -11,11 +11,52 @@ module Markbridge
           @tags = {}
         end
 
+        # When a TagLibrary is +dup+'d / +clone+'d, ensure the
+        # internal +@tags+ Hash is independent of the source. Without
+        # this, both copies would share the same underlying Hash and
+        # mutations to one would silently affect the other.
+        def initialize_copy(other)
+          super
+          @tags = @tags.dup
+        end
+
         # Register a tag for an element class
         # @param element_class [Class] the element class
         # @param tag [Tag] the tag instance
         def register(element_class, tag)
           @tags[element_class] = tag
+          self
+        end
+
+        # Remove a tag binding so the renderer falls through to
+        # +render_children+ for that element class. See
+        # +Renderer#render+ for the auto-passthrough path.
+        #
+        # @param element_class [Class]
+        # @return [self]
+        def unregister(element_class)
+          @tags.delete(element_class)
+          self
+        end
+
+        # Merge a Hash of class → Tag mappings on top of this library
+        # in-place. A +nil+ value unregisters the corresponding class
+        # (so the default auto-passthrough kicks in).
+        #
+        # Named with a trailing +!+ because it mutates +self+ —
+        # mirroring Ruby's Hash#merge / Hash#merge! convention. Use
+        # +dup+ first if you need a non-destructive merge.
+        #
+        # @param mapping [Hash{Class => Tag, nil}]
+        # @return [self]
+        def merge!(mapping)
+          mapping.each_pair do |klass, tag|
+            if tag.nil?
+              unregister(klass)
+            else
+              register(klass, tag)
+            end
+          end
           self
         end
 
@@ -59,8 +100,7 @@ module Markbridge
         # Create the default tag library for Discourse Markdown.
         #
         # Each call returns a *fresh* instance — mutations made to one will
-        # not be visible to another. If you want a process-wide singleton,
-        # use {Markbridge.default_tag_library} instead, which memoizes.
+        # not be visible to another.
         #
         # @return [TagLibrary]
         def self.default

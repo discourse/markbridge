@@ -232,6 +232,32 @@ matcher:
     # observable difference in parser output for identical inputs.
     - Markbridge::Parsers::MediaWiki::Parser#initialize
 
+    # TagLibrary#initialize_copy's `super` call. Ruby's default
+    # Object#initialize_copy is a no-op for our purposes (we re-dup
+    # @tags ourselves on the next line), so `super` is unobservable —
+    # mutant correctly notes it can be removed without breaking any
+    # current test. Keeping it for idiomatic-Ruby reasons: a future
+    # subclass that adds its own copy-init step would expect the
+    # super chain to be intact. Both alive mutations (super → nil,
+    # super deletion) are equivalent.
+    - Markbridge::Renderers::Discourse::TagLibrary#initialize_copy
+
+    # HTML::Parser#parse's `doc.is_a?(Nokogiri::HTML::Document)` swap to
+    # `instance_of?`. Same Bucket A equivalence as TextFormatter's
+    # `is_a?(Nokogiri::XML::Document)`: a `Nokogiri::HTML.parse(...)`
+    # result is *exactly* a `Nokogiri::HTML::Document`, so is_a? and
+    # instance_of? return identical truths for every input we
+    # actually receive. The mutation would only diverge for a
+    # user-defined subclass of `Nokogiri::HTML::Document`, which is
+    # not a documented or realistic shape — testing it would require
+    # contriving a subclass purely to feed the mutation killer.
+    # The four other mutations on the same conditional (always-true
+    # variants: `if true`, `if doc`, `if Nokogiri::HTML::Document`,
+    # and the conditional deletion) are killed by the "DocumentFragment
+    # containing a <body>" spec, which proves that the body-unwrap
+    # path runs only for the Document branch.
+    - Markbridge::Parsers::HTML::Parser#parse
+
 mutation:
   ignore_patterns:
     # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,
@@ -333,14 +359,6 @@ mutation:
     # line 30 for the index→fetch variant.
     - "send{receiver=send{receiver=self selector=class} selector=new}"
     - "index{receiver=lvar{value=new_cache}}"
-
-    # HTML::Parser#process_element_node's `handler.call(element: node,
-    # parent:)` is the lambda-dispatch path, used only by the `br` /
-    # `hr` handlers in HandlerRegistry.default. Neither lambda reads
-    # `element:` — both just emit a void AST node into `parent`. So
-    # `element: nil` is equivalent for every registered caller.
-    # Bucket A.
-    - "send{receiver=lvar{value=handler} selector=call}"
 
 # MarkdownEscaper#block_construct?'s `when DIGIT_0..DIGIT_9` range.
     # Mutations `when DIGIT_0..nil` / `when nil..DIGIT_9` extend the
