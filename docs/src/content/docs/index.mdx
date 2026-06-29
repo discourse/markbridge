@@ -6,7 +6,7 @@ hero:
   tagline: |
     Convert BBCode, HTML, MediaWiki, and TextFormatter XML into
     Discourse-flavored Markdown. Built for forum migrations:
-    placeholder-friendly, side-data-emitting, unknown-tag-aware.
+    placeholder-friendly, unknown-tag-aware.
   image:
     file: ../../assets/markbridge-icon.svg
     alt: Markbridge logo
@@ -38,14 +38,13 @@ result = Markbridge.bbcode_to_markdown(
 
 result.markdown        # => "**Hello** [world](https://example.com) oops"
 result.unknown_tags    # => {"unknown" => 2}
-result.emissions       # => {} (custom Tags can populate this for the importer)
 ```
 
 `*_to_markdown` returns a `Conversion` value object — the rendered string is on `.markdown`, side data and unknown tags ride alongside.
 
 <CardGrid stagger>
   <Card title="Forum migrations, first-class" icon="rocket">
-    The recurring placeholder triad — AST node + parser handler + renderer Tag — is the canonical migration shape. Tags emit side data via `interface.emit`; the importer reads `Conversion#emissions` to resolve uploads, mentions, and links downstream.
+    The recurring placeholder triad — AST node + parser handler + renderer Tag — is the canonical migration shape. Tags stay pure formatters; the importer reads the placeholder nodes back off `conversion.ast` to resolve uploads, mentions, and links downstream.
   </Card>
   <Card title="Four input formats" icon="random">
     BBCode, HTML, MediaWiki wikitext, and <span class="nowrap">s9e/TextFormatter</span> XML. One AST, one Discourse Markdown renderer — pick the entry point that fits your source. `Markbridge.convert(input, format:)` dispatches when the format isn't fixed at the call site.
@@ -57,7 +56,7 @@ result.emissions       # => {} (custom Tags can populate this for the importer)
     Register custom handlers to recognize new tags. `HandlerRegistry#overlay` wraps the default for delegation. Build a custom `Renderer` once with `Markbridge.discourse_renderer(...)` and reuse across thousands of posts.
   </Card>
   <Card title="Performance-conscious" icon="setting">
-    Single-pass parsing, O(1) parent lookups during render, minimal allocations on the hot paths. Linear in input size. Reusable Renderer with zero overhead on the no-emit path.
+    Single-pass parsing, O(1) parent lookups during render, minimal allocations on the hot paths. Linear in input size. One reusable Renderer, safe across thousands of posts.
   </Card>
   <Card title="Battle-tested" icon="star">
     Powers Discourse forum migrations. Extensive unit, integration, and end-to-end system tests keep real-world inputs covered.

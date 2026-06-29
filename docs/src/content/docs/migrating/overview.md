@@ -10,16 +10,16 @@ This page is the mental model. The next two pages — [Placeholders](/migrating/
 ## Four stages
 
 <figure class="diagram">
-  <img class="diagram-light" src="/diagrams/overview.svg" alt="Five-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with interface.emit feeding side data per call into Render from above">
-  <img class="diagram-dark" src="/diagrams/overview-dark.svg" alt="Five-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with interface.emit feeding side data per call into Render from above">
+  <img class="diagram-light" src="/diagrams/overview.svg" alt="Four-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with the importer re-reading placeholder nodes from conversion.ast afterwards">
+  <img class="diagram-dark" src="/diagrams/overview-dark.svg" alt="Four-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with the importer re-reading placeholder nodes from conversion.ast afterwards">
 </figure>
 
 1. **Parse**. The format-specific parser tokenizes the input and builds an `AST::Document`. Unknown tags are tracked but never raise — the parser is resilient by design.
 2. **AST**. A renderer-agnostic tree of `Text`, `Element`, and leaf nodes (`LineBreak`, `HorizontalRule`). Custom AST nodes (Upload, Mention, InternalLink) live alongside the built-ins.
-3. **Render**. The Discourse renderer walks the AST, dispatching each node to its `Tag`. Custom Tags compute placeholder strings *and* emit side data the importer needs after the post is written.
-4. **Conversion**. The render produces a `Markbridge::Conversion` value object: rendered Markdown, the AST, format identifier, unknown-tag counts, parser diagnostics, side-data emissions, and any swallowed errors.
+3. **Render**. The Discourse renderer walks the AST, dispatching each node to its `Tag`. Custom Tags are one-line output formatters — they turn a placeholder node into its placeholder string and nothing else.
+4. **Conversion**. The render produces a `Markbridge::Conversion` value object: rendered Markdown, the AST, format identifier, unknown-tag counts, parser diagnostics, and any swallowed errors.
 
-The four-stage mental model maps exactly to your importer code: parse-and-resolve happens on the way in (via custom handlers); render-and-emit happens on the way out (via custom Tags); the importer collects emissions per call and writes them to the right tables.
+The four-stage mental model maps exactly to your importer code: parse-and-resolve happens on the way in (via custom handlers); render happens on the way out (via custom Tags); the importer reads the side data it needs back off `conversion.ast` and writes it to the right tables.
 
 ## The Conversion object
 
@@ -33,8 +33,6 @@ result.ast           # the AST::Document used for rendering
 result.format        # :bbcode, :html, :text_formatter_xml, or :mediawiki
 result.unknown_tags  # Hash{String => Integer} — tag-name to count
 result.diagnostics   # parser-specific diagnostics (e.g. auto-close counts)
-result.emissions     # Hash{Symbol => Array} — what custom Tags emitted
-result.emitted(:uploads)  # convenience: emissions[:uploads] || []
 result.errors        # render-time errors when raise_on_error: false
 ```
 
@@ -42,7 +40,7 @@ result.errors        # render-time errors when raise_on_error: false
 
 The same shape comes from `Markbridge.convert(input, format:)` if you're handling multiple formats in one loop.
 
-## Side data: `interface.emit`
+## Side data: read it back off the AST
 
 A migration importer typically wants to know more than the rendered string. For each placeholder in the post, it needs the resolution data the importer will look up later:
 
@@ -52,18 +50,40 @@ A migration importer typically wants to know more than the rendered string. For 
 | `[mention]alice[/mention]` | `[mention\|alice]` | `{ name: "alice", source_id: nil }` |
 | `[url=/topics/old-id-7]` | `[topic\|7]` | `{ source_topic_id: 7 }` |
 
-Custom Tags call `interface.emit(:key, payload)` to record this:
+You don't need a side channel for this. The custom AST node carries the parsed data, and `conversion.ast` is the exact tree that produced the Markdown — so the Tag stays a pure formatter:
 
 ```ruby
 class UploadTag < Markbridge::Renderers::Discourse::Tag
-  def render(element, interface)
-    interface.emit(:uploads, id: element.upload_id, path: element.path)
+  def render(element, _interface)
     "[upload|#{element.upload_id}]"
   end
 end
 ```
 
-The importer reads `result.emitted(:uploads)` after the call and writes the upload records before (or after) finalizing the post body. Emissions are buffered per top-level render call, so each post sees only its own side data.
+After the conversion, collect every upload the post referenced by walking the tree for your placeholder class. (In a real importer `result` comes from a `*_to_markdown` call; here we build a one-node tree by hand to keep the snippet self-contained.)
+
+<!-- spec:before
+def record_upload(**); end
+-->
+```ruby
+class UploadPlaceholder < Markbridge::AST::Node
+  attr_reader :upload_id, :path
+  def initialize(upload_id:, path:)
+    @upload_id = upload_id
+    @path = path
+  end
+end
+
+document = Markbridge::AST::Document.new
+document << UploadPlaceholder.new(upload_id: 42, path: "files/cat.png")
+result = Markbridge.render(document)
+
+result.ast.descendants(UploadPlaceholder).each do |node|
+  record_upload(id: node.upload_id, path: node.path)
+end
+```
+
+`descendants(klass)` walks the whole tree (leaf nodes included) and returns the nodes that survived parsing — exactly the placeholders that reached the output, scoped to this one conversion. Nothing bleeds between posts because each call has its own `ast`. The full triad — placeholder AST class, handler, and Tag — is on the [Placeholders](/migrating/placeholders/) page.
 
 The full pattern lives on the [Placeholders](/migrating/placeholders/) page.
 
@@ -100,7 +120,7 @@ posts.each do |post|
     log_failure(post, result.errors)
     next
   end
-  write_markdown(post, result.markdown, result.emissions)
+  write_markdown(post, result.markdown)
 end
 ```
 
@@ -108,7 +128,7 @@ Errors collect on `Conversion#errors` instead of raising. The default stays `rai
 
 ## Build the renderer once
 
-Construct a `Renderer` once outside your migration loop and pass it to every call. It carries your custom Tags, the unregistered AST classes you don't want to render, your escaper, and your postprocessor — and its emission buffer resets at the start of each top-level render so emissions never bleed between posts.
+Construct a `Renderer` once outside your migration loop and pass it to every call. It carries your custom Tags, the unregistered AST classes you don't want to render, your escaper, and your postprocessor. It holds no per-post state, so the same instance is safe across thousands of posts.
 
 ```ruby
 RENDERER = Markbridge.discourse_renderer(
@@ -131,7 +151,7 @@ See [Customizing the renderer](/customization/customizing-renderer/) for every k
 
 ## Where next
 
-- [Placeholders](/migrating/placeholders/) — the AST + handler + Tag triad, with the placeholder/emission round-trip end-to-end.
+- [Placeholders](/migrating/placeholders/) — the AST + handler + Tag triad, with the placeholder round-trip end-to-end.
 - [Full walkthrough](/migrating/full-walkthrough/) — a runnable mini-importer touching every customization path.
 - [Customizing the renderer](/customization/customizing-renderer/) — the full factory reference.
 - [Extending Markbridge](/customization/extending/) — adding handlers and custom Tags from scratch.

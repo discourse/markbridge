@@ -23,7 +23,7 @@ result.markdown
 # => "Hello **world**!"
 ```
 
-`result` is a [`Markbridge::Conversion`](/migrating/overview/) — `.markdown`, plus `.unknown_tags`, `.emissions`, `.errors` for migration use.
+`result` is a [`Markbridge::Conversion`](/migrating/overview/) — `.markdown`, plus `.unknown_tags`, `.errors` for migration use.
 
 To get the AST:
 
@@ -60,17 +60,26 @@ For the authoritative list, see [`HandlerRegistry.default`](https://github.com/d
 ## Parser characteristics
 
 - **Uses Nokogiri's HTML fragment parser** — handles malformed input without raising.
-- **Stateless handlers** — simpler than BBCode's open/close callback API. A handler is a callable that takes `(element:, parent:)`.
-- **Lambda support** — you can register a plain lambda for quick customization instead of a class.
+- **Stateless handlers** — simpler than BBCode's open/close callback API. A handler is an object responding to `#process(element:, parent:)`.
 
 ```ruby
+class AsideHandler < Markbridge::Parsers::HTML::Handlers::BaseHandler
+  def initialize
+    @element_class = AST::Quote
+  end
+
+  attr_reader :element_class
+
+  def process(element:, parent:)
+    note = AST::Quote.new
+    parent << note
+    note # return node to recurse into for children
+  end
+end
+
 handlers =
   Markbridge::Parsers::HTML::HandlerRegistry.build_from_default do |registry|
-    registry.register("aside", ->(element:, parent:) {
-      note = AST::Quote.new
-      parent << note
-      note  # return node to recurse into for children
-    })
+    registry.register("aside", AsideHandler.new)
   end
 
 Markbridge.html_to_markdown("<aside>heads up</aside>", handlers:)

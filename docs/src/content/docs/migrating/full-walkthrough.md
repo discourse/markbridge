@@ -9,11 +9,11 @@ What it demonstrates:
 
 - A custom AST node + parser handler for a tag the default registry doesn't cover (`[font=courier]`).
 - Handler delegation via `HandlerRegistry#overlay` — wrap the default URL handler with a logging-style decorator.
-- A custom Tag that emits side data with `interface.emit` for the importer to pick up.
+- A pure custom Tag that turns internal links into opaque placeholder strings the importer resolves later.
 - `Markbridge.discourse_renderer(...)` with a `tags:` override map, an `unregister:` list, and a custom escaper subclass.
 - `Markbridge.convert(input, format:)` dispatching across BBCode and HTML in one loop.
 - `raise_on_error: false` collecting per-post failures instead of crashing.
-- Reading `Conversion#emitted(:link)` and `Conversion#unknown_tags` post-render.
+- Collecting placeholder side data by walking `Conversion#ast` post-render, and reading `Conversion#unknown_tags`.
 
 ## The full script
 
@@ -60,33 +60,34 @@ FONT_TAG =
     end
   end
 
-# -- Custom URL Tag emitting placeholder records ----------------------------
+# -- Custom URL Tag producing placeholder strings ---------------------------
 
-# Internal links → opaque placeholders the importer resolves later.
-# External links → normal Markdown.
+# Internal links → opaque, deterministic placeholders the importer
+# resolves later. External links → normal Markdown. The Tag is a pure
+# function of its element: the placeholder is derived from the href, so
+# no render-time state and nothing to "emit" — the importer collects the
+# internal links afterwards by walking the AST (see the loop below).
+INTERNAL_HOST = "https://forum.example.com/"
+
 class PlaceholderUrlTag < Markbridge::Renderers::Discourse::Tag
   def render(element, interface)
     href = element.href
     text = interface.render_children(element, context: interface.with_parent(element))
 
-    if internal_link?(href)
-      placeholder = "[[link:#{next_id}]]"
-      interface.emit(:link, { url: href, text:, placeholder: })
-      placeholder
+    if PlaceholderUrlTag.internal?(href)
+      PlaceholderUrlTag.placeholder_for(href)
     else
       "[#{text}](#{href})"
     end
   end
 
-  private
-
-  def internal_link?(href)
-    href&.start_with?("https://forum.example.com/")
+  def self.internal?(href)
+    href&.start_with?(INTERNAL_HOST)
   end
 
-  def next_id
-    @counter ||= 0
-    @counter += 1
+  # Derive a stable token from the source path: t/42, u/alice, …
+  def self.placeholder_for(href)
+    "[[link:#{href.delete_prefix(INTERNAL_HOST)}]]"
   end
 end
 
@@ -164,7 +165,7 @@ POSTS = [
 # -- The migration loop ---------------------------------------------------
 
 stats = { ok: 0, errors: 0 }
-emitted_links = []
+internal_links = []
 
 POSTS.each do |post|
   result =
@@ -183,7 +184,14 @@ POSTS.each do |post|
   end
 
   stats[:ok] += 1
-  emitted_links.concat(result.emitted(:link))
+
+  # Collect the internal links the renderer turned into placeholders, by
+  # walking the AST that produced this post's Markdown. No side channel:
+  # the Url nodes are still in the tree, each carrying its source href.
+  result.ast.descendants(Markbridge::AST::Url).each do |url|
+    next unless PlaceholderUrlTag.internal?(url.href)
+    internal_links << { url: url.href, placeholder: PlaceholderUrlTag.placeholder_for(url.href) }
+  end
 
   puts "post ##{post[:id]} (#{post[:format]}): #{result.markdown.inspect}"
   puts "  unknown_tags: #{result.unknown_tags}" if result.unknown_tags.any?
@@ -193,25 +201,25 @@ puts
 puts "Migration complete:"
 puts "  ok: #{stats[:ok]}"
 puts "  errors: #{stats[:errors]}"
-puts "  link placeholders emitted: #{emitted_links.size}"
-emitted_links.each { |l| puts "    #{l[:placeholder]} -> #{l[:url]}" }
+puts "  link placeholders collected: #{internal_links.size}"
+internal_links.each { |l| puts "    #{l[:placeholder]} -> #{l[:url]}" }
 ```
 
 ## Expected output
 
 ```
 post #1 (bbcode): "**hello** world `code`"
-post #2 (bbcode): "see [[link:1]] and [ext](https://example.org)"
+post #2 (bbcode): "see [[link:t/42]] and [ext](https://example.org)"
 post #3 (bbcode): "hello"
   unknown_tags: {"unknownext" => 2}
-post #4 (html): "**html** [[link:2]]"
+post #4 (html): "**html** [[link:u/alice]]"
 
 Migration complete:
   ok: 4
   errors: 0
-  link placeholders emitted: 2
-    [[link:1]] -> https://forum.example.com/t/42
-    [[link:2]] -> https://forum.example.com/u/alice
+  link placeholders collected: 2
+    [[link:t/42]] -> https://forum.example.com/t/42
+    [[link:u/alice]] -> https://forum.example.com/u/alice
 ```
 
 ## Reading the script
@@ -222,11 +230,15 @@ Migration complete:
 
 The pattern repeats for every source-format tag the default registry doesn't cover. See [Extending Markbridge](/customization/extending/) for the standalone walkthrough.
 
-### Placeholder Tag with `interface.emit`
+### Pure placeholder Tag
 
-`PlaceholderUrlTag` overrides the default `UrlTag` for `AST::Url`. For external links it produces normal Markdown. For internal links — in this example, anything starting with `https://forum.example.com/` — it returns an opaque placeholder string and emits a record on the `:link` channel.
+`PlaceholderUrlTag` overrides the default `UrlTag` for `AST::Url`. For external links it produces normal Markdown. For internal links — in this example, anything starting with `https://forum.example.com/` — it returns an opaque placeholder string derived straight from the href. The Tag records nothing: it's a pure function of its element, so the same href always yields the same placeholder.
 
-The placeholder string is whatever your importer parses cleanly downstream. `[[link:N]]` is one convention; pick another if it fits your tooling better. The string is spliced verbatim into the output — Markdown escaping never touches it (see [Placeholders → Placeholder strings pass through verbatim](/migrating/placeholders/#placeholder-strings-pass-through-verbatim)).
+The placeholder string is whatever your importer parses cleanly downstream. `[[link:t/42]]` (the source path) is one convention; pick another if it fits your tooling better. The string is spliced verbatim into the output — Markdown escaping never touches it (see [Placeholders → Placeholder strings pass through verbatim](/migrating/placeholders/#placeholder-strings-pass-through-verbatim)).
+
+### Collecting the links afterwards
+
+Because the Tag doesn't push anything out, the importer collects the internal links it cares about by walking the AST after each conversion. `result.ast` is the exact tree that produced the Markdown, so `descendants(Markbridge::AST::Url)` returns every link node — filter to the internal ones and derive the same placeholder the Tag did. Each node still carries its source `href`, so there's nothing to reconcile.
 
 ### Handler delegation via wrapping
 
@@ -257,15 +269,15 @@ Render-time exceptions land on `Conversion#errors` instead of crashing the loop.
 ### Reading the result
 
 ```ruby
-result.markdown                # the rendered Markdown
-result.unknown_tags            # Hash{String => Integer}
-result.emitted(:link)          # what PlaceholderUrlTag emitted
-result.errors                  # populated only when raise_on_error: false caught one
+result.markdown                                  # the rendered Markdown
+result.unknown_tags                              # Hash{String => Integer}
+result.ast.descendants(Markbridge::AST::Url)     # link nodes, for placeholder collection
+result.errors                                    # populated only when raise_on_error: false caught one
 ```
 
 `result.unknown_tags` for post #3 (`[unknownext]hello[/unknownext]`) shows `{"unknownext" => 2}` — open + close tokens, both counted. The wrapper is dropped, the inner text survives.
 
-`result.emitted(:link)` returns `[]` when nothing emitted on that channel — the convenience accessor avoids nil-checks. Loop-level accumulation just `concat`s these arrays.
+`result.ast.descendants(klass)` returns `[]` when the tree holds no node of that class — no nil-checks needed. Each conversion has its own `ast`, so the per-post collection never bleeds across posts.
 
 ## Where next
 

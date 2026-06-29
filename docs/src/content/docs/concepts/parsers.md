@@ -27,16 +27,21 @@ A hand-written, two-stage parser:
 
 Thin wrapper over `Nokogiri::HTML.fragment` + a handler registry. Walks the DOM and dispatches each element to a handler.
 
-**Handler API:** stateless — a callable receiving `(element:, parent:)`. It adds an AST node to `parent` and returns either the node to descend into, or `nil` to skip children.
-
-Lambdas count as callables, which keeps quick customizations terse:
+**Handler API:** stateless — an object responding to `#process(element:, parent:)`. It adds an AST node to `parent` and returns either the node to descend into, or `nil` to skip children.
 
 <!-- spec:before
 require "markbridge/html"
 registry = Markbridge::Parsers::HTML::HandlerRegistry.default
 -->
 ```ruby
-registry.register("aside", ->(element:, parent:) { parent })
+class AsideHandler < Markbridge::Parsers::HTML::Handlers::BaseHandler
+  # Descend the children straight into the parent — no AST node for <aside>.
+  def process(element:, parent:)
+    parent
+  end
+end
+
+registry.register("aside", AsideHandler.new)
 ```
 
 Relies on Nokogiri for malformed-HTML recovery — no need for Markbridge to do its own.

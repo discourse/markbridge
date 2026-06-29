@@ -118,31 +118,40 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 | `wrap_inline(content, markers)` | Wrap inline content, collapsing adjacent markers cleanly |
 | `block_context?(element)` | True if the current position is a block context |
 | `html_mode?` | True inside a CommonMark HTML block — the Tag must emit raw HTML or wrap output as a Markdown island |
-| `emit(key, payload)` | Record side data the caller will read off `Conversion#emissions` (see [Placeholders](/migrating/placeholders/)) |
 
 Use `find_parent` / `has_parent?` to render differently inside specific ancestors (e.g. a code span inside a table cell).
 
 ## HTML and TextFormatter parsers
 
-Both use a simpler, stateless handler API. A handler is any callable accepting `(element:, parent:)`. Return the node you want children to recurse into, or `nil` to skip them.
+Both use a simpler, stateless handler API. A handler is an object responding to `#process(element:, parent:)`. Add your node to `parent` and return the node you want children to recurse into, or `nil` to skip them.
 
 <!-- spec:before
 input = "<details>hi</details>"
 -->
 ```ruby
+class SpoilerHandler < Markbridge::Parsers::HTML::Handlers::BaseHandler
+  def initialize
+    @element_class = Markbridge::AST::Spoiler
+  end
+
+  attr_reader :element_class
+
+  def process(element:, parent:)
+    spoiler = Markbridge::AST::Spoiler.new
+    parent << spoiler
+    spoiler
+  end
+end
+
 html_handlers =
   Markbridge::Parsers::HTML::HandlerRegistry.build_from_default do |registry|
-    registry.register("details", ->(element:, parent:) {
-      spoiler = Markbridge::AST::Spoiler.new
-      parent << spoiler
-      spoiler
-    })
+    registry.register("details", SpoilerHandler.new)
   end
 
 Markbridge.html_to_markdown(input, handlers: html_handlers)
 ```
 
-The TextFormatter registry works the same way, but element names are **UPPERCASE** per s9e convention.
+The TextFormatter registry works the same way (handlers respond to `#process(element:, parent:, processor:)`), but element names are **UPPERCASE** per s9e convention.
 
 ## Replacing a built-in renderer tag
 
@@ -208,7 +217,7 @@ library.auto_register!
 
 ## Migration use cases
 
-When you're extending Markbridge to feed a Discourse migration — links to be resolved later, uploads to be tracked, mentions to be looked up — the same triad applies, but the renderer Tag also calls `interface.emit(:key, payload)` to record side data the importer reads back from `Conversion#emissions`. See [Migrating to Discourse → Placeholders](/migrating/placeholders/).
+When you're extending Markbridge to feed a Discourse migration — links to be resolved later, uploads to be tracked, mentions to be looked up — the same triad applies. The renderer Tag stays a pure formatter that returns the placeholder string; the importer reads the placeholder nodes back off `conversion.ast.descendants(...)` afterwards. See [Migrating to Discourse → Placeholders](/migrating/placeholders/).
 
 ## When to customize vs. fork
 

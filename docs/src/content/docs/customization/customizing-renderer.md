@@ -18,7 +18,7 @@ posts.each do |post|
 end
 ```
 
-The renderer is safe to reuse across thousands of posts. Its emission buffer resets on every top-level render, so concurrent reads from prior posts won't leak into later ones — you collect them per call from `result.emissions`.
+The renderer is safe to reuse across thousands of posts. It holds no per-post state, so nothing leaks between posts — you collect any side data per call by walking `result.ast`.
 
 ## The factory
 
@@ -105,7 +105,7 @@ Pass the bare base class (`Postprocessor.new`) to keep the default cleanup; pass
 
 ## Build once, reuse everywhere
 
-Renderers are immutable for the purposes of emission: every top-level `*_to_markdown` call gets a fresh emission buffer. Constructing one is cheap; constructing thousands is wasteful. The build-once pattern is the recommended shape:
+The renderer carries no per-post state: every top-level `*_to_markdown` call produces its own `Conversion`. Constructing a renderer is cheap; constructing thousands is wasteful. The build-once pattern is the recommended shape:
 
 ```ruby
 class ForumImporter
@@ -117,7 +117,7 @@ class ForumImporter
 
   def import(post)
     result = Markbridge.bbcode_to_markdown(post.body, renderer: RENDERER)
-    persist(post, result.markdown, result.emissions)
+    persist(post, result.markdown)
   end
 end
 ```
