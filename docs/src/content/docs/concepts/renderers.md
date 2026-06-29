@@ -54,7 +54,6 @@ end
 | `wrap_inline(content, markers)` | Wrap inline content with collapsing markers |
 | `block_context?(element)` | Block vs. inline position |
 | `html_mode?` | True inside a CommonMark HTML block — Tag must emit raw HTML or wrap output as a Markdown island (`\n\n…\n\n`) |
-| `emit(key, payload)` | Record side data for the caller to retrieve via `Conversion#emissions`. Used for migration placeholders (uploads, mentions, links). |
 
 The interface decouples tags from the renderer: you could write a second renderer (HTML, plain text, JSON) and reuse every tag by providing a compatible interface.
 

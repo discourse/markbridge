@@ -23,7 +23,7 @@ puts result                           # to_s delegates to markdown
 "got #{result}"                       # works
 ```
 
-`Conversion` carries `markdown`, `ast`, `format`, `unknown_tags`, `diagnostics`, `emissions`, `errors`. It does *not* delegate other String methods — `result.gsub(...)` raises `NoMethodError`. Use `result.markdown.gsub(...)`.
+`Conversion` carries `markdown`, `ast`, `format`, `unknown_tags`, `diagnostics`, `errors`. It does *not* delegate other String methods — `result.gsub(...)` raises `NoMethodError`. Use `result.markdown.gsub(...)`.
 
 ### Singleton config and per-process default registries are gone
 
@@ -55,7 +55,7 @@ RENDERER =
 Markbridge.bbcode_to_markdown(input, renderer: RENDERER)
 ```
 
-Build the renderer once outside your migration loop and reuse it across thousands of posts; the no-emit path adds zero overhead. See [Customizing the renderer](/customization/customizing-renderer/) for the full set of factory kwargs.
+Build the renderer once outside your migration loop and reuse it across thousands of posts; it holds no per-post state. See [Customizing the renderer](/customization/customizing-renderer/) for the full set of factory kwargs.
 
 ### `tags:`, `tag_library:`, `escaper:`, `escape_hard_line_breaks:` removed from per-call signature
 
@@ -93,15 +93,11 @@ def process(element:, parent:, processor: nil)
 
 Update every custom subclass under your importer's TextFormatter handler tree. The `processor:` argument is the parser instance and exposes `process_children(xml_element, ast_node)` for handlers that recurse into children manually.
 
-Lambda handlers receive the same kwargs:
+Proc/lambda handlers are no longer accepted — a handler must be an object responding to `#process(...)`. Wrap any one-off lambda in a small handler class with a `#process` method.
 
-```ruby
-registry.register("CUSTOM", ->(element:, parent:, processor:) { ... })
-```
+### Tag side-data: read it back off the AST instead of mutating ctor-injected hashes
 
-### Tag side-data: use `interface.emit` instead of mutating ctor-injected hashes
-
-The textbook before/after for placeholder Tags:
+Placeholder Tags used to record side data by mutating a hash injected through the constructor (and a short-lived draft used an `interface.emit` buffer). Both are gone. A Tag is now a pure function of its element — it returns a string and records nothing; the importer collects side data by walking `conversion.ast` afterwards:
 
 ```ruby
 # Before
@@ -110,7 +106,7 @@ class UrlTag < Markbridge::Renderers::Discourse::Tag
     @placeholders = placeholders
   end
 
-  def render(element, interface)
+  def render(element, _interface)
     link = build_link(element)
     @placeholders[:links] << link        # mutates ctor-injected array
     link[:placeholder]
@@ -120,16 +116,14 @@ end
 
 # After
 class UrlTag < Markbridge::Renderers::Discourse::Tag
-  def render(element, interface)
-    link = build_link(element)
-    interface.emit(:link, link)          # routed to Conversion#emissions
-    link[:placeholder]
+  def render(element, _interface)
+    build_link(element)[:placeholder]    # pure: returns a string, records nothing
   end
 end
-# Importer reads: result.emitted(:link).each { |l| ... }
+# Importer reads back: result.ast.descendants(InternalLink).each { |node| ... }
 ```
 
-Pure lookup tables (`uploads:`, `repository:`) injected into Tag constructors are still fine — only *mutation during render* moves to `emit`.
+The resolved value the importer needs lives on the custom AST node (pinned at parse time by the handler, or read off the source-side data the Tag already has). Pure lookup tables (`uploads:`, `repository:`) injected into Tag constructors are still fine — they're read-only. Only *mutation during render* moves out, to a walk over `conversion.ast.descendants(...)`. See [Placeholders](/migrating/placeholders/).
 
 ### `RawHandler` no longer requires `language:` on the AST class
 

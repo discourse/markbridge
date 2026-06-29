@@ -1,26 +1,26 @@
 ---
 title: Placeholders
-description: Render links, uploads, mentions, and other importer-resolved tags as placeholder strings, with side data emitted alongside the Markdown.
+description: Render links, uploads, mentions, and other importer-resolved tags as placeholder strings, then collect what you need by walking the parsed AST.
 ---
 
-A *placeholder* is a short literal string in the rendered Markdown that the Discourse importer swaps for a real value later: an upload reference, a topic link, a resolved mention. Markbridge gives you everything you need to produce that placeholder *and* record the resolution data alongside it, in one render pass.
+A *placeholder* is a short literal string in the rendered Markdown that the Discourse importer swaps for a real value later: an upload reference, a topic link, a resolved mention. Markbridge gives you everything you need to produce that placeholder, and to find every placeholder again afterwards by walking the parsed tree — no side channel required.
 
 The pattern looks like this:
 
 <figure class="diagram">
-  <img class="diagram-light" src="/diagrams/placeholders.svg" alt="Placeholder triad: source [attachment=0] tag becomes AttachmentPlaceholder AST node, which the renderer Tag splits into a [upload|HASH] string in the Markdown output and an emissions record on Conversion#emissions">
-  <img class="diagram-dark" src="/diagrams/placeholders-dark.svg" alt="Placeholder triad: source [attachment=0] tag becomes AttachmentPlaceholder AST node, which the renderer Tag splits into a [upload|HASH] string in the Markdown output and an emissions record on Conversion#emissions">
+  <img class="diagram-light" src="/diagrams/placeholders.svg" alt="Placeholder triad: a source [attachment=0] tag becomes an AttachmentPlaceholder AST node, which the renderer Tag formats into a [upload|HASH] string in the Markdown output; the importer re-reads the same nodes via conversion.ast.descendants">
+  <img class="diagram-dark" src="/diagrams/placeholders-dark.svg" alt="Placeholder triad: a source [attachment=0] tag becomes an AttachmentPlaceholder AST node, which the renderer Tag formats into a [upload|HASH] string in the Markdown output; the importer re-reads the same nodes via conversion.ast.descendants">
 </figure>
 
-Every placeholder concept follows the same triad: an **AST node** to carry the parsed data, a **parser handler** to construct it, and a **renderer Tag** to format the placeholder and emit the side data.
+Every placeholder concept follows the same triad: an **AST node** to carry the parsed data, a **parser handler** to construct it, and a **renderer Tag** to format the placeholder string. When the importer needs side data (which uploads a post referenced, which mentions to resolve), it reads it back off the AST nodes — `conversion.ast` is the same tree that produced the Markdown, so `conversion.ast.descendants(YourPlaceholder)` hands you every placeholder that survived parsing.
 
-> Markbridge ships with a built-in `Markbridge::AST::Attachment` that maps to Discourse's resolved upload syntax. For migrations the source post doesn't *have* a Discourse upload yet — it has a reference to a row in the source forum's attachments table. Define your own AST class so the importer can resolve those references at render time.
+> Markbridge ships with a built-in `Markbridge::AST::Attachment` that maps to Discourse's resolved upload syntax. For migrations the source post doesn't *have* a Discourse upload yet — it has a reference to a row in the source forum's attachments table. Define your own AST class so the importer can resolve those references.
 
 ## The placeholder triad, end to end
 
 Concrete example: phpBB3 emits attachments as `[attachment=N]filename[/attachment]`, where `N` is the position index of the attachment within the post (zero-based). The actual file lives in `phpbb_attachments` joined to the post; the BBCode just points at slot N.
 
-The pipeline below turns `[attachment=0]filename.jpg[/attachment]` into `[upload|<upload_id>]` in the output — Discourse's upload-marker shape, with the upload identifier looked up from the source post's attachment rows. The `upload_id` is whatever stable identifier the importer's converter framework derives from the source filename/path (not the file's content hash) so each placeholder maps unambiguously to one source-side row. The full record is also emitted on `result.emitted(:uploads)` so the importer can do its own bookkeeping.
+The pipeline below turns `[attachment=0]filename.jpg[/attachment]` into `[upload|<upload_id>]` in the output — Discourse's upload-marker shape, with the upload identifier looked up from the source post's attachment rows. The `upload_id` is whatever stable identifier the importer's converter framework derives from the source filename/path (not the file's content hash) so each placeholder maps unambiguously to one source-side row.
 
 (vBulletin's `[ATTACH]N[/ATTACH]` and IPB's `[attachment=N:filename]` follow the same shape — the example below adapts to either by tweaking the handler.)
 
@@ -43,6 +43,7 @@ end
 
 ### 2. The parser handler
 
+<!-- spec:continue -->
 ```ruby
 module ForumMigration
   class AttachmentHandler < Markbridge::Parsers::BBCode::Handlers::BaseHandler
@@ -78,35 +79,44 @@ end
 
 ### 3. The renderer Tag
 
-The Tag needs the post's attachment list at render time so it can map a position to an `upload_id`. Pass it through the constructor:
+The Tag needs the post's attachment list at render time so it can map a position to an `upload_id`. Pass it through the constructor. The Tag stays a one-line output formatter — no side effects, just a string:
 
+<!-- spec:continue -->
 ```ruby
-class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
-  def initialize(attachments:)
-    @attachments = attachments # ordered list, indexed by position
-  end
+module ForumMigration
+  class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
+    def initialize(attachments:)
+      @attachments = attachments # ordered list, indexed by position
+    end
 
-  def render(element, interface)
-    attachment = @attachments[element.position]
-    interface.emit(
-      :uploads,
-      position: element.position,
-      upload_id: attachment.upload_id,
-      filename: element.filename,
-    )
-    "[upload|#{attachment.upload_id}]"
+    def render(element, _interface)
+      attachment = @attachments[element.position]
+      "[upload|#{attachment.upload_id}]"
+    end
   end
 end
 ```
 
-`[upload|<id>]` is the upload-marker shape Discourse importers recognize — they substitute a real `upload://...` URL once the file has been ingested. The emission gives the importer the same identifier plus the source-side position for cross-referencing.
+`[upload|<id>]` is the upload-marker shape Discourse importers recognize — they substitute a real `upload://...` URL once the file has been ingested.
 
 ### 4. Wire it up
 
-The handler can be shared across all posts (it's stateless), but the renderer holds per-post data, so build it inside the migration loop:
+The handler is stateless, so register it once and share it across every post. The renderer holds the per-post attachment list, so build it inside the migration loop:
 
+<!-- spec:before
+module SourceDB
+  Attachment = Struct.new(:upload_id, :filename, keyword_init: true)
+  def self.attachments_for(_post_id)
+    [Attachment.new(upload_id: "u_screenshot_png_3a7c2", filename: "screenshot.png")]
+  end
+end
+Post = Struct.new(:id, :body, keyword_init: true)
+posts = [Post.new(id: 1, body: "see [attachment=0]screenshot.png[/attachment]")]
+def store(_post, _markdown, _attachments); end
+-->
+<!-- spec:continue -->
 ```ruby
-HANDLERS =
+handlers =
   Markbridge::Parsers::BBCode::HandlerRegistry.default.tap do |r|
     r.register(%w[attachment attach], ForumMigration::AttachmentHandler.new)
   end
@@ -117,12 +127,17 @@ posts.each do |post|
     Markbridge.discourse_renderer(
       tags: {
         ForumMigration::AttachmentPlaceholder =>
-          AttachmentPlaceholderTag.new(attachments:),
+          ForumMigration::AttachmentPlaceholderTag.new(attachments:),
       },
     )
 
-  result = Markbridge.bbcode_to_markdown(post.body, handlers: HANDLERS, renderer:)
-  store(post, result.markdown, result.emitted(:uploads))
+  result = Markbridge.bbcode_to_markdown(post.body, handlers:, renderer:)
+
+  # The placeholders that made it into the output are exactly the
+  # AttachmentPlaceholder nodes left in the tree. Walk them to record
+  # which uploads this post referenced.
+  referenced = result.ast.descendants(ForumMigration::AttachmentPlaceholder)
+  store(post, result.markdown, referenced)
 end
 ```
 
@@ -132,23 +147,36 @@ Constructing the renderer per post breaks the build-once-reuse-many pattern, but
 
 ### 5. What you get
 
+<!-- spec:before
+module SourceDB
+  Attachment = Struct.new(:upload_id, :filename, keyword_init: true)
+end
+-->
+<!-- spec:continue -->
 ```ruby
-attachments = [SourceAttachment.new(upload_id: "u_screenshot_png_3a7c2", filename: "screenshot.png")]
+attachments = [SourceDB::Attachment.new(upload_id: "u_screenshot_png_3a7c2", filename: "screenshot.png")]
 renderer = Markbridge.discourse_renderer(
-  tags: { ForumMigration::AttachmentPlaceholder => AttachmentPlaceholderTag.new(attachments:) },
+  tags: {
+    ForumMigration::AttachmentPlaceholder =>
+      ForumMigration::AttachmentPlaceholderTag.new(attachments:),
+  },
 )
+handlers = Markbridge::Parsers::BBCode::HandlerRegistry.default.tap do |r|
+  r.register(%w[attachment attach], ForumMigration::AttachmentHandler.new)
+end
 
 result = Markbridge.bbcode_to_markdown(
   "Screenshot: [attachment=0]screenshot.png[/attachment] — see what I mean?",
-  handlers: HANDLERS,
+  handlers:,
   renderer:,
 )
 
 result.markdown
 # => "Screenshot: [upload|u_screenshot_png_3a7c2] — see what I mean?"
 
-result.emitted(:uploads)
-# => [{position: 0, upload_id: "u_screenshot_png_3a7c2", filename: "screenshot.png"}]
+# Re-read the placeholder nodes straight off the tree.
+result.ast.descendants(ForumMigration::AttachmentPlaceholder).map(&:position)
+# => [0]
 ```
 
 The importer downstream substitutes `[upload|u_screenshot_png_3a7c2]` for the resolved `upload://...` URL once the file is ingested into Discourse's upload store.
@@ -169,16 +197,18 @@ When a parent renders an HTML block — currently only `TableTag` doing its HTML
 
 **Raw HTML.** If your placeholder has a natural HTML form, emit it directly:
 
+<!-- spec:continue -->
 ```ruby
-class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
-  def render(element, interface)
-    attachment = @attachments[element.position]
-    interface.emit(:uploads, position: element.position, upload_id: attachment.upload_id)
+module ForumMigration
+  class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
+    def render(element, interface)
+      attachment = @attachments[element.position]
 
-    if interface.html_mode?
-      %(<a href="upload://#{attachment.upload_id}">attachment</a>)
-    else
-      "[upload|#{attachment.upload_id}]"
+      if interface.html_mode?
+        %(<a href="upload://#{attachment.upload_id}">attachment</a>)
+      else
+        "[upload|#{attachment.upload_id}]"
+      end
     end
   end
 end
@@ -187,30 +217,45 @@ end
 **Markdown island.** If your placeholder is an opaque sigil that downstream tooling parses regardless of context, wrap it in blank lines so CommonMark closes the HTML block, parses your placeholder as Markdown, and re-opens it:
 
 ```ruby
-"\n\n[upload|#{attachment.upload_id}]\n\n"
+upload_id = "u_screenshot_png_3a7c2"
+"\n\n[upload|#{upload_id}]\n\n"
 ```
 
 The blank lines force a paragraph break around the placeholder, which is fine for block-level placeholders (uploads in tables tend to want their own row anyway) but unsightly for inline ones (mentions, links). Prefer the raw-HTML form for inline placeholders that can land inside tables.
 
-## More than one emission per Tag
+## Collecting more than one kind of placeholder
 
-A Tag can call `emit` more than once and across multiple keys per call:
+A migration usually has several placeholder concepts in flight at once — uploads, internal links, mentions. Each gets its own AST class, and the importer pulls each kind off the tree independently after the conversion:
 
-```ruby
-class InternalLinkTag < Markbridge::Renderers::Discourse::Tag
-  def render(element, interface)
-    interface.emit(:internal_links, source_topic_id: element.source_topic_id)
-
-    unless RESOLVED_TOPICS.key?(element.source_topic_id)
-      interface.emit(:unresolved_topics, source_id: element.source_topic_id)
-    end
-
-    "[topic|#{element.source_topic_id}]"
+<!-- spec:before
+module ForumMigration
+  class InternalLink < Markbridge::AST::Element
+    attr_reader :source_topic_id
+    def initialize(source_topic_id:); super(); @source_topic_id = source_topic_id; end
+  end
+  class Mention < Markbridge::AST::Node
+    attr_reader :username
+    def initialize(username:); @username = username; end
   end
 end
+result = Markbridge.render(
+  Markbridge::AST::Document.new.tap do |d|
+    d << ForumMigration::InternalLink.new(source_topic_id: 42)
+    d << ForumMigration::Mention.new(username: "alice")
+  end,
+)
+RESOLVED_TOPICS = { 42 => 7 }.freeze
+-->
+```ruby
+links    = result.ast.descendants(ForumMigration::InternalLink)
+mentions = result.ast.descendants(ForumMigration::Mention)
+
+# Reconcile whatever you need — e.g. flag links whose source topic
+# didn't resolve to a Discourse topic yet.
+unresolved = links.reject { |link| RESOLVED_TOPICS.key?(link.source_topic_id) }
 ```
 
-The importer reads `result.emitted(:internal_links)` and `result.emitted(:unresolved_topics)` independently. Emissions don't have to be balanced or paired — emit whatever shape your downstream code consumes.
+Because the tree is the record, you never have to keep the collected data balanced or paired the way a side-channel buffer would force you to — each query is independent and reads exactly the nodes that reached the output.
 
 ## Resolution: handler vs Tag
 
@@ -219,16 +264,16 @@ Where should the source-id-to-Discourse-id resolution happen — in the handler 
 | Resolution at parse | Resolution at render |
 |---|---|
 | Handler does the lookup; AST node carries the resolved Discourse value. | Handler stores the source value; Tag does the lookup at render. |
-| Failures surface as missing AST nodes (or `unknown_tags` bumps). | Failures surface as emissions you reconcile after. |
+| Failures surface as missing AST nodes (or `unknown_tags` bumps). | Failures surface when you walk the tree afterwards and reconcile. |
 | Cleaner separation; the renderer is dumb. | Lets you batch lookups across many calls or defer entirely. |
 
-The forum-migration tradeoff usually goes: simple lookups (path → slug, name → user_id) at parse time; lookups that require global state (cross-post topic IDs) at render time, with Tags emitting unresolved references for a second-pass resolution. There's no one right answer — pick the side that matches your data flow.
+The forum-migration tradeoff usually goes: simple lookups (path → slug, name → user_id) at parse time; lookups that require global state (cross-post topic IDs) at render time, with a second pass over `conversion.ast.descendants(...)` to reconcile the references that need it. There's no one right answer — pick the side that matches your data flow.
 
 ## What goes in the AST node
 
 A few rules of thumb for the placeholder AST node:
 
-- Carry only what the renderer Tag needs. If the importer needs more (timestamps, original URLs, hash-of-original), put it on the emission payload, not the AST node.
+- Carry everything the importer needs to reconcile the placeholder later (position, original URL, source id, filename). The node *is* the record you read back via `descendants`, so don't drop data you'll want downstream.
 - Use `attr_reader` and a keyword constructor. Mutability has no upside here.
 - Inherit from `Element` if it can wrap inline content (link text, mention name). Inherit from `Node` if it's a leaf (a poll, an event, a hr-style separator).
 - One AST class per *concept*, not per *source tag alias*. `[url]`, `[link]`, and `[iurl]` all build `AST::Url`; the same Tag renders all three. The same applies to placeholders that have multiple aliases in the source format.

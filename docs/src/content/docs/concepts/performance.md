@@ -88,7 +88,7 @@ posts.each do |post|
 end
 ```
 
-The `Renderer` is safe to reuse across thousands of posts — its emission buffer resets at the start of every top-level render call.
+The `Renderer` is safe to reuse across thousands of posts — it holds no per-post state.
 
 ## Measuring on your workload
 
