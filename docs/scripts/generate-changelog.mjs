@@ -55,18 +55,49 @@ function renderStub() {
   ].join("\n");
 }
 
+// Turn bare `#123` PR/issue references into GitHub links. GitHub redirects
+// /pull/N <-> /issues/N, so /pull/N works whether N is a PR or an issue.
+// The lookbehind skips word chars (so no `abc#1`), `&` (numeric HTML entities
+// like `&#39;`), and `/` (so we don't touch `.../#30` in URLs).
+const ISSUE_REF = /(?<![\w&/])#(\d+)\b/g;
+
+function linkifyIssueRefs(text) {
+  return text.replace(
+    ISSUE_REF,
+    (_m, n) => `[#${n}](https://github.com/${REPO}/pull/${n})`,
+  );
+}
+
+// Apply linkifyIssueRefs to a body while leaving code untouched: split on
+// fenced code blocks first, then on inline code spans within prose segments.
+function linkifyOutsideCode(body) {
+  return body
+    .split(/(```[\s\S]*?```)/g)
+    .map((block) =>
+      block.startsWith("```")
+        ? block
+        : block
+            .split(/(`[^`\n]*`)/g)
+            .map((seg) => (seg.startsWith("`") ? seg : linkifyIssueRefs(seg)))
+            .join(""),
+    )
+    .join("");
+}
+
 // Normalize each release body for the in-docs changelog:
 //   - drop the redundant "What's Changed" heading (from bin/generate-release-notes
 //     and GitHub's auto-generated notes)
 //   - strip leading emojis from headings (the docs theme handles emphasis)
 //   - demote every heading by one level so categories sit comfortably under the
 //     version heading without competing visually
+//   - linkify bare `#123` references to their GitHub PR/issue
 function formatBody(body) {
-  return body
-    .replace(/^#{2,6} What's Changed\s*\n+/gm, "")
-    .replace(/^(#{2,6}) [\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+\s+/gmu, "$1 ")
-    .replace(/^(#{1,5})(\s)/gm, "$1#$2")
-    .trim();
+  return linkifyOutsideCode(
+    body
+      .replace(/^#{2,6} What's Changed\s*\n+/gm, "")
+      .replace(/^(#{2,6}) [\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+\s+/gmu, "$1 ")
+      .replace(/^(#{1,5})(\s)/gm, "$1#$2"),
+  ).trim();
 }
 
 function renderRelease(r) {
