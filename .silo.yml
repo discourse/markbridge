@@ -10,10 +10,11 @@ use:
   ruby:
     versions: [3.3, 3.4, "4.0", jruby]
     default: "4.0"
-  node:
 
 setup:
   - sudo dnf update -y
+  # Node + pnpm for the docs site (Astro/Starlight); both ship as Fedora packages.
+  - sudo dnf install -y nodejs pnpm
   - bundle install
   - bundle exec lefthook install -f
   - (cd docs && CI=true pnpm install)
