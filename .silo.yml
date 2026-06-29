@@ -1,24 +1,19 @@
 # silo project configuration
 # https://github.com/gschlager/silo#project-configuration
 
-image: fedora/43
+image: fedora/44
+
+# Installs rv (MRI) and ruby-install (jruby/truffleruby), the listed Ruby
+# versions, pins the default, and wires up the shell. Replaces the manual
+# toolchain setup we used to copy-paste here.
+use:
+  ruby:
+    versions: [3.3, 3.4, "4.0", jruby]
+    default: "4.0"
 
 setup:
-  - sudo dnf update
-  - sudo dnf copr enable -y gschlager/ruby
-  - sudo dnf install -y gcc make libyaml-devel java-latest-openjdk-headless ruby-install
-  - ruby-install jruby
-  - curl -LsSf https://rv.dev/install | sh
-  - . "$HOME/.cargo/env"
-  - rv ruby install 3.3
-  - rv ruby install 3.4
-  - rv ruby install 4.0
-  - rv ruby pin 4.0
-  - rv run bundle install
-  - rv run bundle exec lefthook install
-  - echo '. "$HOME/.cargo/env"' >> ~/.zshenv
-  - echo 'eval "$(rv shell init zsh)"' >> ~/.zshenv
-  - echo 'eval "$(rv shell completions zsh)"' >> ~/.zshrc
+  - bundle install
+  - bundle exec lefthook install
 
 sync:
   - bundle install
