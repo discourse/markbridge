@@ -67,7 +67,7 @@ See [Customizing the renderer](/customization/customizing-renderer/) for the ful
 
 ## Where to next
 
-- **Converting your format?** Read its [format guide](/format-guides/bbcode/) for the full tag coverage.
+- **Converting your format?** See the [format guides](/format-guides/) for full tag coverage.
 - **Customizing the output?** See [Customizing the renderer](/customization/customizing-renderer/).
 - **Adding a tag the parser doesn't know?** See [Extending Markbridge](/customization/extending/).
 - **Migrating a forum?** Start with [Migrating to Discourse](/migrating/overview/).

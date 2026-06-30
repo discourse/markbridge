@@ -68,6 +68,7 @@ export default defineConfig({
         {
           label: 'Format guides',
           items: [
+            { label: 'Overview', slug: 'format-guides' },
             { label: 'BBCode', slug: 'format-guides/bbcode' },
             { label: 'HTML', slug: 'format-guides/html' },
             { label: 'MediaWiki', slug: 'format-guides/mediawiki' },
@@ -77,6 +78,7 @@ export default defineConfig({
         {
           label: 'Customization',
           items: [
+            { label: 'Overview', slug: 'customization' },
             { label: 'Customizing the renderer', slug: 'customization/customizing-renderer' },
             { label: 'Extending Markbridge', slug: 'customization/extending' },
           ],
@@ -84,6 +86,7 @@ export default defineConfig({
         {
           label: 'Concepts',
           items: [
+            { label: 'Overview', slug: 'concepts' },
             { label: 'Architecture', slug: 'concepts/architecture' },
             { label: 'The AST', slug: 'concepts/ast' },
             { label: 'Parsers', slug: 'concepts/parsers' },

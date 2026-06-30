@@ -27,7 +27,7 @@ Markbridge is built for **forum migrations into Discourse** — that's the flags
 ## Find your way around
 
 - **[Getting Started](/getting-started/)** — install and run your first conversion.
-- **Format guides** — exactly how each input maps to Markdown.
-- **Customization** — build a reusable renderer, and add your own tags and handlers.
-- **Concepts** — the architecture, the AST, the parsers and renderer, and performance.
+- **[Format guides](/format-guides/)** — exactly how each input maps to Markdown.
+- **[Customization](/customization/)** — build a reusable renderer, and add your own tags and handlers.
+- **[Concepts](/concepts/)** — the architecture, the AST, the parsers and renderer, and performance.
 - **[Migrating to Discourse](/migrating/overview/)** — the full forum-migration workflow.
