@@ -11,9 +11,6 @@ export default defineConfig({
       // static-file middleware lets the browser cache `public/` assets
       // aggressively and even hard-refresh keeps the stale copy.
       headers: { 'Cache-Control': 'no-store' },
-      // inotify isn't reliable on every filesystem (containers, mounted
-      // volumes); poll instead so file changes are picked up everywhere.
-      watch: { usePolling: true, interval: 200 },
     },
   },
   integrations: [
