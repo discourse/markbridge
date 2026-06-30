@@ -3,7 +3,7 @@ title: Getting Started
 description: Install Markbridge and run your first conversion in under five minutes.
 ---
 
-Markbridge converts markup to Discourse-flavored Markdown through a parse → AST → render pipeline. This page takes you from install to a working conversion — give it five minutes.
+This page takes you from install to a working conversion in about five minutes. For the big picture first — what Markbridge is and how it's put together — start with the [Introduction](/introduction/).
 
 ## Requirements
 
@@ -41,7 +41,7 @@ puts result.markdown
 
 ## The four formats
 
-Markbridge ships with four parsers that all feed the same Markdown renderer. Pick the one that matches your input:
+Pick the method that matches your input:
 
 | Method | Input format | Guide |
 |---|---|---|
@@ -53,16 +53,6 @@ Markbridge ships with four parsers that all feed the same Markdown renderer. Pic
 `Markbridge.convert(input, format: :bbcode)` dispatches to the right one when the format isn't fixed at the call site (handy in migration loops that handle multiple formats).
 
 Each `*_to_markdown` method has a matching `parse_*` method that returns a `Parse` (with the AST and unknown-tag data) instead of rendering — useful when you want to inspect, transform, or re-render with a custom renderer.
-
-## What just happened
-
-Under the hood, every conversion runs three phases:
-
-1. **Parse** — a format-specific parser tokenizes the input and builds an `AST::Document`.
-2. **Transform** — the AST is a renderer-agnostic tree of `Text`, `Element`, and leaf nodes.
-3. **Render** — `Markbridge::Renderers::Discourse::Renderer` walks the tree and emits Markdown.
-
-Read [Architecture](/concepts/architecture/) for a deeper tour, or jump straight into [Extending Markbridge](/customization/extending/) if you already know you need a custom tag.
 
 ## Customizing output
 
@@ -78,8 +68,7 @@ See [Customizing the renderer](/customization/customizing-renderer/) for the ful
 
 ## Where to next
 
-- **Migrating a forum to Discourse?** Start with [Migrating to Discourse → Overview](/migrating/overview/).
-- **Converting** a specific format? Jump to the matching [format guide](/format-guides/bbcode/).
-- **Adding** a new tag? See [Extending Markbridge](/customization/extending/).
-- **Understanding** how the pipeline works? Start with [Architecture](/concepts/architecture/).
-- **Optimizing**? See [Performance](/concepts/performance/).
+- **Converting your format?** Read its [format guide](/format-guides/bbcode/) for the full tag coverage.
+- **Customizing the output?** See [Customizing the renderer](/customization/customizing-renderer/).
+- **Adding a tag the parser doesn't know?** See [Extending Markbridge](/customization/extending/).
+- **Migrating a forum?** Start with [Migrating to Discourse](/migrating/overview/).
