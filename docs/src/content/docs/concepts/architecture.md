@@ -3,7 +3,7 @@ title: Architecture
 description: The three-phase pipeline that turns markup into Markdown.
 ---
 
-Markbridge is built around a **Parse → AST → Render** pipeline. Each phase has a single responsibility and doesn't know about the others.
+Markbridge is built around a **Parse → AST → Render** pipeline. Each phase has a single responsibility and doesn't know about the others. The parse and AST stages are renderer-agnostic; Discourse-flavored Markdown is what the shipped renderer produces.
 
 <figure class="diagram">
   <img class="diagram-light" src="/diagrams/architecture.svg" alt="Three-phase pipeline: Input (BBCode / HTML / MediaWiki / XML) → AST (Document tree) → Discourse Markdown">
