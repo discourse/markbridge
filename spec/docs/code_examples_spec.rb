@@ -148,26 +148,37 @@ module DocsCodeExamples
 end
 
 RSpec.describe "Docs code examples" do
-  Dir[DocsCodeExamples::DOCS_DIR.join("**", "*.{md,mdx}").to_s].sort.each do |path|
-    rel = Pathname.new(path).relative_path_from(DocsCodeExamples::REPO_ROOT).to_s
-    blocks = DocsCodeExamples.extract_blocks(File.read(path))
-    next if blocks.empty?
+  # Each snippet runs in its own `ruby` subprocess for isolation. On JRuby and
+  # TruffleRuby that's a JVM/Truffle cold start per block (dozens of them), which
+  # dominates those CI jobs. The snippets exercise the documented public API,
+  # which behaves the same on every engine, so run them on CRuby only — the unit,
+  # integration, and system specs still cover JRuby/TruffleRuby.
+  if RUBY_ENGINE == "ruby"
+    Dir[DocsCodeExamples::DOCS_DIR.join("**", "*.{md,mdx}").to_s].sort.each do |path|
+      rel = Pathname.new(path).relative_path_from(DocsCodeExamples::REPO_ROOT).to_s
+      blocks = DocsCodeExamples.extract_blocks(File.read(path))
+      next if blocks.empty?
 
-    describe rel do
-      preceding = []
+      describe rel do
+        preceding = []
 
-      blocks.each_with_index do |block, idx|
-        title = "block #{idx + 1} (around #{rel}:#{block[:line]})"
-        source = DocsCodeExamples.assemble(block, preceding)
-        preceding << (block[:setup] + [block[:code]]).join("\n")
-        wrapped = DocsCodeExamples.wrap(source)
+        blocks.each_with_index do |block, idx|
+          title = "block #{idx + 1} (around #{rel}:#{block[:line]})"
+          source = DocsCodeExamples.assemble(block, preceding)
+          preceding << (block[:setup] + [block[:code]]).join("\n")
+          wrapped = DocsCodeExamples.wrap(source)
 
-        it title do
-          stdout, stderr, status = DocsCodeExamples.run(wrapped)
-          expect(status).to be_success,
-          -> { DocsCodeExamples.failure_message(stdout, stderr, status, wrapped) }
+          it title do
+            stdout, stderr, status = DocsCodeExamples.run(wrapped)
+            expect(status).to be_success,
+            -> { DocsCodeExamples.failure_message(stdout, stderr, status, wrapped) }
+          end
         end
       end
+    end
+  else
+    it "runs on CRuby only (subprocess-per-snippet is too slow on #{RUBY_ENGINE})" do
+      skip "documented API is engine-agnostic; covered by the CRuby matrix jobs"
     end
   end
 end
