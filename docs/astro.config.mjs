@@ -65,13 +65,6 @@ export default defineConfig({
       sidebar: [
         { label: 'Getting Started', slug: 'getting-started' },
         {
-          label: 'Migrating to Discourse',
-          items: [
-            { label: 'Overview', slug: 'migrating/overview' },
-            { label: 'Placeholders', slug: 'migrating/placeholders' },
-          ],
-        },
-        {
           label: 'Format guides',
           items: [
             { label: 'BBCode', slug: 'format-guides/bbcode' },
@@ -95,6 +88,13 @@ export default defineConfig({
             { label: 'Parsers', slug: 'concepts/parsers' },
             { label: 'Renderers', slug: 'concepts/renderers' },
             { label: 'Performance', slug: 'concepts/performance' },
+          ],
+        },
+        {
+          label: 'Migrating to Discourse',
+          items: [
+            { label: 'Overview', slug: 'migrating/overview' },
+            { label: 'Placeholders', slug: 'migrating/placeholders' },
           ],
         },
         {

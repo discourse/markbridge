@@ -3,7 +3,7 @@ title: Migrating to Discourse — overview
 description: The big picture for using Markbridge to migrate forum content into Discourse.
 ---
 
-You have a forum's worth of posts in BBCode, HTML, MediaWiki wikitext, or s9e/TextFormatter XML, and you want each one stored on Discourse as Markdown. Most of the body translates straight across — bold text, lists, headings — but a few tags need help from your importer: internal links to topics that don't exist on Discourse yet, uploads to ship, mentions to look up, polls and events that map to Discourse plugins. That awkward last mile is exactly what Markbridge is built for.
+You have a forum's worth of posts in BBCode, HTML, MediaWiki wikitext, or s9e/TextFormatter XML, and you want each one stored on Discourse as Markdown. Most of the body translates straight across — bold text, lists, headings — but a few tags need more than that: internal links to topics that don't exist on Discourse yet, uploads to ship, mentions to look up, polls and events that map to Discourse plugins. That awkward last mile is exactly what Markbridge is built for.
 
 This page is the big picture. The next page — [Placeholders](/migrating/placeholders/) — fills in the details.
 
