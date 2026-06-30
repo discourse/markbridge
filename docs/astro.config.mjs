@@ -77,10 +77,10 @@ export default defineConfig({
         {
           label: 'Format guides',
           items: [
-            { label: 'BBCode → Markdown', slug: 'format-guides/bbcode' },
-            { label: 'HTML → Markdown', slug: 'format-guides/html' },
-            { label: 'MediaWiki → Markdown', slug: 'format-guides/mediawiki' },
-            { label: 'TextFormatter → Markdown', slug: 'format-guides/textformatter' },
+            { label: 'BBCode', slug: 'format-guides/bbcode' },
+            { label: 'HTML', slug: 'format-guides/html' },
+            { label: 'MediaWiki', slug: 'format-guides/mediawiki' },
+            { label: 'TextFormatter', slug: 'format-guides/textformatter' },
           ],
         },
         {
