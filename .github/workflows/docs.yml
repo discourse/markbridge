@@ -33,7 +33,9 @@ jobs:
       - uses: withastro/action@v3
         with:
           path: ./docs
-          node-version: 20
+          # pnpm 11 (pinned via packageManager in docs/package.json) needs
+          # Node >= 22.13; this also matches local dev.
+          node-version: 22
           # pnpm version comes from the "packageManager" field in
           # docs/package.json — passing it here too makes pnpm/action-setup
           # error with "Multiple versions of pnpm specified".
