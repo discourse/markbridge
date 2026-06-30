@@ -2,17 +2,14 @@
   --sl-color-accent-low: #4a1a0a;
   --sl-color-accent: #e45735;
   --sl-color-accent-high: #ffc2b0;
+  --sl-font: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
 }
 
 :root[data-theme='light'] {
   --sl-color-accent-low: #ffd9cc;
   --sl-color-accent: #c13d1a;
   --sl-color-accent-high: #5c1f0a;
-}
-
-:root {
-  --sl-font: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
 }
 
 .nowrap {
@@ -64,9 +61,9 @@
 
 /* Each diagram has a `-light` and `-dark` SVG; the muted arrow labels and
  * arrow strokes flip between dark grey (on light surface) and light grey
- * (on dark surface). The card surface is a soft tint of the page bg so the
+ * (on dark surface). The figure surface is a soft tint of the page bg so the
  * diagram has a visual frame without slamming a bright white island into
- * dark mode. */
+ * dark mode. Click-to-zoom is wired up in public/diagram-zoom.js. */
 figure.diagram {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -75,15 +72,12 @@ figure.diagram {
   margin: 1.5rem 0;
   display: flex;
   justify-content: center;
+  cursor: zoom-in;
 }
 
 [data-theme='dark'] figure.diagram {
   background: #1e2230;
   border-color: #2a3040;
-}
-
-figure.diagram {
-  cursor: zoom-in;
 }
 
 figure.diagram img {
