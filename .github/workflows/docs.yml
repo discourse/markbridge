@@ -6,6 +6,10 @@ on:
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
   release:
     types: [published, edited, deleted]
   workflow_dispatch:
@@ -15,9 +19,11 @@ permissions:
   pages: write
   id-token: write
 
+# Per-ref so a PR build never queues behind (or blocks) a main deploy.
+# Cancel superseded PR builds; never cancel an in-flight deploy.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -32,6 +38,8 @@ jobs:
 
   deploy:
     needs: build
+    # PRs validate the build only; deploy happens on push to main / release.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
