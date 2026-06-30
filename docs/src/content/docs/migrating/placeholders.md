@@ -280,6 +280,5 @@ A few rules of thumb for the placeholder AST node:
 
 ## Where next
 
-- [Full example](/migrating/full-walkthrough/) — a small importer you can run, putting these three parts to work next to handler wrapping, a custom escaper, and `Markbridge.convert(format:)`.
 - [Customizing the renderer](/customization/customizing-renderer/) — the factory kwargs in detail.
 - [Extending Markbridge](/customization/extending/) — broader extension patterns including `HandlerRegistry#overlay` for delegating to default handlers.

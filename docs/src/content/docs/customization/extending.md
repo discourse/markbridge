@@ -225,5 +225,3 @@ When you extend Markbridge for a Discourse migration — links to resolve later,
 - **Known tag, different output** → pass `tags: { ASTClass => MyTag.new }` to `discourse_renderer`.
 - **Wrap default behavior** → `HandlerRegistry#overlay` for parser-side; `tags:` overrides for renderer-side.
 - **New output format** (not Discourse Markdown) → write a new renderer that walks the AST. The parsers and AST are renderer-agnostic.
-
-See [`examples/`](https://github.com/discourse/markbridge/tree/main/examples) for working versions of all of these.

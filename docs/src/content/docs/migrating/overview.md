@@ -5,7 +5,7 @@ description: The big picture for using Markbridge to migrate forum content into 
 
 You have a forum's worth of posts in BBCode, HTML, MediaWiki wikitext, or s9e/TextFormatter XML, and you want each one stored on Discourse as Markdown. Most of the body translates straight across — bold text, lists, quotes — but a few tags need help from your importer: internal links to topics that don't exist on Discourse yet, uploads to ship, mentions to look up, polls and events that map to Discourse plugins. That awkward last mile is exactly what Markbridge is built for.
 
-This page is the big picture. The next two — [Placeholders](/migrating/placeholders/) and [Full example](/migrating/full-walkthrough/) — fill in the details.
+This page is the big picture. The next page — [Placeholders](/migrating/placeholders/) — fills in the details.
 
 ## Four stages
 
@@ -38,7 +38,21 @@ result.errors        # render-time errors when raise_on_error: false
 
 `Conversion#to_s` delegates to `markdown` so `puts result` and `"#{result}"` work without a `.markdown` call. It does *not* delegate other String methods — `result.gsub(...)` raises. Reach for `result.markdown.gsub(...)` or unwrap explicitly.
 
-The same shape comes from `Markbridge.convert(input, format:)` if you're handling multiple formats in one loop.
+The same shape comes from `Markbridge.convert(input, format:)`, which dispatches to the right `*_to_markdown` method — handy when one corpus mixes formats:
+
+<!-- spec:before
+RENDERER = Markbridge.discourse_renderer
+posts = [
+  { body: "[b]hi[/b]", format: :bbcode },
+  { body: "<b>hi</b>", format: :html },
+]
+-->
+```ruby
+posts.each do |post|
+  result = Markbridge.convert(post[:body], format: post[:format], renderer: RENDERER)
+  # write result.markdown to Discourse…
+end
+```
 
 ## Side data: read it back off the AST
 
@@ -150,6 +164,5 @@ See [Customizing the renderer](/customization/customizing-renderer/) for every k
 ## Where next
 
 - [Placeholders](/migrating/placeholders/) — the AST node, handler, and Tag in detail, with the full round-trip.
-- [Full example](/migrating/full-walkthrough/) — a small importer you can run that touches every customization path.
 - [Customizing the renderer](/customization/customizing-renderer/) — the full factory reference.
 - [Extending Markbridge](/customization/extending/) — adding handlers and custom Tags from scratch.

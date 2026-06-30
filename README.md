@@ -49,7 +49,6 @@ Build a renderer once with `Markbridge.discourse_renderer(...)` and pass it via 
 ## Learn more
 
 * [markbridge.dev](https://markbridge.dev) – guides, format references, and the architecture deep-dive.
-* `examples/` – runnable scripts, from `basic_usage.rb` to a full `forum_migration.rb`.
 * `spec/` – executable documentation of every supported tag and edge case.
 * `bin/console` – an interactive prompt for poking at things during development.
 
