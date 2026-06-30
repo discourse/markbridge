@@ -7,19 +7,15 @@ You have a forum's worth of posts in BBCode, HTML, MediaWiki wikitext, or s9e/Te
 
 This page is the big picture. The next page — [Placeholders](/migrating/placeholders/) — fills in the details.
 
-## Four stages
+## How a migration uses the pipeline
 
-<figure class="diagram">
-  <img class="diagram-light" src="/diagrams/overview.svg" alt="Four-stage pipeline: source markup → Parse → AST::Document → Render → Conversion">
-  <img class="diagram-dark" src="/diagrams/overview-dark.svg" alt="Four-stage pipeline: source markup → Parse → AST::Document → Render → Conversion">
-</figure>
+Every conversion runs the same parse → AST → render pipeline — the [Introduction](/introduction/) covers it. A migration wraps three points around that pipeline:
 
-1. **Parse**. The format-specific parser reads the input and builds an `AST::Document`. Unknown tags are tracked but never raise — the parser is resilient by design.
-2. **AST**. A renderer-agnostic tree of `Text`, `Element`, and leaf nodes (`LineBreak`, `HorizontalRule`). Custom AST nodes (Upload, Mention, InternalLink) live alongside the built-ins.
-3. **Render**. The Discourse renderer walks the AST, dispatching each node to its `Tag`. Custom Tags are one-line output formatters — they turn a placeholder node into its placeholder string and nothing else.
-4. **Conversion**. The render produces a `Markbridge::Conversion` value object: rendered Markdown, the AST, format identifier, unknown-tag counts, parser diagnostics, and any swallowed errors.
+- **On the way in**, custom handlers turn source tags into AST nodes — including your own nodes for uploads, mentions, and internal links.
+- **On the way out**, custom Tags format each node. A placeholder Tag is a one-line formatter that returns its placeholder string and nothing else.
+- **After the conversion**, you walk the AST to collect what each post referenced and write it into Discourse.
 
-These four stages are the pipeline; your own code wraps around them. You resolve on the way in (custom handlers) and render on the way out (custom Tags). Then there's one more step: once the `Conversion` is ready, you walk the AST (`conversion.ast`) to collect what you need — which uploads, mentions, and links the post used — and write it into Discourse. That read-back is the core of the workflow; the [Placeholders](/migrating/placeholders/) page covers it in full.
+That last step — the read-back — is the heart of the workflow; the [Placeholders](/migrating/placeholders/) page covers it in full.
 
 ## The Conversion object
 
