@@ -3,7 +3,7 @@ title: Getting Started
 description: Install Markbridge and run your first conversion in under five minutes.
 ---
 
-Markbridge converts markup to Discourse-flavored Markdown through a parse → AST → render pipeline. This page takes you from install to a working conversion.
+Markbridge converts markup to Discourse-flavored Markdown through a parse → AST → render pipeline. This page takes you from install to a working conversion — give it five minutes.
 
 ## Requirements
 

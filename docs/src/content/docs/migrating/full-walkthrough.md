@@ -1,19 +1,21 @@
 ---
-title: Full walkthrough
-description: An end-to-end forum migration touching every customization path — custom AST, handler delegation, placeholder Tags, custom escaper, and per-post failure isolation.
+title: Full example
+description: One small forum importer that uses every customization path — custom AST, handler wrapping, placeholder Tags, a custom escaper, and per-post failure isolation.
 ---
 
-This page walks through a runnable mini-importer that exercises every customization Markbridge offers. It mirrors `examples/forum_migration.rb` in the gem repository — copy it into a script, `bundle exec ruby` it, and the output should match.
+This page is one small importer that uses every customization Markbridge offers, all at once. It's the same code as [`examples/forum_migration.rb`](https://github.com/discourse/markbridge/blob/main/examples/forum_migration.rb) in the repo — copy it into a file, run it with `bundle exec ruby`, and you should get the output shown below.
 
-What it demonstrates:
+It packs a lot into a few posts:
 
-- A custom AST node + parser handler for a tag the default registry doesn't cover (`[font=courier]`).
-- Handler delegation via `HandlerRegistry#overlay` — wrap the default URL handler with a logging-style decorator.
-- A pure custom Tag that turns internal links into opaque placeholder strings the importer resolves later.
-- `Markbridge.discourse_renderer(...)` with a `tags:` override map, an `unregister:` list, and a custom escaper subclass.
-- `Markbridge.convert(input, format:)` dispatching across BBCode and HTML in one loop.
-- `raise_on_error: false` collecting per-post failures instead of crashing.
-- Collecting placeholder side data by walking `Conversion#ast` post-render, and reading `Conversion#unknown_tags`.
+- A custom AST node and handler for a tag the defaults don't know (`[font=courier]`).
+- A wrapper around the default URL handler (here it just delegates; a real importer would log).
+- A custom Tag that turns internal links into placeholder strings to resolve later.
+- `Markbridge.discourse_renderer(...)` with a `tags:` map, an `unregister:` list, and a custom escaper.
+- `Markbridge.convert(input, format:)` handling BBCode and HTML in the same loop.
+- `raise_on_error: false`, so one broken post doesn't take down the whole run.
+- Collecting the placeholders afterwards by walking `Conversion#ast`, plus reading `Conversion#unknown_tags`.
+
+It's a lot for four posts — but every line maps to something a real migration runs into.
 
 ## The full script
 
@@ -222,66 +224,31 @@ Migration complete:
     [[link:u/alice]] -> https://forum.example.com/u/alice
 ```
 
-## Reading the script
+## What's worth a closer look
 
-### Custom AST + handler
+The script is commented, so here are only the parts that tend to surprise people. The matching pages go deeper on each.
 
-`FontNode` carries the `font` attribute parsed from `[font=courier]`. `FontHandler` is a thin BBCode handler — its only job is to read the attribute and push the AST node. The default `on_close` from `BaseHandler` handles `[/font]`.
+- **The placeholder Tag returns a plain string and remembers nothing.** `PlaceholderUrlTag` turns external links into normal Markdown and internal ones into `[[link:t/42]]`. The same href always gives the same string, so you don't store anything during rendering — you walk `result.ast.descendants(Markbridge::AST::Url)` afterwards and rebuild the list. The tree is your record. ([Placeholders](/migrating/placeholders/))
+- **The placeholder is copied into the output exactly as written.** Markdown escaping only touches text from the source, never a Tag's return value — so the `[` and `]` in `[[link:t/42]]` survive untouched. ([Placeholders → Placeholder strings pass through verbatim](/migrating/placeholders/#placeholder-strings-pass-through-verbatim))
+- **`url`, `link`, and `iurl` share one handler instance.** They all build `AST::Url`, and that one instance has to be shared — using `overlay` here would create three separate wrappers and break tag closing. ([Extending → Wrapping a default handler](/customization/extending/#wrapping-a-default-handler))
+- **`unregister:` keeps the text but drops the formatting.** `Color`, `Size`, and `Underline` disappear, but their inner text renders straight through — handy when the old forum used them just for decoration.
+- **`Markbridge.convert(input, format:)` handles mixed formats in one loop.** If every post is the same format, reach for `bbcode_to_markdown` (etc.) instead — `convert` earns its keep only when the format changes row to row.
+- **`raise_on_error: false` keeps one bad post from sinking the run.** Errors land on `result.errors` instead of raising. Keep the default (`true`) in tests so real bugs still shout at you; flip it for the production import.
 
-The pattern repeats for every source-format tag the default registry doesn't cover. See [Extending Markbridge](/customization/extending/) for the standalone walkthrough.
-
-### Pure placeholder Tag
-
-`PlaceholderUrlTag` overrides the default `UrlTag` for `AST::Url`. For external links it produces normal Markdown. For internal links — in this example, anything starting with `https://forum.example.com/` — it returns an opaque placeholder string derived straight from the href. The Tag records nothing: it's a pure function of its element, so the same href always yields the same placeholder.
-
-The placeholder string is whatever your importer parses cleanly downstream. `[[link:t/42]]` (the source path) is one convention; pick another if it fits your tooling better. The string is spliced verbatim into the output — Markdown escaping never touches it (see [Placeholders → Placeholder strings pass through verbatim](/migrating/placeholders/#placeholder-strings-pass-through-verbatim)).
-
-### Collecting the links afterwards
-
-Because the Tag doesn't push anything out, the importer collects the internal links it cares about by walking the AST after each conversion. `result.ast` is the exact tree that produced the Markdown, so `descendants(Markbridge::AST::Url)` returns every link node — filter to the internal ones and derive the same placeholder the Tag did. Each node still carries its source `href`, so there's nothing to reconcile.
-
-### Handler delegation via wrapping
-
-`LoggingUrlHandler` is a wrapper around the default URL handler. The block in `HandlerRegistry.build_from_default` reads the default with `r["url"]` and registers the wrapper under all three URL aliases (`url`, `link`, `iurl`).
-
-The reason this isn't using `overlay`: when one element class is registered under multiple aliases, the wrapper must be a *single* shared instance. `overlay` would call its block once per alias and create three different wrappers, breaking the closing strategy. See [Extending Markbridge → Wrapping a default handler](/customization/extending/#wrapping-a-default-handler) for the full reasoning.
-
-### Renderer factory and `unregister:`
-
-`Markbridge.discourse_renderer(...)` builds the reusable Renderer:
-
-- `tags:` overrides `AST::Url` (placeholder behavior) and adds `FontNode` (the custom one).
-- `unregister:` drops `Color`, `Size`, and `Underline` — the source forum used these decoratively, but the migrated Markdown shouldn't carry them. Their children render straight through (`render_children`), so the inner text survives.
-- `escaper:` swaps in `ListPermissiveEscaper` so list markers in the source pass through to the output.
-
-The renderer is built once outside the loop and reused for all four posts.
-
-### `Markbridge.convert(input, format:)`
-
-The migration loop handles BBCode and HTML in one pass. `Markbridge.convert` dispatches to the right `*_to_markdown` based on `format:`. The `handlers:` kwarg only matters for BBCode here (HTML uses its own default registry); we pass `nil` for HTML rows to skip it.
-
-If your importer always handles one format, prefer the format-specific method (`bbcode_to_markdown`, etc.) — `convert` exists for the multi-format case.
-
-### `raise_on_error: false` and per-post failure isolation
-
-Render-time exceptions land on `Conversion#errors` instead of crashing the loop. The example treats any error as a per-post failure, logs it, and continues. The default `raise_on_error: true` is preferable in tests and during development; flip it for production migrations where one bad row shouldn't sink the rest.
-
-### Reading the result
+A quick cheat sheet for what comes back:
 
 ```ruby
 result.markdown                                  # the rendered Markdown
 result.unknown_tags                              # Hash{String => Integer}
-result.ast.descendants(Markbridge::AST::Url)     # link nodes, for placeholder collection
-result.errors                                    # populated only when raise_on_error: false caught one
+result.ast.descendants(Markbridge::AST::Url)     # link nodes, for collecting placeholders
+result.errors                                    # filled only when raise_on_error: false caught one
 ```
 
-`result.unknown_tags` for post #3 (`[unknownext]hello[/unknownext]`) shows `{"unknownext" => 2}` — open + close tokens, both counted. The wrapper is dropped, the inner text survives.
-
-`result.ast.descendants(klass)` returns `[]` when the tree holds no node of that class — no nil-checks needed. Each conversion has its own `ast`, so the per-post collection never bleeds across posts.
+Two small things: `unknown_tags` counts the opening *and* closing tag, so `[unknownext]hi[/unknownext]` shows up as `2`, not `1`. And `descendants(klass)` returns `[]` (never `nil`) when nothing matches, so you can skip the nil-checks.
 
 ## Where next
 
-- [Placeholders](/migrating/placeholders/) — the triad pattern in detail.
-- [Customizing the renderer](/customization/customizing-renderer/) — every kwarg of `discourse_renderer`.
+- [Placeholders](/migrating/placeholders/) — the AST node, handler, and Tag in detail.
+- [Customizing the renderer](/customization/customizing-renderer/) — every option of `discourse_renderer`.
 - [Extending Markbridge](/customization/extending/) — handlers, Tags, and `HandlerRegistry#overlay`.
-- [Reference → Upgrading](/reference/upgrading/) — for callers coming from the previous Markbridge API.
+- [Reference → Upgrading](/reference/upgrading/) — if you're coming from an older Markbridge version.

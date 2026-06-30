@@ -8,15 +8,15 @@ A *placeholder* is a short literal string in the rendered Markdown that the Disc
 The pattern looks like this:
 
 <figure class="diagram">
-  <img class="diagram-light" src="/diagrams/placeholders.svg" alt="Placeholder triad: a source [attachment=0] tag becomes an AttachmentPlaceholder AST node, which the renderer Tag formats into a [upload|HASH] string in the Markdown output; the importer re-reads the same nodes via conversion.ast.descendants">
-  <img class="diagram-dark" src="/diagrams/placeholders-dark.svg" alt="Placeholder triad: a source [attachment=0] tag becomes an AttachmentPlaceholder AST node, which the renderer Tag formats into a [upload|HASH] string in the Markdown output; the importer re-reads the same nodes via conversion.ast.descendants">
+  <img class="diagram-light" src="/diagrams/placeholders.svg" alt="The placeholder flow: a source [attachment=0] tag becomes an AttachmentPlaceholder AST node, which the renderer Tag formats into a [upload|HASH] string in the Markdown output; the importer re-reads the same nodes via conversion.ast.descendants">
+  <img class="diagram-dark" src="/diagrams/placeholders-dark.svg" alt="The placeholder flow: a source [attachment=0] tag becomes an AttachmentPlaceholder AST node, which the renderer Tag formats into a [upload|HASH] string in the Markdown output; the importer re-reads the same nodes via conversion.ast.descendants">
 </figure>
 
-Every placeholder concept follows the same triad: an **AST node** to carry the parsed data, a **parser handler** to construct it, and a **renderer Tag** to format the placeholder string. When the importer needs side data (which uploads a post referenced, which mentions to resolve), it reads it back off the AST nodes — `conversion.ast` is the same tree that produced the Markdown, so `conversion.ast.descendants(YourPlaceholder)` hands you every placeholder that survived parsing.
+Every placeholder is built from the same three parts: an **AST node** to hold the parsed data, a **parser handler** to build that node, and a **renderer Tag** to turn it into the placeholder string. When the importer later needs the details (which uploads a post used, which mentions to look up), it reads them back off the AST nodes — `conversion.ast` is the same tree that produced the Markdown, so `conversion.ast.descendants(YourPlaceholder)` hands you every placeholder that made it through parsing.
 
 > Markbridge ships with a built-in `Markbridge::AST::Attachment` that maps to Discourse's resolved upload syntax. For migrations the source post doesn't *have* a Discourse upload yet — it has a reference to a row in the source forum's attachments table. Define your own AST class so the importer can resolve those references.
 
-## The placeholder triad, end to end
+## The three parts, end to end
 
 Concrete example: phpBB3 emits attachments as `[attachment=N]filename[/attachment]`, where `N` is the position index of the attachment within the post (zero-based). The actual file lives in `phpbb_attachments` joined to the post; the BBCode just points at slot N.
 
@@ -141,7 +141,7 @@ posts.each do |post|
 end
 ```
 
-A single handler `.new` registered under both `[attachment]` and `[attach]` so the closing strategy finds the same instance on both sides — see [Extending Markbridge → Wrapping a default handler](/customization/extending/#wrapping-a-default-handler) for why this matters with multi-alias registrations.
+One handler instance is registered under both `[attachment]` and `[attach]`, so the closing logic finds the same object on both sides. When a tag has several names like this, you have to share one instance — [Extending Markbridge](/customization/extending/#wrapping-a-default-handler) explains why.
 
 Constructing the renderer per post breaks the build-once-reuse-many pattern, but only for the slice of state that varies post-to-post (the attachment table). Shared parts — handler registry, custom escaper, postprocessor, decorators that don't depend on per-post data — stay outside the loop.
 
@@ -280,6 +280,6 @@ A few rules of thumb for the placeholder AST node:
 
 ## Where next
 
-- [Full walkthrough](/migrating/full-walkthrough/) — a runnable mini-importer that exercises this triad alongside handler delegation, custom escaper, and `Markbridge.convert(format:)` dispatch.
+- [Full example](/migrating/full-walkthrough/) — a small importer you can run, putting these three parts to work next to handler wrapping, a custom escaper, and `Markbridge.convert(format:)`.
 - [Customizing the renderer](/customization/customizing-renderer/) — the factory kwargs in detail.
 - [Extending Markbridge](/customization/extending/) — broader extension patterns including `HandlerRegistry#overlay` for delegating to default handlers.

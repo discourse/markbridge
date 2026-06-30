@@ -3,15 +3,15 @@ title: Extending Markbridge
 description: Add support for new tags, customize rendering, and swap behavior without patching core.
 ---
 
-Markbridge exposes two extension points: **handlers** teach a parser to recognize new tags; **renderer tags** turn AST nodes into Markdown. Both use registries, so you can layer customizations onto the defaults without forking.
+Markbridge has two places to plug in: **handlers** teach a parser to recognize new tags, and **renderer tags** turn AST nodes into Markdown. Both live in registries, so you add your own on top of the defaults without forking the gem.
 
-## The two-step mental model
+## Two ends to wire up
 
 ```
 custom BBCode tag  →  custom handler  →  custom AST node  →  custom renderer tag  →  Markdown
 ```
 
-Most of the time you need *both* ends — the parser has to produce a node, and the renderer has to know how to output it.
+Most of the time you need *both* ends: the parser has to produce a node, and the renderer has to know how to print it. Miss one and your tag either vanishes or comes out as plain text.
 
 ## Adding a custom BBCode tag
 
@@ -217,7 +217,7 @@ library.auto_register!
 
 ## Migration use cases
 
-When you're extending Markbridge to feed a Discourse migration — links to be resolved later, uploads to be tracked, mentions to be looked up — the same triad applies. The renderer Tag stays a pure formatter that returns the placeholder string; the importer reads the placeholder nodes back off `conversion.ast.descendants(...)` afterwards. See [Migrating to Discourse → Placeholders](/migrating/placeholders/).
+When you extend Markbridge for a Discourse migration — links to resolve later, uploads to track, mentions to look up — the same three parts apply. The renderer Tag stays a simple formatter that returns the placeholder string, and the importer reads the placeholder nodes back off `conversion.ast.descendants(...)` afterwards. The [Placeholders](/migrating/placeholders/) page is the full guide; this page only covers the general mechanics.
 
 ## When to customize vs. fork
 

@@ -19,6 +19,24 @@
   white-space: nowrap;
 }
 
+/* --- Inline code in headings ------------------------------------------- */
+
+/* A heading like `tags:, tag_library:, … removed from per-call signature`
+ * wraps onto two lines. With the default tight heading line-height the
+ * inline-code background of one line overlaps the text below and clips its
+ * descenders. Give headings that contain code more breathing room, trim the
+ * code's vertical padding so its background hugs the glyphs, and clone the box
+ * so a code span that wraps mid-token keeps clean edges on each line. */
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6):has(code) {
+  line-height: 1.5;
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) code {
+  padding-block: 0.05em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .site-title {
   color: var(--sl-color-white);
 }
