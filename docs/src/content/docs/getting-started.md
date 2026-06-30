@@ -7,7 +7,7 @@ This page takes you from install to a working conversion in about five minutes. 
 
 ## Requirements
 
-- Ruby 3.3 or newer (CRuby, or the latest TruffleRuby or JRuby)
+Ruby 3.3 or newer (CRuby, or the latest TruffleRuby or JRuby).
 
 ## Install
 
