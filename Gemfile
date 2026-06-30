@@ -21,5 +21,8 @@ gem "simplecov"
 gem "sinatra"
 gem "syntax_tree"
 
-gem "mutant", "~> 0.16"
-gem "mutant-rspec", "~> 0.16"
+# mutant only runs in the dedicated MRI `mutation` CI job. Keep it (and its
+# rdoc → rbs chain, which has a native extension) off JRuby/TruffleRuby, the
+# same way commonmarker is guarded above.
+gem "mutant", "~> 0.16", install_if: -> { RUBY_ENGINE == "ruby" }
+gem "mutant-rspec", "~> 0.16", install_if: -> { RUBY_ENGINE == "ruby" }
