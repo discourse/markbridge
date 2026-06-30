@@ -5,6 +5,13 @@ description: Build a reusable Discourse renderer with Markbridge.discourse_rende
 
 The Discourse renderer is configurable through a single factory: `Markbridge.discourse_renderer`. Build a `Renderer` once with the customizations you need, then pass it to as many `*_to_markdown` calls as you like via the `renderer:` kwarg.
 
+<!-- spec:before
+MyPlaceholderUrlTag = Class.new(Markbridge::Renderers::Discourse::Tag) do
+  def render(element, interface) = interface.render_children(element)
+end
+def write_markdown(_post, _markdown); end
+posts = [Struct.new(:body).new("[b]hi[/b]")]
+-->
 ```ruby
 RENDERER = Markbridge.discourse_renderer(
   tags: { Markbridge::AST::Url => MyPlaceholderUrlTag.new },
@@ -41,6 +48,11 @@ Every kwarg is optional. The defaults give you the standard Discourse renderer.
 
 `tags:` is a hash of AST class → `Tag` instance. Mappings merge on top of the default `TagLibrary`, so unmapped classes keep their default rendering.
 
+<!-- spec:before
+MyBoldTag = MyPlaceholderUrlTag = Class.new(Markbridge::Renderers::Discourse::Tag) do
+  def render(element, interface) = interface.render_children(element)
+end
+-->
 ```ruby
 Markbridge.discourse_renderer(
   tags: {
@@ -132,8 +144,8 @@ The renderer carries no per-post state: every top-level `*_to_markdown` call pro
 ```ruby
 class ForumImporter
   RENDERER = Markbridge.discourse_renderer(
-    tags: { ... },
-    unregister: [ ... ],
+    tags: {},          # your custom Tags
+    unregister: [],    # AST classes to drop
     escape_hard_line_breaks: true,
   )
 

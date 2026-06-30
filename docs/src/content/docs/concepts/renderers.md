@@ -69,6 +69,11 @@ The Discourse renderer ships with a default library mapping each built-in AST cl
 
 For most customization, prefer the `Markbridge.discourse_renderer(tags:, unregister:)` factory over hand-mutating a library — it gives you a complete, reusable Renderer:
 
+<!-- spec:before
+MyUrlTag = Class.new(Markbridge::Renderers::Discourse::Tag) do
+  def render(element, interface) = interface.render_children(element)
+end
+-->
 ```ruby
 RENDERER = Markbridge.discourse_renderer(
   tags: { Markbridge::AST::Url => MyUrlTag.new },     # override

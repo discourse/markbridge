@@ -62,6 +62,10 @@ renderer.render(ast)
 
 MediaWiki's block syntax is fixed — there's no handler registry for headings, lists, tables, etc. Inline HTML-like tags (`<nowiki>`, `<code>`, `<sup>`, etc.) go through an `InlineTagRegistry` you can customize via the `handlers:` kwarg:
 
+<!-- spec:before
+MyCustomNode = Class.new(Markbridge::AST::Element)
+input = "hello world"
+-->
 ```ruby
 registry = Markbridge::Parsers::MediaWiki::InlineTagRegistry.default
 registry.register("custom", :raw, MyCustomNode)

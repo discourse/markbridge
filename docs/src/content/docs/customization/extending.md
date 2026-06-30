@@ -175,7 +175,7 @@ renderer = Markbridge.discourse_renderer(
 `HandlerRegistry#overlay` replaces a tag's binding by yielding the previous handler — useful when you want to delegate to the default for the easy cases and only customize the awkward ones:
 
 <!-- spec:before
-class LoggingUrlHandler
+class LoggingQuoteHandler
   def initialize(default:); @default = default; end
   def auto_closeable?; @default.auto_closeable?; end
   def element_class; @default.element_class; end
@@ -198,6 +198,20 @@ end
 
 When several tag names share one AST class (e.g. `url`/`link`/`iurl` all build `AST::Url`), the wrapper has to be a *single* instance so the closing strategy's element-to-handler lookup matches on both sides. Use plain `register` for that, not `overlay`:
 
+<!-- spec:before
+class LoggingUrlHandler
+  def initialize(default:); @default = default; end
+  def auto_closeable?; @default.auto_closeable?; end
+  def element_class; @default.element_class; end
+  def on_open(token:, context:, registry:, tokens: nil)
+    @default.on_open(token:, context:, registry:, tokens:)
+  end
+  def on_close(token:, context:, registry:, tokens: nil)
+    @default.on_close(token:, context:, registry:, tokens:)
+  end
+end
+handlers = Markbridge::Parsers::BBCode::HandlerRegistry.default
+-->
 ```ruby
 default_url = handlers["url"]
 handlers.register(%w[url link iurl], LoggingUrlHandler.new(default: default_url))

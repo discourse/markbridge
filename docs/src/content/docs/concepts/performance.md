@@ -76,6 +76,9 @@ There is no per-process default cache for handler registries or renderers — ev
 
 For batch workloads, build once outside the loop and pass with each call:
 
+<!-- spec:before
+posts = [Struct.new(:body).new("[b]hi[/b]")]
+-->
 ```ruby
 HANDLERS = Markbridge::Parsers::BBCode::HandlerRegistry.default
 RENDERER = Markbridge.discourse_renderer(
