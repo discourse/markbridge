@@ -63,8 +63,8 @@ export default defineConfig({
         styleOverrides: { borderRadius: '0.5rem' },
       },
       sidebar: [
-        { label: 'Getting Started', slug: 'getting-started' },
         { label: 'Introduction', slug: 'introduction' },
+        { label: 'Getting Started', slug: 'getting-started' },
         {
           label: 'Format guides',
           items: [
