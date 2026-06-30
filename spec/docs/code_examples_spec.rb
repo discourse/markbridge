@@ -27,8 +27,10 @@ module DocsCodeExamples
   #                              `...`) but the spec needs filled in.
   #
   # Multiple `spec:before` comments accumulate; they all flush at the next
-  # ```ruby block. There is intentionally no skip directive — every Ruby block
-  # in the docs must run.
+  # ```ruby block. There is intentionally no skip directive — every ```ruby
+  # block in the docs must run. Snippets that can't run (old/removed APIs in the
+  # upgrade guide, bare method signatures, "your code here" sketches) are fenced
+  # as ```rb instead: still highlighted as Ruby, but not extracted or executed.
   def extract_blocks(content)
     blocks = []
     setup = []

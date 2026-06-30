@@ -9,7 +9,7 @@ description: Breaking-change notes between Markbridge releases.
 
 ### Convenience methods now return a `Conversion`, not a `String`
 
-```ruby
+```rb
 # Before
 markdown = Markbridge.bbcode_to_markdown(input)
 markdown.gsub(/.../, "...")           # String operation
@@ -40,7 +40,7 @@ Removed:
 
 To customize rendering, build a `Renderer` once via the new factory and pass it through `renderer:`:
 
-```ruby
+```rb
 # Before
 Markbridge.configure { |c| c.escape_hard_line_breaks = true }
 Markbridge.default_tag_library.register(MyAst::Bold, MyTag.new)
@@ -67,7 +67,7 @@ All four moved into `Markbridge.discourse_renderer(...)`. The four `*_to_markdow
 
 ### MediaWiki kwarg renamed: `inline_tag_registry:` → `handlers:`
 
-```ruby
+```rb
 # Before
 Markbridge.parse_mediawiki(input, inline_tag_registry: my_registry)
 Markbridge::Parsers::MediaWiki::Parser.new(inline_tag_registry: my_registry)
@@ -83,7 +83,7 @@ The accepted *type* is unchanged — still an `InlineTagRegistry`. Only the para
 
 `Parsers::TextFormatter::Handlers::BaseHandler#process` now has a three-arg signature:
 
-```ruby
+```rb
 # Before
 def process(element:, parent:)
 
@@ -133,6 +133,12 @@ The resolved value the importer needs lives on the custom AST node (pinned at pa
 
 For migration loops, set `raise_on_error: false` to surface render exceptions on `Conversion#errors` instead of crashing the loop:
 
+<!-- spec:before
+RENDERER = Markbridge.discourse_renderer
+def log_failure(_post, _errors); end
+def write_markdown(_post, _markdown); end
+posts = [Struct.new(:body).new("[b]hi[/b]")]
+-->
 ```ruby
 posts.each do |post|
   result = Markbridge.bbcode_to_markdown(post.body, renderer: RENDERER, raise_on_error: false)

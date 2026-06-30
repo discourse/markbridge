@@ -25,6 +25,10 @@ These four stages line up with your importer code: you parse and resolve on the 
 
 Every `*_to_markdown` call returns a `Conversion`:
 
+<!-- spec:before
+RENDERER = Markbridge.discourse_renderer
+post = Struct.new(:body).new("[b]hi[/b]")
+-->
 ```ruby
 result = Markbridge.bbcode_to_markdown(post.body, renderer: RENDERER)
 
@@ -103,6 +107,9 @@ end
 
 Source content rarely covers exactly the tags you've planned for. `Conversion#unknown_tags` (and `Parse#unknown_tags`) gives you the punch list:
 
+<!-- spec:before
+result = Markbridge.bbcode_to_markdown("[marquee]hi[/marquee]")
+-->
 ```ruby
 result.unknown_tags
 # => {"marquee" => 3, "blink" => 1, "googletools" => 12}
@@ -110,6 +117,11 @@ result.unknown_tags
 
 What you do with it is policy:
 
+<!-- spec:before
+RENDERER = Markbridge.discourse_renderer
+def log(_msg); end
+posts = [Struct.new(:id, :body).new(1, "[b]hi[/b]")]
+-->
 ```ruby
 posts.each do |post|
   result = Markbridge.bbcode_to_markdown(post.body, renderer: RENDERER)
@@ -125,6 +137,12 @@ Aggregate across the corpus to find which tags are worth writing handlers for, w
 
 Forum corpora contain edge cases that surface only when you migrate them. By default, render-time errors propagate; a single bad post crashes the loop. Pass `raise_on_error: false` to flip that:
 
+<!-- spec:before
+RENDERER = Markbridge.discourse_renderer
+def log_failure(_post, _errors); end
+def write_markdown(_post, _markdown); end
+posts = [Struct.new(:body).new("[b]hi[/b]")]
+-->
 ```ruby
 posts.each do |post|
   result = Markbridge.bbcode_to_markdown(post.body, renderer: RENDERER, raise_on_error: false)
@@ -142,6 +160,12 @@ Errors collect on `Conversion#errors` instead of raising. The default stays `rai
 
 Construct a `Renderer` once outside your migration loop and pass it to every call. It carries your custom Tags, the unregistered AST classes you don't want to render, your escaper, and your postprocessor. It holds no per-post state, so the same instance is safe across thousands of posts.
 
+<!-- spec:before
+InternalLinkTag = UploadTag = MentionTag = Class.new(Markbridge::Renderers::Discourse::Tag) do
+  def render(element, interface) = interface.render_children(element)
+end
+posts = [Struct.new(:body).new("[b]hi[/b]")]
+-->
 ```ruby
 RENDERER = Markbridge.discourse_renderer(
   tags: {

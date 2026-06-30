@@ -32,7 +32,8 @@ AST::Node (base)
     │   ├── AST::Paragraph
     │   ├── AST::Heading           — level
     │   ├── AST::Quote
-    │   └── AST::Spoiler
+    │   ├── AST::Spoiler
+    │   └── AST::Details           — collapsible [details] section
     ├── Content
     │   ├── AST::Url               — href attribute
     │   ├── AST::Email             — email address
