@@ -2,6 +2,7 @@
   "name": "docs",
   "type": "module",
   "version": "0.0.1",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "node ./scripts/generate-changelog.mjs && astro dev --host",
     "start": "node ./scripts/generate-changelog.mjs && astro dev --host",
