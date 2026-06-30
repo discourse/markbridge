@@ -41,24 +41,23 @@
   color: var(--sl-color-white);
 }
 
+/* A faint accent-tinted surface so the cards read as cards, not floating text
+ * in whitespace. On hover we deepen the tint, warm the border, and add a soft
+ * shadow — no transform, so nothing moves. (An earlier translateY lift fought
+ * the CardGrid `stagger` offset on the right column and made those cards jump.) */
 .card {
   border-color: var(--sl-card-border);
+  background: color-mix(in srgb, var(--sl-color-accent) 4%, var(--sl-color-bg));
   transition:
-    transform 0.18s ease,
     box-shadow 0.18s ease,
-    border-color 0.18s ease;
+    border-color 0.18s ease,
+    background-color 0.18s ease;
 }
 
 .card:hover {
-  transform: translateY(-2px);
+  border-color: var(--sl-color-accent);
+  background: color-mix(in srgb, var(--sl-color-accent) 8%, var(--sl-color-bg));
   box-shadow: 0 8px 20px -8px var(--sl-card-border);
-}
-
-/* Preserve the CardGrid `stagger` offset on right-column cards while still lifting 2px. */
-@media (min-width: 50rem) {
-  .card-grid.stagger > .card:nth-child(2n):hover {
-    transform: translateY(calc(var(--stagger-height) - 2px));
-  }
 }
 
 /* --- Excalidraw diagrams ----------------------------------------------- */
