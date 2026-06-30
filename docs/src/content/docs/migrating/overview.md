@@ -14,7 +14,7 @@ This page is the big picture. The next page — [Placeholders](/migrating/placeh
   <img class="diagram-dark" src="/diagrams/overview-dark.svg" alt="Four-stage pipeline: source markup → Parse → AST::Document → Render → Conversion">
 </figure>
 
-1. **Parse**. The format-specific parser tokenizes the input and builds an `AST::Document`. Unknown tags are tracked but never raise — the parser is resilient by design.
+1. **Parse**. The format-specific parser reads the input and builds an `AST::Document`. Unknown tags are tracked but never raise — the parser is resilient by design.
 2. **AST**. A renderer-agnostic tree of `Text`, `Element`, and leaf nodes (`LineBreak`, `HorizontalRule`). Custom AST nodes (Upload, Mention, InternalLink) live alongside the built-ins.
 3. **Render**. The Discourse renderer walks the AST, dispatching each node to its `Tag`. Custom Tags are one-line output formatters — they turn a placeholder node into its placeholder string and nothing else.
 4. **Conversion**. The render produces a `Markbridge::Conversion` value object: rendered Markdown, the AST, format identifier, unknown-tag counts, parser diagnostics, and any swallowed errors.
