@@ -41,23 +41,23 @@
   color: var(--sl-color-white);
 }
 
-/* A faint accent-tinted surface so the cards read as cards, not floating text
- * in whitespace. On hover we deepen the tint, warm the border, and add a soft
- * shadow — no transform, so nothing moves. (An earlier translateY lift fought
+/* Cards keep Starlight's per-card accent border. Tighter padding than the
+ * default clamp(1rem … 2.5rem) so they feel less empty, and a soft shadow on
+ * hover — no transform, so nothing moves. (An earlier translateY lift fought
  * the CardGrid `stagger` offset on the right column and made those cards jump.) */
 .card {
   border-color: var(--sl-card-border);
-  background: color-mix(in srgb, var(--sl-color-accent) 4%, var(--sl-color-bg));
-  transition:
-    box-shadow 0.18s ease,
-    border-color 0.18s ease,
-    background-color 0.18s ease;
+  padding: clamp(0.85rem, calc(0.5rem + 1.2vw), 1.4rem);
+  transition: box-shadow 0.18s ease;
 }
 
 .card:hover {
-  border-color: var(--sl-color-accent);
-  background: color-mix(in srgb, var(--sl-color-accent) 8%, var(--sl-color-bg));
   box-shadow: 0 8px 20px -8px var(--sl-card-border);
+}
+
+/* Bigger feature icons — Starlight's ~1.3em badge reads small on the landing page. */
+.card .icon {
+  font-size: 2rem;
 }
 
 /* --- Excalidraw diagrams ----------------------------------------------- */
