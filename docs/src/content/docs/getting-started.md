@@ -45,10 +45,10 @@ Markbridge ships with four parsers that all feed the same Markdown renderer. Pic
 
 | Method | Input format | Guide |
 |---|---|---|
-| `Markbridge.bbcode_to_markdown` | BBCode like `[b]...[/b]` | [BBCode → Markdown](/format-guides/bbcode/) |
-| `Markbridge.html_to_markdown` | HTML (via Nokogiri) | [HTML → Markdown](/format-guides/html/) |
-| `Markbridge.mediawiki_to_markdown` | MediaWiki wikitext | [MediaWiki → Markdown](/format-guides/mediawiki/) |
-| `Markbridge.text_formatter_xml_to_markdown` | <span class="nowrap">s9e/TextFormatter</span> XML (phpBB 3.2+) | [TextFormatter → Markdown](/format-guides/textformatter/) |
+| `Markbridge.bbcode_to_markdown` | BBCode like `[b]...[/b]` | [BBCode](/format-guides/bbcode/) |
+| `Markbridge.html_to_markdown` | HTML (via Nokogiri) | [HTML](/format-guides/html/) |
+| `Markbridge.mediawiki_to_markdown` | MediaWiki wikitext | [MediaWiki](/format-guides/mediawiki/) |
+| `Markbridge.text_formatter_xml_to_markdown` | <span class="nowrap">s9e/TextFormatter</span> XML (phpBB 3.2+) | [TextFormatter](/format-guides/textformatter/) |
 
 `Markbridge.convert(input, format: :bbcode)` dispatches to the right one when the format isn't fixed at the call site (handy in migration loops that handle multiple formats).
 
