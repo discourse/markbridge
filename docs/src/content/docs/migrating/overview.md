@@ -19,7 +19,7 @@ This page is the big picture. The next page — [Placeholders](/migrating/placeh
 3. **Render**. The Discourse renderer walks the AST, dispatching each node to its `Tag`. Custom Tags are one-line output formatters — they turn a placeholder node into its placeholder string and nothing else.
 4. **Conversion**. The render produces a `Markbridge::Conversion` value object: rendered Markdown, the AST, format identifier, unknown-tag counts, parser diagnostics, and any swallowed errors.
 
-These four stages line up with your importer code: you parse and resolve on the way in (custom handlers), render on the way out (custom Tags), then read the details you need back off `conversion.ast` and write them to the right tables.
+These four stages are the pipeline; your importer wraps around them. You resolve on the way in (custom handlers) and render on the way out (custom Tags). Then comes the read-back step the diagram shows: once the `Conversion` is ready, your importer walks the AST (`conversion.ast`) to collect what it needs — which uploads, mentions, and links the post used — and writes them to the right tables. That last step is the core of the migration workflow; the [Placeholders](/migrating/placeholders/) page covers it in full.
 
 ## The Conversion object
 
