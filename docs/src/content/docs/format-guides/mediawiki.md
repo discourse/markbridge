@@ -15,7 +15,7 @@ result.markdown
 # => "**bold** and *italic*"
 ```
 
-Like the other parsers, the convenience method returns a [`Markbridge::Conversion`](/migrating/overview/).
+Like the other parsers, the convenience method returns a [`Markbridge::Conversion`](/concepts/result-objects/).
 
 ## Supported syntax
 

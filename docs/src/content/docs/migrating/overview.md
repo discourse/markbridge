@@ -17,42 +17,9 @@ Every conversion runs the same parse → AST → render pipeline — the [Introd
 
 That last step — the read-back — is the heart of the workflow; the [Placeholders](/migrating/placeholders/) page covers it in full.
 
-## The Conversion object
+## What you get back
 
-Every `*_to_markdown` call returns a `Conversion`:
-
-<!-- spec:before
-RENDERER = Markbridge.discourse_renderer
-post = Struct.new(:body).new("[b]hi[/b]")
--->
-```ruby
-result = Markbridge.bbcode_to_markdown(post.body, renderer: RENDERER)
-
-result.markdown      # the rendered Discourse Markdown
-result.ast           # the AST::Document used for rendering
-result.format        # :bbcode, :html, :text_formatter_xml, or :mediawiki
-result.unknown_tags  # Hash{String => Integer} — tag-name to count
-result.diagnostics   # parser-specific diagnostics (e.g. auto-close counts)
-result.errors        # render-time errors when raise_on_error: false
-```
-
-`Conversion#to_s` delegates to `markdown` so `puts result` and `"#{result}"` work without a `.markdown` call. It does *not* delegate other String methods — `result.gsub(...)` raises. Reach for `result.markdown.gsub(...)` or unwrap explicitly.
-
-The same shape comes from `Markbridge.convert(input, format:)`, which dispatches to the right `*_to_markdown` method — handy when one corpus mixes formats:
-
-<!-- spec:before
-RENDERER = Markbridge.discourse_renderer
-posts = [
-  { body: "[b]hi[/b]", format: :bbcode },
-  { body: "<b>hi</b>", format: :html },
-]
--->
-```ruby
-posts.each do |post|
-  result = Markbridge.convert(post[:body], format: post[:format], renderer: RENDERER)
-  # write result.markdown to Discourse…
-end
-```
+Every `*_to_markdown` call — and `Markbridge.convert`, which dispatches by `format:` when a corpus mixes formats — returns a [`Conversion`](/concepts/result-objects/): the rendered `markdown` plus the `ast`, `unknown_tags`, `diagnostics`, and `errors`. The rest of this page leans on those fields; [Result objects](/concepts/result-objects/) covers the full shape.
 
 ## Side data: read it back off the AST
 

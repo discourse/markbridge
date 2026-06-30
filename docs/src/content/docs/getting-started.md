@@ -36,7 +36,7 @@ puts result.markdown
 
 `require "markbridge/bbcode"` loads the BBCode parser plus the Discourse renderer. Swap `bbcode` for `html`, `mediawiki`, or `textformatter` for the other formats, or use `markbridge/all` to load all four at once. HTML and TextFormatter pull in Nokogiri; BBCode and MediaWiki don't.
 
-`*_to_markdown` returns a `Markbridge::Conversion` value object, not a plain string. The rendered Markdown is on `.markdown`; `.to_s` delegates to it so `puts result` and string interpolation `"#{result}"` work. The Conversion also carries `.unknown_tags`, `.diagnostics`, and `.errors` — see [Migrating to Discourse → Overview](/migrating/overview/) for what they're for.
+`*_to_markdown` returns a `Markbridge::Conversion` value object, not a plain string. The rendered Markdown is on `.markdown`; `.to_s` delegates to it so `puts result` and string interpolation `"#{result}"` work. The Conversion also carries `.unknown_tags`, `.diagnostics`, and `.errors` — see [Result objects](/concepts/result-objects/) for the full shape.
 
 ## The four formats
 

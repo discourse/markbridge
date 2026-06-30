@@ -89,6 +89,7 @@ export default defineConfig({
             { label: 'Overview', slug: 'concepts' },
             { label: 'Architecture', slug: 'concepts/architecture' },
             { label: 'The AST', slug: 'concepts/ast' },
+            { label: 'Result objects', slug: 'concepts/result-objects' },
             { label: 'Parsers', slug: 'concepts/parsers' },
             { label: 'Renderers', slug: 'concepts/renderers' },
             { label: 'Performance', slug: 'concepts/performance' },

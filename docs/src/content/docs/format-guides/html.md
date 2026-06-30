@@ -23,7 +23,7 @@ result.markdown
 # => "Hello **world**!"
 ```
 
-`result` is a [`Markbridge::Conversion`](/migrating/overview/) — `.markdown`, plus `.unknown_tags`, `.errors` for migration use.
+`result` is a [`Markbridge::Conversion`](/concepts/result-objects/) — `.markdown`, plus `.unknown_tags`, `.errors` for migration use.
 
 To get the AST:
 

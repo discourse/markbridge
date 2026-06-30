@@ -16,7 +16,7 @@ result.markdown
 # => "**Hello** [world](https://example.com)!"
 ```
 
-`result` is a [`Markbridge::Conversion`](/migrating/overview/) — `.markdown` is the rendered string, and the same object also exposes `.unknown_tags`, `.diagnostics` (auto-closed counts, depth-exceeded counts, unclosed raw-tag list), and `.errors`.
+`result` is a [`Markbridge::Conversion`](/concepts/result-objects/) — `.markdown` is the rendered string, and the same object also exposes `.unknown_tags`, `.diagnostics` (auto-closed counts, depth-exceeded counts, unclosed raw-tag list), and `.errors`.
 
 To get the AST instead of rendered Markdown:
 
