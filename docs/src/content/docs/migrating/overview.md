@@ -19,7 +19,7 @@ This page is the big picture. The next page — [Placeholders](/migrating/placeh
 3. **Render**. The Discourse renderer walks the AST, dispatching each node to its `Tag`. Custom Tags are one-line output formatters — they turn a placeholder node into its placeholder string and nothing else.
 4. **Conversion**. The render produces a `Markbridge::Conversion` value object: rendered Markdown, the AST, format identifier, unknown-tag counts, parser diagnostics, and any swallowed errors.
 
-These four stages are the pipeline; your importer wraps around them. You resolve on the way in (custom handlers) and render on the way out (custom Tags). Then there's one more step: once the `Conversion` is ready, your importer walks the AST (`conversion.ast`) to collect what it needs — which uploads, mentions, and links the post used — and writes them to the right tables. That read-back is the core of the migration workflow; the [Placeholders](/migrating/placeholders/) page covers it in full.
+These four stages are the pipeline; your own code wraps around them. You resolve on the way in (custom handlers) and render on the way out (custom Tags). Then there's one more step: once the `Conversion` is ready, you walk the AST (`conversion.ast`) to collect what you need — which uploads, mentions, and links the post used — and write it into Discourse. That read-back is the core of the workflow; the [Placeholders](/migrating/placeholders/) page covers it in full.
 
 ## The Conversion object
 
@@ -60,9 +60,9 @@ end
 
 ## Side data: read it back off the AST
 
-A migration importer typically wants to know more than the rendered string. For each placeholder in the post, it needs the resolution data the importer will look up later:
+A migration usually needs more than the rendered string. For each placeholder in a post, you also need the data to resolve it later:
 
-| Tag in source | Placeholder string in markdown | Side data the importer needs |
+| Tag in source | Placeholder string in markdown | Side data to resolve later |
 |---|---|---|
 | `[upload=42]` | `[upload\|42]` | `{ upload_id: 42, path: "..." }` |
 | `[mention]alice[/mention]` | `[mention\|alice]` | `{ name: "alice", source_id: nil }` |
@@ -78,7 +78,7 @@ class UploadTag < Markbridge::Renderers::Discourse::Tag
 end
 ```
 
-After the conversion, collect every upload the post referenced by walking the tree for your placeholder class. (In a real importer `result` comes from a `*_to_markdown` call; here we build a one-node tree by hand to keep the snippet self-contained.)
+After the conversion, collect every upload the post referenced by walking the tree for your placeholder class. (In real use, `result` comes from a `*_to_markdown` call; here we build a one-node tree by hand to keep the snippet self-contained.)
 
 <!-- spec:before
 def record_upload(**); end
