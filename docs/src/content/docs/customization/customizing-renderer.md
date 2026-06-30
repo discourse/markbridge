@@ -29,6 +29,8 @@ Markbridge.discourse_renderer(
   unregister: nil,                   # Array<Class> to drop
   escaper: nil,                      # custom MarkdownEscaper
   escape_hard_line_breaks: false,    # sugar for the default escaper
+  allow: nil,                        # Symbol/Array<Symbol> — markers to leave unescaped
+  escape: true,                      # false swaps in IdentityEscaper (no escaping)
   postprocessor: nil,                # custom Postprocessor instance
 )
 ```
@@ -86,6 +88,26 @@ end
 
 Markbridge.discourse_renderer(escaper: ListPermissiveEscaper.new)
 ```
+
+### `allow:` — let specific Markdown markers through
+
+By default the escaper escapes Markdown found in source text, so a literal `- ` or `1.` from a forum post doesn't accidentally turn into a list. If the source *does* use real Markdown lists you want to keep, allow those markers instead of subclassing the escaper:
+
+```ruby
+Markbridge.discourse_renderer(allow: :lists)
+```
+
+The keys are `:bullet_list`, `:ordered_list`, `:atx_heading`, and `:block_quote`, plus the alias `:lists` (bullet + ordered). An unknown key raises `ArgumentError`. Thematic breaks (`---`, `***`) and setext underlines (`===`) stay escaped — `allow:` opens up specific markers, not the whole escaper. It builds on the default escaper, so don't combine it with a custom `escaper:`.
+
+### `escape:` — turn escaping off entirely
+
+When the source is already trusted Markdown, skip escaping altogether:
+
+```ruby
+Markbridge.discourse_renderer(escape: false)
+```
+
+This swaps in `Markbridge::Renderers::Discourse::IdentityEscaper`, which returns text unchanged. `escape: false` can't be combined with `escape_hard_line_breaks:` or `allow:` (those configure the normal escaper, which `escape: false` replaces); an explicit `escaper:` always wins. To skip escaping for a single node rather than the whole document, use `AST::MarkdownText`.
 
 ### `postprocessor:` — clean up the final string
 

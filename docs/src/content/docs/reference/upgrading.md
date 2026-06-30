@@ -287,6 +287,5 @@ Markbridge.render(doc).markdown
 
 ## See also
 
-- [Migrating to Discourse → Full example](/migrating/full-walkthrough/) — a complete importer that uses every new path.
 - [Customizing the renderer](/customization/customizing-renderer/) — full reference for the factory.
 - [Extending Markbridge](/customization/extending/) — adding custom tags and handlers.
