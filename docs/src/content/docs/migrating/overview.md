@@ -1,11 +1,11 @@
 ---
 title: Migrating to Discourse — overview
-description: The mental model for using Markbridge to migrate forum content into Discourse.
+description: The big picture for using Markbridge to migrate forum content into Discourse.
 ---
 
-You have a forum's worth of posts in BBCode, HTML, MediaWiki wikitext, or s9e/TextFormatter XML. You want each post stored on Discourse as Markdown. Most of the body translates straight across — bold text, lists, blockquotes — but a handful of tags need importer-side resolution: internal links to topics that don't exist yet on Discourse, uploads to be shipped, mentions to be looked up, polls and events that map to Discourse plugins. Markbridge is built for exactly that workflow.
+You have a forum's worth of posts in BBCode, HTML, MediaWiki wikitext, or s9e/TextFormatter XML, and you want each one stored on Discourse as Markdown. Most of the body translates straight across — bold text, lists, quotes — but a few tags need help from your importer: internal links to topics that don't exist on Discourse yet, uploads to ship, mentions to look up, polls and events that map to Discourse plugins. That awkward last mile is exactly what Markbridge is built for.
 
-This page is the mental model. The next two pages — [Placeholders](/migrating/placeholders/) and [Full walkthrough](/migrating/full-walkthrough/) — fill in the mechanics.
+This page is the big picture. The next two — [Placeholders](/migrating/placeholders/) and [Full example](/migrating/full-walkthrough/) — fill in the details.
 
 ## Four stages
 
@@ -19,7 +19,7 @@ This page is the mental model. The next two pages — [Placeholders](/migrating/
 3. **Render**. The Discourse renderer walks the AST, dispatching each node to its `Tag`. Custom Tags are one-line output formatters — they turn a placeholder node into its placeholder string and nothing else.
 4. **Conversion**. The render produces a `Markbridge::Conversion` value object: rendered Markdown, the AST, format identifier, unknown-tag counts, parser diagnostics, and any swallowed errors.
 
-The four-stage mental model maps exactly to your importer code: parse-and-resolve happens on the way in (via custom handlers); render happens on the way out (via custom Tags); the importer reads the side data it needs back off `conversion.ast` and writes it to the right tables.
+These four stages line up with your importer code: you parse and resolve on the way in (custom handlers), render on the way out (custom Tags), then read the details you need back off `conversion.ast` and write them to the right tables.
 
 ## The Conversion object
 
@@ -83,9 +83,7 @@ result.ast.descendants(UploadPlaceholder).each do |node|
 end
 ```
 
-`descendants(klass)` walks the whole tree (leaf nodes included) and returns the nodes that survived parsing — exactly the placeholders that reached the output, scoped to this one conversion. Nothing bleeds between posts because each call has its own `ast`. The full triad — placeholder AST class, handler, and Tag — is on the [Placeholders](/migrating/placeholders/) page.
-
-The full pattern lives on the [Placeholders](/migrating/placeholders/) page.
+`descendants(klass)` walks the whole tree (leaf nodes included) and returns the nodes that survived parsing — exactly the placeholders that reached the output, for this one conversion only. Nothing leaks between posts, because each call has its own `ast`. The three pieces that make this work — the AST node, the handler, and the Tag — are explained on the [Placeholders](/migrating/placeholders/) page.
 
 ## Unknown tags
 
@@ -151,7 +149,7 @@ See [Customizing the renderer](/customization/customizing-renderer/) for every k
 
 ## Where next
 
-- [Placeholders](/migrating/placeholders/) — the AST + handler + Tag triad, with the placeholder round-trip end-to-end.
-- [Full walkthrough](/migrating/full-walkthrough/) — a runnable mini-importer touching every customization path.
+- [Placeholders](/migrating/placeholders/) — the AST node, handler, and Tag in detail, with the full round-trip.
+- [Full example](/migrating/full-walkthrough/) — a small importer you can run that touches every customization path.
 - [Customizing the renderer](/customization/customizing-renderer/) — the full factory reference.
 - [Extending Markbridge](/customization/extending/) — adding handlers and custom Tags from scratch.

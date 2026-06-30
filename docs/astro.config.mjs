@@ -72,7 +72,7 @@ export default defineConfig({
           items: [
             { label: 'Overview', slug: 'migrating/overview' },
             { label: 'Placeholders', slug: 'migrating/placeholders' },
-            { label: 'Full walkthrough', slug: 'migrating/full-walkthrough' },
+            { label: 'Full example', slug: 'migrating/full-walkthrough' },
           ],
         },
         {

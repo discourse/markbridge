@@ -3,9 +3,9 @@ title: Upgrading
 description: Breaking-change notes between Markbridge releases.
 ---
 
-## 0.x — migration-API redesign
+## 0.2.0 — breaking changes
 
-This release reshapes the top-level API around `Conversion`/`Parse` result types and a single `renderer:` kwarg for render-side customization. There is no backwards-compatibility shim — the changes are mechanical, but every call site needs to be updated.
+0.2.0 reshapes the top-level API around `Conversion`/`Parse` result types and a single `renderer:` kwarg for render-side customization. There is no backwards-compatibility shim — the changes are mechanical, but every call site needs to be updated.
 
 ### Convenience methods now return a `Conversion`, not a `String`
 
@@ -146,8 +146,147 @@ end
 
 The default remains `raise_on_error: true`, preserving the prior behavior of letting exceptions propagate.
 
+## 0.2.0 — new capabilities
+
+0.2.0 also added a few things you'll likely want during a migration.
+
+### Let some Markdown markers through with `allow:`
+
+If your source posts already contain `- item` or `1. item` lists you want to keep, you no longer need to subclass the escaper. Before, you'd write a whole class:
+
+```ruby
+class ListPermissiveEscaper < Markbridge::Renderers::Discourse::MarkdownEscaper
+  private
+
+  def escape_block_level(content, prev_was_paragraph)
+    case content.getbyte(0)
+    when 0x2D, 0x2A, 0x2B then return content, false if content.match?(/\A[-*+]\s/)
+    when 0x30..0x39       then return content, false if content.match?(/\A\d+[.)]\s/)
+    end
+    super
+  end
+end
+Markbridge.discourse_renderer(escaper: ListPermissiveEscaper.new)
+```
+
+Now it's one keyword:
+
+```ruby
+Markbridge.discourse_renderer(allow: :lists)
+```
+
+The keys are `:bullet_list`, `:ordered_list`, `:atx_heading`, and `:block_quote`, plus the alias `:lists` (bullet + ordered). An unknown key raises `ArgumentError`. Thematic breaks (`---`, `***`) and setext underlines (`===`) are still escaped — `allow:` opens up specific markers, not the whole escaper.
+
+### Turn escaping off completely with `escape: false`
+
+When the source is already trusted Markdown, skip escaping entirely:
+
+<!-- spec:before
+input = "already **trusted** markdown"
+-->
+```ruby
+no_escape = Markbridge.discourse_renderer(escape: false)
+Markbridge.bbcode_to_markdown(input, renderer: no_escape)
+```
+
+This swaps in `Markbridge::Renderers::Discourse::IdentityEscaper`, a tiny class whose `escape` returns the text unchanged. `escape: false` can't be combined with `escape_hard_line_breaks:` or `allow:` (those configure the normal escaper, which `escape: false` replaces). An explicit `escaper:` always wins. For a single node rather than the whole document, `AST::MarkdownText` already skips the escaper for that node only.
+
+### Change the AST between parse and render
+
+You can edit the parsed tree before it's rendered — handy for adding attachments that weren't in the post body. Every `*_to_markdown` / `convert` method takes a block, or you can render a `Parse` by hand:
+
+<!-- spec:before
+class OrphanAttachment < Markbridge::AST::Node
+  attr_reader :source_id
+  def initialize(source_id:)
+    super()
+    @source_id = source_id
+  end
+end
+class OrphanAttachmentTag < Markbridge::Renderers::Discourse::Tag
+  def render(element, _interface) = "[upload|#{element.source_id}]"
+end
+RENDERER = Markbridge.discourse_renderer(tags: { OrphanAttachment => OrphanAttachmentTag.new })
+input = "see attached"
+attachments = [Struct.new(:id).new(42)]
+-->
+```ruby
+# Block form — edit the AST inline
+Markbridge.bbcode_to_markdown(input, renderer: RENDERER) do |ast|
+  attachments.each { |a| ast << OrphanAttachment.new(source_id: a.id) }
+end
+
+# Or render a Parse you've already changed
+parse = Markbridge.parse_bbcode(input)
+parse.ast << OrphanAttachment.new(source_id: 7)
+result = Markbridge.render(parse, renderer: RENDERER)
+```
+
+`Markbridge.render` takes either a `Parse` (preferred — it keeps `unknown_tags`, `diagnostics`, and the source `format`) or a bare AST node (those fields default to empty, and `format` is `nil` since there was no source). A non-`Document` node is wrapped in one, so `Conversion#ast` is always a `Document`. Your changes stay in `Conversion#ast`.
+
+### Pass a Nokogiri tree to the HTML and TextFormatter parsers
+
+Both Nokogiri-backed parsers now accept a `String` *or* a parsed Nokogiri node. If your importer already runs its own DOM pass, hand the live tree straight over — no serialize-and-reparse in between:
+
+<!-- spec:before
+html = "<p>hello <b>world</b></p>"
+-->
+```ruby
+fragment = Nokogiri::HTML.fragment(html)
+Markbridge.html_to_markdown(fragment)
+```
+
+Same idea for TextFormatter XML:
+
+<!-- spec:before
+xml = "<r>hello</r>"
+-->
+```ruby
+xml_doc = Nokogiri.XML(xml)
+Markbridge.text_formatter_xml_to_markdown(xml_doc)
+```
+
+A full `Nokogiri::HTML::Document` is unwrapped to its `<body>` children (so the synthetic `<html>`/`<head>`/`<body>` don't show up in `unknown_tags`); a fragment or bare element iterates its own children. For TextFormatter, an XML `Document` is unwrapped via `#root` (the single `<r>`/`<t>` element). Skipping the round-trip also avoids a quirk where re-serializing percent-encodes non-ASCII bytes in URLs.
+
+### Walk and edit the tree with helpers on `Element`
+
+Three methods replace the hand-rolled recursion importers used to write:
+
+<!-- spec:before
+doc = Markbridge::AST::Document.new
+doc << Markbridge::AST::Bold.new.tap { |b| b << Markbridge::AST::Text.new("hi") }
+-->
+```ruby
+# Walk every descendant, depth-first
+doc.each_descendant { |node| node }
+
+# Filter by class (uses is_a?, so abstract bases match subclasses)
+bold = doc.descendants(Markbridge::AST::Bold).first
+
+# Swap a direct child in place, keeping its position
+doc.replace_child(bold, Markbridge::AST::Text.new("HI"))
+```
+
+`each_descendant` snapshots each element's children when it reaches them, so calling `replace_child` mid-walk is safe and nodes appended during the walk aren't re-visited.
+
+### `AST::Details` for collapsible sections
+
+Discourse's collapsible `[details=…]…[/details]` block is now a built-in AST node with an auto-registered Tag, so you can drop any local `DetailsBlock` shim:
+
+<!-- spec:before
+doc = Markbridge::AST::Document.new
+-->
+```ruby
+doc << Markbridge::AST::Details.new(title: "Signature").tap do |block|
+  block << Markbridge::AST::Text.new("--\nAlex Doe")
+end
+Markbridge.render(doc).markdown
+```
+
+`title` is optional — leave it out for a bare `[details]` (and `<summary>Summary</summary>` in HTML mode). The title is HTML-escaped in the `<summary>`.
+
 ## See also
 
-- [Migrating to Discourse → Full walkthrough](/migrating/full-walkthrough/) — canonical end-to-end importer shape exercising every new path.
+- [Migrating to Discourse → Full example](/migrating/full-walkthrough/) — a complete importer that uses every new path.
 - [Customizing the renderer](/customization/customizing-renderer/) — full reference for the factory.
 - [Extending Markbridge](/customization/extending/) — adding custom tags and handlers.
