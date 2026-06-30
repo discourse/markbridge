@@ -10,8 +10,8 @@ This page is the big picture. The next page — [Placeholders](/migrating/placeh
 ## Four stages
 
 <figure class="diagram">
-  <img class="diagram-light" src="/diagrams/overview.svg" alt="Four-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with the importer re-reading placeholder nodes from conversion.ast afterwards">
-  <img class="diagram-dark" src="/diagrams/overview-dark.svg" alt="Four-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with the importer re-reading placeholder nodes from conversion.ast afterwards">
+  <img class="diagram-light" src="/diagrams/overview.svg" alt="Four-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with the importer reading back from the AST afterwards">
+  <img class="diagram-dark" src="/diagrams/overview-dark.svg" alt="Four-stage pipeline: source markup → Parse → AST::Document → Render → Conversion, with the importer reading back from the AST afterwards">
 </figure>
 
 1. **Parse**. The format-specific parser tokenizes the input and builds an `AST::Document`. Unknown tags are tracked but never raise — the parser is resilient by design.
