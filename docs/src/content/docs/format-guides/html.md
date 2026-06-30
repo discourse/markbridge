@@ -1,5 +1,5 @@
 ---
-title: HTML → Markdown
+title: HTML
 description: Convert HTML into Discourse-flavored Markdown using Nokogiri.
 ---
 

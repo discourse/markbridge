@@ -1,5 +1,5 @@
 ---
-title: MediaWiki → Markdown
+title: MediaWiki
 description: Convert MediaWiki wikitext into Discourse-flavored Markdown.
 ---
 

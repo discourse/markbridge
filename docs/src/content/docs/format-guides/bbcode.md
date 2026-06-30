@@ -1,5 +1,5 @@
 ---
-title: BBCode → Markdown
+title: BBCode
 description: Convert BBCode forum markup into Discourse-flavored Markdown.
 ---
 

@@ -1,5 +1,5 @@
 ---
-title: TextFormatter → Markdown
+title: TextFormatter
 description: Convert s9e/TextFormatter XML (used by phpBB 3.2+) into Discourse-flavored Markdown.
 ---
 
