@@ -19,27 +19,31 @@ Like the other parsers, the convenience method returns a [`Markbridge::Conversio
 
 ## Supported syntax
 
+<div class="format-tags">
+
 ### Inline formatting
 
-| Wikitext | Output |
-|---|---|
-| `'''bold'''` | `**bold**` |
-| `''italic''` | `*italic*` |
-| `'''''both'''''` | `***both***` |
-| `[[target]]` | Internal link with `target` as both href and text |
-| `[[target\|display]]` | Internal link with custom display text |
-| `[https://example.com text]` | External link |
+| Wikitext | Renders as | AST node |
+|---|---|---|
+| `'''bold'''` | `**bold**` | `AST::Bold` |
+| `''italic''` | `*italic*` | `AST::Italic` |
+| `'''''both'''''` | `***both***` | `AST::Bold` + `AST::Italic` |
+| `[[target]]` | `[target](target)` | `AST::Url` |
+| `[[target\|display]]` | `[display](target)` | `AST::Url` |
+| `[https://example.com text]` | `[text](href)` | `AST::Url` |
 
 ### Block syntax
 
-| Wikitext | Output |
-|---|---|
-| `= H1 =` through `====== H6 ======` | Headings |
-| `* item` / `** sub` / `*** deep` | Nested unordered list |
-| `# item` / `## sub` | Nested ordered list |
-| `----` | Horizontal rule |
-| Line starting with a space | Preformatted block |
-| `{\| ... \|}` | Table |
+| Wikitext | Renders as | AST node |
+|---|---|---|
+| `= H1 =` … `====== H6 ======` | `# H1` … `###### H6` | `AST::Heading` |
+| `* item` / `** sub` | `- item` (nested) | `AST::List` |
+| `# item` / `## sub` | `1. item` (nested) | `AST::List` |
+| `----` | `---` | `AST::HorizontalRule` |
+| Line starting with a space | Code block | `AST::Code` |
+| `{\| ... \|}` | GFM table | `AST::Table` |
+
+</div>
 
 ### HTML tags
 

@@ -40,7 +40,7 @@ All tag names are case-insensitive. Aliases in the same row behave identically.
 | `[b]`, `[bold]`, `[strong]` | `**bold**` | `AST::Bold` |
 | `[i]`, `[italic]`, `[em]` | `*italic*` | `AST::Italic` |
 | `[s]`, `[strike]`, `[del]` | `~~strike~~` | `AST::Strikethrough` |
-| `[u]`, `[underline]` | `<u>underline</u>` (no Markdown form) | `AST::Underline` |
+| `[u]`, `[underline]` | `<u>underline</u>` | `AST::Underline` |
 | `[sup]` | `<sup>sup</sup>` | `AST::Superscript` |
 | `[sub]` | `<sub>sub</sub>` | `AST::Subscript` |
 
@@ -48,23 +48,23 @@ All tag names are case-insensitive. Aliases in the same row behave identically.
 
 | Tags | Renders as | AST node |
 |---|---|---|
-| `[code]`, `[pre]`, `[tt]` | Inline code span or fenced block; `[code=ruby]` sets the language | `AST::Code` |
+| `[code]`, `[pre]`, `[tt]` | Code span or fenced block | `AST::Code` |
 
 ### Links, images, attachments
 
 | Tags | Renders as | AST node |
 |---|---|---|
-| `[url]`, `[link]`, `[iurl]` | Markdown link; accepts `[url=href]text[/url]`, `[url href=…]…`, or `[url]href[/url]` | `AST::Url` |
-| `[email]` | `mailto:` link, from `[email=addr]text[/email]` | `AST::Email` |
-| `[img]` | Markdown image `![](src)` | `AST::Image` |
+| `[url]`, `[link]`, `[iurl]` | `[text](href)` | `AST::Url` |
+| `[email]` | `[text](mailto:addr)` | `AST::Email` |
+| `[img]` | `![](src)` | `AST::Image` |
 | `[attach]`, `[attachment]` | Discourse upload syntax | `AST::Attachment` |
 
 ### Blocks
 
 | Tags | Renders as | AST node |
 |---|---|---|
-| `[quote]` | Discourse `[quote]`; `[quote="author, post:1, topic:2"]` for attribution | `AST::Quote` |
-| `[spoiler]`, `[hide]` | Discourse `[spoiler]` | `AST::Spoiler` |
+| `[quote]` | `[quote]…[/quote]` | `AST::Quote` |
+| `[spoiler]`, `[hide]` | `[spoiler]…[/spoiler]` | `AST::Spoiler` |
 | `[color]` | `<span style="color: …">` | `AST::Color` |
 | `[size]` | `<span style="font-size: …">` | `AST::Size` |
 | `[center]`, `[left]`, `[right]`, `[justify]` | `<div align="…">` | `AST::Align` |
@@ -73,9 +73,9 @@ All tag names are case-insensitive. Aliases in the same row behave identically.
 
 | Tags | Renders as | AST node |
 |---|---|---|
-| `[list]`, `[ul]`, `[ulist]` | `- item`; `[list=1]` makes it ordered | `AST::List` |
+| `[list]`, `[ul]`, `[ulist]` | `- item` | `AST::List` |
 | `[ol]`, `[olist]` | `1. item` | `AST::List` |
-| `[*]`, `[li]`, `[.]` | List item; auto-closes the previous one | `AST::ListItem` |
+| `[*]`, `[li]`, `[.]` | List item | `AST::ListItem` |
 
 ### Tables
 

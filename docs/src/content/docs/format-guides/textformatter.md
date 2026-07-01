@@ -35,23 +35,27 @@ Inside `<r>`, formatted children use **uppercase element names** by convention (
 
 ## Supported elements
 
-| Element | AST node | Attributes |
+<div class="format-tags">
+
+| Element | Renders as | AST node |
 |---|---|---|
-| `<B>` | `AST::Bold` | |
-| `<I>` | `AST::Italic` | |
-| `<S>` | `AST::Strikethrough` | |
-| `<U>` | `AST::Underline` | |
-| `<CODE>` | `AST::Code` | `lang` |
-| `<URL>` | `AST::Url` | `url` |
-| `<EMAIL>` | `AST::Url` (mailto) | `email` |
-| `<IMG>` | `AST::Image` | `src` |
-| `<ATTACHMENT>` | `AST::Attachment` | |
-| `<QUOTE>` | `AST::Quote` | attribution attributes |
-| `<LIST>` | `AST::List` | `type` ("bullet" / "decimal") |
-| `<LI>` | `AST::ListItem` | |
-| `<TABLE>`, `<TR>`, `<TD>` | table nodes | |
-| `<HR>` | `AST::HorizontalRule` | |
-| `<br/>` | `AST::LineBreak` | |
+| `<B>` | `**bold**` | `AST::Bold` |
+| `<I>` | `*italic*` | `AST::Italic` |
+| `<S>` | `~~strike~~` | `AST::Strikethrough` |
+| `<U>` | `<u>underline</u>` | `AST::Underline` |
+| `<CODE>` | Code span or fenced block | `AST::Code` |
+| `<URL>` | `[text](href)` | `AST::Url` |
+| `<EMAIL>` | `[text](mailto:addr)` | `AST::Url` |
+| `<IMG>` | `![](src)` | `AST::Image` |
+| `<ATTACHMENT>` | Discourse upload syntax | `AST::Attachment` |
+| `<QUOTE>` | `[quote]…[/quote]` | `AST::Quote` |
+| `<LIST>` | `- item` / `1. item` | `AST::List` |
+| `<LI>` | List item | `AST::ListItem` |
+| `<TABLE>`, `<TR>`, `<TD>` | GFM table | `AST::Table` |
+| `<HR>` | `---` | `AST::HorizontalRule` |
+| `<br/>` | Hard line break | `AST::LineBreak` |
+
+</div>
 
 For the exact list, see [`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/text_formatter/handler_registry.rb).
 

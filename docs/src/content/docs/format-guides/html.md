@@ -35,23 +35,27 @@ parse.ast
 
 ## Supported tags
 
-| HTML | AST node |
-|---|---|
-| `<b>`, `<strong>` | `AST::Bold` |
-| `<i>`, `<em>` | `AST::Italic` |
-| `<s>`, `<strike>`, `<del>` | `AST::Strikethrough` |
-| `<u>` | `AST::Underline` |
-| `<sup>`, `<sub>` | `AST::Superscript`, `AST::Subscript` |
-| `<code>`, `<pre>`, `<tt>` | `AST::Code` (raw content) |
-| `<a href="...">` | `AST::Url` |
-| `<img src alt>` | `AST::Image` |
-| `<blockquote>` | `AST::Quote` |
-| `<ul>`, `<ol>` | `AST::List` |
-| `<li>` | `AST::ListItem` |
-| `<table>`, `<tr>`, `<td>`, `<th>` | `AST::Table`, `AST::TableRow`, `AST::TableCell` |
-| `<br>` | `AST::LineBreak` |
-| `<hr>` | `AST::HorizontalRule` |
-| `<p>` | Transparent — adds spacing, no AST node |
+<div class="format-tags">
+
+| HTML | Renders as | AST node |
+|---|---|---|
+| `<b>`, `<strong>` | `**bold**` | `AST::Bold` |
+| `<i>`, `<em>` | `*italic*` | `AST::Italic` |
+| `<s>`, `<strike>`, `<del>` | `~~strike~~` | `AST::Strikethrough` |
+| `<u>` | `<u>underline</u>` | `AST::Underline` |
+| `<sup>`, `<sub>` | `<sup>…</sup>` / `<sub>…</sub>` | `AST::Superscript`, `AST::Subscript` |
+| `<code>`, `<pre>`, `<tt>` | Code span or fenced block | `AST::Code` |
+| `<a href="...">` | `[text](href)` | `AST::Url` |
+| `<img src alt>` | `![](src)` | `AST::Image` |
+| `<blockquote>` | `[quote]…[/quote]` | `AST::Quote` |
+| `<ul>`, `<ol>` | `- item` / `1. item` | `AST::List` |
+| `<li>` | List item | `AST::ListItem` |
+| `<table>`, `<tr>`, `<td>`, `<th>` | GFM table | `AST::Table` |
+| `<br>` | Hard line break | `AST::LineBreak` |
+| `<hr>` | `---` | `AST::HorizontalRule` |
+| `<p>` | Paragraph spacing | — (transparent) |
+
+</div>
 
 `<thead>`, `<tbody>`, `<tfoot>` are transparent — their children are processed as if the wrapper weren't there. Unregistered tags are skipped, but their children are still processed (graceful degradation).
 
