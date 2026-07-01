@@ -31,62 +31,66 @@ parse.ast
 
 All tag names are case-insensitive. Aliases in the same row behave identically.
 
+<div class="format-tags">
+
 ### Formatting
 
-| Tags | Output | AST node |
+| Tags | Renders as | AST node |
 |---|---|---|
 | `[b]`, `[bold]`, `[strong]` | `**bold**` | `AST::Bold` |
 | `[i]`, `[italic]`, `[em]` | `*italic*` | `AST::Italic` |
 | `[s]`, `[strike]`, `[del]` | `~~strike~~` | `AST::Strikethrough` |
-| `[u]`, `[underline]` | `<u>underline</u>` | `AST::Underline` |
+| `[u]`, `[underline]` | `<u>underline</u>` (no Markdown form) | `AST::Underline` |
 | `[sup]` | `<sup>sup</sup>` | `AST::Superscript` |
 | `[sub]` | `<sub>sub</sub>` | `AST::Subscript` |
 
 ### Code
 
-| Tags | Notes |
-|---|---|
-| `[code]`, `[pre]`, `[tt]` | Raw content — inner BBCode is not parsed. Supports `[code=ruby]` or `[code lang=ruby]` for language hints. |
+| Tags | Renders as | AST node |
+|---|---|---|
+| `[code]`, `[pre]`, `[tt]` | Inline code span or fenced block; `[code=ruby]` sets the language | `AST::Code` |
 
 ### Links, images, attachments
 
-| Tags | Notes |
-|---|---|
-| `[url]`, `[link]`, `[iurl]` | Accepts `[url=href]text[/url]`, `[url href=...]text[/url]`, or `[url]href[/url]` |
-| `[email]` | `[email=addr]text[/email]` renders as a `mailto:` link |
-| `[img]` | `[img]src[/img]` or `[img=src]alt[/img]` |
-| `[attach]`, `[attachment]` | Renders Discourse attachment syntax |
+| Tags | Renders as | AST node |
+|---|---|---|
+| `[url]`, `[link]`, `[iurl]` | Markdown link; accepts `[url=href]text[/url]`, `[url href=…]…`, or `[url]href[/url]` | `AST::Url` |
+| `[email]` | `mailto:` link, from `[email=addr]text[/email]` | `AST::Email` |
+| `[img]` | Markdown image `![](src)` | `AST::Image` |
+| `[attach]`, `[attachment]` | Discourse upload syntax | `AST::Attachment` |
 
 ### Blocks
 
-| Tags | Notes |
-|---|---|
-| `[quote]` | Supports `[quote="author, post:1, topic:2"]` for Discourse-style attribution |
-| `[spoiler]`, `[hide]` | Renders Discourse `[spoiler]` Markdown |
-| `[color]` | `[color=red]text[/color]` |
-| `[size]` | `[size=5]text[/size]` |
-| `[center]`, `[left]`, `[right]`, `[justify]` | Alignment |
+| Tags | Renders as | AST node |
+|---|---|---|
+| `[quote]` | Discourse `[quote]`; `[quote="author, post:1, topic:2"]` for attribution | `AST::Quote` |
+| `[spoiler]`, `[hide]` | Discourse `[spoiler]` | `AST::Spoiler` |
+| `[color]` | `<span style="color: …">` | `AST::Color` |
+| `[size]` | `<span style="font-size: …">` | `AST::Size` |
+| `[center]`, `[left]`, `[right]`, `[justify]` | `<div align="…">` | `AST::Align` |
 
 ### Lists
 
-| Tags | Notes |
-|---|---|
-| `[list]`, `[ul]`, `[ulist]` | Unordered list. `[list=1]` makes it ordered. |
-| `[ol]`, `[olist]` | Ordered list |
-| `[*]`, `[li]`, `[.]` | List item. Auto-closes the previous item and any open item at the end of the list. |
+| Tags | Renders as | AST node |
+|---|---|---|
+| `[list]`, `[ul]`, `[ulist]` | `- item`; `[list=1]` makes it ordered | `AST::List` |
+| `[ol]`, `[olist]` | `1. item` | `AST::List` |
+| `[*]`, `[li]`, `[.]` | List item; auto-closes the previous one | `AST::ListItem` |
 
 ### Tables
 
-| Tags | Notes |
-|---|---|
-| `[table]`, `[tr]`, `[td]`, `[th]` | Rendered as GFM tables |
+| Tags | Renders as | AST node |
+|---|---|---|
+| `[table]`, `[tr]`, `[td]`, `[th]` | GFM table | `AST::Table` |
 
 ### Self-closing
 
-| Tags | Notes |
-|---|---|
-| `[br]` | Hard line break |
-| `[hr]` | Horizontal rule |
+| Tags | Renders as | AST node |
+|---|---|---|
+| `[br]` | Hard line break | `AST::LineBreak` |
+| `[hr]` | `---` | `AST::HorizontalRule` |
+
+</div>
 
 For the exact registration list, see [`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/bbcode/handler_registry.rb).
 

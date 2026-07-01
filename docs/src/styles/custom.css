@@ -16,6 +16,25 @@
   white-space: nowrap;
 }
 
+/* --- Format-guide tag tables ------------------------------------------- */
+
+/* The "Supported tags" section stacks one small table per group (Formatting,
+ * Code, …). Left alone, each table auto-sizes its columns to its own content,
+ * so they don't line up. Fix the layout and pin the same column widths on every
+ * table in the wrapper, so the stacked tables share one grid. */
+.format-tags table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.format-tags :is(th, td):first-child {
+  width: 26%;
+}
+
+.format-tags :is(th, td):last-child {
+  width: 26%;
+}
+
 /* --- Inline code in headings ------------------------------------------- */
 
 /* A heading like `tags:, tag_library:, … removed from per-call signature`
