@@ -57,6 +57,8 @@ Inside `<r>`, formatted children use **uppercase element names** by convention (
 
 </div>
 
+Several elements carry attributes Markbridge reads: `<CODE>` (`lang`), `<URL>` (`url`), `<EMAIL>` (`email`), `<IMG>` (`src`), `<LIST>` (`type` — `bullet` or `decimal`), and `<QUOTE>` (attribution).
+
 For the exact list, see [`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/text_formatter/handler_registry.rb).
 
 ## Using the parser directly

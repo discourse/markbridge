@@ -92,6 +92,13 @@ All tag names are case-insensitive. Aliases in the same row behave identically.
 
 </div>
 
+A few tags take variants:
+
+- **Code language** — `[code=ruby]` or `[code lang=ruby]`.
+- **Ordered list** — `[list=1]` (same as `[ol]`).
+- **Quote attribution** — `[quote="author, post:1, topic:2"]`.
+- **Link forms** — `[url]` also accepts `[url=href]text[/url]` and `[url]href[/url]`; `[email=addr]text[/email]` and `[img=src]alt[/img]` follow the same shape.
+
 For the exact registration list, see [`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/bbcode/handler_registry.rb).
 
 ## Using the parser directly
