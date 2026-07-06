@@ -6,7 +6,6 @@ require_relative "markbridge/conversion"
 
 require_relative "markbridge/ast"
 require_relative "markbridge/renderers/discourse"
-require_relative "markbridge/processors"
 
 module Markbridge
   class << self

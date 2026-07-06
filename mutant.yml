@@ -17,17 +17,11 @@ matcher:
 # Central-dispatcher methods. The surviving mutations here are all
     # flow-control permutations (`if X && Y && Z` → variants that OR
     # across branches, `if X` → `if true/false/nil`, `next` drops,
-    # `@result << x` vs `@result << nil`, etc.) where the observable
-    # output is identical because a downstream branch catches the
-    # same content. Cases where fence detection is disabled, inline
-    # code picks it up; where inline is disabled, in_code? passthrough
-    # carries the same bytes; where the early-return guard is replaced
-    # with `if nil`/`if false`, the downstream nil-check recovers.
-    # Each permutation is its own spec to write; each spec exercises
-    # rare input patterns unlikely to surface in the public API. The
-    # behaviour pinned by the 37 scanner and 49 mediawiki specs
-    # covers every reachable state transition.
-    - Markbridge::Processors::DiscourseMarkdown::Scanner#scan_input
+    # etc.) where the observable output is identical because a
+    # downstream branch catches the same content. Each permutation is
+    # its own spec to write; each spec exercises rare input patterns
+    # unlikely to surface in the public API. The behaviour pinned by
+    # the 49 mediawiki specs covers every reachable state transition.
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_html_tag
     - Markbridge::Parsers::MediaWiki::InlineParser#dispatch_html_tag
 
@@ -54,20 +48,16 @@ matcher:
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_external_link
 
     # Bounded `while X < N && byte_check(pos)` loops throughout the
-    # escaper and CodeBlockTracker. Mutations on either half of the
-    # compound (bound drop, N permutation, byte_check drop) terminate
-    # via the other: the byte-check fails past end-of-string (getbyte
-    # returns nil, nil != <byte_val>) and the bound redundantly caps
-    # iterations at a small constant. Also `while nil && Y` mutations
-    # trigger the Ruby 3.4.8 PRISM bug (#22002) — surface as timeouts
-    # on 3.4.9+, never alive. All Bucket A.
+    # escaper. Mutations on either half of the compound (bound drop,
+    # N permutation, byte_check drop) terminate via the other: the
+    # byte-check fails past end-of-string (getbyte returns nil,
+    # nil != <byte_val>) and the bound redundantly caps iterations at
+    # a small constant. Also `while nil && Y` mutations trigger the
+    # Ruby 3.4.8 PRISM bug (#22002) — surface as timeouts on 3.4.9+,
+    # never alive. All Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
     - Markbridge::Renderers::Discourse::MarkdownEscaper#paragraph_line?
-    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#try_close_fence
-    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#open_fence
-    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#open_inline
-    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#count_fence_chars
     - Markbridge::Parsers::BBCode::Scanner#scan_while
 
 # escape_block_* fallthrough `[content, false]` returns. The `false`
@@ -118,13 +108,6 @@ matcher:
     # without changing observable output. Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_text
 
-    # CodeBlockTracker helpers `check_inline_boundary` /
-    # `skip_leading_spaces`: `input[pos] != " "` / `!= "`"` vs
-    # `!input[pos].eql?(" ")` / `!.eql?("`")`. `!=` and `!eql?` are
-    # identical for single-character strings. Bucket A.
-    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#check_inline_boundary
-    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#skip_leading_spaces
-
     # ListItemTag#calculate_indent's `if list_count <= 1; return ""`
     # early-return is a perf optimization (saves the parents.each
     # walk on the common top-level-list case — material on JRuby
@@ -138,13 +121,7 @@ matcher:
     # the "ignores non-List parents" spec. Bucket A.
     - Markbridge::Renderers::Discourse::Tags::ListItemTag#calculate_indent
 
-# Upload#parse_upload_url's `if ext.empty?; nil; else; url_part; end`
-    # vs `unless ext.empty?; url_part end`. The latter is syntactic
-    # inversion that produces identical return values (nil if empty,
-    # url_part otherwise). Bucket A.
-    - Markbridge::Processors::DiscourseMarkdown::Detectors::Upload#parse_upload_url
-
-    # ListItemBuilder#build's `lines.size < 2` fast-path. When lines
+# ListItemBuilder#build's `lines.size < 2` fast-path. When lines
     # has exactly 1 element, format_multiline with empty
     # continuation_lines produces byte-identical output to the early
     # return (first_line + "\n"). When lines has 0 elements,
@@ -185,27 +162,6 @@ matcher:
     # Test-observable only as a perf regression on empty-part-heavy
     # input, which isn't realistic through the public parse API.
     - Markbridge::Renderers::Discourse::Renderer#render_children
-
-    # CodeBlockTracker#check_indented_boundary's `input[pos...line_end]`
-    # vs `input[pos..line_end]`. When line_end points at `\n`, the
-    # inclusive form adds the newline to line_content; both downstream
-    # checks (`/\A\s*\z/` blank probe and `start_with?("    ")` indent
-    # probe) are unaffected by a trailing `\n` — `\n` is whitespace
-    # for /\s/, and `start_with?` is anchored. When
-    # `line_end == input_length`, Ruby clamps both ranges to the
-    # same substring. Bucket A, subject-level ignore.
-    - Markbridge::Processors::DiscourseMarkdown::CodeBlockTracker#check_indented_boundary
-
-
-    # advance_code_boundary mutations are all Bucket A equivalents
-    # that flow through to inline-code detection: `unless new_pos`
-    # flipped to `unless nil` / `unless false` / `return false` early
-    # all simply return false earlier, bypassing the fence/indent
-    # advance. The downstream `if @input[@pos] == "`"` branch then
-    # opens inline code on the same bytes (matching delimiter length)
-    # and the `if @code_tracker.in_code?` branch passes the same
-    # content through. Output is byte-identical.
-    - Markbridge::Processors::DiscourseMarkdown::Scanner#advance_code_boundary
 
     # MediaWiki InlineParser depth-bookkeeping. The remaining alive
     # mutations on `#initialize`'s `depth: 0` default and on
@@ -260,15 +216,14 @@ matcher:
 
 mutation:
   ignore_patterns:
-    # Bucket A bound-check equivalences. scan_pos, @current_pos, pos,
-    # and next_pos are all position integers ≤ their *_length bound,
-    # so the source `scan_pos >= input_length` / `pos >= input_length`
-    # / `next_pos < @inline_len` checks are equivalent to `==`,
-    # `.eql?`, and `.equal?` variants (mutant replaces `>=`/`<` with
-    # those). The guards are load-bearing against future drift where
-    # a position might exceed the length, but the observable
-    # behaviour is identical today for these specific comparisons.
-    - "send{receiver=lvar{value=scan_pos} selector=(>=)}"
+    # Bucket A bound-check equivalences. @current_pos, pos, and
+    # next_pos are all position integers ≤ their *_length bound,
+    # so the source `pos >= input_length` / `next_pos < @inline_len`
+    # checks are equivalent to `==`, `.eql?`, and `.equal?` variants
+    # (mutant replaces `>=`/`<` with those). The guards are
+    # load-bearing against future drift where a position might exceed
+    # the length, but the observable behaviour is identical today for
+    # these specific comparisons.
     - "send{receiver=lvar{value=pos} selector=(>=)}"
 
     # split("\n", -1) vs split("\n", -2) vs split("\n", 167) — Ruby
@@ -469,15 +424,6 @@ mutation:
 
     # escape_char_run's `while pos < @inline_len` loop bound.
     - "while{condition=send{receiver=lvar{value=pos} selector=<}}"
-
-    # CodeBlockTracker's `while scan_pos < input_length` loop bounds
-    # in check_fenced_boundary, try_close_fence, open_fence,
-    # count_fence_chars, skip_leading_spaces. Same Bucket-A
-    # equivalence as indent_len / ws_end / pos: input[scan_pos]
-    # returns nil past end, nil != SPACE/char, so the inner
-    # `break if input[scan_pos] != X` fires and terminates. Integer
-    # equality variants (== / .eql? / .equal?) equivalent for Fixnums.
-    - "while{condition=send{receiver=lvar{value=scan_pos} selector=<}}"
 
     # byteslice length-arg mutations in remaining_content and
     # escape_regular_char. `String#byteslice(pos, N)` clamps N to
