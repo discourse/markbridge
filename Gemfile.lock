@@ -281,8 +281,8 @@ DEPENDENCIES
   commonmarker
   lefthook
   markbridge!
-  mutant (~> 0.16)
-  mutant-rspec (~> 0.16)
+  mutant
+  mutant-rspec
   nokogiri
   puma
   rackup

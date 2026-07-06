@@ -22,5 +22,5 @@ gem "syntax_tree"
 # mutant only runs in the dedicated MRI `mutation` CI job. Keep it (and its
 # rdoc → rbs chain, which has a native extension) off JRuby/TruffleRuby, the
 # same way commonmarker is guarded above.
-gem "mutant", "~> 0.16", install_if: -> { RUBY_ENGINE == "ruby" }
-gem "mutant-rspec", "~> 0.16", install_if: -> { RUBY_ENGINE == "ruby" }
+gem "mutant", install_if: -> { RUBY_ENGINE == "ruby" }
+gem "mutant-rspec", install_if: -> { RUBY_ENGINE == "ruby" }
