@@ -83,6 +83,30 @@ VARIANTS = {
     end,
 }.freeze
 
+MEDIAWIKI_VARIANTS = {
+  "mw_fresh" =>
+    lambda do |corpus, tag|
+      report("mw_fresh/#{tag}", corpus) { |post| Markbridge.mediawiki_to_markdown(post) }
+    end,
+  "mw_parse" =>
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::MediaWiki::Parser.new
+      report("mw_parse/#{tag}", corpus) { |post| parser.parse(post) }
+    end,
+}.freeze
+
+HTML_VARIANTS = {
+  "html_fresh" =>
+    lambda do |corpus, tag|
+      report("html_fresh/#{tag}", corpus) { |post| Markbridge.html_to_markdown(post) }
+    end,
+  "html_parse" =>
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::HTML::Parser.new
+      report("html_parse/#{tag}", corpus) { |post| parser.parse(post) }
+    end,
+}.freeze
+
 requested = ARGV.empty? ? VARIANTS.keys : ARGV
 puts "YJIT: #{defined?(RubyVM::YJIT) && RubyVM::YJIT.enabled?}  Ruby #{RUBY_VERSION}"
 avg_ascii = Corpus.ascii.sum(&:bytesize) / Corpus.ascii.size
@@ -90,7 +114,16 @@ avg_multi = Corpus.multibyte.sum(&:bytesize) / Corpus.multibyte.size
 puts "corpus: #{Corpus.ascii.size} posts, avg #{avg_ascii} B (ascii) / #{avg_multi} B (multibyte)"
 
 requested.each do |variant|
-  runner = VARIANTS.fetch(variant)
-  runner.call(Corpus.ascii, "ascii")
-  runner.call(Corpus.multibyte, "multi")
+  if (runner = VARIANTS[variant])
+    runner.call(Corpus.ascii, "ascii")
+    runner.call(Corpus.multibyte, "multi")
+  elsif (runner = MEDIAWIKI_VARIANTS[variant])
+    runner.call(Corpus.mediawiki, "ascii")
+    runner.call(Corpus.mediawiki_multibyte, "multi")
+  elsif (runner = HTML_VARIANTS[variant])
+    runner.call(Corpus.html, "ascii")
+    runner.call(Corpus.html_multibyte, "multi")
+  else
+    raise ArgumentError, "unknown variant #{variant}"
+  end
 end

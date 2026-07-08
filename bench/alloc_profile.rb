@@ -23,12 +23,22 @@ require_relative "corpus"
 
 variant = ARGV[0] || "fresh"
 which = ARGV[1] || "ascii"
-corpus = which == "multi" ? Corpus.multibyte : Corpus.ascii
+corpus =
+  if variant.start_with?("mw_")
+    which == "multi" ? Corpus.mediawiki_multibyte : Corpus.mediawiki
+  elsif variant.start_with?("html_")
+    which == "multi" ? Corpus.html_multibyte : Corpus.html
+  else
+    which == "multi" ? Corpus.multibyte : Corpus.ascii
+  end
 
 handlers = Markbridge::Parsers::BBCode::HandlerRegistry.default
 parser = Markbridge::Parsers::BBCode::Parser.new(handlers:)
 renderer = Markbridge::Renderers::Discourse::Renderer.new
 asts = corpus.map { |post| parser.parse(post) } if variant == "render_only"
+
+mw_parser = Markbridge::Parsers::MediaWiki::Parser.new
+html_parser = Markbridge::Parsers::HTML::Parser.new
 
 work =
   case variant
@@ -40,6 +50,14 @@ work =
     ->(i) { parser.parse(corpus[i]) }
   when "render_only"
     ->(i) { renderer.postprocessor.call(renderer.render(asts[i])) }
+  when "mw_fresh"
+    ->(i) { Markbridge.mediawiki_to_markdown(corpus[i]) }
+  when "mw_parse"
+    ->(i) { mw_parser.parse(corpus[i]) }
+  when "html_fresh"
+    ->(i) { Markbridge.html_to_markdown(corpus[i]) }
+  when "html_parse"
+    ->(i) { html_parser.parse(corpus[i]) }
   else
     raise ArgumentError, "unknown variant #{variant}"
   end
