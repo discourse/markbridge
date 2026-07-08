@@ -68,7 +68,6 @@ matcher:
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
     - Markbridge::Renderers::Discourse::MarkdownEscaper#paragraph_line?
-    - Markbridge::Parsers::BBCode::Scanner#scan_while
 
 # escape_block_* fallthrough `[content, false]` returns. The `false`
     # → drop-second / `true` mutations on the non-match branch are
