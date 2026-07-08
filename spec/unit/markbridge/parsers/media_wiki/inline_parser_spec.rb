@@ -568,4 +568,76 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(italic.children.any? { |c| c.is_a?(Markbridge::AST::Bold) }).to be true
     end
   end
+
+  # The parser works in byte offsets. These inputs place multibyte text
+  # *before* each construct, shaped so that a byte/character-index mixup
+  # would land the cursor on an alphanumeric byte and change the outcome.
+  describe "multibyte text around constructs" do
+    it "parses bold after multibyte text" do
+      doc = parse("héllo wörld '''fett'''")
+
+      expect(doc.children[0].text).to eq("héllo wörld ")
+      expect(doc.children[1]).to be_a(Markbridge::AST::Bold)
+      expect(doc.children[1].children.first.text).to eq("fett")
+    end
+
+    it "parses multibyte content inside formatting" do
+      doc = parse("''größer über straße''")
+
+      expect(doc.children.first).to be_a(Markbridge::AST::Italic)
+      expect(doc.children.first.children.first.text).to eq("größer über straße")
+    end
+
+    it "parses internal links with multibyte target and display after multibyte text" do
+      doc = parse("日本語 [[ターゲット|表示テキスト]] テスト")
+
+      url = doc.children[1]
+      expect(url).to be_a(Markbridge::AST::Url)
+      expect(url.href).to eq("ターゲット")
+      expect(url.children.first.text).to eq("表示テキスト")
+      expect(doc.children[2].text).to eq(" テスト")
+    end
+
+    it "parses external links with multibyte display text after multibyte text" do
+      doc = parse("café [https://example.com/ü Ünïcode Anzeige]")
+
+      url = doc.children[1]
+      expect(url).to be_a(Markbridge::AST::Url)
+      expect(url.href).to eq("https://example.com/ü")
+      expect(url.children.first.text).to eq("Ünïcode Anzeige")
+    end
+
+    it "parses html tags with multibyte raw content after multibyte text" do
+      doc = parse("größer <code>schön ändern</code> Ende")
+
+      code = doc.children[1]
+      expect(code).to be_a(Markbridge::AST::Code)
+      expect(code.children.first.text).to eq("schön ändern")
+      expect(doc.children[2].text).to eq(" Ende")
+    end
+
+    it "keeps apostrophes between multibyte words as plain text" do
+      doc = parse("О'Брайен и l'été c'est")
+
+      expect(doc.children.first.text).to eq("О'Брайен и l'été c'est")
+    end
+
+    it "rolls back unterminated bold after multibyte text" do
+      doc = parse("héllo '''nie geschlossen")
+
+      expect(doc.children.map { |c| c.text }.join).to eq("héllo '''nie geschlossen")
+    end
+
+    it "rolls back unterminated internal links after multibyte text" do
+      doc = parse("héllo [[offen")
+
+      expect(doc.children.map { |c| c.text }.join).to eq("héllo [[offen")
+    end
+
+    it "preserves multibyte nowiki content" do
+      doc = parse("<nowiki>'''kein Fett''' straße</nowiki> danach")
+
+      expect(doc.children.first.text).to eq("'''kein Fett''' straße danach")
+    end
+  end
 end

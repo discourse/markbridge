@@ -216,6 +216,15 @@ matcher:
     - Markbridge::Parsers::MediaWiki::InlineParser#initialize
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_inner_content
 
+    # InlineParser#consecutive_apostrophes_at's `count = 0` seed. The
+    # `count = 1` mutation is equivalent because every call site sits
+    # on an apostrophe byte (the dispatch case arm, byteindex("'")
+    # results, and parse_bold_italic's precondition), so skipping the
+    # zeroth-byte check changes nothing. Killing it would require
+    # calling the helper on a non-apostrophe position, which no public
+    # input can produce.
+    - Markbridge::Parsers::MediaWiki::InlineParser#consecutive_apostrophes_at
+
     # MediaWiki Parser#initialize's block_given? conditional and the
     # InlineTagRegistry kwarg plumbing. Mutations on `if block_given?`
     # (`if true` / `if false`) and on the `inline_tag_registry ||`
