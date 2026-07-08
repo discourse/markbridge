@@ -4,7 +4,8 @@
 # that file measures micro-inputs per feature; this one measures
 # realistic ~1 KB forum posts and — more importantly — *isolates* cost
 # centers by differencing variants (e.g. fresh minus shared = per-call
-# setup cost; parse_only minus scan_only = handler/AST cost).
+# setup cost; parse_only minus scan_only = handler/AST cost; *_parse
+# minus *_walk = nokogiri's share).
 #
 #   bundle exec ruby --yjit bench/corpus_bench.rb [variant ...]
 #
@@ -47,6 +48,7 @@ CORPORA = {
   bbcode: -> { [Corpus.ascii, Corpus.multibyte] },
   mediawiki: -> { [Corpus.mediawiki, Corpus.mediawiki_multibyte] },
   html: -> { [Corpus.html, Corpus.html_multibyte] },
+  text_formatter: -> { [Corpus.text_formatter, Corpus.text_formatter_multibyte] },
 }.freeze
 
 # Each variant names the corpus pair it runs on and a runner that
@@ -121,6 +123,47 @@ VARIANTS = {
       parser = Markbridge::Parsers::HTML::Parser.new
       report("html_parse/#{tag}", corpus) { |post| parser.parse(post) }
     end,
+  ],
+  # The Ruby tree walk alone (pre-parsed input); html_parse minus
+  # html_walk = nokogiri's share.
+  "html_walk" => [
+    :html,
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::HTML::Parser.new
+      fragments = corpus.map { |post| Nokogiri::HTML.fragment(post) }
+      report("html_walk/#{tag}", fragments) { |fragment| parser.parse(fragment) }
+    end,
+  ],
+  "html_nokogiri" => [
+    :html,
+    lambda do |corpus, tag|
+      report("html_nokogiri/#{tag}", corpus) { |post| Nokogiri::HTML.fragment(post) }
+    end,
+  ],
+  "tf_fresh" => [
+    :text_formatter,
+    lambda do |corpus, tag|
+      report("tf_fresh/#{tag}", corpus) { |post| Markbridge.text_formatter_xml_to_markdown(post) }
+    end,
+  ],
+  "tf_parse" => [
+    :text_formatter,
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::TextFormatter::Parser.new
+      report("tf_parse/#{tag}", corpus) { |post| parser.parse(post) }
+    end,
+  ],
+  "tf_walk" => [
+    :text_formatter,
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::TextFormatter::Parser.new
+      docs = corpus.map { |post| Nokogiri.XML(post) }
+      report("tf_walk/#{tag}", docs) { |doc| parser.parse(doc) }
+    end,
+  ],
+  "tf_nokogiri" => [
+    :text_formatter,
+    lambda { |corpus, tag| report("tf_nokogiri/#{tag}", corpus) { |post| Nokogiri.XML(post) } },
   ],
 }.freeze
 

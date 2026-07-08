@@ -26,6 +26,7 @@ CORPORA = {
   bbcode: -> { [Corpus.ascii, Corpus.multibyte] },
   mediawiki: -> { [Corpus.mediawiki, Corpus.mediawiki_multibyte] },
   html: -> { [Corpus.html, Corpus.html_multibyte] },
+  text_formatter: -> { [Corpus.text_formatter, Corpus.text_formatter_multibyte] },
 }.freeze
 
 # Each variant names the corpus pair it runs on and a builder that
@@ -70,6 +71,33 @@ VARIANTS = {
     lambda do |corpus|
       parser = Markbridge::Parsers::HTML::Parser.new
       ->(i) { parser.parse(corpus[i]) }
+    end,
+  ],
+  "html_walk" => [
+    :html,
+    lambda do |corpus|
+      parser = Markbridge::Parsers::HTML::Parser.new
+      fragments = corpus.map { |post| Nokogiri::HTML.fragment(post) }
+      ->(i) { parser.parse(fragments[i]) }
+    end,
+  ],
+  "tf_fresh" => [
+    :text_formatter,
+    ->(corpus) { ->(i) { Markbridge.text_formatter_xml_to_markdown(corpus[i]) } },
+  ],
+  "tf_parse" => [
+    :text_formatter,
+    lambda do |corpus|
+      parser = Markbridge::Parsers::TextFormatter::Parser.new
+      ->(i) { parser.parse(corpus[i]) }
+    end,
+  ],
+  "tf_walk" => [
+    :text_formatter,
+    lambda do |corpus|
+      parser = Markbridge::Parsers::TextFormatter::Parser.new
+      docs = corpus.map { |post| Nokogiri.XML(post) }
+      ->(i) { parser.parse(docs[i]) }
     end,
   ],
 }.freeze
