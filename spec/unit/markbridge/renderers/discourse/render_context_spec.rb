@@ -42,6 +42,66 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
     it "stores the html_mode kwarg as-is" do
       expect(described_class.new([], html_mode: true).html_mode?).to be true
     end
+
+    it "exposes the nearest parent element (nil at root)" do
+      bold = Markbridge::AST::Bold.new
+      italic = Markbridge::AST::Italic.new
+      context = described_class.new
+
+      expect(context.element).to be_nil
+      expect(context.with_parent(bold).element).to be(bold)
+      expect(described_class.new([bold, italic]).element).to be(italic)
+    end
+
+    it "links each context created by with_parent back to its origin" do
+      context = described_class.new
+      new_context = context.with_parent(Markbridge::AST::Bold.new)
+
+      expect(new_context.parent_context).to be(context)
+    end
+
+    it "increments depth once per chained parent" do
+      context = described_class.new
+      bold = Markbridge::AST::Bold.new
+      italic = Markbridge::AST::Italic.new
+
+      expect(context.with_parent(bold).depth).to eq(1)
+      expect(context.with_parent(bold).with_parent(italic).depth).to eq(2)
+    end
+
+    it "supports the chain form without an enclosing context" do
+      bold = Markbridge::AST::Bold.new
+      context = described_class.new(element: bold)
+
+      expect(context.depth).to eq(1)
+      expect(context.parents).to eq([bold])
+      expect(context.find_parent(Markbridge::AST::Italic)).to be_nil
+    end
+
+    it "ignores the parents array when an element is given" do
+      bold = Markbridge::AST::Bold.new
+      italic = Markbridge::AST::Italic.new
+      context = described_class.new([italic], element: bold)
+
+      expect(context.parents).to eq([bold])
+    end
+
+    it "propagates html_mode into the contexts built from a parents array" do
+      bold = Markbridge::AST::Bold.new
+      italic = Markbridge::AST::Italic.new
+      context = described_class.new([bold, italic], html_mode: true)
+
+      expect(context.parent_context.html_mode?).to be true
+    end
+
+    it "keeps depth in sync when toggling html_mode mid-chain" do
+      bold = Markbridge::AST::Bold.new
+      italic = Markbridge::AST::Italic.new
+      context = described_class.new([bold, italic]).with_html_mode(true)
+
+      expect(context.depth).to eq(2)
+      expect(context.element).to be(italic)
+    end
   end
 
   describe "#with_parent" do
@@ -164,6 +224,23 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
 
       expect(context.find_parent(Markbridge::AST::Url)).to equal(sub)
     end
+
+    it "finds a match beyond the nearest parent (the walk must advance)" do
+      # Three levels deep so a walk that fails to advance past the second
+      # node (e.g. re-reading the start context's parent) can't fake it.
+      bold = Markbridge::AST::Bold.new
+      italic = Markbridge::AST::Italic.new
+      underline = Markbridge::AST::Underline.new
+      context = described_class.new([bold, italic, underline])
+
+      expect(context.find_parent(Markbridge::AST::Bold)).to be(bold)
+    end
+
+    it "walks a chain that has no enclosing root context" do
+      context = described_class.new(element: Markbridge::AST::Bold.new)
+
+      expect(context.find_parent(Markbridge::AST::Italic)).to be_nil
+    end
   end
 
   describe "#count_parents" do
@@ -177,6 +254,12 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       context = described_class.new([italic])
 
       expect(context.count_parents(Markbridge::AST::Bold)).to eq(0)
+    end
+
+    it "counts parents on a chain that has no enclosing root context" do
+      context = described_class.new(element: Markbridge::AST::Bold.new)
+
+      expect(context.count_parents(Markbridge::AST::Bold)).to eq(1)
     end
 
     it "counts matching parents" do
@@ -244,6 +327,23 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       context = described_class.new([custom_url_class.new])
 
       expect(context.has_parent?(Markbridge::AST::Url)).to be true
+    end
+
+    it "sees a match beyond the nearest parent (the walk must advance)" do
+      # Three levels deep so a walk that fails to advance past the second
+      # node (e.g. re-reading the start context's parent) can't fake it.
+      bold = Markbridge::AST::Bold.new
+      italic = Markbridge::AST::Italic.new
+      underline = Markbridge::AST::Underline.new
+      context = described_class.new([bold, italic, underline])
+
+      expect(context.has_parent?(Markbridge::AST::Bold)).to be true
+    end
+
+    it "walks a chain that has no enclosing root context" do
+      context = described_class.new(element: Markbridge::AST::Bold.new)
+
+      expect(context.has_parent?(Markbridge::AST::Italic)).to be false
     end
   end
 
