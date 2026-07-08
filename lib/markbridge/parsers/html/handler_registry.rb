@@ -112,7 +112,10 @@ module Markbridge
         # @param tag_name [String]
         # @return [BaseHandler, nil]
         def [](tag_name)
-          @handlers[tag_name.to_s.downcase]
+          # Keys are always downcased strings and Nokogiri's HTML parser
+          # yields downcased element names, so the fetch hits directly on
+          # the hot path; the block normalizes only unusual lookups.
+          @handlers.fetch(tag_name) { @handlers[tag_name.to_s.downcase] }
         end
 
         # Create the default handler registry with common HTML tags
@@ -148,6 +151,29 @@ module Markbridge
           registry = default
           yield(registry) if block_given?
           registry
+        end
+
+        # Shared, deep-frozen default registry for the no-customization
+        # fast path. Built once per process; {Parser} falls back to it
+        # when no +handlers:+ are given, skipping the full registry
+        # construction on every parse. Handlers are stateless after
+        # construction, so sharing is safe across parsers and threads.
+        # Callers who want to mutate the tag sets must build their own
+        # {.default}.
+        #
+        # @return [HandlerRegistry] the same frozen instance on every call
+        def self.shared_default
+          @shared_default ||= default.freeze
+        end
+
+        # Freeze the registry together with its internal collections so
+        # that mutation of a shared instance fails loudly instead of
+        # silently changing state visible to every parser.
+        def freeze
+          @handlers.freeze
+          @block_level_tags.freeze
+          @whitespace_preserving_tags.freeze
+          super
         end
       end
     end

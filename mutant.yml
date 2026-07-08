@@ -48,11 +48,14 @@ matcher:
     # differ in per-token allocations. The fetch exists purely to skip
     # the `to_s.downcase` copy on the hot path; no test can observe
     # the difference through the public API. Bucket A.
-    # MediaWiki::InlineTagRegistry#[] has the identical fetch-with-
-    # downcasing-fallback shape (the inline parser downcases tag names
-    # before lookup) and the same equivalence.
+    # MediaWiki::InlineTagRegistry#[], HTML::HandlerRegistry#[], and
+    # TextFormatter::HandlerRegistry#[] have the identical fetch-with-
+    # normalizing-fallback shape (their tag sources already produce
+    # keys in the stored case) and the same equivalence.
     - Markbridge::Parsers::BBCode::HandlerRegistry#[]
     - Markbridge::Parsers::MediaWiki::InlineTagRegistry#[]
+    - Markbridge::Parsers::HTML::HandlerRegistry#[]
+    - Markbridge::Parsers::TextFormatter::HandlerRegistry#[]
 
     # HandlerRegistry#freeze deep-freezes three internal collections.
     # `register` writes @handlers first and raises FrozenError there,
@@ -74,6 +77,17 @@ matcher:
     # MediaWiki parser.
     - Markbridge::Parsers::BBCode::Parser#normalize_line_endings
     - Markbridge::Parsers::MediaWiki::Parser#normalize_line_endings
+
+    # HTML::Parser fast-path guards with output-equivalent slow paths:
+    # process_text_node's COLLAPSIBLE_WHITESPACE gate (forcing the gsub
+    # on single-space prose rebuilds an equal string) and
+    # trim_trailing_whitespace's TRAILING_STRIPPABLE gate (forcing the
+    # rstrip+pop+re-add on an untrimmed text produces a value-equal
+    # AST). Both guards exist purely to avoid per-node copies; the
+    # behavioral branches around them are pinned by the whitespace-
+    # handling specs. Bucket A.
+    - Markbridge::Parsers::HTML::Parser#process_text_node
+    - Markbridge::Parsers::HTML::Parser#trim_trailing_whitespace
 
     # RenderingInterface#apply_markers' EDGE_WHITESPACE fast path.
     # The capture-group sub handles flush content identically (its
