@@ -32,6 +32,25 @@ module Markbridge
           default.tap { |registry| yield registry if block_given? }
         end
 
+        # Shared, deep-frozen default registry for the no-customization
+        # fast path. Built once per process; {Parser} falls back to it
+        # when no +handlers:+ are given, skipping the full registry
+        # construction on every parse. Handlers are stateless after
+        # construction, so sharing is safe across parsers and threads.
+        #
+        # @return [HandlerRegistry] the same frozen instance on every call
+        def self.shared_default
+          @shared_default ||= default.freeze
+        end
+
+        # Freeze the registry together with its internal Hash so that
+        # registration on a shared instance fails loudly instead of
+        # silently mutating state visible to every parser.
+        def freeze
+          @mappings.freeze
+          super
+        end
+
         def initialize
           @mappings = {}
         end
@@ -47,7 +66,10 @@ module Markbridge
         # @param element_name [String]
         # @return [#process, nil]
         def [](element_name)
-          @mappings[element_name.upcase]
+          # Keys are always upcased and s9e/TextFormatter stores its tag
+          # names in uppercase, so the fetch hits directly on the hot
+          # path; the block normalizes only unusual lookups.
+          @mappings.fetch(element_name) { @mappings[element_name.upcase] }
         end
 
         # Replace the handler bound to one or more element names by
