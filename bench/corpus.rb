@@ -112,9 +112,66 @@ module Corpus
     end
   end
 
-  def build(words, count: 200, seed: 42)
+  # A MediaWiki post: same shape as the BBCode one, wikitext syntax.
+  # Prose includes apostrophes (possessives) on purpose — apostrophe
+  # handling is the inline parser's hottest dispatch.
+  def mediawiki_post(rng, words)
+    parts = []
+    parts << "== #{sentence(rng, words, 3)} =="
+    parts << "#{paragraph(rng, words)} It's #{words[rng.rand(words.size)]}'s turn."
+    parts << "'''#{sentence(rng, words, 4)}''' and ''#{sentence(rng, words, 3)}''"
+    parts << paragraph(rng, words)
+    parts << mediawiki_construct(rng, words)
+    parts << paragraph(rng, words)
+    parts.join("\n\n")
+  end
+
+  def mediawiki_construct(rng, words)
+    case rng.rand(6)
+    when 0
+      "[[#{sentence(rng, words, 2)}|#{sentence(rng, words, 3)}]] inside a sentence."
+    when 1
+      Array.new(3 + rng.rand(3)) { "* #{sentence(rng, words, 5)}" }.join("\n")
+    when 2
+      "<code>x = #{rng.rand(100)}</code> and <pre>keep   this</pre>"
+    when 3
+      "See [https://example.com/#{rng.rand(1000)} #{sentence(rng, words, 3)}] for details."
+    when 4
+      "{|\n|-\n! A !! B\n|-\n| #{words[rng.rand(words.size)]} || 2\n|}"
+    when 5
+      "''''' #{sentence(rng, words, 4)} ''''' with <s>#{sentence(rng, words, 2)}</s>"
+    end
+  end
+
+  # An HTML post with the same overall shape.
+  def html_post(rng, words)
+    parts = []
+    parts << "<p>#{paragraph(rng, words)}</p>"
+    parts << "<p><strong>#{sentence(rng, words, 4)}</strong> and <em>#{sentence(rng, words, 3)}</em></p>"
+    parts << "<p>#{paragraph(rng, words)}</p>"
+    parts << html_construct(rng, words)
+    parts << "<p>#{paragraph(rng, words)}</p>"
+    parts.join("\n")
+  end
+
+  def html_construct(rng, words)
+    case rng.rand(5)
+    when 0
+      "<blockquote><p>#{paragraph(rng, words)}</p></blockquote>"
+    when 1
+      "<ul>#{Array.new(3 + rng.rand(3)) { "<li>#{sentence(rng, words, 5)}</li>" }.join}</ul>"
+    when 2
+      "<pre><code>def hello\n  puts 'x'\nend</code></pre>"
+    when 3
+      "<p>See <a href=\"https://example.com/#{rng.rand(1000)}\">#{sentence(rng, words, 3)}</a>.</p>"
+    when 4
+      "<table><tr><th>A</th><th>B</th></tr><tr><td>#{words[rng.rand(words.size)]}</td><td>2</td></tr></table>"
+    end
+  end
+
+  def build(words, count: 200, seed: 42, kind: :post)
     rng = Random.new(seed)
-    Array.new(count) { post(rng, words) }
+    Array.new(count) { public_send(kind, rng, words) }
   end
 
   def ascii
@@ -123,5 +180,21 @@ module Corpus
 
   def multibyte
     @multibyte ||= build(WORDS_MULTI)
+  end
+
+  def mediawiki
+    @mediawiki ||= build(WORDS_ASCII, kind: :mediawiki_post)
+  end
+
+  def mediawiki_multibyte
+    @mediawiki_multibyte ||= build(WORDS_MULTI, kind: :mediawiki_post)
+  end
+
+  def html
+    @html ||= build(WORDS_ASCII, kind: :html_post)
+  end
+
+  def html_multibyte
+    @html_multibyte ||= build(WORDS_MULTI, kind: :html_post)
   end
 end

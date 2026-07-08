@@ -22,7 +22,11 @@ require "objspace"
 require_relative "corpus"
 
 # ASCII/multibyte corpus pair per source format.
-CORPORA = { bbcode: -> { [Corpus.ascii, Corpus.multibyte] } }.freeze
+CORPORA = {
+  bbcode: -> { [Corpus.ascii, Corpus.multibyte] },
+  mediawiki: -> { [Corpus.mediawiki, Corpus.mediawiki_multibyte] },
+  html: -> { [Corpus.html, Corpus.html_multibyte] },
+}.freeze
 
 # Each variant names the corpus pair it runs on and a builder that
 # receives the corpus and returns the per-post work lambda.
@@ -50,6 +54,22 @@ VARIANTS = {
       asts = corpus.map { |post| parser.parse(post) }
       renderer = Markbridge::Renderers::Discourse::Renderer.new
       ->(i) { renderer.postprocessor.call(renderer.render(asts[i])) }
+    end,
+  ],
+  "mw_fresh" => [:mediawiki, ->(corpus) { ->(i) { Markbridge.mediawiki_to_markdown(corpus[i]) } }],
+  "mw_parse" => [
+    :mediawiki,
+    lambda do |corpus|
+      parser = Markbridge::Parsers::MediaWiki::Parser.new
+      ->(i) { parser.parse(corpus[i]) }
+    end,
+  ],
+  "html_fresh" => [:html, ->(corpus) { ->(i) { Markbridge.html_to_markdown(corpus[i]) } }],
+  "html_parse" => [
+    :html,
+    lambda do |corpus|
+      parser = Markbridge::Parsers::HTML::Parser.new
+      ->(i) { parser.parse(corpus[i]) }
     end,
   ],
 }.freeze

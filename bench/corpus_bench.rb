@@ -43,7 +43,11 @@ def report(name, corpus, &work)
 end
 
 # ASCII/multibyte corpus pair per source format.
-CORPORA = { bbcode: -> { [Corpus.ascii, Corpus.multibyte] } }.freeze
+CORPORA = {
+  bbcode: -> { [Corpus.ascii, Corpus.multibyte] },
+  mediawiki: -> { [Corpus.mediawiki, Corpus.mediawiki_multibyte] },
+  html: -> { [Corpus.html, Corpus.html_multibyte] },
+}.freeze
 
 # Each variant names the corpus pair it runs on and a runner that
 # benchmarks one corpus under a label.
@@ -90,6 +94,32 @@ VARIANTS = {
         scanner = Markbridge::Parsers::BBCode::Scanner.new(post)
         nil while scanner.next_token
       end
+    end,
+  ],
+  "mw_fresh" => [
+    :mediawiki,
+    lambda do |corpus, tag|
+      report("mw_fresh/#{tag}", corpus) { |post| Markbridge.mediawiki_to_markdown(post) }
+    end,
+  ],
+  "mw_parse" => [
+    :mediawiki,
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::MediaWiki::Parser.new
+      report("mw_parse/#{tag}", corpus) { |post| parser.parse(post) }
+    end,
+  ],
+  "html_fresh" => [
+    :html,
+    lambda do |corpus, tag|
+      report("html_fresh/#{tag}", corpus) { |post| Markbridge.html_to_markdown(post) }
+    end,
+  ],
+  "html_parse" => [
+    :html,
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::HTML::Parser.new
+      report("html_parse/#{tag}", corpus) { |post| parser.parse(post) }
     end,
   ],
 }.freeze
