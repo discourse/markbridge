@@ -44,7 +44,11 @@ module Markbridge
         # @param tag_name [String]
         # @return [Entry, nil]
         def [](tag_name)
-          @entries[tag_name.downcase]
+          # Keys are always downcased and the inline parser downcases tag
+          # names before lookup, so the fetch hits directly on the hot
+          # path; the block normalizes only mixed-case lookups instead of
+          # allocating a downcased copy per probe.
+          @entries.fetch(tag_name) { @entries[tag_name.downcase] }
         end
 
         # Check if a tag name is registered.
@@ -86,6 +90,25 @@ module Markbridge
           registry = default
           yield(registry) if block_given?
           registry
+        end
+
+        # Shared, deep-frozen default registry for the no-customization
+        # fast path. Built once per process; {InlineParser} falls back to
+        # it when no +handlers:+ are given, skipping the full registry
+        # construction on every parse. Entries are immutable Data objects,
+        # so sharing is safe across parsers and threads.
+        #
+        # @return [InlineTagRegistry] the same frozen instance on every call
+        def self.shared_default
+          @shared_default ||= default.freeze
+        end
+
+        # Freeze the registry together with its internal Hash so that
+        # registration on a shared instance fails loudly instead of
+        # silently mutating state visible to every parser.
+        def freeze
+          @entries.freeze
+          super
         end
 
         private

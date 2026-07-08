@@ -179,4 +179,38 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineTagRegistry do
       expect(registry["code"].element_class).to eq(Markbridge::AST::Bold)
     end
   end
+
+  describe ".shared_default" do
+    it "returns the same instance on every call" do
+      expect(described_class.shared_default).to be(described_class.shared_default)
+    end
+
+    it "is frozen" do
+      expect(described_class.shared_default).to be_frozen
+    end
+
+    it "resolves the default tags" do
+      expect(described_class.shared_default["code"].element_class).to eq(Markbridge::AST::Code)
+    end
+
+    it "is a different instance from .default" do
+      expect(described_class.shared_default).not_to be(described_class.default)
+    end
+  end
+
+  describe "#freeze" do
+    it "makes register raise instead of silently mutating shared state" do
+      frozen = described_class.new.freeze
+
+      expect { frozen.register("mark", :formatting, Markbridge::AST::Bold) }.to raise_error(
+        FrozenError,
+      )
+    end
+
+    it "returns self" do
+      registry = described_class.new
+
+      expect(registry.freeze).to be(registry)
+    end
+  end
 end
