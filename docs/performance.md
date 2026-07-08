@@ -16,10 +16,10 @@ This guide covers performance considerations, optimization techniques, and best 
 
 Markbridge is designed for performance with these principles:
 
-- **O(n) parsing** - Single pass through input
-- **Minimal allocations** - Reuse buffers, avoid temporary objects
+- **O(n) parsing** - Single pass through input, byte-offset scanning
+- **Minimal allocations** - Shared frozen defaults, copy-on-write text
+  nodes, no per-character strings
 - **Bounded operations** - Depth limits prevent runaway behavior
-- **Smart caching** - O(1) lookups for parent context
 - **Streaming support** - Constant memory for large documents
 
 **Performance characteristics:**
@@ -46,12 +46,9 @@ Markbridge is designed for performance with these principles:
 |-----------|-----------|-------|
 | Tree traversal | O(n) | Visit each node once |
 | Tag lookup | O(1) | Hash-based library |
-| Parent lookup (cached) | O(1) | Hash cache |
-| Parent lookup (uncached) | O(depth) | Linear scan |
+| Parent lookup | O(depth) | Linear scan of the parent chain |
 | Child rendering | O(children) | Linear in child count |
-| Overall | O(n) | Linear in AST size |
-
-**Key insight:** Cached context provides 5x-10x speedup for deeply nested structures!
+| Overall | O(n) | Linear in AST size (depth is bounded by MAX_DEPTH) |
 
 ## Parser Performance
 
@@ -59,20 +56,42 @@ Markbridge is designed for performance with these principles:
 
 The Scanner is the performance-critical path. Follow these patterns:
 
-#### 1. Character-by-Character Streaming
+#### 1. Byte Offsets, Not Character Indices
 
-**Good: Index-based access**
+CRuby has no character-index cache: on any string containing a multibyte
+character, `str[pos]` and `str.index(pattern, pos)` walk bytes from the
+start of the string — O(pos) *per call* and superlinear per document.
+The Scanner therefore works entirely in byte offsets.
+
+**Good: byte-domain access**
 ```ruby
-char = @input[@pos]
-@pos += 1
+byte = @input.getbyte(@pos)          # Integer, no allocation, O(1)
+idx = @input.byteindex("[", @pos)    # C-speed skip to the next tag
+text = @input.byteslice(start, len)  # one slice for the whole span
 ```
 
-**Avoid: String slicing (creates new strings)**
+**Avoid: character-domain access and per-char strings**
 ```ruby
-# Creates intermediate string objects
-char = @input[@pos..@pos]
-slice = @input[@pos..@pos + 10]
+char = @input[@pos]                  # allocates a String per char,
+                                     # O(pos) on multibyte input
+idx = @input.index("[", @pos)        # O(pos) on multibyte input
 ```
+
+Rules that keep this correct:
+
+- **Boundary invariant**: every offset must sit on a character
+  boundary. Held structurally — `byteindex` jumps land on ASCII
+  matches; manual advances step over ASCII bytes. Never mix `getbyte`
+  with character indices (a half-measure that corrupts scans whenever
+  multibyte text precedes a construct).
+- **`byteindex` returns `0` for a match at the start — falsy-looking.**
+  Nil-check, never truthiness-check.
+- **Classify bytes with integer range checks** (`byte >= LOWER_A &&
+  byte <= LOWER_Z`), not regexes over one-char strings. A byte >= 0x80
+  (multibyte lead/continuation) never satisfies an ASCII predicate, so
+  no encoding-awareness is needed at probe sites.
+- **Small extracted strings stay character-domain** — only offsets into
+  the scanned input change meaning.
 
 #### 2. Bounded Backtracking
 
@@ -107,23 +126,23 @@ backup = Scanner.new(@input[@pos..])
 result = "" + char + another_char # Multiple string objects
 ```
 
-#### 4. Regex for Character Classes Only
+#### 4. Regex Only Where the Regex Engine Does the Work
 
-**Good: Character class checks**
+**Good: let the regex engine skip spans in C**
 ```ruby
-TAG_INITIAL_CHAR = /[a-z*]/i
-char =~ TAG_INITIAL_CHAR
+UNQUOTED_VALUE_STOP = /[\[\]\s]/
+stop = @input.byteindex(UNQUOTED_VALUE_STOP, @pos) || @length
 ```
 
-**Good: Direct comparison for single chars**
+**Good: integer comparison for single bytes and classes**
 ```ruby
-char == "["
-char == "]"
+byte == BRACKET_CLOSE
+byte >= DIGIT_0 && byte <= DIGIT_9
 ```
 
-**Avoid: Regex for simple comparisons**
+**Avoid: per-position regex probes (allocates a string per probe)**
 ```ruby
-char =~ /\[/ # Overkill for single character
+@input[@pos].match?(/[a-z*]/i) # a String + a regex match per character
 ```
 
 ### Handler Optimizations
@@ -393,6 +412,26 @@ end
 - Better performance in Ruby 3.x
 
 ## Benchmarking
+
+### Repo instruments
+
+Three scripts live in `bench/` — use them before and after any change to
+the parsing or rendering hot paths:
+
+```bash
+bundle exec ruby --yjit bench/bench.rb           # per-feature micro-inputs
+bundle exec ruby --yjit bench/corpus_bench.rb    # ~1 KB forum posts, isolating variants
+bundle exec ruby bench/alloc_profile.rb          # allocations ranked by file:line
+```
+
+`corpus_bench.rb` localizes cost by differencing variants (`fresh` minus
+`shared` = per-call setup; `parse_only` minus `scan_only` = handler/AST
+cost) and runs an ASCII and a multibyte corpus — always compare both,
+character-index pathologies only show up on multibyte input.
+`alloc_profile.rb` names the exact allocation sites; profile before
+optimizing, the ranking is usually not what intuition predicts. Note
+that wall-clock benchmarks understate allocation wins: fewer allocations
+also mean fewer GC cycles in real workloads.
 
 ### Setup
 
