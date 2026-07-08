@@ -176,6 +176,28 @@ module Markbridge
           registry
         end
 
+        # Shared, deep-frozen default registry for the no-customization
+        # fast path. Built once per process; {Parser} falls back to it
+        # when no +handlers:+ are given, skipping the full registry
+        # construction on every parse. Handlers and closing strategies
+        # are stateless after construction, so sharing is safe across
+        # parsers and threads.
+        #
+        # @return [HandlerRegistry] the same frozen instance on every call
+        def self.shared_default
+          @shared_default ||= default.freeze
+        end
+
+        # Freeze the registry together with its internal collections so
+        # that registration on a shared instance fails loudly instead of
+        # silently mutating state visible to every parser.
+        def freeze
+          @handlers.freeze
+          @element_handlers.freeze
+          @auto_closeable_elements.freeze
+          super
+        end
+
         # Build a registry from the default configuration with optional customization
         # @yield [HandlerRegistry] the registry to customize
         # @return [HandlerRegistry]

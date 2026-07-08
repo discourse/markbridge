@@ -250,4 +250,47 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
       expect(original.dup[Markbridge::AST::Bold]).to be(tag)
     end
   end
+
+  describe ".shared_default" do
+    it "returns the same instance on every call" do
+      expect(described_class.shared_default).to be(described_class.shared_default)
+    end
+
+    it "is frozen" do
+      expect(described_class.shared_default).to be_frozen
+    end
+
+    it "resolves the default tags" do
+      expect(described_class.shared_default[Markbridge::AST::Bold]).to be_a(
+        Markbridge::Renderers::Discourse::Tags::BoldTag,
+      )
+    end
+
+    it "is a different instance from .default" do
+      expect(described_class.shared_default).not_to be(described_class.default)
+    end
+
+    it "dups into a mutable, isolated copy" do
+      copy = described_class.shared_default.dup
+      copy.unregister(Markbridge::AST::Bold)
+
+      expect(copy[Markbridge::AST::Bold]).to be_nil
+      expect(described_class.shared_default[Markbridge::AST::Bold]).not_to be_nil
+    end
+  end
+
+  describe "#freeze" do
+    it "makes register raise instead of silently mutating shared state" do
+      tag = Markbridge::Renderers::Discourse::Tag.new { |_, _| "x" }
+      frozen = described_class.new.freeze
+
+      expect { frozen.register(Markbridge::AST::Bold, tag) }.to raise_error(FrozenError)
+    end
+
+    it "returns self" do
+      library = described_class.new
+
+      expect(library.freeze).to be(library)
+    end
+  end
 end

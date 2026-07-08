@@ -522,4 +522,56 @@ RSpec.describe Markbridge::Parsers::BBCode::HandlerRegistry do
       expect(result).to be(registry)
     end
   end
+
+  describe ".shared_default" do
+    it "returns the same instance on every call" do
+      expect(described_class.shared_default).to be(described_class.shared_default)
+    end
+
+    it "is frozen" do
+      expect(described_class.shared_default).to be_frozen
+    end
+
+    it "resolves the default tags" do
+      handler = described_class.shared_default["b"]
+
+      expect(handler.element_class).to eq(Markbridge::AST::Bold)
+    end
+
+    it "has a closing strategy wired up" do
+      registry = described_class.shared_default
+      document = Markbridge::AST::Document.new
+      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+      context.push(Markbridge::AST::Bold.new)
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "b", pos: 3, source: "[/b]")
+
+      registry.close_element(token:, context:)
+
+      expect(context.current).to be(document)
+    end
+
+    it "is a different instance from .default" do
+      expect(described_class.shared_default).not_to be(described_class.default)
+    end
+  end
+
+  describe "#freeze" do
+    it "makes register raise instead of silently mutating shared state" do
+      frozen = described_class.new.freeze
+
+      expect { frozen.register("b", fake_handler) }.to raise_error(FrozenError)
+    end
+
+    it "makes closing_strategy= raise" do
+      frozen = described_class.new.freeze
+
+      expect { frozen.closing_strategy = nil }.to raise_error(FrozenError)
+    end
+
+    it "returns self" do
+      registry = described_class.new
+
+      expect(registry.freeze).to be(registry)
+    end
+  end
 end
