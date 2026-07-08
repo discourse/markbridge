@@ -53,11 +53,14 @@ module Markbridge
 
         private
 
+        LINE_ENDING_RE = /\r\n?|[\u2028\u2029]+/
+        private_constant :LINE_ENDING_RE
+
         # Normalize line endings (CR, CRLF, and Unicode separators)
         # @param input [String]
-        # @return [String]
+        # @return [String] the input itself when already normalized (LF-only)
         def normalize_line_endings(input)
-          input.gsub(/\r\n?|[\u2028\u2029]+/, "\n")
+          input.match?(LINE_ENDING_RE) ? input.gsub(LINE_ENDING_RE, "\n") : input
         end
 
         # Parse tokens using scanner

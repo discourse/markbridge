@@ -202,6 +202,20 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
       expect(interface.wrap_inline("foo\nbar", "**")).to eq("**foo\nbar**")
     end
 
+    it "preserves edge whitespace around multi-line content (the sub needs /m)" do
+      expect(interface.wrap_inline(" foo\nbar ", "**")).to eq(" **foo\nbar** ")
+    end
+
+    it "preserves leading whitespace when there is no trailing whitespace" do
+      # The trailing capture must accept the empty string ([[:space:]]*).
+      expect(interface.wrap_inline("  text", "**")).to eq("  **text**")
+    end
+
+    it "preserves trailing whitespace when there is no leading whitespace" do
+      # The leading capture must accept the empty string ([[:space:]]*).
+      expect(interface.wrap_inline("text  ", "**")).to eq("**text**  ")
+    end
+
     context "when content already contains the open marker" do
       it "falls back to <strong> for **" do
         expect(interface.wrap_inline("a**b", "**")).to eq("<strong>a**b</strong>")

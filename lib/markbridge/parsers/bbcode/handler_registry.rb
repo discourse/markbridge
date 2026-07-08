@@ -62,7 +62,11 @@ module Markbridge
         # @param tag_name [String]
         # @return [BaseHandler, nil]
         def [](tag_name)
-          @handlers[tag_name.to_s.downcase]
+          # Keys are always downcased strings and the scanner emits
+          # downcased tags, so the fetch hits directly on the hot path;
+          # the block normalizes only unusual lookups (mixed case,
+          # symbols) instead of allocating a downcased copy per token.
+          @handlers.fetch(tag_name) { @handlers[tag_name.to_s.downcase] }
         end
 
         # Get handler for an element instance

@@ -19,13 +19,15 @@ module Markbridge
 
       # Create a new text node with the given content.
       #
-      # The text is copied into a fresh mutable buffer so that subsequent
-      # in-place mutations (e.g. via {#merge}) do not leak back to the caller's
-      # original string.
+      # Frozen input is shared as-is (copy-on-write: {#merge} dups before
+      # its first append) — the parser hot path always passes frozen token
+      # text, so no copy is made per text node. Mutable input is copied so
+      # that in-place mutations cannot leak in either direction between
+      # the caller's string and this node.
       #
       # @param text [String] the text content
       def initialize(text)
-        @text = text.dup
+        @text = text.frozen? ? text : text.dup
       end
 
       # Merge another text node's content into this one.
@@ -34,6 +36,7 @@ module Markbridge
       # @param other [Text] the text node to merge from
       # @return [Text] self for method chaining
       def merge(other)
+        @text = @text.dup if @text.frozen?
         @text << other.text
         self
       end

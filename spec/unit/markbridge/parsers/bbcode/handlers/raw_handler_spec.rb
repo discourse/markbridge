@@ -33,6 +33,97 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::RawHandler do
 
       expect(document.children.first.children.first.text).to eq("body")
     end
+
+    # Language support is detected once at construction (reflection is too
+    # costly per element); these examples prove the detection result drives
+    # element creation.
+    it "detects language: support at construction time" do
+      document = Markbridge::AST::Document.new
+      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+      registry = Markbridge::Parsers::BBCode::HandlerRegistry.new
+      token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "code",
+          attrs: {
+            option: "ruby",
+          },
+          pos: 0,
+          source: "[code=ruby]",
+        )
+      close_token =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "code", pos: 12, source: "[/code]")
+      scanner = MockScanner.new([close_token])
+
+      described_class.new(Markbridge::AST::Code).on_open(
+        token:,
+        context:,
+        registry:,
+        tokens: scanner,
+      )
+
+      expect(document.children.first.language).to eq("ruby")
+    end
+
+    it "detects at construction time that language: is not accepted" do
+      bare_class =
+        Class.new(Markbridge::AST::Element) do
+          def self.name
+            "BareElement"
+          end
+        end
+      document = Markbridge::AST::Document.new
+      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+      registry = Markbridge::Parsers::BBCode::HandlerRegistry.new
+      token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "bare",
+          # A language-shaped attr is present, but the AST class would raise
+          # on an unknown language: kwarg if the handler forwarded it.
+          attrs: {
+            lang: "ruby",
+          },
+          pos: 0,
+          source: "[bare lang=ruby]",
+        )
+      close_token =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "bare", pos: 16, source: "[/bare]")
+      scanner = MockScanner.new([close_token])
+
+      described_class.new(bare_class).on_open(token:, context:, registry:, tokens: scanner)
+
+      expect(document.children.first).to be_an_instance_of(bare_class)
+    end
+
+    it "does not mistake other keyword parameters for language: support" do
+      other_class =
+        Class.new(Markbridge::AST::Element) do
+          def initialize(other: nil)
+            super()
+            @other = other
+          end
+        end
+      document = Markbridge::AST::Document.new
+      context = Markbridge::Parsers::BBCode::ParserState.new(document)
+      registry = Markbridge::Parsers::BBCode::HandlerRegistry.new
+      token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "other",
+          attrs: {
+            lang: "ruby",
+          },
+          pos: 0,
+          source: "[other lang=ruby]",
+        )
+      close_token =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "other", pos: 17, source: "[/other]")
+      scanner = MockScanner.new([close_token])
+
+      # If the handler wrongly detected language: support, creating the
+      # element would raise ArgumentError (unknown keyword :language).
+      described_class.new(other_class).on_open(token:, context:, registry:, tokens: scanner)
+
+      expect(document.children.first).to be_an_instance_of(other_class)
+    end
   end
 
   describe "#on_open" do

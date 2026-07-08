@@ -63,6 +63,11 @@ module Markbridge
           node.children.any? { |c| c.instance_of?(AST::Text) && c.text.include?("\n") }
         end
 
+        # Leading or trailing whitespace (Unicode-aware, matching the
+        # flanking-preservation sub in #wrap_inline).
+        EDGE_WHITESPACE = /\A[[:space:]]|[[:space:]]\z/m
+        private_constant :EDGE_WHITESPACE
+
         # Helper: wrap inline content with markers
         # Handles edge cases like existing markers and whitespace
         def wrap_inline(content, open_marker, close_marker = nil)
@@ -82,8 +87,20 @@ module Markbridge
             end
           end
 
-          # Preserve leading/trailing whitespace (Unicode-aware, since
-          # CommonMark's flanking rules treat e.g. nbsp as whitespace).
+          apply_markers(content, open_marker, close_marker)
+        end
+
+        private
+
+        # Wrap content in markers, keeping leading/trailing whitespace
+        # outside the markers (Unicode-aware, since CommonMark's flanking
+        # rules treat e.g. nbsp as whitespace).
+        def apply_markers(content, open_marker, close_marker)
+          # Fast path: no edge whitespace to preserve (the common case), so
+          # plain interpolation replaces the capture-group sub below and its
+          # MatchData + capture allocations.
+          return "#{open_marker}#{content}#{close_marker}" unless content.match?(EDGE_WHITESPACE)
+
           content.sub(/\A([[:space:]]*)(.+?)([[:space:]]*)\z/m) do
             match = Regexp.last_match
             "#{match[1]}#{open_marker}#{match[2]}#{close_marker}#{match[3]}"
