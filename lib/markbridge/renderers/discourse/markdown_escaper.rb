@@ -178,6 +178,12 @@ module Markbridge
         end
 
         def escape_text(text)
+          # Single-line fast path (the common case for inline text nodes):
+          # skip the split and its Array + line-String allocations. A lone
+          # `\r` without `\n` stays on the line either way — `/\r?\n/`
+          # needs the `\n` — so `include?("\n")` alone decides correctly.
+          return escape_line(text, false) unless text.include?("\n")
+
           # On CRLF input, consume `\r` as part of the line terminator instead
           # of leaving it on the line. A trailing `\r` breaks line-end anchored
           # regexes (e.g. SETEXT_UNDERLINE_*) and the `ws_end >= line_length`
@@ -186,7 +192,6 @@ module Markbridge
           # LF-only fast path on a string split (regex split is ~20% slower
           # on the indented-code hot path).
           lines = text.include?("\r") ? text.split(/\r?\n/, -1) : text.split("\n", -1)
-          return escape_line(lines[0], false) if lines.size == 1
 
           # Pre-allocate result buffer
           bytesize = text.bytesize
@@ -231,6 +236,12 @@ module Markbridge
             result = String.new(encoding: line.encoding)
             result << line[0, indent_len] << escaped
             result
+          elsif escaped.equal?(line)
+            # Nothing needed escaping, so `escaped` IS the input line: its
+            # encoding is already right, and since escape_text's
+            # single-line fast path that input can be the caller's own
+            # (possibly frozen) string — force_encoding would raise.
+            line
           else
             escaped.force_encoding(line.encoding)
           end
