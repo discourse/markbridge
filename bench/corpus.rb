@@ -169,6 +169,38 @@ module Corpus
     end
   end
 
+  # An s9e/TextFormatter XML post (the phpBB 3.2+ storage format): a
+  # single <r> root, inline tags with <s>/<e> markup-preservation
+  # children, <br/> line breaks.
+  def text_formatter_post(rng, words)
+    parts = []
+    parts << sentence(rng, words, 10)
+    parts << "<B><s>[b]</s>#{sentence(rng, words, 4)}<e>[/b]</e></B> and " \
+      "<I><s>[i]</s>#{sentence(rng, words, 3)}<e>[/i]</e></I>"
+    parts << sentence(rng, words, 12)
+    parts << text_formatter_construct(rng, words)
+    parts << sentence(rng, words, 10)
+    "<r>#{parts.join("<br/><br/>")}</r>"
+  end
+
+  def text_formatter_construct(rng, words)
+    case rng.rand(5)
+    when 0
+      "<QUOTE author=\"alice\"><s>[quote=alice]</s>#{sentence(rng, words, 8)}<e>[/quote]</e></QUOTE>"
+    when 1
+      items = Array.new(3 + rng.rand(3)) { "<LI><s>[*]</s>#{sentence(rng, words, 5)}</LI>" }.join
+      "<LIST><s>[list]</s>#{items}<e>[/list]</e></LIST>"
+    when 2
+      "<CODE><s>[code]</s>x = #{rng.rand(100)}<e>[/code]</e></CODE>"
+    when 3
+      url = "https://example.com/#{rng.rand(1000)}"
+      "<URL url=\"#{url}\"><s>[url=#{url}]</s>#{sentence(rng, words, 3)}<e>[/url]</e></URL>"
+    when 4
+      "<S><s>[s]</s>#{sentence(rng, words, 3)}<e>[/s]</e></S> und " \
+        "<U><s>[u]</s>#{sentence(rng, words, 2)}<e>[/u]</e></U>"
+    end
+  end
+
   def build(words, count: 200, seed: 42, kind: :post)
     rng = Random.new(seed)
     Array.new(count) { public_send(kind, rng, words) }
@@ -196,5 +228,13 @@ module Corpus
 
   def html_multibyte
     @html_multibyte ||= build(WORDS_MULTI, kind: :html_post)
+  end
+
+  def text_formatter
+    @text_formatter ||= build(WORDS_ASCII, kind: :text_formatter_post)
+  end
+
+  def text_formatter_multibyte
+    @text_formatter_multibyte ||= build(WORDS_MULTI, kind: :text_formatter_post)
   end
 end

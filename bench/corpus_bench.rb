@@ -105,6 +105,38 @@ HTML_VARIANTS = {
       parser = Markbridge::Parsers::HTML::Parser.new
       report("html_parse/#{tag}", corpus) { |post| parser.parse(post) }
     end,
+  # Nokogiri's share of html_parse: parse-from-string minus walk-of-
+  # preparsed-tree = the C parse; this variant is the walk alone.
+  "html_walk" =>
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::HTML::Parser.new
+      fragments = corpus.map { |post| Nokogiri::HTML.fragment(post) }
+      report("html_walk/#{tag}", fragments) { |fragment| parser.parse(fragment) }
+    end,
+  "html_nokogiri" =>
+    lambda do |corpus, tag|
+      report("html_nokogiri/#{tag}", corpus) { |post| Nokogiri::HTML.fragment(post) }
+    end,
+}.freeze
+
+TEXT_FORMATTER_VARIANTS = {
+  "tf_fresh" =>
+    lambda do |corpus, tag|
+      report("tf_fresh/#{tag}", corpus) { |post| Markbridge.text_formatter_xml_to_markdown(post) }
+    end,
+  "tf_parse" =>
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::TextFormatter::Parser.new
+      report("tf_parse/#{tag}", corpus) { |post| parser.parse(post) }
+    end,
+  "tf_walk" =>
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::TextFormatter::Parser.new
+      docs = corpus.map { |post| Nokogiri.XML(post) }
+      report("tf_walk/#{tag}", docs) { |doc| parser.parse(doc) }
+    end,
+  "tf_nokogiri" =>
+    lambda { |corpus, tag| report("tf_nokogiri/#{tag}", corpus) { |post| Nokogiri.XML(post) } },
 }.freeze
 
 requested = ARGV.empty? ? VARIANTS.keys : ARGV
@@ -123,6 +155,9 @@ requested.each do |variant|
   elsif (runner = HTML_VARIANTS[variant])
     runner.call(Corpus.html, "ascii")
     runner.call(Corpus.html_multibyte, "multi")
+  elsif (runner = TEXT_FORMATTER_VARIANTS[variant])
+    runner.call(Corpus.text_formatter, "ascii")
+    runner.call(Corpus.text_formatter_multibyte, "multi")
   else
     raise ArgumentError, "unknown variant #{variant}"
   end

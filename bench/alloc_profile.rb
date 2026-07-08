@@ -28,6 +28,8 @@ corpus =
     which == "multi" ? Corpus.mediawiki_multibyte : Corpus.mediawiki
   elsif variant.start_with?("html_")
     which == "multi" ? Corpus.html_multibyte : Corpus.html
+  elsif variant.start_with?("tf_")
+    which == "multi" ? Corpus.text_formatter_multibyte : Corpus.text_formatter
   else
     which == "multi" ? Corpus.multibyte : Corpus.ascii
   end
@@ -39,6 +41,7 @@ asts = corpus.map { |post| parser.parse(post) } if variant == "render_only"
 
 mw_parser = Markbridge::Parsers::MediaWiki::Parser.new
 html_parser = Markbridge::Parsers::HTML::Parser.new
+tf_parser = Markbridge::Parsers::TextFormatter::Parser.new
 
 work =
   case variant
@@ -58,6 +61,16 @@ work =
     ->(i) { Markbridge.html_to_markdown(corpus[i]) }
   when "html_parse"
     ->(i) { html_parser.parse(corpus[i]) }
+  when "html_walk"
+    fragments = corpus.map { |post| Nokogiri::HTML.fragment(post) }
+    ->(i) { html_parser.parse(fragments[i]) }
+  when "tf_fresh"
+    ->(i) { Markbridge.text_formatter_xml_to_markdown(corpus[i]) }
+  when "tf_parse"
+    ->(i) { tf_parser.parse(corpus[i]) }
+  when "tf_walk"
+    docs = corpus.map { |post| Nokogiri.XML(post) }
+    ->(i) { tf_parser.parse(docs[i]) }
   else
     raise ArgumentError, "unknown variant #{variant}"
   end
