@@ -33,7 +33,7 @@ module Markbridge
             if block_given?
               HandlerRegistry.build_from_default(&block)
             else
-              handlers || HandlerRegistry.default
+              handlers || HandlerRegistry.shared_default
             end
           @unknown_tags = Hash.new(0)
         end
@@ -75,6 +75,13 @@ module Markbridge
           AST::Document.new << AST::Text.new(input)
         end
 
+        # <s>/<e> hold the original BBCode markup for unparsing; <t>/<r>
+        # are the plain-text/rich-text roots. Frozen constants — the
+        # membership checks run once per element node.
+        MARKUP_PRESERVATION_TAGS = %w[s e].freeze
+        ROOT_TAGS = %w[t r].freeze
+        private_constant :MARKUP_PRESERVATION_TAGS, :ROOT_TAGS
+
         # Process children of an XML element (public for handler access)
         # @param element [Nokogiri::XML::Element]
         # @param ast_parent [AST::Element]
@@ -102,10 +109,10 @@ module Markbridge
           tag_name = element.name
 
           # Skip markup preservation elements and their content (used for unparsing)
-          return if %w[s e].include?(tag_name)
+          return if MARKUP_PRESERVATION_TAGS.include?(tag_name)
 
           # Handle root nodes
-          return process_children(element, ast_parent) if %w[t r].include?(tag_name)
+          return process_children(element, ast_parent) if ROOT_TAGS.include?(tag_name)
 
           # Handle line breaks
           if tag_name == "br"
