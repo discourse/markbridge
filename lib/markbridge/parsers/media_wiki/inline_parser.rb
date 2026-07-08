@@ -43,7 +43,7 @@ module Markbridge
         attr_reader :unknown_tags
 
         def initialize(handlers: nil, depth: 0, unknown_tags: nil)
-          @registry = handlers || InlineTagRegistry.default
+          @registry = handlers || InlineTagRegistry.shared_default
           @depth = depth
           @unknown_tags = unknown_tags || Hash.new(0)
         end

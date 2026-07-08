@@ -48,7 +48,11 @@ matcher:
     # differ in per-token allocations. The fetch exists purely to skip
     # the `to_s.downcase` copy on the hot path; no test can observe
     # the difference through the public API. Bucket A.
+    # MediaWiki::InlineTagRegistry#[] has the identical fetch-with-
+    # downcasing-fallback shape (the inline parser downcases tag names
+    # before lookup) and the same equivalence.
     - Markbridge::Parsers::BBCode::HandlerRegistry#[]
+    - Markbridge::Parsers::MediaWiki::InlineTagRegistry#[]
 
     # HandlerRegistry#freeze deep-freezes three internal collections.
     # `register` writes @handlers first and raises FrozenError there,
@@ -66,8 +70,10 @@ matcher:
     # `if LINE_ENDING_RE`, conditional drop) return an equal string
     # that differs only in object identity, which parse() never
     # exposes. Bucket A — the guard exists purely to avoid a
-    # full-document copy per post.
+    # full-document copy per post. Same guard, same equivalence in the
+    # MediaWiki parser.
     - Markbridge::Parsers::BBCode::Parser#normalize_line_endings
+    - Markbridge::Parsers::MediaWiki::Parser#normalize_line_endings
 
     # RenderingInterface#apply_markers' EDGE_WHITESPACE fast path.
     # The capture-group sub handles flush content identically (its
