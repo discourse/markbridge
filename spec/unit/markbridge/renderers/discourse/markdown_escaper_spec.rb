@@ -571,9 +571,39 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(escaper.escape(input)).to equal(input)
       end
 
+      it "returns multi-line plain input as the same object (the MAYBE_SPECIAL gate must hold)" do
+        # Multi-line matters: escape_text's single-line fast path also
+        # preserves object identity, so only a multi-line input can tell
+        # the MAYBE_SPECIAL gate apart from an unconditional escape_text
+        # (which splits and rebuilds, returning an equal but new String).
+        input = "the quick brown fox\njumps over the lazy dog"
+        expect(escaper.escape(input)).to equal(input)
+      end
+
       it "returns a NEW string when the input contains any special character" do
         input = "hello *world*"
         expect(escaper.escape(input)).not_to equal(input)
+      end
+
+      it "returns the input String (same object) when its specials turn out benign on a single line" do
+        # `.` and `)` pass the MAYBE_SPECIAL pre-check but produce no
+        # escapes; the single-line fast path must hand back the input
+        # itself instead of a split-off copy.
+        input = "version 1.2 (beta)"
+        expect(escaper.escape(input)).to equal(input)
+      end
+
+      it "accepts frozen single-line input whose specials turn out benign" do
+        input = "version 1.2 (beta)"
+        expect(escaper.escape(input.freeze)).to eq(input)
+      end
+
+      it "escapes frozen single-line input" do
+        expect(escaper.escape("*bold*".freeze)).to eq("\\*bold\\*")
+      end
+
+      it "escapes frozen multi-line input" do
+        expect(escaper.escape("# heading\n*bold*".freeze)).to eq("\\# heading\n\\*bold\\*")
       end
 
       it "returns a NEW string when the input contains indented code" do
