@@ -40,6 +40,16 @@ matcher:
     # `[ foo]`, `[=x]`, `[]`, `[1=2]`, `[/123]`.
     - Markbridge::Parsers::BBCode::Scanner#parse_tag_at_cursor
 
+    # HandlerRegistry#freeze deep-freezes three internal collections.
+    # `register` writes @handlers first and raises FrozenError there,
+    # which shields drops of the later `@element_handlers.freeze` /
+    # `@auto_closeable_elements.freeze` lines from observation — the
+    # only public writer never reaches those hashes on a frozen
+    # registry. Tried: register-raises spec (kills the override drop
+    # and @handlers.freeze variants, can't reach the shielded lines).
+    # Bucket A.
+    - Markbridge::Parsers::BBCode::HandlerRegistry#freeze
+
     # parse_external_link mutations are all Bucket A: `split(" ", 2)`
     # vs `split(nil, 2)` (Ruby's awk-style behaviour on " " is
     # identical to default whitespace for realistic URLs);

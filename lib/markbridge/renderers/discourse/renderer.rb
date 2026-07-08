@@ -8,7 +8,7 @@ module Markbridge
         attr_reader :postprocessor
 
         def initialize(tag_library: nil, escaper: nil, html_escaper: nil, postprocessor: nil)
-          @tag_library = tag_library || TagLibrary.default
+          @tag_library = tag_library || TagLibrary.shared_default
           @escaper = escaper || MarkdownEscaper.new
           @html_escaper = html_escaper || HtmlEscaper
           @postprocessor = postprocessor || Postprocessor::DEFAULT

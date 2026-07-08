@@ -26,7 +26,7 @@ module Markbridge
             if block_given?
               HandlerRegistry.build_from_default(&block)
             else
-              handlers || HandlerRegistry.default
+              handlers || HandlerRegistry.shared_default
             end
           @unknown_tags = Hash.new(0)
         end

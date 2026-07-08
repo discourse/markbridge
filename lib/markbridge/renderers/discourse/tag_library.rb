@@ -106,6 +106,26 @@ module Markbridge
         def self.default
           new.auto_register!
         end
+
+        # Shared, deep-frozen default library for the no-customization
+        # fast path. Built once per process; {Renderer} falls back to it
+        # when no +tag_library:+ is given, skipping the constant-scan and
+        # ~30 tag instantiations of {.default} on every render. Tags are
+        # stateless, so sharing is safe across renderers and threads.
+        # +dup+ yields a mutable copy (see {#initialize_copy}).
+        #
+        # @return [TagLibrary] the same frozen instance on every call
+        def self.shared_default
+          @shared_default ||= default.freeze
+        end
+
+        # Freeze the library together with its internal Hash so that
+        # registration on a shared instance fails loudly instead of
+        # silently mutating state visible to every renderer.
+        def freeze
+          @tags.freeze
+          super
+        end
       end
     end
   end
