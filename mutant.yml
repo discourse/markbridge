@@ -40,6 +40,16 @@ matcher:
     # `[ foo]`, `[=x]`, `[]`, `[1=2]`, `[/123]`.
     - Markbridge::Parsers::BBCode::Scanner#parse_tag_at_cursor
 
+    # HandlerRegistry#[]'s `fetch(tag_name) { @handlers[downcased] }`
+    # fast path. Keys are always downcased strings, so the surviving
+    # mutations — dropping the fetch (leaving only the downcasing
+    # block body) or degrading fetch's key so every lookup falls into
+    # the block — produce identical results for every input and only
+    # differ in per-token allocations. The fetch exists purely to skip
+    # the `to_s.downcase` copy on the hot path; no test can observe
+    # the difference through the public API. Bucket A.
+    - Markbridge::Parsers::BBCode::HandlerRegistry#[]
+
     # HandlerRegistry#freeze deep-freezes three internal collections.
     # `register` writes @handlers first and raises FrozenError there,
     # which shields drops of the later `@element_handlers.freeze` /
@@ -49,6 +59,25 @@ matcher:
     # and @handlers.freeze variants, can't reach the shielded lines).
     # Bucket A.
     - Markbridge::Parsers::BBCode::HandlerRegistry#freeze
+
+    # Parser#normalize_line_endings' `match?` guard. The guard only
+    # skips the gsub copy when the input has no CR/LS/PS; mutations
+    # that force the gsub branch (`if true`, `if input`,
+    # `if LINE_ENDING_RE`, conditional drop) return an equal string
+    # that differs only in object identity, which parse() never
+    # exposes. Bucket A — the guard exists purely to avoid a
+    # full-document copy per post.
+    - Markbridge::Parsers::BBCode::Parser#normalize_line_endings
+
+    # RenderingInterface#apply_markers' EDGE_WHITESPACE fast path.
+    # The capture-group sub handles flush content identically (its
+    # edge captures match empty strings), so mutations that disable
+    # the fast path (`unless true`, `unless content`, guard/return
+    # drops) are output-equivalent and only cost a MatchData + capture
+    # allocations per inline tag. The sub's own regex semantics (/m
+    # flag, edge quantifiers) are pinned by wrap_inline specs with
+    # multi-line and one-sided-whitespace content. Bucket A.
+    - Markbridge::Renderers::Discourse::RenderingInterface#apply_markers
 
     # parse_external_link mutations are all Bucket A: `split(" ", 2)`
     # vs `split(nil, 2)` (Ruby's awk-style behaviour on " " is

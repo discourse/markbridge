@@ -11,6 +11,13 @@ module Markbridge
           def initialize(element_class, collector: RawContentCollector.new)
             @element_class = element_class
             @collector = collector
+            # Computed once here: handlers are long-lived, elements are
+            # per-tag, and the reflection is too costly to repeat per element.
+            @accepts_language =
+              element_class
+                .instance_method(:initialize)
+                .parameters
+                .any? { |_kind, name| name == :language }
           end
 
           def on_open(token:, context:, registry:, tokens:)
@@ -43,10 +50,7 @@ module Markbridge
           end
 
           def accepts_language?
-            @element_class
-              .instance_method(:initialize)
-              .parameters
-              .any? { |_kind, name| name == :language }
+            @accepts_language
           end
         end
       end
