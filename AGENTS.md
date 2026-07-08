@@ -207,8 +207,10 @@ expect(token).to match_tag_end("b")
   add it to the `mutant.yml` ignore list (with the required comment
   from the skill) — don't reach behind the curtain.
 - No stubbing or mocking the SUT (the class currently being mutated).
-- `MarkdownEscaper` is a hot path. Benchmark (`bundle exec ruby --yjit /tmp/bench_escaper.rb`)
-  before/after any change to `lib/markbridge/renderers/discourse/markdown_escaper.rb`.
+- `MarkdownEscaper` is a hot path. Benchmark before/after any change to
+  `lib/markbridge/renderers/discourse/markdown_escaper.rb` with the
+  isolated escape reports (`bundle exec ruby --yjit bench/bench.rb
+  --single escape_plain` and `--single escape_mixed`).
   Tests over refactors when behavior is equivalent.
 - When writing a `mutant.yml` `ignore` entry per the skill's
   "Unkillable" flow, the inline comment must name the specific
@@ -221,16 +223,30 @@ Tests-only changes can be one commit.**
 ## Performance Notes
 
 **Scanner** (performance-critical):
-- Use index-based access: `@input[@pos]`, not `@input[@pos..@pos]`
+- Byte offsets everywhere: `byteindex`/`byteslice`/`getbyte`, never
+  character indices (`str[pos]` is O(pos) on multibyte input — CRuby has
+  no character-index cache) and never per-char probe strings
+- Every offset must sit on a character boundary (held structurally:
+  jumps land on ASCII matches, advances step over ASCII bytes)
+- Classify bytes with integer range checks, not regexes; `byteindex`
+  returns 0 for a match at the start — nil-check, don't truthiness-check
 - Bounded backtracking: save position, restore on failure
-- Minimize allocations: reuse strings
-- Regex only for character classes
+- Measure with `bench/corpus_bench.rb` (isolating variants) and
+  `bench/alloc_profile.rb` (per-line allocation ranking) before and
+  after changes; always compare the ascii and multi corpora
+
+**Parsing/rendering setup**:
+- `HandlerRegistry.shared_default` / `TagLibrary.shared_default` are
+  built once per process (deep-frozen); the no-customization paths use
+  them. Never mutate them — build a fresh `.default` (or `dup`) for
+  customization
 
 **AST**:
 - Text nodes auto-merge (reduces tree size)
+- `AST::Text` shares frozen input strings (copy-on-write; `merge` dups
+  before its first append) — pass frozen strings on hot paths
 
 **Renderer**:
-- RenderContext uses hash-based cache (O(1) parent lookups)
 - Single-pass tree traversal
 - In-memory rendering (stream large documents yourself)
 
