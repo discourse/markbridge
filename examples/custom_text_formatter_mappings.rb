@@ -78,8 +78,8 @@ class CustomQuoteHandler < Markbridge::Parsers::TextFormatter::Handlers::BaseHan
     quote =
       Markbridge::AST::Quote.new(
         author: attrs[:author] || "Anonymous",
-        post: attrs[:post_id],
-        topic: attrs[:topic_id],
+        post_id: attrs[:post_id]&.to_i,
+        topic_id: attrs[:topic_id]&.to_i,
         username: attrs[:username],
       )
     parent << quote

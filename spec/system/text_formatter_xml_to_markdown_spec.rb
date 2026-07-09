@@ -10,12 +10,15 @@ RSpec.describe "phpBB3 XML to Markdown" do
       expect(result.markdown).to eq("Hello **world**!\n[example](https://example.com)")
     end
 
-    it "renders Discourse quote markup when attribution is present" do
+    it "renders a name-only attribution for id-based quote attributes" do
+      # post_id is a database id, not a Discourse post number — building a
+      # "post:123, topic:456" reference from it would link the wrong post.
+      # The ids stay on the AST (post_id/user_id) for consumers to remap.
       xml = '<r><QUOTE username="alice" post_id="123" topic_id="456">Quoted text</QUOTE></r>'
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result.markdown).to eq("[quote=\"alice, post:123, topic:456\"]\nQuoted text\n[/quote]")
+      expect(result.markdown).to eq("[quote=\"alice\"]\nQuoted text\n[/quote]")
     end
 
     it "renders ordered lists with proper spacing" do

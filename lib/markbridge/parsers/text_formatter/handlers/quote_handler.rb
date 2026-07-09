@@ -5,6 +5,12 @@ module Markbridge
     module TextFormatter
       module Handlers
         # Handler for QUOTE elements in s9e/TextFormatter XML
+        #
+        # Maps phpBB-style attribution attributes: +post_id+ and
+        # +user_id+ are database ids and land in {AST::Quote#post_id} /
+        # {AST::Quote#user_id} — deliberately not in
+        # {AST::Quote#post_number}, which carries Discourse post-number
+        # semantics that s9e exports don't provide.
         class QuoteHandler < BaseHandler
           def initialize
             @element_class = AST::Quote
@@ -15,9 +21,10 @@ module Markbridge
             node =
               AST::Quote.new(
                 author: attrs[:author],
-                post: attrs[:post_id] || attrs[:post],
-                topic: attrs[:topic_id] || attrs[:topic],
+                post_id: integer_or_nil(attrs[:post_id]),
+                topic_id: integer_or_nil(attrs[:topic_id]),
                 username: attrs[:username],
+                user_id: integer_or_nil(attrs[:user_id]),
               )
             parent << node
 
@@ -26,6 +33,15 @@ module Markbridge
           end
 
           attr_reader :element_class
+
+          private
+
+          # Coerce an attribute value to Integer; nil and non-numeric
+          # values (which would make a useless attribution anyway)
+          # become nil.
+          def integer_or_nil(value)
+            Integer(value, exception: false)
+          end
         end
       end
     end
