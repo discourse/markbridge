@@ -23,18 +23,18 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::QuoteHandler do
       expect(context.current).to be_a(Markbridge::AST::Quote)
       expect(context.current.author).to be_nil
       expect(context.current.username).to be_nil
-      expect(context.current.post).to be_nil
-      expect(context.current.topic).to be_nil
+      expect(context.current.post_number).to be_nil
+      expect(context.current.topic_id).to be_nil
     end
 
-    it "uses a bare :option as the author but does not populate username/post/topic" do
+    it "uses a bare :option as the author but does not populate username/post_number/topic_id" do
       handler.on_open(token: tag_start(attrs: { option: "John" }), context:, registry:)
 
       quote = context.current
       expect(quote.author).to eq("John")
       expect(quote.username).to be_nil
-      expect(quote.post).to be_nil
-      expect(quote.topic).to be_nil
+      expect(quote.post_number).to be_nil
+      expect(quote.topic_id).to be_nil
     end
 
     it "uses the :author attribute when no :option is set" do
@@ -64,16 +64,16 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::QuoteHandler do
         quote = context.current
         expect(quote.author).to eq("john")
         expect(quote.username).to eq("john")
-        expect(quote.post).to eq("123")
-        expect(quote.topic).to eq("456")
+        expect(quote.post_number).to eq(123)
+        expect(quote.topic_id).to eq(456)
       end
 
       it "accepts post-only (no topic) parts after the username" do
         handler.on_open(token: tag_start(attrs: { option: "john, post:7" }), context:, registry:)
 
         quote = context.current
-        expect(quote.post).to eq("7")
-        expect(quote.topic).to be_nil
+        expect(quote.post_number).to eq(7)
+        expect(quote.topic_id).to be_nil
       end
 
       it "accepts Discourse parts with no space after the comma" do
@@ -83,8 +83,8 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::QuoteHandler do
           registry:,
         )
 
-        expect(context.current.post).to eq("42")
-        expect(context.current.topic).to eq("9")
+        expect(context.current.post_number).to eq(42)
+        expect(context.current.topic_id).to eq(9)
       end
 
       it "accepts Discourse parts with extra whitespace after the comma" do
@@ -94,8 +94,8 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::QuoteHandler do
           registry:,
         )
 
-        expect(context.current.post).to eq("42")
-        expect(context.current.topic).to eq("9")
+        expect(context.current.post_number).to eq(42)
+        expect(context.current.topic_id).to eq(9)
       end
 
       it "strips surrounding whitespace from the parsed username" do
@@ -115,8 +115,8 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::QuoteHandler do
           registry:,
         )
 
-        expect(context.current.post).to eq("7")
-        expect(context.current.topic).to be_nil
+        expect(context.current.post_number).to eq(7)
+        expect(context.current.topic_id).to be_nil
       end
     end
 
@@ -128,7 +128,7 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::QuoteHandler do
           registry:,
         )
 
-        expect(context.current.post).to eq("99")
+        expect(context.current.post_number).to eq(99)
       end
 
       it "prefers explicit :topic over option-parsed topic" do
@@ -138,7 +138,46 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::QuoteHandler do
           registry:,
         )
 
-        expect(context.current.topic).to eq("88")
+        expect(context.current.topic_id).to eq(88)
+      end
+
+      it "drops non-numeric explicit attributes instead of storing garbage" do
+        handler.on_open(
+          token: tag_start(attrs: { option: "john, post:1, topic:2", post: "abc", topic: "1x" }),
+          context:,
+          registry:,
+        )
+
+        # The invalid explicit values coerce to nil, so the option-parsed
+        # numbers win.
+        expect(context.current.post_number).to eq(1)
+        expect(context.current.topic_id).to eq(2)
+      end
+
+      it "parses leading-zero values as decimal instead of octal (and does not raise)" do
+        # Integer() without an explicit base treats "099" as octal and
+        # raises — a crash escaping through the public parse API.
+        handler.on_open(
+          token: tag_start(attrs: { option: "john, post:099, topic:0456" }),
+          context:,
+          registry:,
+        )
+
+        expect(context.current.post_number).to eq(99)
+        expect(context.current.topic_id).to eq(456)
+      end
+
+      it "coerces leading-zero explicit attributes as decimal" do
+        handler.on_open(token: tag_start(attrs: { post: "099", topic: "010" }), context:, registry:)
+
+        expect(context.current.post_number).to eq(99)
+        expect(context.current.topic_id).to eq(10)
+      end
+
+      it "rejects base-prefix forms like 0x1A instead of decoding them" do
+        handler.on_open(token: tag_start(attrs: { post: "0x1A" }), context:, registry:)
+
+        expect(context.current.post_number).to be_nil
       end
 
       it "prefers explicit :username over option-parsed username" do

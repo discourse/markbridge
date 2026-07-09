@@ -14,14 +14,16 @@ module Markbridge
             return "<blockquote>#{content}</blockquote>" if interface.html_mode?
 
             # Build Discourse quote BBCode
-            # Format: [quote="username, post:123, topic:456"]content[/quote]
+            # Format: [quote="username, post:2, topic:456"]content[/quote]
+            # (post: is the post number within the topic, topic: the topic id)
             body =
-              if element.post && element.topic && element.username
+              if element.post_number && element.topic_id && element.username
                 # Full Discourse quote with context
-                "[quote=\"#{element.username}, post:#{element.post}, topic:#{element.topic}\"]\n#{content}\n[/quote]"
-              elsif element.author
-                # Quote with author attribution only
-                "[quote=\"#{element.author}\"]\n#{content}\n[/quote]"
+                "[quote=\"#{element.username}, post:#{element.post_number}, topic:#{element.topic_id}\"]\n#{content}\n[/quote]"
+              elsif element.author || element.username
+                # Name-only attribution; a bare post_id/user_id can't
+                # produce a valid Discourse post reference.
+                "[quote=\"#{element.author || element.username}\"]\n#{content}\n[/quote]"
               else
                 # Plain quote rendered as Markdown blockquote
                 content.split("\n").map { |line| "> #{line}" }.join("\n")
