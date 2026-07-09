@@ -1,22 +1,16 @@
-# Vendored mutant skill
+# Mutant skill
 
-This directory vendors [mutant's SKILL.md](https://github.com/mbj/mutant/blob/main/SKILL.md)
-so Claude Code auto-loads the author's mutation-testing playbook when
-mutant is in use.
+SKILL.md is original work for this project. It replaces a verbatim
+vendored copy of [mutant's upstream SKILL.md](https://github.com/mbj/mutant/blob/main/SKILL.md):
+mutant is distributed under a proprietary EULA (with a free-usage
+grant for opensource projects, which is what our `usage: opensource`
+in mutant.yml relies on), and that grant does not obviously cover
+redistributing repository content in a public MIT repo. Rather than
+argue the point, we wrote our own playbook — it also carries the
+markbridge-specific conventions and hard-won recipes the generic
+upstream document can't know about.
 
-**Pinned to mutant commit [`efadfe18`](https://github.com/mbj/mutant/commit/efadfe18d6044f05de8600a243a12f300727d42f)**
-(2026-03-17). Refresh manually when we want newer skill guidance; don't
-auto-update on CI.
-
-Not shipped in the `mutant` gem yet (as of 0.16.0), so we vendor rather
-than load from the gem path. If a future release ships it, switch to
-the gem copy and delete this vendor.
-
-## Refresh
-
-```sh
-curl -s https://raw.githubusercontent.com/mbj/mutant/<new-sha>/SKILL.md \
-  -o .claude/skills/mutant/SKILL.md
-```
-
-Then update the pinned SHA in this README.
+The upstream document remains linked at the bottom of SKILL.md as
+reference reading. If mutant ever ships its skill inside the gem with
+clear licensing, reconsider loading that from the gem path alongside
+(not instead of) the project-specific guidance here.
