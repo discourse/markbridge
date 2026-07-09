@@ -74,6 +74,8 @@ Set via: `registry.closing_strategy = ClosingStrategies::Reordering.new`
 
 Tags receive `(element, interface)` where interface provides:
 - `render_children(element, context:)`
+- `render_default(node)` - stock rendering, bypassing tag overrides
+  (lets a custom tag intercept only the nodes it cares about)
 - `with_parent(element)` - immutable context chaining
 - `find_parent(klass)`, `count_parents(klass)`, `has_parent?(klass)`
 - `wrap_inline(content, markers)`
