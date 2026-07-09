@@ -86,6 +86,13 @@ done
 {
   echo "## What's Changed"
   echo
+  # UPGRADING.md sections are named after the release that ships them
+  # (newest first); one matching this version means breaking changes.
+  if grep -q "^## ${VERSION} " UPGRADING.md 2>/dev/null; then
+    echo "> [!WARNING]"
+    echo "> This release contains breaking changes — see [UPGRADING.md](https://github.com/${REPO}/blob/${TAG}/UPGRADING.md) before updating."
+    echo
+  fi
   if [ -n "${features}" ]; then
     echo "### ✨ Features"
     printf '%s' "${features}"
