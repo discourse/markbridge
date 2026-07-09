@@ -44,9 +44,11 @@ RSpec.describe "HTML to Markdown Conversion" do
       expect(result.markdown).to eq(expected)
     end
 
-    it "converts link with no text" do
+    it "converts link with no text to a bare URL" do
+      # A text-less link renders as the bare href — `[](url)` would show
+      # nothing, while a bare URL autolinks (and can onebox) in Discourse.
       html = '<a href="https://example.com"></a>'
-      expected = "[](https://example.com)"
+      expected = "https://example.com"
 
       result = Markbridge.html_to_markdown(html)
       expect(result.markdown).to eq(expected)
