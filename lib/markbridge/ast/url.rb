@@ -22,6 +22,21 @@ module Markbridge
         super()
         @href = href
       end
+
+      # Whether this link is "bare" — it has no link text of its own:
+      # either no children, or a single Text child whose content is
+      # exactly the href (how parsers model a URL that stands for
+      # itself). Consumers that record or rewrite links need this
+      # judgment too (a bare URL must stay bare to keep autolinking
+      # and oneboxing working), so it lives on the node rather than
+      # in the renderer.
+      #
+      # @return [Boolean]
+      def bare?
+        return true if children.empty?
+
+        children.size == 1 && children.first.instance_of?(Text) && children.first.text == href
+      end
     end
   end
 end
