@@ -407,4 +407,86 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("<s>text~~more</s>")
     end
   end
+
+  describe "#render with a misbehaving custom tag" do
+    it "raises a descriptive TypeError when a tag returns nil" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(Markbridge::AST::Bold, Markbridge::Renderers::Discourse::Tag.new { nil })
+      renderer = described_class.new(tag_library: library)
+      bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x")
+
+      expect { renderer.render(bold) }.to raise_error(TypeError, /must return a String/)
+    end
+
+    it "names the offending node class in the error" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(Markbridge::AST::Bold, Markbridge::Renderers::Discourse::Tag.new { nil })
+      renderer = described_class.new(tag_library: library)
+      bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x")
+
+      expect { renderer.render(bold) }.to raise_error(TypeError, /Bold/)
+    end
+  end
+
+  describe "#render_default" do
+    def renderer_with_bold_override(&block)
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(Markbridge::AST::Bold, Markbridge::Renderers::Discourse::Tag.new(&block))
+      described_class.new(tag_library: library)
+    end
+
+    it "renders with the stock tag, bypassing the override" do
+      renderer = renderer_with_bold_override { |_node, _interface| "OVERRIDDEN" }
+      bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x")
+
+      expect(renderer.render(bold)).to eq("OVERRIDDEN")
+      expect(renderer.render_default(bold)).to eq("**x**")
+    end
+
+    it "lets an override delegate conditionally via the interface" do
+      renderer =
+        renderer_with_bold_override do |node, interface|
+          if node.children.first&.text == "special"
+            "!!special!!"
+          else
+            interface.render_default(node)
+          end
+        end
+
+      special = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("special")
+      plain = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("plain")
+      document = Markbridge::AST::Document.new
+      document << special << plain
+
+      expect(renderer.render(document)).to eq("!!special!!**plain**")
+    end
+
+    it "keeps applying overrides inside the delegated subtree" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(
+        Markbridge::AST::Italic,
+        Markbridge::Renderers::Discourse::Tag.new { |_n, _i| "ITALIC-OVERRIDE" },
+      )
+      renderer = described_class.new(tag_library: library)
+      quote = Markbridge::AST::Quote.new
+      quote << Markbridge::AST::Italic.new
+
+      # render_default bypasses only the Quote lookup; the Italic child
+      # still renders through this renderer's (overridden) library.
+      expect(renderer.render_default(quote)).to include("ITALIC-OVERRIDE")
+    end
+
+    it "falls back to the tag-less paths for node classes without a stock tag" do
+      custom_class = Class.new(Markbridge::AST::Element)
+      element = custom_class.new << Markbridge::AST::Text.new("inside")
+
+      expect(renderer.render_default(element)).to eq("inside")
+    end
+
+    it "renders Text nodes through the escaper like #render does" do
+      text = Markbridge::AST::Text.new("*not bold*")
+
+      expect(renderer.render_default(text)).to eq("\\*not bold\\*")
+    end
+  end
 end

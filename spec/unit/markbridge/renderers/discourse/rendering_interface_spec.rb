@@ -31,6 +31,26 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
+  describe "#render_default" do
+    it "delegates to the renderer with the supplied node and current context" do
+      allow(renderer).to receive(:render_default).and_return("stock")
+
+      result = interface.render_default(:node)
+
+      expect(renderer).to have_received(:render_default).with(:node, context:)
+      expect(result).to eq("stock")
+    end
+
+    it "uses an explicit context when one is passed" do
+      other_context = Markbridge::Renderers::Discourse::RenderContext.new
+      allow(renderer).to receive(:render_default).and_return("stock")
+
+      interface.render_default(:node, context: other_context)
+
+      expect(renderer).to have_received(:render_default).with(:node, context: other_context)
+    end
+  end
+
   describe "#render_children" do
     it "delegates to renderer.render_children with the element and current context" do
       allow(renderer).to receive(:render_children).and_return("children")
