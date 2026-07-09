@@ -28,7 +28,10 @@ module Markbridge
 
             if interface.html_mode?
               %(<a href="#{HtmlEscaper.escape(href)}">#{text}</a>)
-            elsif bare?(element, text)
+            elsif element.bare? || text.empty?
+              # Url#bare? judges the AST (so label escaping can't confuse
+              # it); the rendered-text check additionally catches labels
+              # that render to nothing (e.g. an empty formatting child).
               href
             else
               "[#{text}](#{markdown_destination(href)})"
@@ -49,18 +52,6 @@ module Markbridge
             return true if href.match?(ALLOWED_SCHEMES)
 
             !href.match?(SCHEME_LIKE)
-          end
-
-          # Bare when there is no link text, or when the only child is a
-          # Text node whose content is exactly the href (compared on the
-          # AST, not on the rendered text, so Markdown escaping in the
-          # label cannot break the detection).
-          def bare?(element, rendered_text)
-            return true if rendered_text.empty?
-
-            children = element.children
-            children.size == 1 && children.first.instance_of?(AST::Text) &&
-              children.first.text == element.href
           end
         end
       end
