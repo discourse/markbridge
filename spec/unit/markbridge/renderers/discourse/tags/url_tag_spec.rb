@@ -163,6 +163,15 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
         expect(tag.render(element, interface)).to eq("https://example.com")
       end
 
+      it "renders the plain href when the label renders to nothing" do
+        # Not bare on the AST (a non-Text child exists), but the child
+        # produces no output — `[](url)` would show nothing.
+        element = Markbridge::AST::Url.new(href: "https://example.com")
+        element << Markbridge::AST::Bold.new
+
+        expect(tag.render(element, interface)).to eq("https://example.com")
+      end
+
       it "detects bareness on the AST, unaffected by Markdown escaping of the label" do
         # The rendered label would be "https://example.com/a\_b" — comparing
         # rendered text against the href would miss this bare URL.
