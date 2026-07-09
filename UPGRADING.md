@@ -1,5 +1,55 @@
 # Upgrading Markbridge
 
+## 0.3.0 — quote attribution fields and URL rendering
+
+### `AST::Quote` attribution fields renamed and typed
+
+`post` and `topic` are gone. The fields now say what they hold, and
+all numbers/ids are `Integer` (previously `String`):
+
+```ruby
+# Before
+quote.post       # => "123"  (documented as "post ID", actually a
+quote.topic      # => "456"   post *number* for Discourse quotes)
+
+# After
+quote.post_number # => 123   position within the topic (Discourse)
+quote.topic_id    # => 456
+quote.post_id     # => 9001  database id (phpBB/XenForo-style sources)
+quote.user_id     # => 12    new — id-based user attribution
+```
+
+The TextFormatter parser no longer funnels phpBB's `post_id` into the
+rendered Discourse attribution — a database id in a `post:N` reference
+links the wrong post. Id-attributed quotes now render name-only
+(`[quote="alice"]`) and carry `post_id`/`user_id` on the AST for you
+to remap (typically in the block yielded between parse and render).
+
+### Bare and relative URLs render differently
+
+- A bare URL (link text equal to the href, or no text) renders as the
+  plain href instead of `[url](url)`, so Discourse can autolink and
+  onebox it. `AST::Url#bare?` exposes the same judgment for consumers.
+- Relative hrefs (`/t/5`, `#anchor`, wiki page names) are kept as
+  links instead of being silently dropped; unknown schemes
+  (`javascript:` etc.) are still removed. Destinations containing
+  whitespace use the `<...>` CommonMark form.
+- A text-less link no longer renders as `[](url)`.
+
+### Custom tags must return a String
+
+A tag returning `nil` (or anything else) now raises a descriptive
+`TypeError` immediately instead of failing later inside string
+concatenation. To intercept only some nodes and keep the stock
+rendering for the rest, use the new fall-through:
+
+```ruby
+Tag.new do |node, interface|
+  next interface.render_default(node) unless node.username&.start_with?("legacy_")
+  # custom rendering...
+end
+```
+
 ## 0.x — migration-API redesign
 
 This release reshapes the top-level API around `Conversion`/`Parse`
