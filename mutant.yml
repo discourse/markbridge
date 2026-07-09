@@ -111,9 +111,8 @@ matcher:
     # N permutation, byte_check drop) terminate via the other: the
     # byte-check fails past end-of-string (getbyte returns nil,
     # nil != <byte_val>) and the bound redundantly caps iterations at
-    # a small constant. Also `while nil && Y` mutations trigger the
-    # Ruby 3.4.8 PRISM bug (#22002) — surface as timeouts on 3.4.9+,
-    # never alive. All Bucket A.
+    # a small constant. `while nil && Y` mutations never run the body
+    # and surface as timeouts, never alive. All Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
     - Markbridge::Renderers::Discourse::MarkdownEscaper#paragraph_line?
@@ -146,12 +145,10 @@ matcher:
     # getbyte past end returns nil, which never equals a byte_val,
     # so the loop exits identically without the bound. Mutations
     # that drop either half of the compound produce equivalent
-    # behavior. This loop is on the inline-escape hot path and was
-    # previously split into `while <bound>; break if <check>` form
-    # to avoid Ruby 3.4.8 PRISM bug #22002; the split form cost
-    # ~5% on escape-heavy text. Reverted to compound form plus
-    # ignore since the PRISM bug surfaces as timeouts (accepted)
-    # rather than process crashes on 3.4.9+.
+    # behavior. This loop is on the inline-escape hot path; a split
+    # `while <bound>; break if <check>` form once used here cost ~5%
+    # on escape-heavy text, so it stays compound with this ignore —
+    # non-terminating mutants surface as accepted timeouts.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_char_run
 
     # MarkdownEscaper#escape_text's `text.include?("\r") ?` fast-path

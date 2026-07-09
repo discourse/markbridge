@@ -194,33 +194,20 @@ expect(token).to match_tag_end("b")
 - Keep tests independent (random order execution)
 - Use `expect`, never `should`
 
-## Mutation Testing — markbridge-specific
+## Mutation Testing
 
-- Project wrapper is `bin/mutant`, not `bundle exec mutant`.
-- Line coverage must not regress. Capture baseline with
-  `COVERAGE=1 bin/rspec` before changes; re-run after to compare.
-- Test through the public API only. No `send`/`__send__` to reach
-  private methods, and no test-only subclasses that publicize them
-  (`Class.new(described_class) { public :helper }`). Both couple the
-  tests to internal structure and defeat the point of `private`. If a
-  mutation is only observable by calling a private method directly,
-  add it to the `mutant.yml` ignore list (with the required comment
-  from the skill) — don't reach behind the curtain.
-- No stubbing or mocking the SUT (the class currently being mutated).
-- `MarkdownEscaper` is a hot path. Benchmark before/after any change to
-  `lib/markbridge/renderers/discourse/markdown_escaper.rb` with the
-  isolated escape reports (`bundle exec ruby --yjit bench/bench.rb
-  --single escape_plain` and `--single escape_mixed`).
-  Tests over refactors when behavior is equivalent.
-- When writing a `mutant.yml` `ignore` entry per the skill's
-  "Unkillable" flow, the inline comment must name the specific
-  mutation that survived and summarize what was tried.
-
-**Commit flow (per the skill): code changes and test changes go in
-separate commits — test first, code-simplification second. Don't mix.
-Tests-only changes can be one commit.**
+The full playbook — wrapper usage, killing/simplifying/ignoring alive
+mutations, the ignore-comment requirement, project-specific traps, and
+the commit flow — lives in `.claude/skills/mutant/SKILL.md` and loads
+automatically when mutation work comes up.
 
 ## Performance Notes
+
+**MarkdownEscaper** is a hot path. Benchmark before/after any change to
+`lib/markbridge/renderers/discourse/markdown_escaper.rb` with the
+isolated escape reports (`bundle exec ruby --yjit bench/bench.rb
+--single escape_plain` and `--single escape_mixed`). Tests over
+refactors when behavior is equivalent.
 
 **Scanner** (performance-critical):
 - Byte offsets everywhere: `byteindex`/`byteslice`/`getbyte`, never
