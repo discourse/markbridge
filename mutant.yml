@@ -149,8 +149,12 @@ matcher:
     # produce unused entries, both of which are memory-only side
     # effects with no observable output change. Bucket A. The cache
     # itself is load-bearing for perf (~5-10% of render time on deep
-    # trees).
+    # trees). #render_default shares the identical housekeeping (it
+    # can be entered both top-level and from inside a tag override)
+    # and the same 9 mutations survive for the same reason; its
+    # rendering behavior is pinned by the renderer specs.
     - Markbridge::Renderers::Discourse::Renderer#render
+    - Markbridge::Renderers::Discourse::Renderer#render_default
 
     # Renderer#render_children's `if part.empty?; next; end` fast-path
     # avoids the per-child boundary check for child renderers that

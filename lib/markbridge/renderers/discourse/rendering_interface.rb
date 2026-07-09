@@ -18,6 +18,14 @@ module Markbridge
           @renderer.render(node, context:)
         end
 
+        # Render a node with the stock tag for its class, bypassing any
+        # override in the renderer's tag library. Lets a custom tag handle
+        # only the nodes it cares about and delegate the rest — see
+        # Renderer#render_default.
+        def render_default(node, context: @context)
+          @renderer.render_default(node, context:)
+        end
+
         def render_children(element, context: @context)
           @renderer.render_children(element, context:)
         end
