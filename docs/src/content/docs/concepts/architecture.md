@@ -42,7 +42,7 @@ Adjacent `Text` nodes auto-merge on insert, which keeps the tree small. `Element
 
 `Renderers::Discourse::Renderer` walks the tree. For each node it looks up a `Tag` in the `TagLibrary` and calls `tag.render(element, interface)`. The interface carries a `RenderContext` — an immutable parent chain that lets tags ask "am I inside a list?" or "what's my depth?" without passing state around manually.
 
-Parent lookups are cached per-context in a hash, so `has_parent?` is O(1) regardless of tree depth.
+`RenderContext` is a linked parent chain: each nested level adds one small context object, and `has_parent?` / `find_parent` walk the chain (nesting depth is shallow in practice).
 
 ## Design patterns in use
 

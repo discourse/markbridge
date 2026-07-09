@@ -3,6 +3,45 @@ title: Upgrading
 description: Breaking-change notes between Markbridge releases.
 ---
 
+## 0.3.0 — breaking changes
+
+### `AST::Quote` attribution fields renamed and typed
+
+`post` and `topic` are gone. The fields now say what they hold, and every id is an `Integer` (it used to be a `String`):
+
+```rb
+# Before
+quote.post    # => "123"  (called "post ID", but actually a post *number*)
+quote.topic   # => "456"
+
+# After
+quote.post_number  # => 123   position within the topic (Discourse quotes)
+quote.topic_id     # => 456
+quote.post_id      # => 9001  database id (phpBB / XenForo-style sources)
+quote.user_id      # => 12    new — id-based user attribution
+```
+
+The TextFormatter parser no longer funnels phpBB's `post_id` into a rendered `post:N` attribution — a database id there links the wrong post. Id-attributed quotes now render name-only (`[quote="alice"]`) and carry `post_id` / `user_id` on the AST for you to remap, typically in the block yielded between parse and render.
+
+### Bare and relative URLs render differently
+
+- A **bare URL** — link text equal to the href, or no text — renders as the plain href instead of `[url](url)`, so Discourse can autolink and onebox it. `AST::Url#bare?` exposes the same judgment.
+- **Relative hrefs** (`/t/5`, `#anchor`, wiki page names) are kept as links instead of being dropped. Unknown schemes (`javascript:` and friends) are still removed. Destinations containing whitespace use the `<…>` CommonMark form.
+- A text-less link no longer renders as `[](url)`.
+
+### Custom tags must return a String
+
+A tag that returns `nil` (or anything other than a String) now raises a descriptive `TypeError` right away, instead of failing later inside string concatenation. To override only some nodes and keep the stock rendering for the rest, use the new fall-through:
+
+```ruby
+Markbridge::Renderers::Discourse::Tag.new do |node, interface|
+  next interface.render_default(node) unless node.href&.start_with?("/")
+  "[internal|#{node.href}]"
+end
+```
+
+`interface.render_default(node)` renders the node with its stock Tag, bypassing your override — so a custom Tag can intercept just the cases it cares about and defer the rest.
+
 ## 0.2.0 — breaking changes
 
 0.2.0 reshapes the top-level API around `Conversion`/`Parse` result types and a single `renderer:` kwarg for render-side customization. There is no backwards-compatibility shim — the changes are mechanical, but every call site needs to be updated.

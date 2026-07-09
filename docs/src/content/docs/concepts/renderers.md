@@ -59,7 +59,7 @@ The interface decouples tags from the renderer: you could write a second rendere
 
 ## RenderContext
 
-Behind the interface is a `RenderContext` — an immutable parent chain. Creating a child context (via `with_parent`) allocates a new instance; the old one is untouched. Parent lookups are cached in a hash for O(1) access regardless of tree depth.
+Behind the interface is a `RenderContext` — an immutable, linked parent chain. Creating a child context (via `with_parent`) links a new instance to the current one; the old one is untouched. `has_parent?` / `find_parent` walk that chain, so each nested level is a single fixed-size allocation rather than a copied parent array, and nesting depth stays shallow in practice.
 
 This immutability is load-bearing: it keeps the renderer side-effect free during a walk, which makes reasoning about nested tags much simpler.
 

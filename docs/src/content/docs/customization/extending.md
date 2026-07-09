@@ -111,6 +111,7 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 | Method | Purpose |
 |---|---|
 | `render_children(element)` | Render child nodes and concatenate their output |
+| `render_default(node)` | Render `node` with its stock Tag, bypassing your override — intercept only some nodes and defer the rest |
 | `with_parent(element)` | Return a new context that treats `element` as a parent |
 | `find_parent(klass)` | Walk up the ancestor chain for a specific AST class |
 | `has_parent?(klass)` | Boolean parent check |
@@ -120,6 +121,8 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 | `html_mode?` | True inside a CommonMark HTML block — the Tag must emit raw HTML or wrap output as a Markdown island |
 
 Use `find_parent` / `has_parent?` to render differently inside specific ancestors (e.g. a code span inside a table cell).
+
+A Tag must return a String — returning `nil` (or anything else) raises a `TypeError`. To handle only some nodes, defer the rest with `render_default(node)` instead of falling through to `nil`.
 
 ## HTML and TextFormatter parsers
 

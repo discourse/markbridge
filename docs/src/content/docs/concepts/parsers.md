@@ -11,7 +11,7 @@ Each parser targets one input format but produces the same AST. They share philo
 
 A hand-written, two-stage parser:
 
-1. **Scanner** — streams characters and produces `TextToken`, `TagStartToken`, `TagEndToken`. Character-by-character, no regex except for character classes, index-based access to avoid allocations.
+1. **Scanner** — streams the input and produces `TextToken`, `TagStartToken`, `TagEndToken`. Byte-offset based (`byteslice` / `byteindex` / `getbyte`, not character indices, which are O(n) on multibyte input), no regex except for character classes, minimal allocations.
 2. **Parser** — consumes tokens through a `HandlerRegistry`. Each handler implements `on_open` / `on_close`. A `ParserState` tracks the node stack and enforces the max-depth limit (100).
 
 **Unique to BBCode:** closing strategies. Real-world BBCode often has mismatched tags (`[b][i]text[/b][/i]`). A `ClosingStrategy` decides how to recover:

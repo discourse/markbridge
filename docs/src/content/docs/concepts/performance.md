@@ -21,7 +21,7 @@ Markbridge is designed to run on large batches of forum content. The pipeline is
 **Renderer**:
 
 - Single-pass depth-first walk.
-- Parent lookups (`has_parent?`, `find_parent`) are O(1) via a hash cache on `RenderContext`.
+- Parent lookups (`has_parent?`, `find_parent`) walk `RenderContext`'s linked parent chain — one small allocation per nested level, and nesting depth stays shallow.
 - `Text` nodes auto-merge during AST construction, so the tree is smaller than the raw token stream.
 
 ## Bounded operations
@@ -72,9 +72,7 @@ Don't accumulate ASTs or rendered output across iterations — let Ruby GC them 
 
 ## Reusing handlers and renderers
 
-There is no per-process default cache for handler registries or renderers — every `*_to_markdown` call without a `handlers:` or `renderer:` kwarg builds a fresh default. That's fine for one-off use, but in a tight loop it pays the construction cost on every iteration.
-
-For batch workloads, build once outside the loop and pass with each call:
+The default handler registry and tag library are built once and shared (frozen) across the process, so a bare `*_to_markdown` call reuses them — it only allocates the thin parser and renderer that wrap them. That's already cheap. In a tight loop you can still shave those wrapper allocations (and carry your customizations) by building a renderer once and passing it:
 
 <!-- spec:before
 posts = [Struct.new(:body).new("[b]hi[/b]")]

@@ -156,7 +156,7 @@ class ForumImporter
 end
 ```
 
-There is no per-process default renderer — pass `renderer:` explicitly or let the convenience methods build a fresh default each call.
+There's no shared default `Renderer` instance — each bare call wraps a fresh (cheap) `Renderer` around the shared default tag library. Pass `renderer:` to reuse one instance across calls and carry your customizations.
 
 ## Coming from `Markbridge.configure`
 
