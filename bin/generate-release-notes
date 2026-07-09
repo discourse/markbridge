@@ -3,6 +3,15 @@
 # Groups commits by prefix: FEATURE: -> Features, FIX: -> Bug Fixes.
 # DEV:/DEPS: and other prefixes are dropped as not user-facing.
 #
+# Works with both merge styles:
+# - Rebase merges land the individual commits, which are matched by
+#   their subjects directly.
+# - Squash merges carry the squashed commit subjects as "* <subject>"
+#   body lines (repo setting squash_merge_commit_message=COMMIT_MESSAGES),
+#   so a multi-commit PR keeps its FEATURE:/FIX: entries even when the
+#   squash subject itself (usually the PR title) has a dropped prefix
+#   like DEV:.
+#
 # Usage: bin/generate-release-notes [<previous-tag>]
 # Requires: gh, git, ruby
 set -euo pipefail
@@ -22,27 +31,53 @@ REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 features=""
 fixes=""
 
-while IFS=$'\t' read -r sha subject; do
+# Bucket one subject line, linked to the PR associated with `sha`
+# (short SHA when there is none). Non-FEATURE/FIX subjects are ignored.
+add_entry() {
+  local sha=$1 subject=$2 bucket title pr ref entry
+
   case "${subject}" in
     FEATURE:*) bucket="features" ;;
     FIX:*)     bucket="fixes" ;;
-    *)         continue ;;
+    *)         return 0 ;;
   esac
 
   title=${subject#*: }
+  # Squash-commit subjects already carry a trailing " (#N)"; strip it so
+  # the reference below doesn't double up.
+  title=$(printf '%s' "${title}" | sed -E 's/ \(#[0-9]+\)$//')
+
   pr=$(gh api "repos/${REPO}/commits/${sha}/pulls" -q '.[0].number' 2>/dev/null || true)
-  if [ -n "${pr}" ]; then
-    ref="#${pr}"
-  else
-    ref=$(git rev-parse --short "${sha}")
-  fi
+  # gh can emit error JSON on stdout (e.g. for commits GitHub doesn't
+  # know); only accept an all-digits PR number.
+  case "${pr}" in
+    "" | *[!0-9]*) ref=$(git rev-parse --short "${sha}") ;;
+    *) ref="#${pr}" ;;
+  esac
   entry="* ${title} (${ref})"$'\n'
 
   case "${bucket}" in
     features) features+="${entry}" ;;
     fixes)    fixes+="${entry}" ;;
   esac
-done < <(git log --format='%H%x09%s' "${PREV_TAG}..HEAD")
+}
+
+for sha in $(git rev-list "${PREV_TAG}..HEAD"); do
+  subject=$(git show -s --format='%s' "${sha}")
+
+  case "${subject}" in
+    FEATURE:* | FIX:*)
+      add_entry "${sha}" "${subject}"
+      ;;
+    *)
+      # Possibly a squash merge of a multi-commit PR: expand any
+      # FEATURE:/FIX: subjects from the squash body's commit list.
+      while IFS= read -r line; do
+        add_entry "${sha}" "${line#\* }"
+      done < <(git show -s --format='%b' "${sha}" | grep -E '^\* (FEATURE|FIX):' || true)
+      ;;
+  esac
+done
 
 {
   echo "## What's Changed"
