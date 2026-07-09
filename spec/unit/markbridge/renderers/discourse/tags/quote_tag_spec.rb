@@ -24,7 +24,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
     end
 
     it "renders quote with full Discourse context" do
-      element = Markbridge::AST::Quote.new(username: "john", post: "123", topic: "456")
+      element = Markbridge::AST::Quote.new(username: "john", post_number: 123, topic_id: 456)
       element << Markbridge::AST::Text.new("This is a quote")
 
       result = tag.render(element, interface)
@@ -42,32 +42,41 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
     end
 
     it "falls back to author-only form when post is missing but topic and username are set" do
-      element = Markbridge::AST::Quote.new(author: "John", topic: "456", username: "john")
+      element = Markbridge::AST::Quote.new(author: "John", topic_id: 456, username: "john")
       element << Markbridge::AST::Text.new("hi")
 
       expect(tag.render(element, interface)).to eq("\n\n[quote=\"John\"]\nhi\n[/quote]\n\n")
     end
 
     it "falls back to author-only form when topic is missing but post and username are set" do
-      element = Markbridge::AST::Quote.new(author: "John", post: "123", username: "john")
+      element = Markbridge::AST::Quote.new(author: "John", post_number: 123, username: "john")
       element << Markbridge::AST::Text.new("hi")
 
       expect(tag.render(element, interface)).to eq("\n\n[quote=\"John\"]\nhi\n[/quote]\n\n")
     end
 
     it "falls back to author-only form when username is missing but post and topic are set" do
-      element = Markbridge::AST::Quote.new(author: "John", post: "123", topic: "456")
+      element = Markbridge::AST::Quote.new(author: "John", post_number: 123, topic_id: 456)
       element << Markbridge::AST::Text.new("hi")
 
       expect(tag.render(element, interface)).to eq("\n\n[quote=\"John\"]\nhi\n[/quote]\n\n")
     end
 
     it "falls back to plain blockquote when no attribution is present" do
-      element = Markbridge::AST::Quote.new(post: "123", topic: "456")
+      element = Markbridge::AST::Quote.new(post_number: 123, topic_id: 456)
       element << Markbridge::AST::Text.new("hi")
 
-      # post + topic without username AND without author -> plain blockquote
+      # post_number + topic_id without username AND without author -> plain blockquote
       expect(tag.render(element, interface)).to eq("\n\n> hi\n\n")
+    end
+
+    it "uses the username as name-only attribution when author is missing" do
+      # A quote attributed by ids only (e.g. phpBB post_id/user_id) can't
+      # produce a Discourse post reference, but the name must survive.
+      element = Markbridge::AST::Quote.new(username: "alice", post_id: 9001, user_id: 12)
+      element << Markbridge::AST::Text.new("hi")
+
+      expect(tag.render(element, interface)).to eq("\n\n[quote=\"alice\"]\nhi\n[/quote]\n\n")
     end
 
     let(:element_class) { Markbridge::AST::Quote }
