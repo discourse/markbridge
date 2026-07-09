@@ -76,19 +76,25 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
       expect(result.markdown).to eq("[Click here](https://example.com)")
     end
 
-    it "converts external link without display text" do
+    it "converts external link without display text to a bare URL" do
+      # Bare URLs stay bare so Discourse can autolink/onebox them.
       result = Markbridge.mediawiki_to_markdown("[https://example.com]")
-      expect(result.markdown).to eq("[https://example.com](https://example.com)")
+      expect(result.markdown).to eq("https://example.com")
     end
 
     it "converts internal link" do
+      # Display text equals the target, so the link is "bare" — the raw
+      # target comes through (a wiki page name is not a resolvable href).
       result = Markbridge.mediawiki_to_markdown("[[Page Name]]")
       expect(result.markdown).to eq("Page Name")
     end
 
     it "converts internal link with display text" do
+      # Relative targets are preserved instead of silently dropped;
+      # whitespace-containing destinations get the <> CommonMark form.
+      # Consumers remap wiki targets to real URLs on the AST.
       result = Markbridge.mediawiki_to_markdown("[[Page Name|display text]]")
-      expect(result.markdown).to eq("display text")
+      expect(result.markdown).to eq("[display text](<Page Name>)")
     end
   end
 
@@ -252,7 +258,9 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
 
       result = Markbridge.mediawiki_to_markdown(wiki)
 
-      expect(result.markdown).to eq("| Page | Status |\n| --- | --- |\n| Home | Ready |")
+      expect(result.markdown).to eq(
+        "| Page | Status |\n| --- | --- |\n| [Home](<Main Page>) | Ready |",
+      )
     end
 
     it "preserves pipes inside internal links on per-line cells" do
@@ -265,7 +273,7 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
 
       result = Markbridge.mediawiki_to_markdown(wiki)
 
-      expect(result.markdown).to eq("| Home |\n| --- |")
+      expect(result.markdown).to eq("| [Home](<Main Page>) |\n| --- |")
     end
   end
 end
