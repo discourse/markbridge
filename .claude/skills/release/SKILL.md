@@ -19,11 +19,16 @@
    `Gemfile.lock`.
 3. Commit exactly those two files as `DEV: Bump version to X.Y.Z`
    (see 8731ca4 for the shape).
-4. Preview the release notes before pushing:
+4. Breaking changes? Write the `## X.Y.Z` section in UPGRADING.md
+   *before* releasing — the notes script detects it and prepends a
+   warning callout linking to the file at the tag.
+5. Preview the release notes before pushing:
    `bin/generate-release-notes` — this is exactly what CI will publish.
    Entries come from FEATURE:/FIX:/PERF: commit subjects (rebase
-   merges) or squash-body bullets; DEV:/DEPS: are dropped.
-5. Push the commit to main — with approval; do not push on your own.
+   merges) or squash-body bullets; DEV:/DEPS: are dropped. Headline
+   prose (e.g. perf numbers) is a manual `gh release edit` after
+   publishing, when the release warrants it.
+6. Push the commit to main — with approval; do not push on your own.
 
 CI does the rest on that push: the publish job releases the gem to
 RubyGems (discourse/publish-rubygems-action creates the vX.Y.Z tag)
