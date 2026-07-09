@@ -363,10 +363,10 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(doc.children[0].children[0].text).to eq("a   b")
     end
 
-    it "preserves whitespace inside <textarea> via the ancestor walk" do
+    it "preserves whitespace inside <textarea> even though it has no handler" do
       # <textarea> has no handler, so handle_unknown_tag recurses into
-      # children — preserves_whitespace? walks the ancestor chain and
-      # finds <textarea> there, skipping the collapse.
+      # children — the preserve-depth tracking must cover the unknown-tag
+      # path too, not just handled tags.
       #
       # Single-level test only: libxml2 parses <textarea>'s inner HTML,
       # but NekoHTML (JRuby) treats <textarea> as RCDATA per HTML5 and
@@ -375,6 +375,73 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       doc = parser.parse("<textarea>a   b</textarea>")
 
       expect(doc.children[0].text).to eq("a   b")
+    end
+
+    it "stops preserving whitespace after the preserving element closes" do
+      doc = parser.parse("<p><code>a   b</code> and   after</p>")
+
+      paragraph = doc.children[0]
+      expect(paragraph.children[0].children[0].text).to eq("a   b")
+      expect(paragraph.children[1].text).to eq(" and after")
+    end
+
+    it "stops preserving whitespace after an unregistered preserving tag closes" do
+      # <textarea> has no handler, so preservation must be switched on
+      # and off around the unknown-tag path as well; the sibling text
+      # after it collapses normally.
+      doc = parser.parse("<div><textarea>a   b</textarea>c   d</div>")
+
+      # Both texts land in the same parent and merge into one node:
+      # "a   b" kept verbatim, "c   d" collapsed.
+      expect(doc.children[0].text).to eq("a   bc d")
+    end
+
+    it "preserves whitespace when the parse root itself is a <pre> element" do
+      pre = Nokogiri::HTML.fragment("<pre>a   b</pre>").at_css("pre")
+      doc = parser.parse(pre)
+
+      expect(doc.children[0].text).to eq("a   b")
+    end
+
+    it "preserves whitespace when the parse root sits inside a <pre> ancestor" do
+      span = Nokogiri::HTML.fragment("<pre><span>a   b</span></pre>").at_css("span")
+      doc = parser.parse(span)
+
+      expect(doc.children[0].text).to eq("a   b")
+    end
+
+    it "does not preserve whitespace for a parse root under non-preserving ancestors" do
+      # Guards the seeded counter: only whitespace-preserving ancestors
+      # may count, not just any ancestors.
+      span = Nokogiri::HTML.fragment("<div><span>a   b</span></div>").at_css("span")
+      doc = parser.parse(span)
+
+      expect(doc.children[0].text).to eq("a b")
+    end
+
+    it "keeps preserving whitespace after a non-preserving child element closes" do
+      # A custom preserving tag without a handler is the only way to get
+      # the parser to walk children in preserving mode (pre/code/tt use
+      # RawHandler, which flattens content without walking).
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.whitespace_preserving_tags << "poem"
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<poem><b>x</b>a   b</poem>")
+
+      poem_children = doc.children
+      expect(poem_children[0]).to be_a(Markbridge::AST::Bold)
+      expect(poem_children[1].text).to eq("a   b")
+    end
+
+    it "keeps preserving whitespace after a nested preserving element closes" do
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.whitespace_preserving_tags << "poem"
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<poem><poem>a   b</poem>c   d</poem>")
+
+      expect(doc.children[0].text).to eq("a   bc   d")
     end
 
     it "preserves whitespace inside <tt>" do

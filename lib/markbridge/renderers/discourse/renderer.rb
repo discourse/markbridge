@@ -8,7 +8,7 @@ module Markbridge
         attr_reader :postprocessor
 
         def initialize(tag_library: nil, escaper: nil, html_escaper: nil, postprocessor: nil)
-          @tag_library = tag_library || TagLibrary.default
+          @tag_library = tag_library || TagLibrary.shared_default
           @escaper = escaper || MarkdownEscaper.new
           @html_escaper = html_escaper || HtmlEscaper
           @postprocessor = postprocessor || Postprocessor::DEFAULT
@@ -20,26 +20,56 @@ module Markbridge
         # @param node [AST::Node]
         # @param context [RenderContext] rendering context with parent chain
         # @return [String]
+        # @raise [TypeError] when the tag bound to the node's class returns
+        #   something other than a String (a nil from a custom tag would
+        #   otherwise surface as an inscrutable concatenation error deep
+        #   inside render_children)
         def render(node, context: RenderContext.new)
           root_call = @interface_cache.nil?
           @interface_cache = {} if root_call
 
           tag = @tag_library[node.class]
           if tag
-            interface = interface_for(context)
-            return tag.render(node, interface)
+            result = tag.render(node, interface_for(context))
+            unless result.is_a?(String)
+              raise TypeError,
+                    "#{tag.class} rendered #{node.class} to " \
+                      "#{result.inspect} — tags must return a String " \
+                      "(use interface.render_default(node) to fall back " \
+                      "to the stock rendering)"
+            end
+            return result
           end
 
-          case node
-          when AST::Element # Document is an Element subclass
-            render_children(node, context:)
-          when AST::MarkdownText
-            render_markdown_text(node, context)
-          when AST::Text
-            render_text(node, context)
-          else
-            ""
-          end
+          render_without_tag(node, context)
+        ensure
+          @interface_cache = nil if root_call
+        end
+
+        # Render a node with the stock tag for its class, ignoring any
+        # override registered in this renderer's tag library. Lets a
+        # custom tag intercept only the nodes it cares about and delegate
+        # the rest:
+        #
+        #   library.register(AST::Quote, Tag.new do |node, interface|
+        #     next interface.render_default(node) unless node.username&.start_with?("legacy_")
+        #     ...custom rendering...
+        #   end)
+        #
+        # Children still render through this renderer, so overrides for
+        # other node classes keep applying inside the delegated subtree.
+        #
+        # @param node [AST::Node]
+        # @param context [RenderContext] rendering context with parent chain
+        # @return [String]
+        def render_default(node, context: RenderContext.new)
+          root_call = @interface_cache.nil?
+          @interface_cache = {} if root_call
+
+          tag = default_tag_library[node.class]
+          return tag.render(node, interface_for(context)) if tag
+
+          render_without_tag(node, context)
         ensure
           @interface_cache = nil if root_call
         end
@@ -81,6 +111,26 @@ module Markbridge
 
         def interface_for(context)
           @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)
+        end
+
+        # Pristine default library backing #render_default. Built lazily —
+        # most renders never need it.
+        def default_tag_library
+          @default_tag_library ||= TagLibrary.default
+        end
+
+        # The tag-less rendering paths shared by #render and #render_default.
+        def render_without_tag(node, context)
+          case node
+          when AST::Element # Document is an Element subclass
+            render_children(node, context:)
+          when AST::MarkdownText
+            render_markdown_text(node, context)
+          when AST::Text
+            render_text(node, context)
+          else
+            ""
+          end
         end
 
         # In html_mode, surround pre-formatted Markdown with blank lines so that

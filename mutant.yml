@@ -40,6 +40,65 @@ matcher:
     # `[ foo]`, `[=x]`, `[]`, `[1=2]`, `[/123]`.
     - Markbridge::Parsers::BBCode::Scanner#parse_tag_at_cursor
 
+    # HandlerRegistry#[]'s `fetch(tag_name) { @handlers[downcased] }`
+    # fast path. Keys are always downcased strings, so the surviving
+    # mutations — dropping the fetch (leaving only the downcasing
+    # block body) or degrading fetch's key so every lookup falls into
+    # the block — produce identical results for every input and only
+    # differ in per-token allocations. The fetch exists purely to skip
+    # the `to_s.downcase` copy on the hot path; no test can observe
+    # the difference through the public API. Bucket A.
+    # MediaWiki::InlineTagRegistry#[], HTML::HandlerRegistry#[], and
+    # TextFormatter::HandlerRegistry#[] have the identical fetch-with-
+    # normalizing-fallback shape (their tag sources already produce
+    # keys in the stored case) and the same equivalence.
+    - Markbridge::Parsers::BBCode::HandlerRegistry#[]
+    - Markbridge::Parsers::MediaWiki::InlineTagRegistry#[]
+    - Markbridge::Parsers::HTML::HandlerRegistry#[]
+    - Markbridge::Parsers::TextFormatter::HandlerRegistry#[]
+
+    # HandlerRegistry#freeze deep-freezes three internal collections.
+    # `register` writes @handlers first and raises FrozenError there,
+    # which shields drops of the later `@element_handlers.freeze` /
+    # `@auto_closeable_elements.freeze` lines from observation — the
+    # only public writer never reaches those hashes on a frozen
+    # registry. Tried: register-raises spec (kills the override drop
+    # and @handlers.freeze variants, can't reach the shielded lines).
+    # Bucket A.
+    - Markbridge::Parsers::BBCode::HandlerRegistry#freeze
+
+    # Parser#normalize_line_endings' `match?` guard. The guard only
+    # skips the gsub copy when the input has no CR/LS/PS; mutations
+    # that force the gsub branch (`if true`, `if input`,
+    # `if LINE_ENDING_RE`, conditional drop) return an equal string
+    # that differs only in object identity, which parse() never
+    # exposes. Bucket A — the guard exists purely to avoid a
+    # full-document copy per post. Same guard, same equivalence in the
+    # MediaWiki parser.
+    - Markbridge::Parsers::BBCode::Parser#normalize_line_endings
+    - Markbridge::Parsers::MediaWiki::Parser#normalize_line_endings
+
+    # HTML::Parser fast-path guards with output-equivalent slow paths:
+    # process_text_node's COLLAPSIBLE_WHITESPACE gate (forcing the gsub
+    # on single-space prose rebuilds an equal string) and
+    # trim_trailing_whitespace's TRAILING_STRIPPABLE gate (forcing the
+    # rstrip+pop+re-add on an untrimmed text produces a value-equal
+    # AST). Both guards exist purely to avoid per-node copies; the
+    # behavioral branches around them are pinned by the whitespace-
+    # handling specs. Bucket A.
+    - Markbridge::Parsers::HTML::Parser#process_text_node
+    - Markbridge::Parsers::HTML::Parser#trim_trailing_whitespace
+
+    # RenderingInterface#apply_markers' EDGE_WHITESPACE fast path.
+    # The capture-group sub handles flush content identically (its
+    # edge captures match empty strings), so mutations that disable
+    # the fast path (`unless true`, `unless content`, guard/return
+    # drops) are output-equivalent and only cost a MatchData + capture
+    # allocations per inline tag. The sub's own regex semantics (/m
+    # flag, edge quantifiers) are pinned by wrap_inline specs with
+    # multi-line and one-sided-whitespace content. Bucket A.
+    - Markbridge::Renderers::Discourse::RenderingInterface#apply_markers
+
     # parse_external_link mutations are all Bucket A: `split(" ", 2)`
     # vs `split(nil, 2)` (Ruby's awk-style behaviour on " " is
     # identical to default whitespace for realistic URLs);
@@ -52,13 +111,11 @@ matcher:
     # N permutation, byte_check drop) terminate via the other: the
     # byte-check fails past end-of-string (getbyte returns nil,
     # nil != <byte_val>) and the bound redundantly caps iterations at
-    # a small constant. Also `while nil && Y` mutations trigger the
-    # Ruby 3.4.8 PRISM bug (#22002) — surface as timeouts on 3.4.9+,
-    # never alive. All Bucket A.
+    # a small constant. `while nil && Y` mutations never run the body
+    # and surface as timeouts, never alive. All Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
     - Markbridge::Renderers::Discourse::MarkdownEscaper#paragraph_line?
-    - Markbridge::Parsers::BBCode::Scanner#scan_while
 
 # escape_block_* fallthrough `[content, false]` returns. The `false`
     # → drop-second / `true` mutations on the non-match branch are
@@ -88,12 +145,10 @@ matcher:
     # getbyte past end returns nil, which never equals a byte_val,
     # so the loop exits identically without the bound. Mutations
     # that drop either half of the compound produce equivalent
-    # behavior. This loop is on the inline-escape hot path and was
-    # previously split into `while <bound>; break if <check>` form
-    # to avoid Ruby 3.4.8 PRISM bug #22002; the split form cost
-    # ~5% on escape-heavy text. Reverted to compound form plus
-    # ignore since the PRISM bug surfaces as timeouts (accepted)
-    # rather than process crashes on 3.4.9+.
+    # behavior. This loop is on the inline-escape hot path; a split
+    # `while <bound>; break if <check>` form once used here cost ~5%
+    # on escape-heavy text, so it stays compound with this ignore —
+    # non-terminating mutants surface as accepted timeouts.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_char_run
 
     # MarkdownEscaper#escape_text's `text.include?("\r") ?` fast-path
@@ -149,8 +204,12 @@ matcher:
     # produce unused entries, both of which are memory-only side
     # effects with no observable output change. Bucket A. The cache
     # itself is load-bearing for perf (~5-10% of render time on deep
-    # trees).
+    # trees). #render_default shares the identical housekeeping (it
+    # can be entered both top-level and from inside a tag override)
+    # and the same 9 mutations survive for the same reason; its
+    # rendering behavior is pinned by the renderer specs.
     - Markbridge::Renderers::Discourse::Renderer#render
+    - Markbridge::Renderers::Discourse::Renderer#render_default
 
     # Renderer#render_children's `if part.empty?; next; end` fast-path
     # avoids the per-child boundary check for child renderers that
@@ -177,6 +236,15 @@ matcher:
     # safety net, not a correctness invariant for normal use.
     - Markbridge::Parsers::MediaWiki::InlineParser#initialize
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_inner_content
+
+    # InlineParser#consecutive_apostrophes_at's `count = 0` seed. The
+    # `count = 1` mutation is equivalent because every call site sits
+    # on an apostrophe byte (the dispatch case arm, byteindex("'")
+    # results, and parse_bold_italic's precondition), so skipping the
+    # zeroth-byte check changes nothing. Killing it would require
+    # calling the helper on a non-apostrophe position, which no public
+    # input can produce.
+    - Markbridge::Parsers::MediaWiki::InlineParser#consecutive_apostrophes_at
 
     # MediaWiki Parser#initialize's block_given? conditional and the
     # InlineTagRegistry kwarg plumbing. Mutations on `if block_given?`

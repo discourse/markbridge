@@ -33,4 +33,39 @@ RSpec.describe Markbridge::AST::Url do
 
     expect(element.children).to eq([text])
   end
+
+  describe "#bare?" do
+    it "is bare with no children" do
+      expect(described_class.new(href: "https://example.com").bare?).to be true
+    end
+
+    it "is bare when the only child is a Text equal to the href" do
+      element = described_class.new(href: "https://example.com")
+      element << Markbridge::AST::Text.new("https://example.com")
+
+      expect(element.bare?).to be true
+    end
+
+    it "is not bare when the text differs from the href" do
+      element = described_class.new(href: "https://example.com")
+      element << Markbridge::AST::Text.new("click here")
+
+      expect(element.bare?).to be false
+    end
+
+    it "is not bare when more children follow the href-equal text" do
+      element = described_class.new(href: "https://example.com")
+      element << Markbridge::AST::Text.new("https://example.com")
+      element << Markbridge::AST::Bold.new
+
+      expect(element.bare?).to be false
+    end
+
+    it "is not bare when the only child is a non-Text node" do
+      element = described_class.new(href: "https://example.com")
+      element << Markbridge::AST::Bold.new
+
+      expect(element.bare?).to be false
+    end
+  end
 end

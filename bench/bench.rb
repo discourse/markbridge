@@ -8,7 +8,7 @@
 #   bundle exec ruby --yjit bench/bench.rb --isolated # one process per report
 #
 # Suite mode runs all reports in one process. It's faster to run
-# but YJIT compiles 12 hot paths concurrently, so they compete for
+# but YJIT compiles all report paths concurrently, so they compete for
 # the JIT budget and inline-decision heuristics — the resulting
 # numbers tend to under-report per-path throughput, especially on
 # the inline-escape path.
@@ -78,29 +78,6 @@ REPORTS = {
     input:
       "Text with *asterisks* and _underscores_ and `backticks` and [brackets] and |pipes|" \
         "\n\n# Not a heading\n---\nnot a rule",
-  },
-  "mixed" => {
-    type: :convert,
-    input: [
-      "[b]bold[/b]",
-      "[quote]x[/quote]",
-      "[list]\n[*]a\n[*]b\n[/list]",
-      "[table][tr][td]1[/td][td]2[/td][/tr][/table]",
-      "[code]x[/code]",
-    ].join("\n\n"),
-  },
-  "large_doc" => {
-    type: :convert,
-    input:
-      (
-        [
-          "[b]bold[/b]",
-          "[quote]x[/quote]",
-          "[list]\n[*]a\n[*]b\n[/list]",
-          "[table][tr][td]1[/td][td]2[/td][/tr][/table]",
-          "[code]x[/code]",
-        ].join("\n\n") + "\n\n"
-      ) * 20,
   },
   "escape_plain" => {
     type: :escape,

@@ -433,5 +433,148 @@ RSpec.describe Markbridge::Parsers::BBCode::Scanner do
         expect(tokens[1]).to match_text_token("]")
       end
     end
+
+    # The scanner classifies bytes with integer range checks (e.g.
+    # a-z == 97..122). Each example probes one range endpoint or a byte
+    # directly adjacent to it, so off-by-one mutations on any bound flip
+    # the outcome.
+    context "with ASCII byte-class boundaries" do
+      it "accepts tag names at the letter-range boundaries" do
+        expect(scan("[a]")[0]).to match_tag_start("a")
+        expect(scan("[z]")[0]).to match_tag_start("z")
+        expect(scan("[A]")[0]).to match_tag_start("a")
+        expect(scan("[Z]")[0]).to match_tag_start("z")
+      end
+
+      it "rejects initial bytes adjacent to the letter ranges" do
+        # ` (0x60) and { (0x7B) flank a-z; @ (0x40) and \ (0x5C) flank A-Z
+        expect(scan("[`x]")[0]).to match_text_token("[")
+        expect(scan("[{x]")[0]).to match_text_token("[")
+        expect(scan("[@x]")[0]).to match_text_token("[")
+        expect(scan("[\\x]")[0]).to match_text_token("[")
+      end
+
+      it "accepts tag-name bytes at the letter and digit boundaries" do
+        expect(scan("[qa]")[0]).to match_tag_start("qa")
+        expect(scan("[qz]")[0]).to match_tag_start("qz")
+        expect(scan("[qA]")[0]).to match_tag_start("qa")
+        expect(scan("[qZ]")[0]).to match_tag_start("qz")
+        expect(scan("[q0]")[0]).to match_tag_start("q0")
+        expect(scan("[q9]")[0]).to match_tag_start("q9")
+      end
+
+      it "stops the tag name at bytes adjacent to the letter and digit ranges" do
+        expect(scan("[q`]")[0]).to match_text_token("[")
+        expect(scan("[q{]")[0]).to match_text_token("[")
+        expect(scan("[q@]")[0]).to match_text_token("[")
+        expect(scan("[q/]")[0]).to match_text_token("[")
+      end
+
+      it "accepts uid bytes at the hex-range boundaries" do
+        expect(scan("[q:0]")[0]).to match_tag_start("q:0")
+        expect(scan("[q:9]")[0]).to match_tag_start("q:9")
+        expect(scan("[q:a]")[0]).to match_tag_start("q:a")
+        expect(scan("[q:f]")[0]).to match_tag_start("q:f")
+        expect(scan("[q:A]")[0]).to match_tag_start("q:a")
+        expect(scan("[q:F]")[0]).to match_tag_start("q:f")
+      end
+
+      it "stops the uid at bytes adjacent to the hex ranges" do
+        # g/G follow f/F, ` precedes a, @ precedes A; the uid ends there and
+        # the leftover byte is consumed as an (empty-valued) attribute name,
+        # so the tag name must stay bare.
+        expect(scan("[q:g]")[0]).to match_tag_start("q:")
+        expect(scan("[q:G]")[0]).to match_tag_start("q:")
+        expect(scan("[q:`]")[0]).to match_text_token("[")
+        expect(scan("[q:@]")[0]).to match_text_token("[")
+        # / (0x2F) directly precedes 0; it is no uid byte and no attribute
+        # byte either, so the whole tag rolls back
+        expect(scan("[q:/]")[0]).to match_text_token("[")
+      end
+
+      it "accepts attribute-name bytes at the \\w boundaries" do
+        # Ax/Zx probe bytes A and Z (keys are downcased on the way in)
+        tokens = scan("[quote a=1 z=2 Ax=3 Zx=4 k0=5 k9=6 a_b=7]")
+
+        expect(tokens[0]).to match_tag_start(
+          "quote",
+          a: "1",
+          z: "2",
+          ax: "3",
+          zx: "4",
+          k0: "5",
+          k9: "6",
+          a_b: "7",
+        )
+      end
+
+      it "stops attribute names at bytes adjacent to the \\w ranges" do
+        # - (0x2D) precedes 0 in ASCII; ` (0x60) precedes a
+        expect(scan("[quote k-x=1]")[0]).to match_text_token("[")
+        expect(scan("[quote `x=1]")[0]).to match_text_token("[")
+      end
+
+      it "treats the whitespace-class boundary bytes as attribute separators" do
+        # \t (0x09) and \r (0x0D) are the endpoints of the \s control range
+        expect(scan("[quote\tk=1]")[0]).to match_tag_start("quote", k: "1")
+        expect(scan("[quote\rk=1]")[0]).to match_tag_start("quote", k: "1")
+        expect(scan("[quote\nk=1]")[0]).to match_tag_start("quote", k: "1")
+      end
+
+      it "does not treat control bytes below \\t as whitespace" do
+        # NUL (0x08 would work too) is directly below \t; if it counted as
+        # whitespace the attributes would parse and this would be a tag
+        expect(scan("[quote\u0000k=1]")[0]).to match_text_token("[")
+      end
+    end
+
+    # The scanner works in byte offsets. These inputs place multibyte text
+    # *before* each construct, shaped so that a byte/character-index mixup
+    # would land the cursor on an alphanumeric byte and change the outcome.
+    context "with multibyte text preceding constructs" do
+      it "scans tags after multibyte text" do
+        tokens = scan("héllo wörld [b]bold[/b]")
+
+        expect(tokens.size).to eq(4)
+        expect(tokens[0]).to match_text_token("héllo wörld ")
+        expect(tokens[1]).to match_tag_start("b")
+        expect(tokens[2]).to match_text_token("bold")
+        expect(tokens[3]).to match_tag_end("b")
+      end
+
+      it "scans quoted attribute values containing multibyte text" do
+        tokens = scan("café [quote=\"Ünïcode Näme\"]x[/quote]")
+
+        expect(tokens[1]).to match_tag_start("quote", option: "Ünïcode Näme")
+      end
+
+      it "scans unquoted attribute values containing multibyte text" do
+        tokens = scan("日本語 [color=rötlich]x[/color]")
+
+        expect(tokens[1]).to match_tag_start("color", option: "rötlich")
+      end
+
+      it "scans key=value attributes after a multibyte option value" do
+        tokens = scan("[quote=\"Ünïcode\" post_id=42]x[/quote]")
+
+        expect(tokens[0]).to match_tag_start("quote", option: "Ünïcode", post_id: "42")
+      end
+
+      it "rolls back invalid tags after multibyte text" do
+        tokens = scan("héllo [not a tag")
+
+        expect(tokens.size).to eq(3)
+        expect(tokens[0]).to match_text_token("héllo ")
+        expect(tokens[1]).to match_text_token("[")
+        expect(tokens[2]).to match_text_token("not a tag")
+      end
+
+      it "preserves multibyte text between adjacent tags" do
+        tokens = scan("[b]schön[/b][i]größer[/i]")
+
+        expect(tokens[1]).to match_text_token("schön")
+        expect(tokens[4]).to match_text_token("größer")
+      end
+    end
   end
 end

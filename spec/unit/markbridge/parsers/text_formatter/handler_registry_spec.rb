@@ -367,4 +367,40 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       expect(registry.overlay("URL") { |p| p }).to be(registry)
     end
   end
+
+  describe ".shared_default" do
+    it "returns the same instance on every call" do
+      expect(described_class.shared_default).to be(described_class.shared_default)
+    end
+
+    it "is frozen" do
+      expect(described_class.shared_default).to be_frozen
+    end
+
+    it "resolves the default tags" do
+      expect(described_class.shared_default["B"]).to be_a(
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+      )
+    end
+
+    it "is a different instance from .default" do
+      expect(described_class.shared_default).not_to be(described_class.default)
+    end
+  end
+
+  describe "#freeze" do
+    it "makes register raise instead of silently mutating shared state" do
+      handler =
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Bold)
+      frozen = described_class.new.freeze
+
+      expect { frozen.register("MARK", handler) }.to raise_error(FrozenError)
+    end
+
+    it "returns self" do
+      registry = described_class.new
+
+      expect(registry.freeze).to be(registry)
+    end
+  end
 end

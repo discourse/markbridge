@@ -7,17 +7,19 @@ RSpec.describe Markbridge::AST::Text do
       expect(node.text).to eq("hello")
     end
 
-    it "stores a mutable copy even when given a frozen string" do
-      node = described_class.new("hello".freeze)
+    it "shares frozen input without copying (copy-on-write)" do
+      original = "hello".freeze
+      node = described_class.new(original)
 
-      expect(node.text).not_to be_frozen
+      expect(node.text).to be(original)
     end
 
-    it "does not share its buffer with the caller's string" do
+    it "does not share its buffer with the caller's mutable string" do
       original = +"hello"
       node = described_class.new(original)
 
       expect(node.text).not_to be(original)
+      expect(node.text).to eq("hello")
     end
   end
 
@@ -54,6 +56,26 @@ RSpec.describe Markbridge::AST::Text do
 
       node1.merge(node2)
       expect(node1.text).to eq("hello")
+    end
+
+    it "dups a shared frozen buffer before the first append" do
+      node1 = described_class.new("hello".freeze)
+      node2 = described_class.new(" world")
+
+      node1.merge(node2)
+
+      expect(node1.text).to eq("hello world")
+    end
+
+    it "appends in place on subsequent merges instead of re-copying" do
+      node = described_class.new("a".freeze)
+      node.merge(described_class.new("b"))
+      buffer_after_first_merge = node.text
+
+      node.merge(described_class.new("c"))
+
+      expect(node.text).to be(buffer_after_first_merge)
+      expect(node.text).to eq("abc")
     end
   end
 end

@@ -62,7 +62,11 @@ module Markbridge
         # @param tag_name [String]
         # @return [BaseHandler, nil]
         def [](tag_name)
-          @handlers[tag_name.to_s.downcase]
+          # Keys are always downcased strings and the scanner emits
+          # downcased tags, so the fetch hits directly on the hot path;
+          # the block normalizes only unusual lookups (mixed case,
+          # symbols) instead of allocating a downcased copy per token.
+          @handlers.fetch(tag_name) { @handlers[tag_name.to_s.downcase] }
         end
 
         # Get handler for an element instance
@@ -174,6 +178,28 @@ module Markbridge
           registry.closing_strategy = closing_strategy || default_closing_strategy(registry)
 
           registry
+        end
+
+        # Shared, deep-frozen default registry for the no-customization
+        # fast path. Built once per process; {Parser} falls back to it
+        # when no +handlers:+ are given, skipping the full registry
+        # construction on every parse. Handlers and closing strategies
+        # are stateless after construction, so sharing is safe across
+        # parsers and threads.
+        #
+        # @return [HandlerRegistry] the same frozen instance on every call
+        def self.shared_default
+          @shared_default ||= default.freeze
+        end
+
+        # Freeze the registry together with its internal collections so
+        # that registration on a shared instance fails loudly instead of
+        # silently mutating state visible to every parser.
+        def freeze
+          @handlers.freeze
+          @element_handlers.freeze
+          @auto_closeable_elements.freeze
+          super
         end
 
         # Build a registry from the default configuration with optional customization
