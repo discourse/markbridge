@@ -64,7 +64,11 @@ module Markbridge
 
           # Coerce an attribute value to Integer; nil and non-numeric
           # values (which would make a useless attribution anyway)
-          # become nil.
+          # become nil. The result is an unbounded Ruby Integer — a
+          # runaway digit run like "post:77777777777777777789999"
+          # parses to a bignum, so consumers binding these into
+          # fixed-width storage (int64 columns) need their own bounds
+          # check.
           def integer_or_nil(value)
             Integer(value, exception: false)
           end

@@ -32,6 +32,27 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::QuoteHandler do
       expect(quote.post_number).to be_nil
     end
 
+    it "feeds a bare topic attribute into topic_id" do
+      # A topic reference is an id in every dialect we know.
+      handler.process(element: build_element('<QUOTE topic="456"/>'), parent:)
+
+      expect(parent.children[0].topic_id).to eq(456)
+    end
+
+    it "prefers topic_id over a bare topic attribute" do
+      handler.process(element: build_element('<QUOTE topic_id="1" topic="2"/>'), parent:)
+
+      expect(parent.children[0].topic_id).to eq(1)
+    end
+
+    it "deliberately ignores a bare post attribute (id-or-number is dialect-unknowable)" do
+      handler.process(element: build_element('<QUOTE post="123"/>'), parent:)
+
+      quote = parent.children[0]
+      expect(quote.post_id).to be_nil
+      expect(quote.post_number).to be_nil
+    end
+
     it "drops non-numeric id attributes instead of storing garbage" do
       handler.process(
         element: build_element('<QUOTE post_id="abc" topic_id="1x" user_id=""/>'),
