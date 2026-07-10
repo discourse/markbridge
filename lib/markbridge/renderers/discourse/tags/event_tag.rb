@@ -18,11 +18,15 @@ module Markbridge
         #     end
         #   end
         class EventTag < Tag
-          def render(element, interface)
+          def render(element, _interface)
             body = element.raw || build_event_bbcode(element)
-            return "\n\n#{body}\n\n" if interface.html_mode?
-
-            "#{body}\n\n"
+            # Bracket both sides with blank lines so the stub cooks as a
+            # standalone block. Without the leading pair it degrades into list
+            # soup when it follows inline text on the same line — which now
+            # happens whenever an event is hoisted out of an inline container,
+            # and already happened for an event written mid-line in the source.
+            # (Same island form the html_mode contract wants.)
+            "\n\n#{body}\n\n"
           end
 
           private
