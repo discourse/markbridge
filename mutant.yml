@@ -282,6 +282,21 @@ matcher:
     # path runs only for the Document branch.
     - Markbridge::Parsers::HTML::Parser#parse
 
+    # Normalizer fast-path guards. Both methods exist ONLY to skip work;
+    # when a mutation defeats the guard, the fallback recomputes the same
+    # result, so every surviving mutation is output-equivalent (byte-for-
+    # byte). The real behaviour they gate is pinned elsewhere:
+    #   RuleSet#resolve — the ancestor scan is extracted into
+    #     #scan_ancestors, which the resolve/normalize specs cover; the
+    #     guard only decides whether to call it, and a non-candidate class
+    #     yields NO_MATCH from the scan anyway.
+    #   Walker#unchanged? — the copy-on-write skip; when it wrongly returns
+    #     false, normalize_element just rebuilds an identical child list
+    #     (the "leaves a violation-free tree untouched" and COW specs pin
+    #     the observable behaviour).
+    - Markbridge::Normalizer::RuleSet#resolve
+    - Markbridge::Normalizer::Walker#unchanged?
+
 mutation:
   ignore_patterns:
     # Bucket A bound-check equivalences. @current_pos, pos, and

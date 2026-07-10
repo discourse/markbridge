@@ -1,5 +1,48 @@
 # Upgrading Markbridge
 
+## Unreleased — AST normalization runs by default
+
+A new `Markbridge::Normalizer` pass runs between the parse-time `yield`
+hook and rendering, rewriting the AST so the renderer is only ever handed
+markup the target format can express. It is **on by default** for every
+`*_to_markdown` call, `convert`, and `render`.
+
+What changes in the output, without any code change on your side:
+
+- A link wrapping an image (`[url][img]…[/img][/url]`,
+  `<a><img></a>`) no longer renders as `[![alt](src)](url)`. The image is
+  hoisted out and placed right after the link; the link stays as a bare
+  URL. Same for `Upload`/`Attachment` and for Discourse blocks
+  (`Quote`/`Poll`/`Event`) inside a link.
+- A link inside a link (`[url][url]…[/url][/url]`) collapses to a single
+  link (CommonMark forbids nested links).
+- Block content inside an inline container (a block in a link label or
+  inside emphasis/a heading) is hoisted out so the inline construct
+  doesn't break.
+- Wrappers left empty by the above are pruned — no `****` husks. An empty
+  **link** is kept, because it renders as a meaningful bare URL.
+
+Each change is reported through the existing diagnostics channel under
+`conversion.diagnostics[:normalization]`, next to `unknown_tags`.
+
+To opt out or customize:
+
+```ruby
+Markbridge.convert(input, format: :bbcode, normalize: false)   # skip it
+
+n = Markbridge::Normalizer.for(:discourse)
+n.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Mention, strategy: :textify)
+Markbridge.convert(input, format: :bbcode, normalize: n)       # customized
+```
+
+**For consumers that hoisted image-likes out of links themselves** (e.g.
+in a custom `Url` tag): that logic — recursive image extraction, empty-
+wrapper pruning, the stock-render fallback — can be deleted. The tree now
+arrives legal, and `diagnostics[:normalization]` gives you the per-post
+tally the hand-rolled version could not.
+
+See [docs/normalization.md](docs/normalization.md).
+
 ## 0.3.0 — quote attribution fields and URL rendering
 
 ### `AST::Quote` attribution fields renamed and typed

@@ -5,6 +5,7 @@ require_relative "markbridge/parse"
 require_relative "markbridge/conversion"
 
 require_relative "markbridge/ast"
+require_relative "markbridge/normalizer"
 require_relative "markbridge/renderers/discourse"
 
 module Markbridge
@@ -44,11 +45,21 @@ module Markbridge
     #   {Conversion} with an empty +markdown+ string, and surface the
     #   exceptions via {Conversion#errors}.
     # @yieldparam ast [AST::Document] mutate before rendering (optional)
+    # @param normalize [Boolean, Normalizer] enforce target-format nesting
+    #   rules between the +yield+ hook and render. +true+ (default) uses the
+    #   shared Discourse normalizer; a {Normalizer} is used as-is; +false+
+    #   skips normalization. See {Normalizer}.
     # @return [Conversion]
-    def bbcode_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
+    def bbcode_to_markdown(
+      input,
+      handlers: nil,
+      renderer: nil,
+      raise_on_error: true,
+      normalize: true
+    )
       parse = parse_bbcode(input, handlers:)
       yield(parse.ast) if block_given?
-      build_conversion(parse, renderer:, raise_on_error:)
+      build_conversion(parse, renderer:, raise_on_error:, normalize:)
     end
 
     # Parse HTML to AST.
@@ -85,11 +96,12 @@ module Markbridge
     #   {Conversion} with an empty +markdown+ string, and surface the
     #   exceptions via {Conversion#errors}.
     # @yieldparam ast [AST::Document] mutate before rendering (optional)
+    # @param normalize [Boolean, Normalizer] see {.bbcode_to_markdown}
     # @return [Conversion]
-    def html_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
+    def html_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true, normalize: true)
       parse = parse_html(input, handlers:)
       yield(parse.ast) if block_given?
-      build_conversion(parse, renderer:, raise_on_error:)
+      build_conversion(parse, renderer:, raise_on_error:, normalize:)
     end
 
     # Parse s9e/TextFormatter XML to AST.
@@ -122,11 +134,18 @@ module Markbridge
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     # @param raise_on_error [Boolean] see {.bbcode_to_markdown}
     # @yieldparam ast [AST::Document] mutate before rendering (optional)
+    # @param normalize [Boolean, Normalizer] see {.bbcode_to_markdown}
     # @return [Conversion]
-    def text_formatter_xml_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
+    def text_formatter_xml_to_markdown(
+      input,
+      handlers: nil,
+      renderer: nil,
+      raise_on_error: true,
+      normalize: true
+    )
       parse = parse_text_formatter_xml(input, handlers:)
       yield(parse.ast) if block_given?
-      build_conversion(parse, renderer:, raise_on_error:)
+      build_conversion(parse, renderer:, raise_on_error:, normalize:)
     end
 
     # Parse MediaWiki wikitext to AST.
@@ -155,11 +174,18 @@ module Markbridge
     # @param renderer [Renderers::Discourse::Renderer, nil] custom renderer
     # @param raise_on_error [Boolean] see {.bbcode_to_markdown}
     # @yieldparam ast [AST::Document] mutate before rendering (optional)
+    # @param normalize [Boolean, Normalizer] see {.bbcode_to_markdown}
     # @return [Conversion]
-    def mediawiki_to_markdown(input, handlers: nil, renderer: nil, raise_on_error: true)
+    def mediawiki_to_markdown(
+      input,
+      handlers: nil,
+      renderer: nil,
+      raise_on_error: true,
+      normalize: true
+    )
       parse = parse_mediawiki(input, handlers:)
       yield(parse.ast) if block_given?
-      build_conversion(parse, renderer:, raise_on_error:)
+      build_conversion(parse, renderer:, raise_on_error:, normalize:)
     end
 
     # Convert input in the given format. Thin dispatcher over the
@@ -211,8 +237,17 @@ module Markbridge
     # @param format [Symbol] :discourse (only renderer currently shipped)
     # @param renderer [Renderers::Discourse::Renderer, nil]
     # @param raise_on_error [Boolean]
+    # @param normalize [Boolean, Normalizer] see {.bbcode_to_markdown}.
+    #   Normalization is idempotent, so re-rendering an already-normalized
+    #   {Parse} is a no-op.
     # @return [Conversion]
-    def render(parse_or_ast, format: :discourse, renderer: nil, raise_on_error: true)
+    def render(
+      parse_or_ast,
+      format: :discourse,
+      renderer: nil,
+      raise_on_error: true,
+      normalize: true
+    )
       raise ArgumentError, "unknown render format #{format.inspect}" unless format == :discourse
 
       parse =
@@ -228,7 +263,7 @@ module Markbridge
           raise ArgumentError, "expected Parse or AST::Node, got #{parse_or_ast.class}"
         end
 
-      build_conversion(parse, renderer:, raise_on_error:)
+      build_conversion(parse, renderer:, raise_on_error:, normalize:)
     end
 
     # Build a configured Discourse {Renderers::Discourse::Renderer}
@@ -297,11 +332,26 @@ module Markbridge
       }
     end
 
-    def build_conversion(parse, renderer:, raise_on_error:)
+    def build_conversion(parse, renderer:, raise_on_error:, normalize: true)
+      parse = apply_normalization(parse, normalize)
       renderer ||= Renderers::Discourse::Renderer.new
       markdown, errors = render_through(renderer, parse.ast, raise_on_error:)
 
       Conversion.new(parsed: parse, markdown:, errors:)
+    end
+
+    # Normalize +parse.ast+ in place (target-format nesting rules) and fold
+    # any report into +diagnostics[:normalization]+. Returns the +parse+ to
+    # render — a new one carrying the report when something changed, else
+    # the original unchanged.
+    def apply_normalization(parse, normalize)
+      return parse unless normalize
+
+      normalizer = normalize.is_a?(Normalizer) ? normalize : Normalizer.shared_for(:discourse)
+      report = normalizer.normalize(parse.ast)
+      return parse if report.empty?
+
+      parse.with(diagnostics: parse.diagnostics.merge(normalization: report))
     end
 
     def build_escaper(escape:, escape_hard_line_breaks:, allow:)

@@ -958,8 +958,17 @@ doc = AST::Document.new([
 renderer.render(doc) # => "content" (Unknown wrapper ignored)
 ```
 
+## AST normalization
+
+The renderer's tags are simple string emitters — they assume the tree they
+receive is already legal for the target format. Enforcing that (no link in
+a link, no image or block in a link label, etc.) is the job of a separate
+pass, `Markbridge::Normalizer`, which runs by default between parse and
+render. See **[AST Normalization](../normalization.md)**.
+
 ## Next Steps
 
+- **[AST Normalization](../normalization.md)** - Target-format nesting rules applied before rendering
 - **[BBCode Parser Guide](../parsers/bbcode.md)** - Learn how to build AST from BBCode
 - **[Extending Markbridge](../extending.md)** - Add custom tags and renderers
 - **[Architecture Overview](../architecture.md)** - Understand the full pipeline
