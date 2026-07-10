@@ -23,9 +23,9 @@ module Markbridge
       # Nodes the Discourse renderer emits as block-level Markdown (blank
       # lines / block structure) — illegal inside an inline container.
       # Classification verified against the tags: Align, Details, Heading,
-      # Paragraph, Quote, List/ListItem, Table/TableRow/TableCell and
-      # HorizontalRule bracket their output in "\n\n". Spoiler renders
-      # inline in Markdown and single-line Code stays inline (handled by
+      # Paragraph, Quote, List/ListItem, Table/TableRow/TableCell, Poll and
+      # Event bracket their output in "\n\n". Spoiler renders inline in
+      # Markdown and single-line Code stays inline (handled by
       # {INLINE_CODE}), so both are deliberately absent.
       BLOCK_NODES = [
         AST::Quote,
@@ -39,17 +39,15 @@ module Markbridge
         AST::Paragraph,
         AST::HorizontalRule,
         AST::Align,
-      ].freeze
-
-      # Image-likes and Discourse block constructs a link must not wrap.
-      DISCOURSE_HOIST_FROM_URL = [
-        AST::Image,
-        AST::Upload,
-        AST::Attachment,
-        AST::Quote,
         AST::Poll,
         AST::Event,
       ].freeze
+
+      # Image-likes a link must not wrap. These render as valid CommonMark
+      # inside a link (+[![alt](src)](url)+) but Discourse wants them hoisted
+      # out. Block constructs (Quote/Poll/Event) are handled by the CommonMark
+      # layer via {BLOCK_NODES}, since a block breaks *any* inline container.
+      DISCOURSE_HOIST_FROM_URL = [AST::Image, AST::Upload, AST::Attachment].freeze
 
       # Keep an inline code span in a link (legal), hoist a block/fenced one
       # out. Mirrors +RenderingInterface#block_context?+: Code renders as a

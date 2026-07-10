@@ -93,6 +93,18 @@ RSpec.describe Markbridge::Normalizer::Walker do
       expect(hoisted.children).to eq([inner_quote]) # inner quote NOT flattened out
     end
 
+    it "hoists a block-level Poll out of an inline container (not just a link)" do
+      # Poll renders block-level, so it breaks emphasis with blank lines just
+      # like it breaks a link label.
+      poll = Markbridge::AST::Poll.new(name: "p")
+      tree = doc(el(Markbridge::AST::Bold, text("x"), poll))
+      normalizer.normalize(tree)
+
+      expect(tree.children.map(&:class)).to eq([Markbridge::AST::Bold, Markbridge::AST::Poll])
+      expect(tree.children.last).to be(poll)
+      expect(tree.children.first.children.map(&:class)).to eq([Markbridge::AST::Text])
+    end
+
     it "does not rip an image out of a quote that is itself hoisted from a link" do
       img = image
       tree = doc(url(el(Markbridge::AST::Quote, img)))
@@ -515,16 +527,21 @@ RSpec.describe Markbridge::Normalizer::Walker do
   end
 
   describe "unwrap edge cases" do
-    it "drops a leaf node targeted by an unwrap rule (nothing to splice)" do
+    it "keeps a leaf targeted by an unwrap rule and does not report a no-op" do
       normalizer.rule(
         parent: Markbridge::AST::Url,
         child: Markbridge::AST::Mention,
         strategy: :unwrap,
       )
-      tree = doc(url(text("a"), Markbridge::AST::Mention.new(name: "x")))
+      mention = Markbridge::AST::Mention.new(name: "x")
+      tree = doc(url(text("a"), mention))
+      report = normalizer.normalize(tree)
 
-      expect { normalizer.normalize(tree) }.not_to raise_error
-      expect(tree.children.first.children.map(&:class)).to eq([Markbridge::AST::Text])
+      expect(tree.children.first.children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::Mention],
+      )
+      expect(tree.children.first.children.last).to be(mention) # kept, not dropped
+      expect(report).to eq([]) # unwrap of a leaf is a silent no-op
     end
 
     it "resolves a callable rule on a dissolved (unwrapped) child, reporting the boundary" do

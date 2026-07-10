@@ -88,8 +88,15 @@ RSpec.describe Markbridge::Normalizer::Layers do
       expect(resolve(rules, Markbridge::AST::Url, Markbridge::AST::Url)).to eq(:unwrap)
     end
 
-    it "hoists every image-like and Discourse block out of a link" do
+    it "hoists every image-like out of a link" do
       described_class::DISCOURSE_HOIST_FROM_URL.each do |child|
+        expect(resolve(rules, Markbridge::AST::Url, child)).to eq(:hoist_after),
+        "expected (Url, #{child}) => :hoist_after"
+      end
+    end
+
+    it "hoists the Discourse block constructs out of a link (via the block layer)" do
+      [Markbridge::AST::Quote, Markbridge::AST::Poll, Markbridge::AST::Event].each do |child|
         expect(resolve(rules, Markbridge::AST::Url, child)).to eq(:hoist_after),
         "expected (Url, #{child}) => :hoist_after"
       end

@@ -25,7 +25,7 @@ module Markbridge
     # Hot path: the ancestor stack is a single shared, push/pop array, and
     # an element's children list is copied only on the first divergence
     # (copy-on-write). A violation-free subtree therefore allocates nothing
-    # and is left byte-for-byte alone — the pass can run by default.
+    # and is left untouched — the pass can run by default.
     class Walker
       EMPTY = [].freeze
 
@@ -188,9 +188,15 @@ module Markbridge
       end
 
       def unwrap(child, boundary, stack, out, bubble)
-        @report.record(boundary.class, child.class, :unwrap)
-        return bubble unless child.is_a?(AST::Element)
+        # Unwrap means "promote the element's children"; a leaf has none. A
+        # rule that targets one is a misconfiguration, so keep the node in
+        # place rather than silently dropping it (and don't report a no-op).
+        unless child.is_a?(AST::Element)
+          out << child
+          return bubble
+        end
 
+        @report.record(boundary.class, child.class, :unwrap)
         # Dissolve: re-run the child's children through the current +out+,
         # resolved against the current stack. Re-resolving in the same pass
         # reaches fixpoint for nested links.
