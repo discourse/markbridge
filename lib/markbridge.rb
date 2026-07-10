@@ -332,7 +332,7 @@ module Markbridge
       }
     end
 
-    def build_conversion(parse, renderer:, raise_on_error:, normalize: true)
+    def build_conversion(parse, renderer:, raise_on_error:, normalize:)
       parse = apply_normalization(parse, normalize)
       renderer ||= Renderers::Discourse::Renderer.new
       markdown, errors = render_through(renderer, parse.ast, raise_on_error:)
