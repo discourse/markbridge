@@ -51,7 +51,7 @@ RSpec.describe "Markbridge normalization (end-to-end)" do
 
   describe "custom normalizer" do
     it "applies a consumer-added rule on top of the defaults" do
-      normalizer = Markbridge::Normalizer.for(:discourse)
+      normalizer = Markbridge::Normalizer.discourse
       normalizer.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Image, strategy: :drop)
 
       md =
@@ -84,7 +84,7 @@ RSpec.describe "Markbridge normalization (end-to-end)" do
     inputs.each do |input|
       it "leaves no CommonMark violations for #{input.inspect}" do
         ast = Markbridge.parse_bbcode(input).ast
-        Markbridge::Normalizer.shared_for(:discourse).normalize(ast)
+        Markbridge::Normalizer.shared_discourse.normalize(ast)
         expect(Markbridge::Normalizer.common_mark.violations(ast)).to eq([])
       end
     end

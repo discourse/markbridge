@@ -347,7 +347,7 @@ module Markbridge
     def apply_normalization(parse, normalize)
       return parse unless normalize
 
-      normalizer = normalize.is_a?(Normalizer) ? normalize : Normalizer.shared_for(:discourse)
+      normalizer = normalize.is_a?(Normalizer) ? normalize : Normalizer.shared_discourse
       report = normalizer.normalize(parse.ast)
       return parse if report.empty?
 

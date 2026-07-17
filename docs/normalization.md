@@ -49,7 +49,7 @@ the source.
      which is what Discourse cooks inside a link anyway
 
 `Markbridge::Normalizer.common_mark` gives you just the first layer;
-`Markbridge::Normalizer.for(:discourse)` gives you both.
+`Markbridge::Normalizer.discourse` gives you both.
 
 ## Strategies
 
@@ -93,7 +93,7 @@ next. The key is absent when nothing changed.
 Markbridge.convert(input, format: :bbcode, normalize: false)
 
 # Layer your own rules on top of the defaults
-normalizer = Markbridge::Normalizer.for(:discourse)
+normalizer = Markbridge::Normalizer.discourse
 normalizer.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Mention, strategy: :textify)
 Markbridge.convert(input, format: :bbcode, normalize: normalizer)
 ```
@@ -103,9 +103,9 @@ your `#rule` calls override the built-in layers. Matching is by exact class
 (`instance_of?`), so a rule for `AST::Url` never accidentally catches a
 subclass.
 
-The no-customization path uses `Markbridge::Normalizer.shared_for(:discourse)`,
+The no-customization path uses `Markbridge::Normalizer.shared_discourse`,
 a memoized, deep-frozen instance built once per process — do not mutate it
-(call `.for(:discourse)` for a fresh, customizable one).
+(call `.discourse` for a fresh, customizable one).
 
 ## Validation mode
 
@@ -125,6 +125,7 @@ single pass.
 
 ## Adding a target format
 
-`Markbridge::Normalizer::Layers` holds the two rule tables. A new target
-adds a layer method there and a branch in `Normalizer.for`; the engine
-(`RuleSet`, `Walker`) is format-agnostic.
+`Markbridge::Normalizer::Layers` holds the rule tables — `common_mark`
+(objective legality) and `discourse` (policy on top). The engine (`RuleSet`,
+`Walker`) is format-agnostic, so a second target would add a `Layers` method
+and a matching `Normalizer.<target>` accessor; nothing else changes.

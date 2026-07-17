@@ -704,7 +704,7 @@ RSpec.describe Markbridge do
 
     it "uses a passed Normalizer, including a subclass instance (is_a?, not instance_of?)" do
       subclass = Class.new(Markbridge::Normalizer)
-      normalizer = subclass.for(:discourse)
+      normalizer = subclass.discourse
       normalizer.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Image, strategy: :drop)
       ast = Markbridge::AST::Document.new
       append_linked_image(ast)

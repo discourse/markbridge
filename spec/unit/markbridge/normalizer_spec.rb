@@ -14,30 +14,30 @@ RSpec.describe Markbridge::Normalizer do
   def url(*children, href: "https://ex.com") = el(Markbridge::AST::Url, *children, href:)
   def image(src: "https://ex.com/i.png") = Markbridge::AST::Image.new(src:)
 
-  subject(:normalizer) { described_class.for(:discourse) }
+  subject(:normalizer) { described_class.discourse }
 
-  describe ".for" do
+  describe ".discourse" do
     it "builds a fresh, customizable instance" do
-      one = described_class.for(:discourse)
-      two = described_class.for(:discourse)
+      one = described_class.discourse
+      two = described_class.discourse
       expect(one).to be_a(described_class)
       expect(one).not_to be(two)
       expect(one).not_to be_frozen
     end
 
-    it "raises for an unknown target" do
-      expect { described_class.for(:markdown) }.to raise_error(
-        ArgumentError,
-        /unknown normalizer target :markdown/,
-      )
+    it "carries the Discourse rules (an image in a link hoists out)" do
+      tree = doc(url(image))
+      described_class.discourse.normalize(tree)
+
+      expect(tree.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Image])
     end
   end
 
-  describe ".shared_for" do
+  describe ".shared_discourse" do
     it "returns the same frozen instance on every call" do
-      expect(described_class.shared_for(:discourse)).to be_a(described_class)
-      expect(described_class.shared_for(:discourse)).to be(described_class.shared_for(:discourse))
-      expect(described_class.shared_for(:discourse)).to be_frozen
+      expect(described_class.shared_discourse).to be_a(described_class)
+      expect(described_class.shared_discourse).to be(described_class.shared_discourse)
+      expect(described_class.shared_discourse).to be_frozen
     end
   end
 
@@ -75,7 +75,7 @@ RSpec.describe Markbridge::Normalizer do
 
     it "raises on a frozen (shared) instance" do
       expect {
-        described_class.shared_for(:discourse).rule(
+        described_class.shared_discourse.rule(
           parent: Markbridge::AST::Url,
           child: Markbridge::AST::Image,
           strategy: :drop,

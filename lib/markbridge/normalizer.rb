@@ -20,10 +20,10 @@ module Markbridge
   # callable escape hatch — applied by the {Walker}.
   #
   # @example Default (CommonMark + Discourse), reused across conversions
-  #   Markbridge::Normalizer.shared_for(:discourse)
+  #   Markbridge::Normalizer.shared_discourse
   #
   # @example Customized for a consumer
-  #   n = Markbridge::Normalizer.for(:discourse)
+  #   n = Markbridge::Normalizer.discourse
   #   n.rule(parent: AST::Url, child: AST::Mention, strategy: :textify)
   #   Markbridge.convert(input, format: :bbcode, normalize: n)
   #
@@ -37,11 +37,11 @@ module Markbridge
     private_constant :EMPTY_STACK
 
     class << self
-      # A fresh, customizable normalizer for a target format.
-      # @param target [Symbol] currently only +:discourse+
+      # A fresh, customizable Discourse normalizer (CommonMark legality plus
+      # Discourse policy). Add rules with {#rule}.
       # @return [Normalizer]
-      def for(target)
-        new(layer_for(target))
+      def discourse
+        new(Layers.discourse)
       end
 
       # A fresh normalizer carrying only the CommonMark layer (no Discourse
@@ -51,26 +51,13 @@ module Markbridge
         new(Layers.common_mark)
       end
 
-      # A memoized, deep-frozen normalizer for the hot path — its rule
-      # tables are built once per process. Safe to share across conversions
-      # and threads because +#normalize+/+#violations+ keep no per-call
-      # state on +self+.
-      #
-      # @param target [Symbol]
+      # A memoized, deep-frozen Discourse normalizer for the hot path — its
+      # rule tables are built once per process. Safe to share across
+      # conversions and threads because +#normalize+/+#violations+ keep no
+      # per-call state on +self+.
       # @return [Normalizer] the same frozen instance on every call
-      def shared_for(target)
-        (@shared ||= {})[target] ||= self.for(target).freeze
-      end
-
-      private
-
-      def layer_for(target)
-        case target
-        when :discourse
-          Layers.discourse
-        else
-          raise ArgumentError, "unknown normalizer target #{target.inspect} (expected :discourse)"
-        end
+      def shared_discourse
+        @shared_discourse ||= discourse.freeze
       end
     end
 
@@ -79,8 +66,8 @@ module Markbridge
       @rules = rule_set
     end
 
-    # Add or override a rule. Chainable. Raises on a frozen ({shared_for})
-    # instance — build a fresh one via {.for}.
+    # Add or override a rule. Chainable. Raises on a frozen ({shared_discourse})
+    # instance — build a fresh one via {.discourse}.
     #
     # @param parent [Class] ancestor AST class
     # @param child [Class] contained AST class
