@@ -4,60 +4,114 @@ require_relative "normalizer/rule_set"
 require_relative "normalizer/report"
 require_relative "normalizer/text_projection"
 require_relative "normalizer/walker"
-require_relative "normalizer/layers"
 
 module Markbridge
-  # Enforces target-format nesting rules on an AST between parse and render.
+  # Rewrites an AST so the renderer only gets markup the target format can
+  # express. It runs once, between parse and render. The default rules are
+  # CommonMark legality: no link inside a link, no block element inside an
+  # inline container, and an inline-only code span. Each match resolves to a
+  # strategy (+:keep+, +:hoist_after+, +:unwrap+, +:textify+, +:drop+, or a
+  # callable) that the {Walker} applies.
   #
-  # Real markup nests elements in ways Markdown can't express (a link inside
-  # a link, an image inside a link, a block inside a link label). The
-  # renderer's tags stay simple string emitters; this pass, one level up,
-  # rewrites the tree so the renderer is only ever handed something legal.
+  # Discourse-specific policy (for example, moving an image out of a link) is
+  # not built in. A consumer adds those with {#rule}.
   #
-  # Two rule layers: a CommonMark layer of objective legality and a
-  # Discourse layer of renderer policy on top. Each violation resolves to a
-  # strategy — +:keep+, +:hoist_after+, +:unwrap+, +:textify+, +:drop+, or a
-  # callable escape hatch — applied by the {Walker}.
+  # @example The default, reused across conversions
+  #   Markbridge::Normalizer.shared_default
   #
-  # @example Default (CommonMark + Discourse), reused across conversions
-  #   Markbridge::Normalizer.shared_discourse
-  #
-  # @example Customized for a consumer
-  #   n = Markbridge::Normalizer.discourse
-  #   n.rule(parent: AST::Url, child: AST::Mention, strategy: :textify)
+  # @example A customized normalizer
+  #   n = Markbridge::Normalizer.default
+  #   n.rule(parent: AST::Url, child: AST::Image, strategy: :hoist_after)
   #   Markbridge.convert(input, format: :bbcode, normalize: n)
   #
-  # @example Lint a tree without mutating it
-  #   Markbridge::Normalizer.common_mark.violations(ast) # => [...]
+  # @example List what would change, without changing it
+  #   Markbridge::Normalizer.default.violations(ast) # => [...]
   class Normalizer
-    # The built-in strategy symbols a rule may resolve to.
+    # The strategy symbols a rule may resolve to.
     STRATEGIES = %i[keep hoist_after unwrap textify drop].freeze
 
     EMPTY_STACK = [].freeze
     private_constant :EMPTY_STACK
 
+    # Containers that hold inline content only: a link's text (CommonMark
+    # §6.3), and emphasis and heading content.
+    INLINE_CONTAINERS = [
+      AST::Url,
+      AST::Bold,
+      AST::Italic,
+      AST::Strikethrough,
+      AST::Underline,
+      AST::Superscript,
+      AST::Subscript,
+      AST::Heading,
+    ].freeze
+
+    # AST nodes the Discourse renderer prints as block-level Markdown (their
+    # output has blank lines around it). One inside an inline container breaks
+    # that container, so it is moved out. Spoiler and single-line Code stay
+    # inline and are not listed (Code is handled by {INLINE_CODE}).
+    BLOCK_NODES = [
+      AST::Quote,
+      AST::Heading,
+      AST::List,
+      AST::ListItem,
+      AST::Table,
+      AST::TableRow,
+      AST::TableCell,
+      AST::Details,
+      AST::Paragraph,
+      AST::HorizontalRule,
+      AST::Align,
+      AST::Poll,
+      AST::Event,
+    ].freeze
+
+    # A code span may stay inside an inline container while it is on one line.
+    # A fenced or multi-line block is moved out. This matches
+    # +RenderingInterface#block_context?+: Code prints as a fenced block when a
+    # Text child has a newline (the language alone does not make it a block).
+    INLINE_CODE =
+      lambda do |_boundary, node|
+        block = node.children.any? { |c| c.instance_of?(AST::Text) && c.text.include?("\n") }
+        block ? :hoist_after : :keep
+      end
+
     class << self
-      # A fresh, customizable Discourse normalizer (CommonMark legality plus
-      # Discourse policy). Add rules with {#rule}.
+      # A fresh, customizable normalizer with the default rules. Add more with
+      # {#rule}.
       # @return [Normalizer]
-      def discourse
-        new(Layers.discourse)
+      def default
+        new(build_rules)
       end
 
-      # A fresh normalizer carrying only the CommonMark layer (no Discourse
-      # policy) — the objective-legality rules, handy for validation.
-      # @return [Normalizer]
-      def common_mark
-        new(Layers.common_mark)
-      end
-
-      # A memoized, deep-frozen Discourse normalizer for the hot path — its
-      # rule tables are built once per process. Safe to share across
-      # conversions and threads because +#normalize+/+#violations+ keep no
-      # per-call state on +self+.
+      # The default normalizer, built once and frozen, reused across
+      # conversions. +#normalize+ and +#violations+ keep no state on the
+      # instance, so one frozen instance is safe to reuse, also across threads.
       # @return [Normalizer] the same frozen instance on every call
-      def shared_discourse
-        @shared_discourse ||= discourse.freeze
+      def shared_default
+        @shared_default ||= default.freeze
+      end
+
+      private
+
+      def build_rules
+        rules = RuleSet.new
+
+        # §6.3 A link may not contain another link, at any depth. Unwrap the
+        # inner link and keep its text.
+        rules.add(parent: AST::Url, child: AST::Url, strategy: :unwrap)
+
+        INLINE_CONTAINERS.each do |container|
+          rules.add(parent: container, child: AST::Code, strategy: INLINE_CODE)
+
+          BLOCK_NODES.each do |block|
+            next if container == block
+
+            rules.add(parent: container, child: block, strategy: :hoist_after)
+          end
+        end
+
+        rules
       end
     end
 
@@ -66,8 +120,9 @@ module Markbridge
       @rules = rule_set
     end
 
-    # Add or override a rule. Chainable. Raises on a frozen ({shared_discourse})
-    # instance — build a fresh one via {.discourse}.
+    # Add or override a rule. Chainable. A rule for a +(parent, child)+ pair
+    # that already exists is replaced. Raises on a frozen ({shared_default})
+    # instance; build a fresh one with {.default}.
     #
     # @param parent [Class] ancestor AST class
     # @param child [Class] contained AST class
@@ -81,16 +136,15 @@ module Markbridge
     # Rewrite +ast+ in place so it satisfies the rules.
     #
     # @param ast [AST::Document, AST::Element]
-    # @return [Array<Hash>] a report of what changed (empty when nothing
-    #   did), one +{parent:, child:, strategy:, count:}+ row per distinct
-    #   transformation.
+    # @return [Array<Hash>] a report of what changed (empty when nothing did),
+    #   one +{parent:, child:, strategy:, count:}+ row per distinct change.
     def normalize(ast)
       report = Report.new
       Walker.new(@rules, report).call(ast)
       report.to_a
     end
 
-    # Report would-be violations of +ast+ without mutating it.
+    # List the violations in +ast+ without changing it.
     #
     # @param ast [AST::Document, AST::Element]
     # @return [Array<Hash>] +{parent:, child:, strategy:}+ per occurrence

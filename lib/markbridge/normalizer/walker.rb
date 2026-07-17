@@ -4,35 +4,34 @@ module Markbridge
   class Normalizer
     # The parent-aware tree-rewriting engine. One {Walker} is built per
     # {Normalizer#normalize} call (holding that call's {RuleSet} and
-    # {Report} — no state leaks onto the Normalizer). It mutates the tree
+    # {Report}; no state is kept on the Normalizer). It changes the tree
     # in place via {AST::Element#replace_children}, touching only elements
     # whose children actually changed.
     #
-    # The load-bearing property is *resolve-before-descend*: a child's
-    # strategy is resolved against its current ancestor stack first, and a
-    # relocated subtree (hoist/unwrap) is then walked against the ancestor
-    # stack it will have *after landing* — so a node that leaves a link
-    # never sees the link while its own interior is normalized. That keeps
-    # a legally-nested quote-in-quote or image-in-quote intact and gives
-    # the pass a fixpoint (a second normalize reports nothing).
+    # The main rule is resolve-before-descend: a child's strategy is resolved
+    # against its current ancestor stack first, and a moved subtree (hoist or
+    # unwrap) is then walked against the ancestor stack it will have in its
+    # new place. So a node that leaves a link does not see the link while its
+    # own inside is normalized. That keeps a legally nested quote-in-quote or
+    # image-in-quote intact, and it means a second normalize reports nothing.
     #
-    # Hoisting: a node extracted from an inline container bubbles up tagged
-    # with its boundary (the outermost offending ancestor, by identity) and
-    # lands as a sibling immediately after that boundary, at the boundary's
-    # parent. Wrappers left empty by a hoist/drop are pruned (see
-    # {PRUNE_WHEN_EMPTY}) so no +****+ husks remain.
+    # Hoisting: a node taken out of an inline container is moved up, tagged
+    # with its boundary (the outermost matching ancestor, compared by
+    # identity), and placed right after that boundary, at the boundary's
+    # parent. A wrapper left empty by a hoist or drop is removed (see
+    # {PRUNE_WHEN_EMPTY}), so no empty +**+ +**+ markers stay.
     #
-    # Hot path: the ancestor stack is a single shared, push/pop array, and
-    # an element's children list is copied only on the first divergence
-    # (copy-on-write). A violation-free subtree therefore allocates nothing
-    # and is left untouched — the pass can run by default.
+    # For speed, the ancestor stack is one shared array that is pushed and
+    # popped, and an element's children list is copied only when a child
+    # first changes (copy-on-write). A subtree with no violations allocates
+    # nothing and is left as it was, so the pass can run by default.
     class Walker
       EMPTY = [].freeze
 
-      # Nodes that are meaningless once emptied by a hoist/drop and should
-      # be pruned rather than left as a husk. NB: +AST::Url+ is deliberately
-      # absent — an empty link is meaningful output (it renders as a bare
-      # URL), so an image hoisted out of a link leaves the link behind.
+      # Wrappers that mean nothing once they are empty, so an empty one is
+      # removed instead of kept. +AST::Url+ is not here on purpose: an empty
+      # link still renders as a bare URL, so a hoist that empties a link keeps
+      # the link.
       PRUNE_WHEN_EMPTY = [
         AST::Bold,
         AST::Italic,
@@ -65,10 +64,10 @@ module Markbridge
 
       private
 
-      # Copy-on-write fast path: a kept child that came back unchanged (same
-      # object, no bubble) while nothing earlier diverged needs no rebuilt
-      # +out+. Pure optimization — when it is wrong, the fallback simply
-      # rebuilds an identical child list, so its mutations are equivalent.
+      # Copy-on-write check: a kept child that came back unchanged (same
+      # object, no bubble) while nothing earlier changed needs no rebuilt
+      # +out+. This only saves work. If it is wrong, the code still rebuilds
+      # the same child list, so its mutations do not change the output.
       def unchanged?(out, child2, child, child_bubble)
         out.nil? && child2.equal?(child) && child_bubble.empty?
       end
@@ -118,8 +117,8 @@ module Markbridge
         [element, raised]
       end
 
-      # An element is pruned when it ends up childless and is one of the
-      # husk-forming wrappers (see {PRUNE_WHEN_EMPTY}).
+      # An element is removed when it ends up with no children and is one of
+      # the wrappers in {PRUNE_WHEN_EMPTY}.
       def prune?(element, out, children)
         empty = out ? out.empty? : children.empty?
         empty && PRUNE_WHEN_EMPTY.include?(element.class)
@@ -140,9 +139,9 @@ module Markbridge
         end
       end
 
-      # Append an already-normalized kept child and land any bubbles it
-      # raised whose boundary is this child. (+land+ is a no-op on an empty
-      # +child_bubble+, so no early-out is needed.)
+      # Append a kept child that is already normalized, then place any of its
+      # bubbles whose boundary is this child. ({#land} does nothing when
+      # +child_bubble+ is empty, so there is no separate check for that.)
       def append_kept(child2, child_bubble, child, out, bubble)
         out << child2 unless child2.nil?
         land(child_bubble, child, out, bubble)
@@ -197,9 +196,9 @@ module Markbridge
         end
 
         @report.record(boundary.class, child.class, :unwrap)
-        # Dissolve: re-run the child's children through the current +out+,
-        # resolved against the current stack. Re-resolving in the same pass
-        # reaches fixpoint for nested links.
+        # Unwrap: run the child's children through the current +out+, resolved
+        # against the current stack. Resolving them again in the same pass is
+        # what fixes deeply nested links in one go.
         child.children.each { |grandchild| bubble = process_into(grandchild, stack, out, bubble) }
         bubble
       end

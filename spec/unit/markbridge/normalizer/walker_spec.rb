@@ -15,7 +15,15 @@ RSpec.describe Markbridge::Normalizer::Walker do
   def url(*children, href: "https://ex.com") = el(Markbridge::AST::Url, *children, href:)
   def image(src: "https://ex.com/i.png") = Markbridge::AST::Image.new(src:)
 
-  let(:normalizer) { Markbridge::Normalizer.discourse }
+  # The default rules do not move an image out of a link. These engine
+  # examples add that rule so they have a simple violation to use.
+  let(:normalizer) do
+    Markbridge::Normalizer.default.rule(
+      parent: Markbridge::AST::Url,
+      child: Markbridge::AST::Image,
+      strategy: :hoist_after,
+    )
+  end
 
   describe "hoist_after" do
     it "moves an image out of a link, reports it, and leaves the empty link" do
@@ -24,7 +32,7 @@ RSpec.describe Markbridge::Normalizer::Walker do
       report = normalizer.normalize(tree)
 
       expect(tree.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Image])
-      expect(tree.children.last).to be(img) # the same node, relocated
+      expect(tree.children.last).to be(img) # the same node, moved
       expect(tree.children.first.children).to eq([])
       expect(report).to eq([{ parent: "Url", child: "Image", strategy: :hoist_after, count: 1 }])
     end
@@ -32,7 +40,7 @@ RSpec.describe Markbridge::Normalizer::Walker do
     it "does not push a bubble entry when the hoisted node is pruned to nil" do
       # An empty prunable wrapper hoisted out normalizes to nil — it must not
       # be pushed as a [nil, boundary] bubble (which would splice a nil child).
-      custom = Markbridge::Normalizer.discourse
+      custom = Markbridge::Normalizer.default
       custom.rule(
         parent: Markbridge::AST::Url,
         child: Markbridge::AST::Bold,
@@ -259,7 +267,7 @@ RSpec.describe Markbridge::Normalizer::Walker do
   describe "pruning" do
     # Every entry in PRUNE_WHEN_EMPTY, emptied via a custom hoist rule so
     # even the non-inline-container wrappers (Color/Size/Align/Email) are
-    # exercised. A missing entry would leave a husk and fail here.
+    # exercised. A missing entry would leave an empty wrapper and fail here.
     prunable = {
       Markbridge::AST::Bold => {
       },
@@ -289,7 +297,7 @@ RSpec.describe Markbridge::Normalizer::Walker do
 
     prunable.each do |wrapper, kwargs|
       it "prunes an emptied #{wrapper.name.split("::").last}" do
-        custom = Markbridge::Normalizer.discourse
+        custom = Markbridge::Normalizer.default
         custom.rule(parent: wrapper, child: Markbridge::AST::Image, strategy: :hoist_after)
         node = kwargs.empty? ? wrapper.new : wrapper.new(**kwargs)
         node << image
@@ -428,7 +436,7 @@ RSpec.describe Markbridge::Normalizer::Walker do
     it "does not merge (or crash on) a non-text node adjacent to a Text" do
       # common_mark has no (Url, Image) rule, so the image survives the unwrap
       # and lands next to the text — mergeable? must reject the pair.
-      unwrapper = Markbridge::Normalizer.common_mark
+      unwrapper = Markbridge::Normalizer.default
       unwrapper.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Bold, strategy: :unwrap)
       img = image
       tree = doc(url(el(Markbridge::AST::Bold, img, text("x"))))
@@ -458,7 +466,7 @@ RSpec.describe Markbridge::Normalizer::Walker do
       # possible if the destination stack still contains the Color ancestor.
       # (Color is used because, unlike an inline container, it has no block
       # rule of its own, so the quote's boundary stays at the Url.)
-      custom = Markbridge::Normalizer.discourse
+      custom = Markbridge::Normalizer.default
       custom.rule(
         parent: Markbridge::AST::Color,
         child: Markbridge::AST::Image,
@@ -479,7 +487,7 @@ RSpec.describe Markbridge::Normalizer::Walker do
       # (Url, Quote) hoists the quote out of the link; a custom (Document, Image)
       # rule must still fire on the image inside that quote, which requires the
       # destination stack to still contain the Document (root) ancestor.
-      custom = Markbridge::Normalizer.discourse
+      custom = Markbridge::Normalizer.default
       custom.rule(
         parent: Markbridge::AST::Document,
         child: Markbridge::AST::Image,
@@ -597,8 +605,13 @@ RSpec.describe Markbridge::Normalizer::Walker do
       # (Color, Bold) unwrap dissolves the bold; the inner link keeps its
       # image hoist landing right after the link, inside the Color — the
       # dissolved child (the link) is itself the boundary.
-      custom = Markbridge::Normalizer.discourse
+      custom = Markbridge::Normalizer.default
       custom.rule(parent: Markbridge::AST::Color, child: Markbridge::AST::Bold, strategy: :unwrap)
+      custom.rule(
+        parent: Markbridge::AST::Url,
+        child: Markbridge::AST::Image,
+        strategy: :hoist_after,
+      )
       img = image
       color = el(Markbridge::AST::Color, el(Markbridge::AST::Bold, url(img)), color: "red")
       custom.normalize(doc(color))
@@ -621,9 +634,14 @@ RSpec.describe Markbridge::Normalizer::Walker do
     end
 
     it "keeps a dissolved child that resolves to :keep (not routed to emit)" do
-      # unwrap the bold; the mention it held resolves to :keep via (Url, Mention)
-      # and must be appended, not sent through emit (which would raise on :keep).
+      # unwrap the bold; the mention it held resolves to an explicit :keep and
+      # must be appended, not sent through emit (which would raise on :keep).
       normalizer.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Bold, strategy: :unwrap)
+      normalizer.rule(
+        parent: Markbridge::AST::Url,
+        child: Markbridge::AST::Mention,
+        strategy: :keep,
+      )
       tree = doc(url(el(Markbridge::AST::Bold, Markbridge::AST::Mention.new(name: "x"))))
 
       expect { normalizer.normalize(tree) }.not_to raise_error
@@ -661,7 +679,7 @@ RSpec.describe Markbridge::Normalizer::Walker do
     it "appends a node hoisted with the document as its boundary" do
       # A (Document, Image) rule makes the document the hoist boundary; the
       # bubble reaches the root and Walker#call must append it (not drop it).
-      custom = Markbridge::Normalizer.discourse
+      custom = Markbridge::Normalizer.default
       custom.rule(
         parent: Markbridge::AST::Document,
         child: Markbridge::AST::Image,

@@ -41,19 +41,19 @@ module Markbridge
       # @return [Array(Object, AST::Element), Array(nil, nil)]
       def resolve(child, ancestors)
         child_class = child.class
-        # Fast path: skip the ancestor scan entirely for a class no rule
-        # targets (the common case — plain text). Pure optimization; the scan
-        # below returns the same result for a non-candidate class.
+        # Skip the ancestor scan for a class no rule targets (most nodes, for
+        # example plain text). The scan below returns the same result for such
+        # a class, so this only saves work.
         return NO_MATCH unless @child_classes.include?(child_class)
 
         scan_ancestors(child_class, ancestors)
       end
 
-      # Deep-freeze so a shared instance fails loudly on mutation. Freezing
-      # +@by_parent+ and its inner hashes is enough: {#add} writes there
-      # before it ever touches +@child_classes+, so a frozen registry always
-      # raises on the +@by_parent+ write first — +@child_classes+ can never be
-      # reached to be mutated, and so does not need freezing.
+      # Freeze so a shared instance raises if something tries to change it.
+      # Freezing +@by_parent+ and its inner hashes is enough: {#add} writes
+      # there before it touches +@child_classes+, so a frozen instance raises
+      # on the +@by_parent+ write first. +@child_classes+ is never reached, so
+      # it does not need freezing.
       def freeze
         @by_parent.each_value(&:freeze)
         @by_parent.freeze
@@ -62,9 +62,9 @@ module Markbridge
 
       private
 
-      # The ancestor scan behind {#resolve}: outermost matching ancestor
-      # wins. Split out from the fast-path guard so its behaviour stays under
-      # test while the guard (a pure optimization) can be ignored.
+      # The ancestor scan behind {#resolve}: the outermost matching ancestor
+      # wins. It is split from the skip check in {#resolve} so the scan can be
+      # tested on its own.
       def scan_ancestors(child_class, ancestors)
         ancestors.each do |ancestor|
           strategies = @by_parent[ancestor.class]

@@ -14,41 +14,126 @@ RSpec.describe Markbridge::Normalizer do
   def url(*children, href: "https://ex.com") = el(Markbridge::AST::Url, *children, href:)
   def image(src: "https://ex.com/i.png") = Markbridge::AST::Image.new(src:)
 
-  subject(:normalizer) { described_class.discourse }
+  # Any valid instance of the class; the rules only look at the class.
+  def instance(klass)
+    case klass.name.split("::").last
+    when "Heading"
+      klass.new(level: 1)
+    when "Align"
+      klass.new(alignment: "center")
+    when "Url"
+      klass.new(href: "u")
+    when "Image"
+      klass.new(src: "s")
+    when "Poll"
+      klass.new(name: "p")
+    when "Event"
+      klass.new(name: "e", starts_at: "2026-01-01")
+    else
+      klass.new
+    end
+  end
 
-  describe ".discourse" do
+  # An instance of +container_klass+ holding +child+.
+  def wrap(container_klass, child) = instance(container_klass).tap { |c| c << child }
+
+  def short(klass) = klass.name.split("::").last
+
+  # The default rules do not move an image out of a link (that is Discourse
+  # policy a consumer adds). The examples below add that rule so they have a
+  # simple case to work with.
+  subject(:normalizer) do
+    described_class.default.rule(
+      parent: Markbridge::AST::Url,
+      child: Markbridge::AST::Image,
+      strategy: :hoist_after,
+    )
+  end
+
+  describe ".default" do
     it "builds a fresh, customizable instance" do
-      one = described_class.discourse
-      two = described_class.discourse
+      one = described_class.default
+      two = described_class.default
       expect(one).to be_a(described_class)
       expect(one).not_to be(two)
       expect(one).not_to be_frozen
     end
 
-    it "carries the Discourse rules (an image in a link hoists out)" do
-      tree = doc(url(image))
-      described_class.discourse.normalize(tree)
+    it "carries the default rules (a link inside a link is unwrapped)" do
+      tree = doc(url(url(text("x"), href: "b"), href: "a"))
+      described_class.default.normalize(tree)
 
-      expect(tree.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Image])
+      expect(tree.children.size).to eq(1)
+      expect(tree.children.first.href).to eq("a")
     end
   end
 
-  describe ".shared_discourse" do
+  describe ".shared_default" do
     it "returns the same frozen instance on every call" do
-      expect(described_class.shared_discourse).to be_a(described_class)
-      expect(described_class.shared_discourse).to be(described_class.shared_discourse)
-      expect(described_class.shared_discourse).to be_frozen
+      expect(described_class.shared_default).to be_a(described_class)
+      expect(described_class.shared_default).to be(described_class.shared_default)
+      expect(described_class.shared_default).to be_frozen
+    end
+
+    it "normalizes and can be reused, even though it is frozen" do
+      shared = described_class.shared_default
+      2.times do
+        tree = doc(url(url(text("x"), href: "b"), href: "a"))
+        expect(shared.normalize(tree)).to eq(
+          [{ parent: "Url", child: "Url", strategy: :unwrap, count: 1 }],
+        )
+      end
     end
   end
 
-  describe ".common_mark" do
-    it "omits the Discourse policy layer (an image in a link is left legal-but-untouched)" do
-      tree = doc(url(image))
-      described_class.common_mark.normalize(tree)
+  describe "default rules" do
+    it "unwraps a link inside a link" do
+      expect(described_class.default.violations(doc(url(url(text("x")))))).to contain_exactly(
+        { parent: "Url", child: "Url", strategy: :unwrap },
+      )
+    end
 
-      # No (Url, Image) rule in the CommonMark-only layer → image stays put.
-      expect(tree.children.first).to be_a(Markbridge::AST::Url)
-      expect(tree.children.first.children).to contain_exactly(be_a(Markbridge::AST::Image))
+    it "flags every block node inside every inline container" do
+      described_class::INLINE_CONTAINERS.each do |container|
+        described_class::BLOCK_NODES.each do |block|
+          next if container == block
+
+          found = described_class.default.violations(doc(wrap(container, instance(block))))
+          expect(found).to include(
+            { parent: short(container), child: short(block), strategy: :hoist_after },
+          ),
+          "(#{container}, #{block}) not flagged"
+        end
+      end
+    end
+
+    it "keeps an inline code span but flags a fenced one, in any inline container" do
+      described_class::INLINE_CONTAINERS.each do |container|
+        inline = el(Markbridge::AST::Code, text("x"))
+        fenced = el(Markbridge::AST::Code, text("a\nb"))
+
+        expect(described_class.default.violations(doc(wrap(container, inline)))).to eq([]),
+        "inline code in #{container}"
+        expect(described_class.default.violations(doc(wrap(container, fenced)))).to contain_exactly(
+          { parent: short(container), child: "Code", strategy: :hoist_after },
+        ),
+        "fenced code in #{container}"
+      end
+    end
+
+    it "does not flag a node that is both an inline container and a block against itself" do
+      # Heading is in INLINE_CONTAINERS and in BLOCK_NODES. build_rules must not
+      # add a (Heading, Heading) hoist rule, or a heading in a heading would move.
+      heading = Markbridge::AST::Heading
+      tree = doc(wrap(heading, instance(heading)))
+
+      expect(described_class.default.violations(tree)).to eq([])
+    end
+
+    it "does not add Discourse policy: an image or mention in a link is not flagged" do
+      expect(described_class.default.violations(doc(url(image)))).to eq([])
+      mention = Markbridge::AST::Mention.new(name: "a")
+      expect(described_class.default.violations(doc(url(mention)))).to eq([])
     end
   end
 
@@ -63,19 +148,19 @@ RSpec.describe Markbridge::Normalizer do
       ).to be(normalizer)
     end
 
-    it "overrides a built-in rule for the same (parent, child) pair" do
+    it "replaces an existing rule for the same (parent, child) pair" do
       tree = doc(url(image))
       normalizer.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Image, strategy: :drop)
       normalizer.normalize(tree)
 
-      # Overridden from :hoist_after to :drop — image gone, nothing hoisted.
+      # was :hoist_after, now :drop — image gone, nothing hoisted
       expect(tree.children).to eq([tree.children.first])
       expect(tree.children.first.children).to eq([])
     end
 
     it "raises on a frozen (shared) instance" do
       expect {
-        described_class.shared_discourse.rule(
+        described_class.shared_default.rule(
           parent: Markbridge::AST::Url,
           child: Markbridge::AST::Image,
           strategy: :drop,
@@ -102,7 +187,7 @@ RSpec.describe Markbridge::Normalizer do
       normalizer.normalize(tree)
 
       expect(tree.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Image])
-      # bold emptied by the hoist → pruned (no **** husk)
+      # bold emptied by the hoist → removed (no empty ** **)
       expect(tree.children.first.children).to eq([])
     end
 
@@ -163,7 +248,7 @@ RSpec.describe Markbridge::Normalizer do
     end
   end
 
-  describe "#normalize ordering (relocated subtrees walk their destination stack)" do
+  describe "#normalize ordering (moved subtrees walk against their new-place stack)" do
     it "keeps a legally-nested quote-in-quote intact when the outer quote is hoisted" do
       inner_quote = el(Markbridge::AST::Quote, text("deep"))
       outer_quote = el(Markbridge::AST::Quote, inner_quote)
@@ -307,7 +392,7 @@ RSpec.describe Markbridge::Normalizer do
     it "is empty once the tree has been normalized (validation property)" do
       tree = doc(url(el(Markbridge::AST::Bold, image)))
       normalizer.normalize(tree)
-      expect(described_class.common_mark.violations(tree)).to eq([])
+      expect(described_class.default.violations(tree)).to eq([])
     end
   end
 end

@@ -1,16 +1,27 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge do
-  # Append a link wrapping an image — a Discourse normalization violation
-  # (the image is hoisted out) — so a test can prove whether the +normalize:+
-  # pass ran, regardless of the source format.
+  # Append a link inside a link — a default violation (the inner link is
+  # unwrapped) — so a test can prove the +normalize:+ pass ran, whatever the
+  # source format.
+  def append_nested_link(ast)
+    outer = Markbridge::AST::Url.new(href: "https://a.example.com")
+    inner = Markbridge::AST::Url.new(href: "https://b.example.com")
+    inner << Markbridge::AST::Text.new("x")
+    outer << inner
+    ast << outer
+  end
+
+  # Append a link wrapping an image. Moving it out is not a default rule, so
+  # only a normalizer that adds the rule changes this.
   def append_linked_image(ast)
     url = Markbridge::AST::Url.new(href: "https://example.com")
     url << Markbridge::AST::Image.new(src: "https://example.com/pic.png")
     ast << url
   end
 
-  HOISTED = [{ parent: "Url", child: "Image", strategy: :hoist_after, count: 1 }].freeze
+  UNWRAPPED = [{ parent: "Url", child: "Url", strategy: :unwrap, count: 1 }].freeze
+
   it "has a version number" do
     expect(Markbridge::VERSION).not_to be_nil
   end
@@ -77,16 +88,14 @@ RSpec.describe Markbridge do
 
   describe ".bbcode_to_markdown" do
     it "normalizes the AST by default" do
-      conversion = described_class.bbcode_to_markdown("hi") { |ast| append_linked_image(ast) }
+      conversion = described_class.bbcode_to_markdown("hi") { |ast| append_nested_link(ast) }
 
-      expect(conversion.diagnostics[:normalization]).to eq(HOISTED)
+      expect(conversion.diagnostics[:normalization]).to eq(UNWRAPPED)
     end
 
     it "does not normalize when normalize: false" do
       conversion =
-        described_class.bbcode_to_markdown("hi", normalize: false) do |ast|
-          append_linked_image(ast)
-        end
+        described_class.bbcode_to_markdown("hi", normalize: false) { |ast| append_nested_link(ast) }
 
       expect(conversion.diagnostics[:normalization]).to be_nil
     end
@@ -231,15 +240,15 @@ RSpec.describe Markbridge do
 
   describe ".html_to_markdown" do
     it "normalizes the AST by default" do
-      conversion = described_class.html_to_markdown("<b>hi</b>") { |ast| append_linked_image(ast) }
+      conversion = described_class.html_to_markdown("<b>hi</b>") { |ast| append_nested_link(ast) }
 
-      expect(conversion.diagnostics[:normalization]).to eq(HOISTED)
+      expect(conversion.diagnostics[:normalization]).to eq(UNWRAPPED)
     end
 
     it "does not normalize when normalize: false" do
       conversion =
         described_class.html_to_markdown("<b>hi</b>", normalize: false) do |ast|
-          append_linked_image(ast)
+          append_nested_link(ast)
         end
 
       expect(conversion.diagnostics[:normalization]).to be_nil
@@ -346,15 +355,15 @@ RSpec.describe Markbridge do
 
     it "normalizes the AST by default" do
       conversion =
-        described_class.text_formatter_xml_to_markdown(xml) { |ast| append_linked_image(ast) }
+        described_class.text_formatter_xml_to_markdown(xml) { |ast| append_nested_link(ast) }
 
-      expect(conversion.diagnostics[:normalization]).to eq(HOISTED)
+      expect(conversion.diagnostics[:normalization]).to eq(UNWRAPPED)
     end
 
     it "does not normalize when normalize: false" do
       conversion =
         described_class.text_formatter_xml_to_markdown(xml, normalize: false) do |ast|
-          append_linked_image(ast)
+          append_nested_link(ast)
         end
 
       expect(conversion.diagnostics[:normalization]).to be_nil
@@ -451,15 +460,15 @@ RSpec.describe Markbridge do
   describe ".mediawiki_to_markdown" do
     it "normalizes the AST by default" do
       conversion =
-        described_class.mediawiki_to_markdown("'''hi'''") { |ast| append_linked_image(ast) }
+        described_class.mediawiki_to_markdown("'''hi'''") { |ast| append_nested_link(ast) }
 
-      expect(conversion.diagnostics[:normalization]).to eq(HOISTED)
+      expect(conversion.diagnostics[:normalization]).to eq(UNWRAPPED)
     end
 
     it "does not normalize when normalize: false" do
       conversion =
         described_class.mediawiki_to_markdown("'''hi'''", normalize: false) do |ast|
-          append_linked_image(ast)
+          append_nested_link(ast)
         end
 
       expect(conversion.diagnostics[:normalization]).to be_nil
@@ -690,29 +699,30 @@ RSpec.describe Markbridge do
   describe ".render" do
     it "normalizes the AST by default" do
       ast = Markbridge::AST::Document.new
-      append_linked_image(ast)
+      append_nested_link(ast)
 
-      expect(described_class.render(ast).diagnostics[:normalization]).to eq(HOISTED)
+      expect(described_class.render(ast).diagnostics[:normalization]).to eq(UNWRAPPED)
     end
 
     it "does not normalize when normalize: false" do
       ast = Markbridge::AST::Document.new
-      append_linked_image(ast)
+      append_nested_link(ast)
 
       expect(described_class.render(ast, normalize: false).diagnostics[:normalization]).to be_nil
     end
 
     it "uses a passed Normalizer, including a subclass instance (is_a?, not instance_of?)" do
       subclass = Class.new(Markbridge::Normalizer)
-      normalizer = subclass.discourse
+      normalizer = subclass.default
       normalizer.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Image, strategy: :drop)
       ast = Markbridge::AST::Document.new
       append_linked_image(ast)
 
       conversion = described_class.render(ast, normalize: normalizer)
 
-      # The subclass instance is accepted and its :drop rule applied; with
-      # instance_of? it would be rejected and the default :hoist_after used.
+      # The subclass instance is accepted and its :drop rule runs. With
+      # instance_of? it would be rejected, shared_default would run instead,
+      # and shared_default has no image rule, so the image would stay.
       expect(conversion.diagnostics[:normalization]).to eq(
         [{ parent: "Url", child: "Image", strategy: :drop, count: 1 }],
       )

@@ -45,9 +45,9 @@ module Markbridge
     #   {Conversion} with an empty +markdown+ string, and surface the
     #   exceptions via {Conversion#errors}.
     # @yieldparam ast [AST::Document] mutate before rendering (optional)
-    # @param normalize [Boolean, Normalizer] enforce target-format nesting
+    # @param normalize [Boolean, Normalizer] apply target-format nesting
     #   rules between the +yield+ hook and render. +true+ (default) uses the
-    #   shared Discourse normalizer; a {Normalizer} is used as-is; +false+
+    #   shared default normalizer; a {Normalizer} is used as-is; +false+
     #   skips normalization. See {Normalizer}.
     # @return [Conversion]
     def bbcode_to_markdown(
@@ -347,7 +347,7 @@ module Markbridge
     def apply_normalization(parse, normalize)
       return parse unless normalize
 
-      normalizer = normalize.is_a?(Normalizer) ? normalize : Normalizer.shared_discourse
+      normalizer = normalize.is_a?(Normalizer) ? normalize : Normalizer.shared_default
       report = normalizer.normalize(parse.ast)
       return parse if report.empty?
 
