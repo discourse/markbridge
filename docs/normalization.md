@@ -1,10 +1,11 @@
 # AST Normalization
 
 Real markup nests elements in ways the target format can't express: a link
-inside a link, an image inside a link, a block inside a link label. Left
-alone, these render as broken Markdown — the inner link wins and the outer
-degrades to text, a linked image comes out as `[![alt](src)](url)`, a
-block's blank lines terminate the `[…](url)` construct.
+inside a link, an image inside a link, a block element inside any inline
+container (a link label, but equally bold or a heading). Left alone, these
+render as broken Markdown — the inner link wins and the outer degrades to
+text, a linked image comes out as `[![alt](src)](url)`, a block's blank
+lines break out of the emphasis or `[…](url)` wrapping it.
 
 `Markbridge::Normalizer` walks the AST once, between the parse-time `yield`
 hook and rendering, and rewrites it so the renderer is only ever handed
@@ -28,13 +29,23 @@ the source.
 1. **CommonMark layer** — objective legality from the spec. Break these and
    the emitted Markdown does not parse back as the tree intended:
    - no link inside a link, at any depth (§6.3)
-   - a link label / emphasis / heading holds inline content only — no
-     block elements
+   - an *inline container* holds inline content only, so any block element
+     inside one is hoisted out. The inline containers are links, emphasis
+     (`Bold`, `Italic`, `Underline`, `Strikethrough`, `Superscript`,
+     `Subscript`) and headings; the block elements are `List`, `Table`,
+     `Quote`, `Details`, `Paragraph`, `HorizontalRule`, `Align`, and the
+     Discourse block stubs `Poll`/`Event` (each renders as its own block).
+     This is **not** link-specific — a poll inside bold, or a list inside a
+     heading, is fixed the same way a block inside a link is.
    - an inline code span in a link label is legal only while it stays
      inline (single line)
 2. **Discourse layer** — renderer policy on top:
-   - image-likes (`Image`, `Upload`, `Attachment`) and Discourse blocks
-     (`Quote`, `Poll`, `Event`) inside a link are hoisted out
+   - image-likes (`Image`, `Upload`, `Attachment`) inside a **link** are
+     hoisted out. Unlike the block rules above, this is policy rather than
+     legality: `[![alt](src)](url)` is valid CommonMark, but Discourse wants
+     the image beside the link, not wrapping it. (Image-likes are inline, so
+     they are legal inside emphasis and stay put there — only the link case
+     is a violation.)
    - a `Mention` inside a link is kept — it renders as literal `@name`,
      which is what Discourse cooks inside a link anyway
 
@@ -48,8 +59,8 @@ Each violation resolves to one strategy:
 | Strategy | Effect |
 |----------|--------|
 | `:keep` | Explicitly allow it (documents a decision, silences the report). |
-| `:hoist_after` | Move the node out to a sibling after the *outermost* offending ancestor, preserving document order. An image inside bold inside a link hoists after the **link**, not the bold. |
-| `:unwrap` | Replace the element with its children (the inner link of a nested pair). |
+| `:hoist_after` | Move the node out to a sibling after the *outermost* offending ancestor, preserving document order. An image nested in a bold that is itself inside a link lands after the **whole link** — clearing both, since the bold sits inside the link — not stranded after the bold inside the link. (The walker only ever moves a node *out* to a sibling; it never inserts one into a wrapper it wasn't already in.) |
+| `:unwrap` | Dissolve the element, splicing its children into its place. The built-in case is the inner link of a nested pair: `[[text](inner)](outer)` becomes `[text](outer)` — the inner link's wrapper and its href are dropped, its text kept under the outer link. |
 | `:textify` | Replace the subtree with its plain-text projection (`@name` for a mention, concatenated text otherwise). |
 | `:drop` | Remove it entirely. |
 | callable | `->(boundary, node) { … }` returning a strategy symbol, an `Array<AST::Node>` to splice, or `nil` to drop — the escape hatch for anything the built-ins don't cover. |
