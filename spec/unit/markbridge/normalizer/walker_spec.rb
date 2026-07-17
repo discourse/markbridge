@@ -524,6 +524,25 @@ RSpec.describe Markbridge::Normalizer::Walker do
 
       expect(tree.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Code])
     end
+
+    it "hoists a multi-line code block out of an inline container that is not a link" do
+      code = el(Markbridge::AST::Code, text("a\nb"))
+      tree = doc(el(Markbridge::AST::Bold, code))
+      normalizer.normalize(tree)
+
+      # bold emptied → pruned; the block lands at the top level
+      expect(tree.descendants(Markbridge::AST::Bold)).to be_empty
+      expect(tree.children).to eq([code])
+    end
+
+    it "keeps an inline code span inside bold" do
+      code = el(Markbridge::AST::Code, text("x"))
+      tree = doc(el(Markbridge::AST::Bold, code))
+      normalizer.normalize(tree)
+
+      expect(tree.children.first).to be_a(Markbridge::AST::Bold)
+      expect(tree.children.first.children).to eq([code])
+    end
   end
 
   describe "unwrap edge cases" do

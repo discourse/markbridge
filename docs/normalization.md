@@ -36,8 +36,8 @@ the source.
      a link. The authoritative lists are `Normalizer::Layers::INLINE_CONTAINERS`
      and `BLOCK_NODES` (which covers `List`, `Table`, `Quote`, `Details`,
      `HorizontalRule`, `Align`, and the Discourse `Poll`/`Event` stubs).
-   - an inline code span in a link label is legal only while it stays
-     inline (single line)
+   - a code span inside an inline container is legal only while it stays
+     inline (single line); a fenced/multi-line block is hoisted out
 2. **Discourse layer** — renderer policy on top:
    - image-likes (`Image`, `Upload`, `Attachment`) inside a **link** are
      hoisted out. Unlike the block rules above, this is policy rather than

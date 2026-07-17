@@ -61,18 +61,18 @@ RSpec.describe Markbridge::Normalizer::Layers do
       expect(resolve(rules, Markbridge::AST::Heading, Markbridge::AST::Heading)).to be_nil
     end
 
-    it "keeps an inline (single-line) code span in a link" do
-      code = Markbridge::AST::Code.new
-      code << Markbridge::AST::Text.new("x")
-      strategy, = rules.resolve(code, [instance(Markbridge::AST::Url)])
-      expect(strategy.call(nil, code)).to eq(:keep)
-    end
+    it "wires the inline-code rule to every inline container (keep inline, hoist a block)" do
+      inline = Markbridge::AST::Code.new
+      inline << Markbridge::AST::Text.new("x")
+      block = Markbridge::AST::Code.new
+      block << Markbridge::AST::Text.new("a\nb")
 
-    it "hoists a multi-line code block out of a link" do
-      code = Markbridge::AST::Code.new
-      code << Markbridge::AST::Text.new("a\nb")
-      strategy, = rules.resolve(code, [instance(Markbridge::AST::Url)])
-      expect(strategy.call(nil, code)).to eq(:hoist_after)
+      described_class::INLINE_CONTAINERS.each do |container|
+        strategy, = rules.resolve(inline, [instance(container)])
+        expect(strategy).to respond_to(:call), "no (#{container}, Code) rule"
+        expect(strategy.call(nil, inline)).to eq(:keep), "inline code in #{container}"
+        expect(strategy.call(nil, block)).to eq(:hoist_after), "code block in #{container}"
+      end
     end
 
     it "does NOT carry the Discourse policy (no image-in-link rule)" do

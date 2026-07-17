@@ -49,10 +49,10 @@ module Markbridge
       # layer via {BLOCK_NODES}, since a block breaks *any* inline container.
       DISCOURSE_HOIST_FROM_URL = [AST::Image, AST::Upload, AST::Attachment].freeze
 
-      # Keep an inline code span in a link (legal), hoist a block/fenced one
-      # out. Mirrors +RenderingInterface#block_context?+: Code renders as a
-      # fenced block iff a Text child contains a newline (the language alone
-      # does not force a block).
+      # Keep an inline code span (legal in any inline container), hoist a
+      # block/fenced one out. Mirrors +RenderingInterface#block_context?+:
+      # Code renders as a fenced block iff a Text child contains a newline
+      # (the language alone does not force a block).
       INLINE_CODE =
         lambda do |_boundary, node|
           block = node.children.any? { |c| c.instance_of?(AST::Text) && c.text.include?("\n") }
@@ -69,12 +69,12 @@ module Markbridge
           # nesting." Unwrap the inner link, keeping its label text.
           rules.add(parent: AST::Url, child: AST::Url, strategy: :unwrap)
 
-          # §6.1 A code span in a link label is legal only while it stays
-          # inline.
-          rules.add(parent: AST::Url, child: AST::Code, strategy: INLINE_CODE)
-
           # Inline-only containers may not hold block-level content.
           INLINE_CONTAINERS.each do |container|
+            # §6.1 A code span inside an inline container is legal only while
+            # it stays inline; a fenced/multi-line block is hoisted out.
+            rules.add(parent: container, child: AST::Code, strategy: INLINE_CODE)
+
             BLOCK_NODES.each do |block|
               next if container == block
 
