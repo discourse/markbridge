@@ -26,6 +26,12 @@ Markbridge follows a **Parse → AST → Render** architecture:
    Registry                                   Library
 ```
 
+Between the AST and Render, an optional `Markbridge::Normalizer` pass
+rewrites the tree so the renderer is only handed markup the target format
+can express (no link inside a link, no block inside an inline container,
+etc.). It runs by default at the conversion level; the three components
+above are unchanged by it. See [AST Normalization](normalization.md).
+
 ### Phase 1: Parsing (BBCode → AST)
 
 **Purpose:** Convert BBCode text into a structured tree

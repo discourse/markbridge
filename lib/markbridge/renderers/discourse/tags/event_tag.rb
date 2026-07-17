@@ -20,12 +20,6 @@ module Markbridge
         class EventTag < Tag
           def render(element, _interface)
             body = element.raw || build_event_bbcode(element)
-            # Bracket both sides with blank lines so the stub cooks as a
-            # standalone block. Without the leading pair it degrades into list
-            # soup when it follows inline text on the same line — which now
-            # happens whenever an event is hoisted out of an inline container,
-            # and already happened for an event written mid-line in the source.
-            # (Same island form the html_mode contract wants.)
             "\n\n#{body}\n\n"
           end
 

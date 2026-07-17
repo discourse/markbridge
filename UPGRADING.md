@@ -12,13 +12,12 @@ What changes in the output, without any code change on your side:
 - A link wrapping an image (`[url][img]…[/img][/url]`,
   `<a><img></a>`) no longer renders as `[![alt](src)](url)`. The image is
   hoisted out and placed right after the link; the link stays as a bare
-  URL. Same for `Upload`/`Attachment` and for Discourse blocks
-  (`Quote`/`Poll`/`Event`) inside a link.
+  URL. Same for an `Upload` or `Attachment` in a link.
 - A link inside a link (`[url][url]…[/url][/url]`) collapses to a single
   link (CommonMark forbids nested links).
-- Block content inside an inline container (a block in a link label or
-  inside emphasis/a heading) is hoisted out so the inline construct
-  doesn't break.
+- A block element inside any inline container — a quote, list, table, or a
+  `Poll`/`Event` stub inside a link, bold, or a heading — is hoisted out so
+  the inline construct doesn't break. This is not link-specific.
 - Wrappers left empty by the above are pruned — no `****` husks. An empty
   **link** is kept, because it renders as a meaningful bare URL.
 

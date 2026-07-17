@@ -30,13 +30,12 @@ the source.
    the emitted Markdown does not parse back as the tree intended:
    - no link inside a link, at any depth (§6.3)
    - an *inline container* holds inline content only, so any block element
-     inside one is hoisted out. The inline containers are links, emphasis
-     (`Bold`, `Italic`, `Underline`, `Strikethrough`, `Superscript`,
-     `Subscript`) and headings; the block elements are `List`, `Table`,
-     `Quote`, `Details`, `Paragraph`, `HorizontalRule`, `Align`, and the
-     Discourse block stubs `Poll`/`Event` (each renders as its own block).
-     This is **not** link-specific — a poll inside bold, or a list inside a
-     heading, is fixed the same way a block inside a link is.
+     inside one is hoisted out. This is **not** link-specific: emphasis
+     (`Bold`, `Italic`, …) and headings are inline containers too, so a poll
+     inside bold or a list inside a heading is fixed just like a block inside
+     a link. The authoritative lists are `Normalizer::Layers::INLINE_CONTAINERS`
+     and `BLOCK_NODES` (which covers `List`, `Table`, `Quote`, `Details`,
+     `HorizontalRule`, `Align`, and the Discourse `Poll`/`Event` stubs).
    - an inline code span in a link label is legal only while it stays
      inline (single line)
 2. **Discourse layer** — renderer policy on top:
@@ -65,9 +64,9 @@ Each violation resolves to one strategy:
 | `:drop` | Remove it entirely. |
 | callable | `->(boundary, node) { … }` returning a strategy symbol, an `Array<AST::Node>` to splice, or `nil` to drop — the escape hatch for anything the built-ins don't cover. |
 
-A wrapper left childless by a hoist or drop is pruned, so no `****` husks
-remain. An empty **link** is the exception — it is kept, because it renders
-as a meaningful bare URL.
+A formatting wrapper (bold, italic, color, …) left childless by a hoist or
+drop is pruned, so no `****` husks remain. An empty **link** is the
+exception — it is kept, because it renders as a meaningful bare URL.
 
 ## Diagnostics
 

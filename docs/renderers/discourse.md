@@ -961,10 +961,11 @@ renderer.render(doc) # => "content" (Unknown wrapper ignored)
 ## AST normalization
 
 The renderer's tags are simple string emitters — they assume the tree they
-receive is already legal for the target format. Enforcing that (no link in
-a link, no image or block in a link label, etc.) is the job of a separate
-pass, `Markbridge::Normalizer`, which runs by default between parse and
-render. See **[AST Normalization](../normalization.md)**.
+receive is already legal for the target format. Enforcing that (no link
+inside a link, no image inside a link, no block element inside an inline
+container like bold or a heading, etc.) is the job of a separate pass,
+`Markbridge::Normalizer`, which runs by default between parse and render.
+See **[AST Normalization](../normalization.md)**.
 
 ## Next Steps
 
