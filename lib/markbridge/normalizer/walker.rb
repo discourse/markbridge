@@ -64,12 +64,13 @@ module Markbridge
 
       private
 
-      # Copy-on-write check: a kept child that came back unchanged (same
-      # object, no bubble) while nothing earlier changed needs no rebuilt
-      # +out+. This only saves work. If it is wrong, the code still rebuilds
-      # the same child list, so its mutations do not change the output.
-      def unchanged?(out, child2, child, child_bubble)
-        out.nil? && child2.equal?(child) && child_bubble.empty?
+      # Copy-on-write check: a kept child that came back as the same object
+      # (so normalizing it changed nothing) with no bubble, while nothing
+      # earlier changed, needs no rebuilt +out+. This only saves work. If it
+      # is wrong, the code still rebuilds the same child list, so its
+      # mutations do not change the output.
+      def unchanged?(out, normalized, child, child_bubble)
+        out.nil? && normalized.equal?(child) && child_bubble.empty?
       end
 
       # Normalize a node's descendants. Elements recurse; leaves are
@@ -97,11 +98,11 @@ module Markbridge
           strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
 
           if strategy.nil? || strategy == :keep
-            child2, child_bubble = normalize_node(child, stack)
-            next if unchanged?(out, child2, child, child_bubble)
+            normalized, child_bubble = normalize_node(child, stack)
+            next if unchanged?(out, normalized, child, child_bubble)
 
             out ||= children[0, index]
-            bubble = append_kept(child2, child_bubble, child, out, bubble)
+            bubble = append_kept(normalized, child_bubble, child, out, bubble)
           else
             out ||= children[0, index]
             bubble = emit(child, strategy, boundary, stack, out, bubble)
@@ -142,8 +143,8 @@ module Markbridge
       # Append a kept child that is already normalized, then place any of its
       # bubbles whose boundary is this child. ({#land} does nothing when
       # +child_bubble+ is empty, so there is no separate check for that.)
-      def append_kept(child2, child_bubble, child, out, bubble)
-        out << child2 unless child2.nil?
+      def append_kept(normalized, child_bubble, child, out, bubble)
+        out << normalized unless normalized.nil?
         land(child_bubble, child, out, bubble)
       end
 
