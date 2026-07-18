@@ -128,7 +128,7 @@ module Markbridge
       # Resolve one child (against +stack+) and place it into an existing
       # +out+ — the shared entry point used by {#emit}'s +:unwrap+ recursion,
       # where +out+ already exists.
-      def process_into(child, stack, out, bubble)
+      def resolve_into(child, stack, out, bubble)
         strategy, boundary = @rules.resolve(child, stack)
         strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
 
@@ -200,7 +200,7 @@ module Markbridge
         # Unwrap: run the child's children through the current +out+, resolved
         # against the current stack. Resolving them again in the same pass is
         # what fixes deeply nested links in one go.
-        child.children.each { |grandchild| bubble = process_into(grandchild, stack, out, bubble) }
+        child.children.each { |grandchild| bubble = resolve_into(grandchild, stack, out, bubble) }
         bubble
       end
 
