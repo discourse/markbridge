@@ -43,9 +43,22 @@ def report(name, corpus, &work)
        )
 end
 
+# A violation-heavy variant of a corpus: prepends a few degenerate
+# constructs (linked image, nested links, block-in-link) to each post so
+# the normalizer's worst case — including the destination-stack rewalk on
+# moved subtrees — is exercised on realistic surrounding text.
+def build_heavy(corpus)
+  violating =
+    "[url=https://ex.com/a][img]https://ex.com/i.png[/img][/url] " \
+      "[url=https://a.com][url=https://b.com]x[/url][/url] " \
+      "[url=https://ex.com][quote]q[/quote][/url] "
+  corpus.map { |post| violating + post }
+end
+
 # ASCII/multibyte corpus pair per source format.
 CORPORA = {
   bbcode: -> { [Corpus.ascii, Corpus.multibyte] },
+  bbcode_heavy: -> { [build_heavy(Corpus.ascii), build_heavy(Corpus.multibyte)] },
   mediawiki: -> { [Corpus.mediawiki, Corpus.mediawiki_multibyte] },
   html: -> { [Corpus.html, Corpus.html_multibyte] },
   text_formatter: -> { [Corpus.text_formatter, Corpus.text_formatter_multibyte] },
@@ -95,6 +108,44 @@ VARIANTS = {
       report("scan_only/#{tag}", corpus) do |post|
         scanner = Markbridge::Parsers::BBCode::Scanner.new(post)
         nil while scanner.next_token
+      end
+    end,
+  ],
+  # The default-on gate: the normalization walk over violation-free trees
+  # in isolation (pre-parsed ASTs; the clean corpus never mutates, so every
+  # round measures the same zero-violation traversal). Compare against zero.
+  "norm_only" => [
+    :bbcode,
+    lambda do |corpus, tag|
+      parser = Markbridge::Parsers::BBCode::Parser.new
+      asts = corpus.map { |post| parser.parse(post) }
+      normalizer = Markbridge::Normalizer.shared_for(:discourse)
+      report("norm_only/#{tag}", asts) { |ast| normalizer.normalize(ast) }
+    end,
+  ],
+  # End-to-end baseline with normalization off; `fresh` minus this is the
+  # zero-violation overhead of default-on normalization.
+  "fresh_no_norm" => [
+    :bbcode,
+    lambda do |corpus, tag|
+      report("fresh_no_norm/#{tag}", corpus) do |post|
+        Markbridge.bbcode_to_markdown(post, normalize: false)
+      end
+    end,
+  ],
+  # Worst-case bound: end-to-end over a violation-heavy corpus, with and
+  # without normalization (the difference is the mutation + rewalk cost).
+  "norm_heavy" => [
+    :bbcode_heavy,
+    lambda do |corpus, tag|
+      report("norm_heavy/#{tag}", corpus) { |post| Markbridge.bbcode_to_markdown(post) }
+    end,
+  ],
+  "norm_heavy_off" => [
+    :bbcode_heavy,
+    lambda do |corpus, tag|
+      report("norm_heavy_off/#{tag}", corpus) do |post|
+        Markbridge.bbcode_to_markdown(post, normalize: false)
       end
     end,
   ],

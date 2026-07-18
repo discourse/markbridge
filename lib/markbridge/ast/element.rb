@@ -105,6 +105,34 @@ module Markbridge
         @children[index] = new_child
         self
       end
+
+      # Replace this element's entire child list in one shot.
+      #
+      # A plain validated setter for tree-rewriting passes (e.g. the
+      # {Markbridge::Normalizer}) that rebuild an element's children out
+      # of band and need to commit the result without re-running the
+      # per-append logic of {#<<}. Every entry must be a {Node}.
+      #
+      # NOTE: unlike {#<<}, this does *not* merge adjacent {Text} nodes —
+      # the auto-merge invariant is a property of {#<<} only. Callers that
+      # build the array themselves own that coalescing (the Normalizer's
+      # walker merges adjacent text as it assembles the list, so it never
+      # hands a state {#<<} would not have produced).
+      #
+      # @param new_children [Array<Node>] the replacement children
+      # @return [Element] +self+
+      # @raise [TypeError] when any entry is not a {Node}
+      def replace_children(new_children)
+        new_children.each do |child|
+          next if child.is_a?(Node)
+
+          actual = child.nil? ? "nil" : child.class
+          raise TypeError, "replace_children on #{self.class} expected #{Node}s, got #{actual}"
+        end
+
+        @children = new_children
+        self
+      end
     end
   end
 end
