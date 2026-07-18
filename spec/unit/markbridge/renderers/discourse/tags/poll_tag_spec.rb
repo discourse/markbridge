@@ -7,16 +7,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
   let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
   describe "#render" do
-    it "returns the raw BBCode verbatim when present" do
+    it "returns the raw BBCode verbatim when present, as a standalone block" do
       element = Markbridge::AST::Poll.new(raw: "[poll]ORIGINAL[/poll]")
 
-      expect(tag.render(element, interface)).to eq("[poll]ORIGINAL[/poll]\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n[poll]ORIGINAL[/poll]\n\n")
     end
 
     it "reconstructs BBCode with options when raw is missing" do
       element = Markbridge::AST::Poll.new(options: %w[A B])
 
-      expect(tag.render(element, interface)).to eq("[poll]\n* A\n* B\n[/poll]\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n[poll]\n* A\n* B\n[/poll]\n\n")
     end
 
     it "omits the name attribute when it equals the default 'poll'" do
@@ -70,35 +70,32 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
     it "produces an empty options block when there are no options" do
       element = Markbridge::AST::Poll.new
 
-      expect(tag.render(element, interface)).to eq("[poll]\n\n[/poll]\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n[poll]\n\n[/poll]\n\n")
     end
 
-    it "emits a trailing blank line after a reconstructed poll" do
+    it "brackets a reconstructed poll with leading and trailing blank lines" do
       element = Markbridge::AST::Poll.new(name: "fav", type: "regular", options: %w[A B])
 
+      expect(tag.render(element, interface)).to start_with("\n\n[poll")
       expect(tag.render(element, interface)).to end_with("[/poll]\n\n")
     end
 
-    it "emits a trailing blank line after a raw-passthrough poll" do
+    it "brackets a raw-passthrough poll the same way" do
       element = Markbridge::AST::Poll.new(raw: "[poll]\n* A\n* B\n[/poll]")
 
-      expect(tag.render(element, interface)).to eq("[poll]\n* A\n* B\n[/poll]\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n[poll]\n* A\n* B\n[/poll]\n\n")
     end
 
-    context "in html_mode" do
-      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+    # The stub is mode-agnostic: the same blank-line-bracketed island serves
+    # both a standalone block in Markdown and the html_mode contract (which
+    # is enforced by html_mode_contract_spec).
+    it "emits the same island form in html_mode" do
+      html_context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+      html_interface =
+        Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, html_context)
+      element = Markbridge::AST::Poll.new(options: %w[A B])
 
-      it "wraps the BBCode in leading + trailing blank lines so CommonMark re-enters Markdown parsing" do
-        element = Markbridge::AST::Poll.new(options: %w[A B])
-
-        expect(tag.render(element, interface)).to eq("\n\n[poll]\n* A\n* B\n[/poll]\n\n")
-      end
-
-      it "wraps a raw-passthrough poll in blank lines too" do
-        element = Markbridge::AST::Poll.new(raw: "[poll]ORIGINAL[/poll]")
-
-        expect(tag.render(element, interface)).to eq("\n\n[poll]ORIGINAL[/poll]\n\n")
-      end
+      expect(tag.render(element, html_interface)).to eq("\n\n[poll]\n* A\n* B\n[/poll]\n\n")
     end
   end
 end

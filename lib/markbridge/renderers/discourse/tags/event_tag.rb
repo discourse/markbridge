@@ -18,11 +18,9 @@ module Markbridge
         #     end
         #   end
         class EventTag < Tag
-          def render(element, interface)
+          def render(element, _interface)
             body = element.raw || build_event_bbcode(element)
-            return "\n\n#{body}\n\n" if interface.html_mode?
-
-            "#{body}\n\n"
+            "\n\n#{body}\n\n"
           end
 
           private

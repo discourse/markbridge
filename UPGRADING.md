@@ -1,5 +1,57 @@
 # Upgrading Markbridge
 
+## Unreleased — AST normalization runs by default
+
+A new `Markbridge::Normalizer` pass runs between the parse-time `yield` hook
+and rendering. It rewrites the AST so the renderer only gets markup the target
+format can express. It is **on by default** for every `*_to_markdown` call,
+`convert`, and `render`.
+
+What changes in the output, with no code change on your side:
+
+- A link inside a link (`[url][url]…[/url][/url]`) collapses to a single link.
+  CommonMark does not allow nested links.
+- A block element inside an inline container — a quote, list, table, or a
+  `Poll`/`Event` node inside a link, bold, or a heading — is moved out, so the
+  inline element does not break. This is not link-specific.
+- A fenced or multi-line code block inside an inline container is moved out; a
+  one-line code span stays.
+- A formatting wrapper left empty by the above is removed (no empty `**` `**`).
+  An empty link is kept, because it renders as a plain URL.
+
+Each change is reported under `conversion.diagnostics[:normalization]`, next
+to `unknown_tags`.
+
+The default rules are legality only. Discourse policy is not built in. A
+linked image (`[![alt](src)](url)`) is valid CommonMark, so the default leaves
+it alone. To move image-likes out of links, add the rules yourself. This is
+the pattern that replaces hoisting logic a consumer used to have in a custom
+`Url` tag:
+
+```ruby
+NORMALIZER =
+  Markbridge::Normalizer
+    .default
+    .rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Image, strategy: :hoist_after)
+    .rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Upload, strategy: :hoist_after)
+    .rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Attachment, strategy: :hoist_after)
+    .freeze
+
+Markbridge.convert(input, format: :bbcode, normalize: NORMALIZER)
+```
+
+Build the normalizer once (a constant) and reuse it. `#normalize` keeps no
+state on the instance, so one frozen instance is safe for every conversion,
+also across threads, and passing it is as fast as the default path.
+
+To skip normalization:
+
+```ruby
+Markbridge.convert(input, format: :bbcode, normalize: false)
+```
+
+See [docs/normalization.md](docs/normalization.md).
+
 ## 0.3.0 — quote attribution fields and URL rendering
 
 ### `AST::Quote` attribution fields renamed and typed
