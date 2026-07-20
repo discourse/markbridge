@@ -1,0 +1,53 @@
+name: Deploy docs to Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  release:
+    types: [published, edited, deleted]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Per-ref so a PR build never queues behind (or blocks) a main deploy.
+# Cancel superseded PR builds; never cancel an in-flight deploy.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: withastro/action@v6
+        with:
+          path: ./docs
+          # pnpm 11 (pinned via packageManager in docs/package.json) needs
+          # Node >= 22.13; this also matches local dev.
+          node-version: 22
+          # pnpm version comes from the "packageManager" field in
+          # docs/package.json — passing it here too makes pnpm/action-setup
+          # error with "Multiple versions of pnpm specified".
+
+  deploy:
+    needs: build
+    # PRs validate the build only; deploy happens on push to main / release.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

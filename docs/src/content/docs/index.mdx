@@ -1,0 +1,62 @@
+---
+title: Markbridge
+description: Convert BBCode, HTML, MediaWiki, and TextFormatter XML into Discourse-flavored Markdown — built for forum migrations.
+template: splash
+hero:
+  tagline: |
+    Convert BBCode, HTML, MediaWiki, and TextFormatter XML into
+    Discourse-flavored Markdown. Built for forum migrations:
+    placeholder-friendly, unknown-tag-aware.
+  image:
+    file: ../../assets/markbridge-icon.svg
+    alt: Markbridge logo
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Migrating a forum?
+      link: /migrating/overview/
+      icon: right-arrow
+      variant: secondary
+    - text: View on GitHub
+      link: https://github.com/discourse/markbridge
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## See it in action
+
+```ruby
+require "markbridge/bbcode"
+
+result = Markbridge.bbcode_to_markdown(
+  "[b]Hello[/b] [url=https://example.com]world[/url] [unknown]oops[/unknown]"
+)
+
+result.markdown        # => "**Hello** [world](https://example.com) oops"
+result.unknown_tags    # => {"unknown" => 2}
+```
+
+<CardGrid stagger>
+  <Card title="Built for migrations" icon="rocket">
+    Designed for importing whole forums, not one-off snippets.
+  </Card>
+  <Card title="Four input formats" icon="random">
+    BBCode, HTML, MediaWiki, and <span class="nowrap">s9e/TextFormatter</span> XML — one AST, one renderer.
+  </Card>
+  <Card title="Never crashes on bad input" icon="approve-check-circle">
+    Unknown and malformed tags are tracked, not raised.
+  </Card>
+  <Card title="Extensible" icon="puzzle">
+    Add or wrap tag handlers — no monkey-patching.
+  </Card>
+  <Card title="Fast" icon="setting">
+    Single-pass, linear-time parsing; one renderer, reused across thousands of posts.
+  </Card>
+  <Card title="Battle-tested" icon="star">
+    Powers real Discourse migrations, covered end-to-end by tests.
+  </Card>
+</CardGrid>
