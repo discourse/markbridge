@@ -1,6 +1,27 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge do
+  # Append a link inside a link — a default violation (the inner link is
+  # unwrapped) — so a test can prove the +normalize:+ pass ran, whatever the
+  # source format.
+  def append_nested_link(ast)
+    outer = Markbridge::AST::Url.new(href: "https://a.example.com")
+    inner = Markbridge::AST::Url.new(href: "https://b.example.com")
+    inner << Markbridge::AST::Text.new("x")
+    outer << inner
+    ast << outer
+  end
+
+  # Append a link wrapping an image. Moving it out is not a default rule, so
+  # only a normalizer that adds the rule changes this.
+  def append_linked_image(ast)
+    url = Markbridge::AST::Url.new(href: "https://example.com")
+    url << Markbridge::AST::Image.new(src: "https://example.com/pic.png")
+    ast << url
+  end
+
+  UNWRAPPED = [{ parent: "Url", child: "Url", strategy: :unwrap, count: 1 }].freeze
+
   it "has a version number" do
     expect(Markbridge::VERSION).not_to be_nil
   end
@@ -66,6 +87,19 @@ RSpec.describe Markbridge do
   end
 
   describe ".bbcode_to_markdown" do
+    it "normalizes the AST by default" do
+      conversion = described_class.bbcode_to_markdown("hi") { |ast| append_nested_link(ast) }
+
+      expect(conversion.diagnostics[:normalization]).to eq(UNWRAPPED)
+    end
+
+    it "does not normalize when normalize: false" do
+      conversion =
+        described_class.bbcode_to_markdown("hi", normalize: false) { |ast| append_nested_link(ast) }
+
+      expect(conversion.diagnostics[:normalization]).to be_nil
+    end
+
     it "returns a Conversion whose markdown reflects the input" do
       result = described_class.bbcode_to_markdown("[b]hi[/b]")
 
@@ -205,6 +239,21 @@ RSpec.describe Markbridge do
   end
 
   describe ".html_to_markdown" do
+    it "normalizes the AST by default" do
+      conversion = described_class.html_to_markdown("<b>hi</b>") { |ast| append_nested_link(ast) }
+
+      expect(conversion.diagnostics[:normalization]).to eq(UNWRAPPED)
+    end
+
+    it "does not normalize when normalize: false" do
+      conversion =
+        described_class.html_to_markdown("<b>hi</b>", normalize: false) do |ast|
+          append_nested_link(ast)
+        end
+
+      expect(conversion.diagnostics[:normalization]).to be_nil
+    end
+
     it "renders HTML to a Conversion" do
       result = described_class.html_to_markdown("<b>hi</b>")
 
@@ -304,6 +353,22 @@ RSpec.describe Markbridge do
   describe ".text_formatter_xml_to_markdown" do
     let(:xml) { "<r><B><s>[b]</s>hi<e>[/b]</e></B></r>" }
 
+    it "normalizes the AST by default" do
+      conversion =
+        described_class.text_formatter_xml_to_markdown(xml) { |ast| append_nested_link(ast) }
+
+      expect(conversion.diagnostics[:normalization]).to eq(UNWRAPPED)
+    end
+
+    it "does not normalize when normalize: false" do
+      conversion =
+        described_class.text_formatter_xml_to_markdown(xml, normalize: false) do |ast|
+          append_nested_link(ast)
+        end
+
+      expect(conversion.diagnostics[:normalization]).to be_nil
+    end
+
     it "renders TextFormatter XML to a Conversion" do
       result = described_class.text_formatter_xml_to_markdown(xml)
 
@@ -393,6 +458,22 @@ RSpec.describe Markbridge do
   end
 
   describe ".mediawiki_to_markdown" do
+    it "normalizes the AST by default" do
+      conversion =
+        described_class.mediawiki_to_markdown("'''hi'''") { |ast| append_nested_link(ast) }
+
+      expect(conversion.diagnostics[:normalization]).to eq(UNWRAPPED)
+    end
+
+    it "does not normalize when normalize: false" do
+      conversion =
+        described_class.mediawiki_to_markdown("'''hi'''", normalize: false) do |ast|
+          append_nested_link(ast)
+        end
+
+      expect(conversion.diagnostics[:normalization]).to be_nil
+    end
+
     it "renders MediaWiki to a Conversion" do
       expect(described_class.mediawiki_to_markdown("'''hi'''").markdown).to eq("**hi**")
     end
@@ -616,6 +697,38 @@ RSpec.describe Markbridge do
   end
 
   describe ".render" do
+    it "normalizes the AST by default" do
+      ast = Markbridge::AST::Document.new
+      append_nested_link(ast)
+
+      expect(described_class.render(ast).diagnostics[:normalization]).to eq(UNWRAPPED)
+    end
+
+    it "does not normalize when normalize: false" do
+      ast = Markbridge::AST::Document.new
+      append_nested_link(ast)
+
+      expect(described_class.render(ast, normalize: false).diagnostics[:normalization]).to be_nil
+    end
+
+    it "uses a passed Normalizer, including a subclass instance (is_a?, not instance_of?)" do
+      subclass = Class.new(Markbridge::Normalizer)
+      normalizer = subclass.default
+      normalizer.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Image, strategy: :drop)
+      ast = Markbridge::AST::Document.new
+      append_linked_image(ast)
+
+      conversion = described_class.render(ast, normalize: normalizer)
+
+      # The subclass instance is accepted and its :drop rule runs. With
+      # instance_of? it would be rejected, shared_default would run instead,
+      # and shared_default has no image rule, so the image would stay.
+      expect(conversion.diagnostics[:normalization]).to eq(
+        [{ parent: "Url", child: "Image", strategy: :drop, count: 1 }],
+      )
+      expect(conversion.ast.descendants(Markbridge::AST::Image)).to be_empty
+    end
+
     it "renders a Document AST through the default Discourse renderer" do
       doc = described_class.parse_bbcode("[b]hi[/b]").ast
 

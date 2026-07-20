@@ -272,4 +272,48 @@ RSpec.describe Markbridge::AST::Element do
       )
     end
   end
+
+  describe "#replace_children" do
+    let(:element) { test_element_class.new }
+
+    before { element << Markbridge::AST::Text.new("old") }
+
+    it "swaps the entire child list" do
+      replacement = [Markbridge::AST::Bold.new, Markbridge::AST::Italic.new]
+      element.replace_children(replacement)
+
+      expect(element.children).to eq(replacement)
+    end
+
+    it "returns self for chaining" do
+      expect(element.replace_children([])).to be(element)
+    end
+
+    it "accepts an empty list" do
+      element.replace_children([])
+      expect(element.children).to eq([])
+    end
+
+    it "does NOT merge adjacent Text nodes (the merge invariant is #<< only)" do
+      first = Markbridge::AST::Text.new("hello")
+      second = Markbridge::AST::Text.new(" world")
+      element.replace_children([first, second])
+
+      expect(element.children).to eq([first, second])
+    end
+
+    it "raises TypeError when any entry is not a Node, naming the offending value" do
+      expect { element.replace_children([Markbridge::AST::Bold.new, "nope"]) }.to raise_error(
+        TypeError,
+        /replace_children on #{Regexp.escape(test_element_class.to_s)} expected Markbridge::AST::Nodes, got String/,
+      )
+    end
+
+    it "raises TypeError for a nil entry" do
+      expect { element.replace_children([nil]) }.to raise_error(
+        TypeError,
+        /replace_children on #{Regexp.escape(test_element_class.to_s)} expected Markbridge::AST::Nodes, got nil/,
+      )
+    end
+  end
 end
