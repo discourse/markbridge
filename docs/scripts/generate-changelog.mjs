@@ -84,18 +84,49 @@ function linkifyOutsideCode(body) {
     .join("");
 }
 
+// GitHub alert callouts (`> [!WARNING]`, `> [!NOTE]`, …) don't render on the
+// docs site — Starlight would show a plain blockquote with a literal "[!WARNING]"
+// line. Convert them to Starlight asides. GitHub has five alert types; map each
+// to the closest of Starlight's four.
+const ALERT_KIND = {
+  NOTE: "note",
+  TIP: "tip",
+  IMPORTANT: "note",
+  WARNING: "caution",
+  CAUTION: "danger",
+};
+
+function convertGitHubAlerts(body) {
+  return body.replace(
+    /^> \[!(\w+)\][^\n]*\n((?:>[^\n]*(?:\n|$))*)/gm,
+    (_m, type, rest) => {
+      const kind = ALERT_KIND[type.toUpperCase()] ?? "note";
+      const inner = rest.replace(/^> ?/gm, "").replace(/\s+$/, "");
+      return `:::${kind}\n${inner}\n:::\n`;
+    },
+  );
+}
+
 // Normalize each release body for the in-docs changelog:
+//   - convert GitHub alert callouts to Starlight asides
 //   - drop the redundant "What's Changed" heading (from bin/generate-release-notes
 //     and GitHub's auto-generated notes)
-//   - strip leading emojis from headings (the docs theme handles emphasis)
+//   - strip leading emojis from headings (the docs theme handles emphasis).
+//     The character class covers pictographic emoji plus the modifiers that ride
+//     along with them — the FE0F variation selector (⚠️, 🗑️), the ZWJ that joins
+//     sequences, and skin-tone modifiers — so an emoji with a trailing selector
+//     is stripped whole instead of leaving the selector behind.
 //   - demote every heading by one level so categories sit comfortably under the
 //     version heading without competing visually
 //   - linkify bare `#123` references to their GitHub PR/issue
 function formatBody(body) {
   return linkifyOutsideCode(
-    body
+    convertGitHubAlerts(body)
       .replace(/^#{2,6} What's Changed\s*\n+/gm, "")
-      .replace(/^(#{2,6}) [\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+\s+/gmu, "$1 ")
+      .replace(
+        /^(#{2,6})\s+(?:[\p{Extended_Pictographic}\u200D\uFE0F\u{1F3FB}-\u{1F3FF}]\s*)+/gmu,
+        "$1 ",
+      )
       .replace(/^(#{1,5})(\s)/gm, "$1#$2"),
   ).trim();
 }
