@@ -3,6 +3,17 @@ title: Upgrading
 description: Breaking-change notes between Markbridge releases.
 ---
 
+## 0.3.1 — AST normalization runs by default
+
+A new `Markbridge::Normalizer` pass runs between the parse-time `yield` hook and rendering, and it's **on by default** for every `*_to_markdown` call, `convert`, and `render`. It rewrites nesting that Markdown can't express, so you may see different output with no code change on your side:
+
+- A link inside a link collapses to a single link (CommonMark forbids nested links).
+- A block element inside an inline container — a quote, list, table, or a `Poll`/`Event` inside a link, bold, or a heading — is moved out, so the inline element doesn't break.
+- A fenced or multi-line code block inside an inline container is moved out; a one-line code span stays.
+- A formatting wrapper left empty by the above is removed (no stray `**` `**`).
+
+Every change is reported under `conversion.diagnostics[:normalization]`, next to `unknown_tags`. The default rules are legality only — Discourse policy like moving an image out of a link isn't built in; add those rules yourself. To turn the pass off, pass `normalize: false`. See [AST normalization](/concepts/normalization/) for the full picture.
+
 ## 0.3.0 — breaking changes
 
 ### `AST::Quote` attribution fields renamed and typed

@@ -92,6 +92,7 @@ export default defineConfig({
             { label: 'Result objects', slug: 'concepts/result-objects' },
             { label: 'Parsers', slug: 'concepts/parsers' },
             { label: 'Renderers', slug: 'concepts/renderers' },
+            { label: 'AST normalization', slug: 'concepts/normalization' },
             { label: 'Performance', slug: 'concepts/performance' },
           ],
         },

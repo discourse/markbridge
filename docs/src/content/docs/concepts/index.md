@@ -10,4 +10,5 @@ The deep dives, for when you want to understand or change how Markbridge works:
 - **[Result objects](/concepts/result-objects/)** — what you get back: the `Conversion` and `Parse` value objects.
 - **[Parsers](/concepts/parsers/)** — how each of the four parsers works, and their trade-offs.
 - **[Renderers](/concepts/renderers/)** — the Discourse renderer, Tags, and the rendering interface.
+- **[AST normalization](/concepts/normalization/)** — the pass that rewrites nesting Markdown can't express before rendering.
 - **[Performance](/concepts/performance/)** — where the pipeline is tuned, and how to measure your own workload.
