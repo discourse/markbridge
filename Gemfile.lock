@@ -63,8 +63,8 @@ GEM
       dry-inflector (~> 1.0)
       dry-logic (~> 1.4)
       zeitwerk (~> 2.6)
-    erb (6.0.5)
-    erb (6.0.5-java)
+    erb (6.0.6)
+    erb (6.0.6-java)
     erubi (1.13.1)
     flay (2.14.4)
       erubi (~> 1.10)
@@ -238,7 +238,7 @@ GEM
       rack-protection (= 4.2.1)
       rack-session (>= 2.0.0, < 3)
       tilt (~> 2.0)
-    sorbet-runtime (0.6.13342)
+    sorbet-runtime (0.6.13351)
     syntax_tree (6.3.0)
       prettier_print (>= 1.2.0)
     thread_safe (0.3.6)
@@ -318,8 +318,8 @@ CHECKSUMS
   dry-logic (1.6.0) sha256=da6fedbc0f90fc41f9b0cc7e6f05f5d529d1efaef6c8dcc8e0733f685745cea2
   dry-schema (1.16.0) sha256=cd3aaeabc0f1af66ec82a29096d4c4fb92a0a58b9dae29a22b1bbceb78985727
   dry-types (1.9.1) sha256=baebeecdb9f8395d6c9d227b62011279440943e3ef2468fe8ccc1ba11467f178
-  erb (6.0.5) sha256=858e63488cb796c9daba8b6e9ff4b3879c395022049be9a66a8e00980e612eac
-  erb (6.0.5-java) sha256=5cb6137f3bb3c86049f531566e3e69ae608c6b5abddbc557d5a4cf2dac722aad
+  erb (6.0.6) sha256=a9b24986700f5bf127c4f297c5403c3ca41b83b0a316c0cd09a096b56e644ae5
+  erb (6.0.6-java) sha256=d6787cd12bd3ace6812cb215fac5c35d98a70e98729e60de23ed00f68bc9241f
   erubi (1.13.1) sha256=a082103b0885dbc5ecf1172fede897f9ebdb745a4b97a5e8dc63953db1ee4ad9
   flay (2.14.4) sha256=a62d96a51d1da185aa41ba95b696966df9f7d1d91a457709277f24515895de77
   flog (4.9.4) sha256=12cc054fab7a2cbd2a906514397c4d7788954d530564782d6f14939dc2dfbcbb
@@ -392,7 +392,7 @@ CHECKSUMS
   sexp_processor (4.17.5) sha256=ae2b48ba98353d5d465ce8759836b7a05f2e12c5879fcd14d7815b026de32f0e
   simplecov (1.0.2) sha256=c6459434efe4b948b46477cc2df2faa73ab365f83a33c7c17f81262f4f7f1244
   sinatra (4.2.1) sha256=b7aeb9b11d046b552972ade834f1f9be98b185fa8444480688e3627625377080
-  sorbet-runtime (0.6.13342) sha256=dbeb9892597f593ed2b29e38018912787f6c4e0c4b736d8af0d6bd3c63bde3c3
+  sorbet-runtime (0.6.13351) sha256=f8fee17c6e3edf835dc6823d26afb9a7c8969c6710d1fabe2fb43f4e0c15c64f
   syntax_tree (6.3.0) sha256=56e25a9692c798ec94c5442fe94c5e94af76bef91edc8bb02052cbdecf35f13d
   thread_safe (0.3.6) sha256=9ed7072821b51c57e8d6b7011a8e282e25aeea3a4065eab326e43f66f063b05a
   thread_safe (0.3.6-java) sha256=bb28394cd0924c068981adee71f36a81c85c92e7d74d3f62372bd51489a0e0c2
