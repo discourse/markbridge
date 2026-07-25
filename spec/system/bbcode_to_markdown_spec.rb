@@ -144,7 +144,9 @@ RSpec.describe "BBCode to Markdown Conversion" do
         expected = <<~MARKDOWN.strip
           - **Bold item**
           - *Italic item*
-          - `Code item`
+          - ```
+            Code item
+            ```
         MARKDOWN
 
         result = Markbridge.bbcode_to_markdown(bbcode)
@@ -161,10 +163,11 @@ RSpec.describe "BBCode to Markdown Conversion" do
           [/list]
         BBCODE
 
-        expected = <<~MARKDOWN.strip
-          - Item with **bold** and *italic*
-            - Nested with `code`
-        MARKDOWN
+        # The nested [code] renders as a fence inside the nested list item;
+        # the line before it keeps its trailing space from the source.
+        expected =
+          "- Item with **bold** and *italic*\n" \
+            "  - Nested with \n\n      ```\n      code\n      ```"
 
         result = Markbridge.bbcode_to_markdown(bbcode)
         expect(result.markdown).to eq(expected)
@@ -183,8 +186,13 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq("*italic text*")
     end
 
-    it "converts code tags" do
+    it "converts code tags to fenced blocks even for single-line content" do
       result = Markbridge.bbcode_to_markdown("[code]code text[/code]")
+      expect(result.markdown).to eq("```\ncode text\n```")
+    end
+
+    it "keeps tt tags inline" do
+      result = Markbridge.bbcode_to_markdown("[tt]code text[/tt]")
       expect(result.markdown).to eq("`code text`")
     end
 
@@ -255,9 +263,19 @@ RSpec.describe "BBCode to Markdown Conversion" do
     it "handles text with multiple formatting types" do
       result =
         Markbridge.bbcode_to_markdown(
-          "Plain text with [b]bold[/b] and [i]italic[/i] and [code]code[/code].",
+          "Plain text with [b]bold[/b] and [i]italic[/i] and [tt]code[/tt].",
         )
       expect(result.markdown).to eq("Plain text with **bold** and *italic* and `code`.")
+    end
+
+    it "renders a mid-sentence code tag as a fence with blank lines around it" do
+      result =
+        Markbridge.bbcode_to_markdown(
+          "Plain text with [b]bold[/b] and [i]italic[/i] and [code]code[/code].",
+        )
+      expect(result.markdown).to eq(
+        "Plain text with **bold** and *italic* and \n\n```\ncode\n```\n\n.",
+      )
     end
 
     it "preserves plain text" do

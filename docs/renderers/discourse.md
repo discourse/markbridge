@@ -410,6 +410,13 @@ AST::Code.new(language: "ruby", children: [
 # => "```ruby\ndef hello\n  puts 'world'\nend\n```"
 ```
 
+**Forced block (`block: true`, set by parsers for constructs that are a
+block by definition, e.g. `<pre>` or `[code]`):**
+```ruby
+AST::Code.new(language: "ruby", block: true, children: [AST::Text.new("x")])
+# => "```ruby\nx\n```"
+```
+
 **Fence selection:**
 - Uses ` ``` ` by default
 - Switches to `~~~` if content contains ` ``` `
@@ -531,8 +538,8 @@ Complete mapping of AST nodes to Discourse Markdown:
 | `AST::Italic` | `*text*` | `<em>text</em>` | Fallback when `*` in content |
 | `AST::Strikethrough` | `~~text~~` | `<s>text</s>` | Fallback when `~~` in content |
 | `AST::Underline` | `<u>text</u>` | N/A | Always HTML (no Markdown syntax) |
-| `AST::Code` (inline) | `` `code` `` | N/A | No newlines in content |
-| `AST::Code` (block) | ` ```lang\ncode\n``` ` | N/A | Contains newlines or block context |
+| `AST::Code` (inline) | `` `code` `` | N/A | No newlines in content, no `block` flag |
+| `AST::Code` (block) | ` ```lang\ncode\n``` ` | N/A | Contains newlines or has `block: true` |
 | `AST::List` (unordered) | `- item` | N/A | Bullet list |
 | `AST::List` (ordered) | `1. item` | N/A | Numbered list |
 | `AST::ListItem` | Indented item | N/A | 2 spaces per nesting level |
@@ -930,17 +937,22 @@ AST::Url.new(href: "javascript:alert(1)", children: [AST::Text.new("text")])
 ### Block Context Detection
 
 Code blocks only render as blocks when:
-- Content contains newlines, OR
-- In block context (custom logic)
+- The node has `block: true` (set by parsers for constructs that are a
+  block by definition), OR
+- Content contains newlines
 
 ```ruby
-# Inline (no newlines)
+# Inline (no newlines, no block flag)
 AST::Code.new([AST::Text.new("code")])
 # => "`code`"
 
 # Block (has newlines)
 AST::Code.new([AST::Text.new("line1\nline2")])
 # => "```\nline1\nline2\n```"
+
+# Block (forced by the flag, even single-line)
+AST::Code.new(block: true, children: [AST::Text.new("code")])
+# => "```\ncode\n```"
 ```
 
 ### Unknown AST Nodes

@@ -35,6 +35,12 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::CodeHandler do
       expect(parent.children[0].language).to be_nil
     end
 
+    it "sets block on the element (CODE is always a block in s9e)" do
+      handler.process(element: build_element("<CODE/>"), parent:)
+
+      expect(parent.children[0].block).to be true
+    end
+
     it "normalizes uppercase XML attribute names to lowercase symbol keys" do
       handler.process(element: build_element('<CODE LANG="ruby"/>'), parent:)
 

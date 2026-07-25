@@ -66,8 +66,8 @@ end
 
 | HTML Tag | AST Node | Notes |
 |----------|----------|-------|
-| `<code>` | `AST::Code` | Inline or block code |
-| `<pre>` | `AST::Code` | Preformatted code block |
+| `<code>` | `AST::Code` | Inline code; a block when the content has newlines |
+| `<pre>` | `AST::Code` | Code block (`block: true`), even for single-line content |
 
 The language for syntax highlighting is read from the first of: a
 `language-*` class on the element itself or on its direct `<code>` child

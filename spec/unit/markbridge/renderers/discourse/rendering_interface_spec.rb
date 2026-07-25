@@ -149,6 +149,35 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
       expect(interface.block_context?(Markbridge::AST::Text.new("hi"))).to be false
     end
 
+    it "returns true for a single-line AST::Code with block: true" do
+      code = Markbridge::AST::Code.new(block: true)
+      code << Markbridge::AST::Text.new("inline")
+
+      expect(interface.block_context?(code)).to be true
+    end
+
+    it "returns false for a single-line AST::Code without the block flag" do
+      code = Markbridge::AST::Code.new
+      code << Markbridge::AST::Text.new("inline")
+
+      expect(interface.block_context?(code)).to be false
+    end
+
+    it "returns true for a multi-line AST::Code without the block flag" do
+      code = Markbridge::AST::Code.new
+      code << Markbridge::AST::Text.new("line1\nline2")
+
+      expect(interface.block_context?(code)).to be true
+    end
+
+    it "returns true for a single-line AST::Code subclass with block: true" do
+      subclass = Class.new(Markbridge::AST::Code)
+      code = subclass.new(block: true)
+      code << Markbridge::AST::Text.new("inline")
+
+      expect(interface.block_context?(code)).to be true
+    end
+
     it "returns true when an Element child contains a newline in its text" do
       bold = Markbridge::AST::Bold.new
       bold << Markbridge::AST::Text.new("line1\nline2")
