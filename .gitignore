@@ -21,3 +21,6 @@
 # IDE and silo-local state
 /.idea/
 /.silo.local.yml
+
+# pnpm content-addressable store (created when running docs locally)
+/.pnpm-store/

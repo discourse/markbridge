@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Run the documentation site locally. Installs dependencies on first run.
+#
+# Usage:
+#   bin/docs                 # pnpm run dev (default)
+#   bin/docs build           # pnpm run build
+#   bin/docs preview         # pnpm run preview
+#   bin/docs <any-script>    # pnpm run <any-script>
+set -euo pipefail
+
+cd "$(dirname "$0")/../docs"
+
+if [ ! -d node_modules ]; then
+  echo "Installing dependencies..."
+  pnpm install
+fi
+
+script="${1:-dev}"
+shift || true
+exec pnpm run "${script}" "$@"
