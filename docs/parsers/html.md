@@ -89,6 +89,7 @@ end
 | HTML Tag | AST Node | Notes |
 |----------|----------|-------|
 | `<p>` | Paragraph handling | Adds spacing between paragraphs |
+| `<h1>` – `<h6>` | `AST::Heading` | Heading with matching level |
 | `<br>` | `AST::LineBreak` | Line break |
 | `<hr>` | `AST::HorizontalRule` | Horizontal rule |
 

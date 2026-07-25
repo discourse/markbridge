@@ -73,6 +73,30 @@ RSpec.describe "HTML to Markdown Conversion" do
     end
   end
 
+  describe "headings" do
+    it "converts a heading" do
+      result = Markbridge.html_to_markdown("<h2>Title</h2>")
+      expect(result.markdown).to eq("## Title")
+    end
+
+    it "converts all heading levels" do
+      (1..6).each do |level|
+        result = Markbridge.html_to_markdown("<h#{level}>Title</h#{level}>")
+        expect(result.markdown).to eq("#{"#" * level} Title")
+      end
+    end
+
+    it "converts a heading with inline formatting" do
+      result = Markbridge.html_to_markdown("<h3>A <b>bold</b> title</h3>")
+      expect(result.markdown).to eq("### A **bold** title")
+    end
+
+    it "separates headings from surrounding content with blank lines" do
+      result = Markbridge.html_to_markdown("<h1>Top</h1><p>Some text</p><h2>Sub</h2>")
+      expect(result.markdown).to eq("# Top\n\nSome text\n\n## Sub")
+    end
+  end
+
   describe "lists" do
     it "converts unordered list" do
       html = <<~HTML

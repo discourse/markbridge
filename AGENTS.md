@@ -143,7 +143,10 @@ except across blank lines. Every tag must pick one of two forms when
 
 `spec/integration/markbridge/renderers/discourse/html_mode_contract_spec.rb`
 enforces this structurally: every registered tag is rendered in
-`html_mode` and the output is checked for raw Markdown sigils.
+`html_mode` and the output is checked for raw Markdown sigils. The
+check ships as a shared RSpec example (`require "markbridge/rspec"`,
+then `it_behaves_like "an html_mode safe tag"`), so consumer projects
+can run it against their own tags.
 
 **See `examples/` for complete examples.**
 
