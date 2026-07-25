@@ -31,6 +31,17 @@ RSpec.describe "AST subclass matching" do
     )
   end
 
+  it "hoists a single-line Code subclass with block: true out of Bold" do
+    bold = Markbridge::AST::Bold.new
+    bold << Markbridge::AST::Text.new("before")
+    code = LegacyCode.new(language: "ruby", block: true)
+    code << Markbridge::AST::Text.new("x")
+    bold << code
+    document = Markbridge::AST::Document.new([bold])
+
+    expect(Markbridge.render(document).markdown).to eq("**before**\n\n```ruby\nx\n```")
+  end
+
   it "keeps a single-line Code subclass inline, like the default Code rule" do
     bold = Markbridge::AST::Bold.new
     code = LegacyCode.new

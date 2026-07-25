@@ -15,12 +15,19 @@ module Markbridge
       # @return [String, nil] the programming language for syntax highlighting
       attr_reader :language
 
+      # @return [Boolean, nil] +true+ forces a fenced block; anything else
+      #   leaves the block-or-inline decision to the renderer
+      attr_reader :block
+
       # Create a new code element.
       #
       # @param language [String, nil] optional language identifier for syntax highlighting
-      def initialize(language: nil)
+      # @param block [Boolean, nil] +true+ when the source construct is a code
+      #   block by definition (e.g. +<pre>+), even with single-line content
+      def initialize(language: nil, block: nil)
         super()
         @language = language
+        @block = block
       end
     end
   end

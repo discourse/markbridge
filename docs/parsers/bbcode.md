@@ -73,7 +73,7 @@ The parser automatically:
 
 | Tags | Handler | AST Node | Auto-closeable | Notes |
 |------|---------|----------|----------------|-------|
-| `[code]`, `[pre]`, `[tt]` | `RawHandler` | `AST::Code` | No | Captures unparsed content until closing tag |
+| `[code]`, `[pre]`, `[tt]` | `RawHandler` | `AST::Code` | No | Captures unparsed content until closing tag; `[code]` and `[pre]` set `block: true` (always a fenced block), `[tt]` stays inline for single-line content |
 
 **Attributes:**
 - `lang` or option attribute sets language hint

@@ -48,8 +48,9 @@ module Markbridge
 
     # AST nodes the Discourse renderer prints as block-level Markdown (their
     # output has blank lines around it). One inside an inline container breaks
-    # that container, so it is moved out. Spoiler and single-line Code stay
-    # inline and are not listed (Code is handled by {KEEP_INLINE_CODE}).
+    # that container, so it is moved out. Spoiler and single-line Code without
+    # a forced +block+ flag stay inline and are not listed (Code is handled by
+    # {KEEP_INLINE_CODE}).
     BLOCK_NODES = [
       AST::Quote,
       AST::Heading,
@@ -68,11 +69,14 @@ module Markbridge
 
     # A code span may stay inside an inline container while it is on one line.
     # A fenced or multi-line block is moved out. This matches
-    # +RenderingInterface#block_context?+: Code prints as a fenced block when a
-    # Text child has a newline (the language alone does not make it a block).
+    # +RenderingInterface#block_context?+: Code prints as a fenced block when
+    # its +block+ flag is set or a Text child has a newline (the language alone
+    # does not make it a block).
     KEEP_INLINE_CODE =
       lambda do |_boundary, node|
-        block = node.children.any? { |c| c.instance_of?(AST::Text) && c.text.include?("\n") }
+        block =
+          node.block ||
+            node.children.any? { |c| c.instance_of?(AST::Text) && c.text.include?("\n") }
         block ? :hoist_after : :keep
       end
 

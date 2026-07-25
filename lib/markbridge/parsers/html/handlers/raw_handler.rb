@@ -20,7 +20,8 @@ module Markbridge
             # Get the inner text content
             content = element.inner_text
 
-            ast_element = @element_class.new(language: language_for(element))
+            ast_element =
+              @element_class.new(language: language_for(element), block: block_for(element))
             ast_element << AST::Text.new(content) unless content.empty?
             parent << ast_element
 
@@ -31,6 +32,16 @@ module Markbridge
           attr_reader :element_class
 
           private
+
+          # <pre> is a block by definition, so its content keeps the fenced
+          # form even on one line; <code> and <tt> leave the decision to the
+          # renderer's newline check.
+          #
+          # @param element [Nokogiri::XML::Element]
+          # @return [Boolean, nil]
+          def block_for(element)
+            true if element.name == "pre"
+          end
 
           # The language of a code block, from the strongest signal to the
           # weakest: a `language-*` class on the element itself or on its

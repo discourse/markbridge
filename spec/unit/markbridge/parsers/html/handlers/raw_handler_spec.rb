@@ -114,6 +114,24 @@ RSpec.describe Markbridge::Parsers::HTML::Handlers::RawHandler do
       expect(parent.children[0].language).to be_nil
     end
 
+    it "sets block on the element for pre" do
+      handler.process(element: build_element("<pre>x</pre>"), parent:)
+
+      expect(parent.children[0].block).to be true
+    end
+
+    it "leaves block nil for code" do
+      handler.process(element: build_element("<code>x</code>"), parent:)
+
+      expect(parent.children[0].block).to be_nil
+    end
+
+    it "leaves block nil for tt" do
+      handler.process(element: build_element("<tt>x</tt>"), parent:)
+
+      expect(parent.children[0].block).to be_nil
+    end
+
     it "does not append a Text child when the inner text is empty" do
       handler.process(element: build_element("<code></code>"), parent:)
 

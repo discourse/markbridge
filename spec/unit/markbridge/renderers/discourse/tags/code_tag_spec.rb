@@ -22,6 +22,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to eq("")
     end
 
+    it "renders single-line content as a fenced block when block is true" do
+      element = Markbridge::AST::Code.new(language: "ruby", block: true)
+      element << Markbridge::AST::Text.new("x")
+
+      result = tag.render(element, interface)
+      expect(result).to eq("\n\n```ruby\nx\n```\n\n")
+    end
+
     it "renders block code with newlines" do
       element = Markbridge::AST::Code.new
       element << Markbridge::AST::Text.new("line1\nline2")
@@ -165,6 +173,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
         element << Markbridge::AST::Text.new("a < b")
 
         expect(tag.render(element, interface)).to eq("<code>a &lt; b</code>")
+      end
+
+      it "renders single-line content as <pre><code> when block is true" do
+        element = Markbridge::AST::Code.new(block: true)
+        element << Markbridge::AST::Text.new("x")
+
+        expect(tag.render(element, interface)).to eq("<pre><code>x</code></pre>")
       end
 
       it "renders block code as <pre><code>" do
