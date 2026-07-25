@@ -17,10 +17,9 @@ This guide explains how the HTML parser converts standard HTML into the Markbrid
 The HTML parser (`Markbridge::Parsers::HTML::Parser`) uses Nokogiri to convert HTML markup into AST. It provides a simpler alternative to the BBCode parser when working with HTML content.
 
 **Key Features:**
-- Leverages Nokogiri's battle-tested HTML parser (libxml2 on MRI/TruffleRuby, Xerces/NekoHTML on JRuby)
+- Uses Nokogiri's HTML parser (libxml2 on MRI/TruffleRuby, Xerces/NekoHTML on JRuby)
 - Handles malformed HTML gracefully
 - Stateless handler API (simpler than BBCode)
-- Lambda handler support for quick customization
 - Void element detection (self-closing tags)
 
 **Dependencies:**
@@ -169,14 +168,17 @@ class CustomHandler < Markbridge::Parsers::HTML::Handlers::BaseHandler
     @element_class = element_class
   end
 
-  def process(element:, parent:, processor:)
+  def process(element:, parent:)
     # element: Nokogiri::XML::Element (complete DOM element)
-    # parent: AST::Element (where to add children)
-    # processor: Parser (for processing children)
+    # parent: AST::Element (where to add the new node)
 
     ast_element = @element_class.new
     parent << ast_element
-    processor.process_children(element, ast_element)
+
+    # Return the created element and the parser processes the DOM
+    # element's children into it. Return nil to skip the children
+    # (for example when the handler consumed the content itself).
+    ast_element
   end
 
   attr_reader :element_class
@@ -196,11 +198,11 @@ registry.register(["b", "strong"], handler)
 
 #### RawHandler
 
-For code blocks that preserve content:
+For code blocks that preserve content. Takes the AST class to create:
 
 ```ruby
-handler = RawHandler.new
-registry.register(["code", "pre"], handler)
+handler = RawHandler.new(Markbridge::AST::Code)
+registry.register(["code", "pre", "tt"], handler)
 ```
 
 #### UrlHandler
@@ -221,20 +223,13 @@ registry.register(["ul", "ol"], ListHandler.new)
 registry.register("li", ListItemHandler.new)
 ```
 
-### Lambda Handlers
+#### SelfClosingHandler
 
-For simple cases, use lambda handlers:
+For void elements that map to a childless AST node:
 
 ```ruby
-registry.register("hr", ->(element:, parent:, **) {
-  parent << AST::HorizontalRule.new
-  nil # Return nil to skip processing children
-})
-
-registry.register("br", ->(element:, parent:, **) {
-  parent << AST::LineBreak.new
-  nil
-})
+registry.register("br", SelfClosingHandler.new(Markbridge::AST::LineBreak))
+registry.register("hr", SelfClosingHandler.new(Markbridge::AST::HorizontalRule))
 ```
 
 ## Configuration
