@@ -9,6 +9,10 @@ module Markbridge
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
 
+            # An empty element renders to nothing — a bare `` pair or an
+            # empty fence would only add noise to the output.
+            return "" if content.empty?
+
             if interface.block_context?(element)
               if interface.html_mode?
                 render_html_block(content, element.language)

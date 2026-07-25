@@ -17,23 +17,93 @@ RSpec.describe Markbridge::Parsers::HTML::Handlers::RawHandler do
       expect(parent.children[0].children[0].text).to eq("code content")
     end
 
-    it "extracts language from the class attribute" do
-      handler.process(element: build_element('<code class="ruby">code</code>'), parent:)
+    it "extracts language from a language-* class" do
+      handler.process(element: build_element('<code class="language-ruby">code</code>'), parent:)
 
       expect(parent.children[0].language).to eq("ruby")
     end
 
-    it "extracts language from the lang attribute when class is missing" do
+    it "extracts language from a language-* class among styling classes" do
+      handler.process(element: build_element('<pre class="hljs language-ruby">code</pre>'), parent:)
+
+      expect(parent.children[0].language).to eq("ruby")
+    end
+
+    it "extracts language from a language-* class on the direct code child" do
+      handler.process(
+        element: build_element('<pre><code class="language-python">code</code></pre>'),
+        parent:,
+      )
+
+      expect(parent.children[0].language).to eq("python")
+    end
+
+    it "prefers a language-* class on the code child over a lone class on the element" do
+      handler.process(
+        element:
+          build_element('<pre class="prettyprint"><code class="language-ruby">code</code></pre>'),
+        parent:,
+      )
+
+      expect(parent.children[0].language).to eq("ruby")
+    end
+
+    it "extracts language from the lang attribute" do
       handler.process(element: build_element('<code lang="python">code</code>'), parent:)
 
       expect(parent.children[0].language).to eq("python")
     end
 
-    it "prefers the class attribute over lang when both are present" do
+    it "strips and downcases the lang attribute" do
+      handler.process(element: build_element('<code lang=" RUBY ">code</code>'), parent:)
+
+      expect(parent.children[0].language).to eq("ruby")
+    end
+
+    it "downcases a lone class on the direct code child" do
+      handler.process(element: build_element('<pre><code class="Ruby">code</code></pre>'), parent:)
+
+      expect(parent.children[0].language).to eq("ruby")
+    end
+
+    it "prefers a language-* class over the lang attribute" do
+      handler.process(
+        element: build_element('<code class="language-ruby" lang="python">code</code>'),
+        parent:,
+      )
+
+      expect(parent.children[0].language).to eq("ruby")
+    end
+
+    it "prefers the lang attribute over a lone class without language- prefix" do
       handler.process(
         element: build_element('<code class="ruby" lang="python">code</code>'),
         parent:,
       )
+
+      expect(parent.children[0].language).to eq("python")
+    end
+
+    it "uses a lone class as language when nothing else matches" do
+      handler.process(element: build_element('<code class="ruby">code</code>'), parent:)
+
+      expect(parent.children[0].language).to eq("ruby")
+    end
+
+    it "leaves language nil for multiple classes without language- prefix" do
+      handler.process(element: build_element('<pre class="hljs prettyprint">code</pre>'), parent:)
+
+      expect(parent.children[0].language).to be_nil
+    end
+
+    it "leaves language nil when the extracted token is not a valid language" do
+      handler.process(element: build_element('<code class="language-c#">code</code>'), parent:)
+
+      expect(parent.children[0].language).to be_nil
+    end
+
+    it "downcases the extracted language" do
+      handler.process(element: build_element('<code class="language-Ruby">code</code>'), parent:)
 
       expect(parent.children[0].language).to eq("ruby")
     end

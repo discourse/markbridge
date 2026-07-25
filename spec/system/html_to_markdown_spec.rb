@@ -172,9 +172,31 @@ RSpec.describe "HTML to Markdown Conversion" do
       expect(result.markdown).to eq(expected)
     end
 
+    it "renders empty code elements to nothing" do
+      result = Markbridge.html_to_markdown("<code></code> and <pre></pre>")
+
+      expect(result.markdown).to eq("and")
+    end
+
     it "converts code block" do
       html = "<pre>function hello() {\n  console.log('hi');\n}</pre>"
       expected = "```\nfunction hello() {\n  console.log('hi');\n}\n```"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result.markdown).to eq(expected)
+    end
+
+    it "puts the language-* class of the inner code element on the fence" do
+      html = "<pre><code class=\"language-ruby\">def hello\n  puts 'hi'\nend</code></pre>"
+      expected = "```ruby\ndef hello\n  puts 'hi'\nend\n```"
+
+      result = Markbridge.html_to_markdown(html)
+      expect(result.markdown).to eq(expected)
+    end
+
+    it "keeps styling classes off the fence" do
+      html = "<pre class=\"hljs codeblock\">plain()\nrun()</pre>"
+      expected = "```\nplain()\nrun()\n```"
 
       result = Markbridge.html_to_markdown(html)
       expect(result.markdown).to eq(expected)

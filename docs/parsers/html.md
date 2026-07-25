@@ -70,6 +70,14 @@ end
 | `<code>` | `AST::Code` | Inline or block code |
 | `<pre>` | `AST::Code` | Preformatted code block |
 
+The language for syntax highlighting is read from the first of: a
+`language-*` class on the element itself or on its direct `<code>` child
+(the CommonMark convention, `<pre><code class="language-ruby">`), the
+`lang` attribute, or a lone class used as-is. Styling classes like
+`class="hljs codeblock"` are ignored, and the result must be a single
+clean token (letters, digits, `_`, `+`, `-`) so it is safe on a fence
+line.
+
 ### Link Tags
 
 | HTML Tag | AST Node | Notes |
