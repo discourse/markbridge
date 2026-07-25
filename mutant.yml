@@ -282,19 +282,14 @@ matcher:
     # path runs only for the Document branch.
     - Markbridge::Parsers::HTML::Parser#parse
 
-    # Normalizer fast-path guards. Both methods exist ONLY to skip work;
+    # Normalizer fast-path guard. The method exists ONLY to skip work;
     # when a mutation defeats the guard, the fallback recomputes the same
-    # result, so every surviving mutation is output-equivalent (byte-for-
-    # byte). The real behaviour they gate is pinned elsewhere:
-    #   RuleSet#resolve — the ancestor scan is extracted into
-    #     #scan_ancestors, which the resolve/normalize specs cover; the
-    #     guard only decides whether to call it, and a non-candidate class
-    #     yields NO_MATCH from the scan anyway.
+    # result, so every surviving mutation is output-equivalent (byte-by-
+    # byte). The real behaviour it gates is pinned elsewhere:
     #   Walker#unchanged? — the copy-on-write skip; when it wrongly returns
     #     false, normalize_element just rebuilds an identical child list
     #     (the "leaves a violation-free tree untouched" and COW specs pin
     #     the observable behaviour).
-    - Markbridge::Normalizer::RuleSet#resolve
     - Markbridge::Normalizer::Walker#unchanged?
 
 mutation:
@@ -322,6 +317,14 @@ mutation:
     # behave identically once the `limit: 2` argument is threaded.
     # Bucket A.
     - "send{receiver=lvar{value=limit} selector=(-)}"
+
+    # RuleSet#resolve's `return NO_MATCH if candidates.empty?` guard.
+    # It only skips the ancestor scan for a class no rule targets; the
+    # scan returns NO_MATCH for such a class anyway, so every guard
+    # mutation (`if true/false/nil`, guard removal, `return` drop) is
+    # output-equivalent and only costs speed. `candidates` names a
+    # local only in this method, so the pattern hits nothing else.
+    - "if{condition=send{receiver=lvar{value=candidates} selector=empty?}}"
 
     # process_table's `i = start_index + 1` initial offset. The `+ 0`
     # / `start_index` variants leave the loop pointing at the `{|`

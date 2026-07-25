@@ -36,6 +36,16 @@ module Markbridge
             raise NotImplementedError, "#{self.class} must implement #render or provide a block"
           end
         end
+
+        # A tag that renders only the element's children, with the element
+        # pushed on the parent chain. Tag dispatch matches by ancestry, so
+        # a subclass normally inherits its base class tag; register
+        # PASSTHROUGH for the subclass to opt out — the exact-class hit
+        # wins and the base tag is not used.
+        PASSTHROUGH =
+          new do |element, interface|
+            interface.render_children(element, context: interface.with_parent(element))
+          end.freeze
       end
     end
   end

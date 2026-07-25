@@ -159,15 +159,86 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
     it "escapes ] in Text content when context has a Url-subclass ancestor" do
       # Custom AST nodes that extend AST::Url inherit the in_link_label
-      # escaping without any registration. (Tag dispatch is a separate
-      # concern — TagLibrary is exact-class; this test exercises only
-      # the renderer's ancestry-driven escape decision.)
+      # escaping without any registration. (This test exercises only the
+      # renderer's ancestry-driven escape decision, not tag dispatch.)
       custom_url_class = Class.new(Markbridge::AST::Url)
       url = custom_url_class.new(href: "https://example.com")
       text = Markbridge::AST::Text.new("[A]")
       context = Markbridge::Renderers::Discourse::RenderContext.new([url])
 
       expect(renderer.render(text, context:)).to eq("\\[A\\]")
+    end
+
+    context "with AST subclasses" do
+      let(:subclass) { Class.new(Markbridge::AST::Bold) }
+
+      it "renders a subclass without its own tag through the base class tag" do
+        node = subclass.new << Markbridge::AST::Text.new("text")
+
+        expect(renderer.render(node)).to eq("**text**")
+      end
+
+      it "renders an anonymous subclass like its base class (intentional)" do
+        # Ancestry dispatch applies to anonymous classes too — there is
+        # nothing special about a missing name.
+        node = Class.new(Markbridge::AST::Italic).new << Markbridge::AST::Text.new("text")
+
+        expect(renderer.render(node)).to eq("*text*")
+      end
+
+      it "works with the frozen shared_default library" do
+        node = subclass.new << Markbridge::AST::Text.new("text")
+        shared =
+          described_class.new(
+            tag_library: Markbridge::Renderers::Discourse::TagLibrary.shared_default,
+          )
+
+        expect(shared.render(node)).to eq("**text**")
+      end
+
+      it "prefers the subclass's own tag over the inherited one" do
+        library = Markbridge::Renderers::Discourse::TagLibrary.default
+        library.register(subclass, Markbridge::Renderers::Discourse::Tag.new { |_, _| "OWN" })
+        node = subclass.new << Markbridge::AST::Text.new("text")
+
+        expect(described_class.new(tag_library: library).render(node)).to eq("OWN")
+      end
+
+      it "restores plain child rendering when Tag::PASSTHROUGH is registered" do
+        library = Markbridge::Renderers::Discourse::TagLibrary.default
+        library.register(subclass, Markbridge::Renderers::Discourse::Tag::PASSTHROUGH)
+        node = subclass.new << Markbridge::AST::Text.new("text")
+
+        expect(described_class.new(tag_library: library).render(node)).to eq("text")
+      end
+
+      it "puts the element on the parent chain under Tag::PASSTHROUGH" do
+        code_subclass = Class.new(Markbridge::AST::Code)
+        library = Markbridge::Renderers::Discourse::TagLibrary.default
+        library.register(code_subclass, Markbridge::Renderers::Discourse::Tag::PASSTHROUGH)
+        node = code_subclass.new << Markbridge::AST::Text.new("a*b")
+
+        # Text under a Code ancestor is not Markdown-escaped, so the
+        # children must have seen the element as their parent.
+        expect(described_class.new(tag_library: library).render(node)).to eq("a*b")
+      end
+
+      it "asks the library to resolve each class once per render call, caching nil results" do
+        library = instance_double(Markbridge::Renderers::Discourse::TagLibrary)
+        allow(library).to receive(:[]).and_return(nil)
+        allow(library).to receive(:resolve).and_return(nil)
+        renderer = described_class.new(tag_library: library)
+        document = Markbridge::AST::Document.new
+        # Two elements of the same class (Text would auto-merge).
+        document << Markbridge::AST::Bold.new << Markbridge::AST::Bold.new
+
+        renderer.render(document)
+
+        # Two Bold nodes, one ancestry walk: the per-call cache stores the
+        # nil result instead of walking again.
+        expect(library).to have_received(:resolve).with(Markbridge::AST::Bold).once
+        expect(library).to have_received(:resolve).with(Markbridge::AST::Document).once
+      end
     end
 
     context "in html_mode" do
@@ -487,6 +558,45 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       text = Markbridge::AST::Text.new("*not bold*")
 
       expect(renderer.render_default(text)).to eq("\\*not bold\\*")
+    end
+
+    it "reaches the stock base class tag for a subclass node" do
+      subclass = Class.new(Markbridge::AST::Bold)
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(subclass, Markbridge::Renderers::Discourse::Tag.new { |_, _| "OWN" })
+      renderer = described_class.new(tag_library: library)
+      node = subclass.new << Markbridge::AST::Text.new("x")
+
+      # The custom tag wins in #render; render_default skips it and finds
+      # the stock BoldTag through the subclass's ancestry.
+      expect(renderer.render(node)).to eq("OWN")
+      expect(renderer.render_default(node)).to eq("**x**")
+    end
+
+    it "asks the default library to resolve each class once per render call" do
+      subclass = Class.new(Markbridge::AST::Bold)
+      fallback = Markbridge::Renderers::Discourse::Tag.new { |_, _| "STOCK" }
+      default_library = instance_double(Markbridge::Renderers::Discourse::TagLibrary)
+      allow(default_library).to receive(:[]).and_return(nil)
+      allow(default_library).to receive(:resolve).and_return(fallback)
+      allow(Markbridge::Renderers::Discourse::TagLibrary).to receive(:default).and_return(
+        default_library,
+      )
+
+      library = Markbridge::Renderers::Discourse::TagLibrary.new
+      library.register(
+        subclass,
+        Markbridge::Renderers::Discourse::Tag.new do |node, interface|
+          interface.render_default(node)
+        end,
+      )
+      renderer = described_class.new(tag_library: library)
+      document = Markbridge::AST::Document.new
+      document << subclass.new << subclass.new
+
+      expect(renderer.render(document)).to eq("STOCKSTOCK")
+      # Two subclass nodes, one ancestry walk against the default library.
+      expect(default_library).to have_received(:resolve).with(subclass).once
     end
   end
 end

@@ -119,7 +119,7 @@ VARIANTS = {
     lambda do |corpus, tag|
       parser = Markbridge::Parsers::BBCode::Parser.new
       asts = corpus.map { |post| parser.parse(post) }
-      normalizer = Markbridge::Normalizer.shared_for(:discourse)
+      normalizer = Markbridge::Normalizer.shared_default
       report("norm_only/#{tag}", asts) { |ast| normalizer.normalize(ast) }
     end,
   ],
