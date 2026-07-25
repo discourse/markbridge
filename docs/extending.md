@@ -466,6 +466,39 @@ library.register(AST::Spoiler) do |element, interface|
 end
 ```
 
+### Testing Custom Tags Against the html_mode Contract
+
+Every tag must also render sensibly when `interface.html_mode?` is
+true — inside a CommonMark HTML block (for example the table HTML
+fallback), raw Markdown output would show up as literal text. A tag
+has two valid forms there: a raw HTML fragment, or its normal Markdown
+wrapped in `\n\n…\n\n` (a Markdown island; the blank lines let
+CommonMark parse the inner content).
+
+Markbridge ships this check as a shared RSpec example. Require it from
+your spec setup and give it your tag and a sample element:
+
+```ruby
+require "markbridge/rspec"
+
+RSpec.describe MyQuoteTag do
+  it_behaves_like "an html_mode safe tag" do
+    let(:tag) { described_class.new }
+    let(:element) do
+      element = MyQuote.new
+      element << Markbridge::AST::Text.new("body *with* sigils")
+      element
+    end
+  end
+end
+```
+
+Give the element children whose text contains Markdown sigils — a tag
+that passes them through unprotected is then caught. Markbridge runs
+its own tags through the same example. When the tag needs a customized
+renderer to resolve its children, override `markbridge_renderer` with
+your configured renderer inside the block.
+
 ## Plugin Pattern
 
 Create reusable plugins that bundle parser and renderer extensions:
