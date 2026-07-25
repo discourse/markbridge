@@ -21,3 +21,9 @@
 # IDE and silo-local state
 /.idea/
 /.silo.local.yml
+
+# Docs site build output (the docs branch holds the source)
+/docs/.astro/
+/docs/dist/
+/docs/node_modules/
+/.pnpm-store/
