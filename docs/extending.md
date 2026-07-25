@@ -8,6 +8,7 @@ This guide shows you how to add custom BBCode tags and renderers to Markbridge. 
 - [Adding a New BBCode Tag](#adding-a-new-bbcode-tag)
 - [Creating Custom Handlers](#creating-custom-handlers)
 - [Creating Custom Renderers](#creating-custom-renderers)
+- [Extending the Normalizer](#extending-the-normalizer)
 - [Plugin Pattern](#plugin-pattern)
 - [Advanced Examples](#advanced-examples)
 - [Best Practices](#best-practices)
@@ -196,12 +197,16 @@ end
 
 ### Auto-passthrough for unregistered AST classes
 
-A custom AST class that has *no* Tag bound to it doesn't need a
-"passthrough" Tag — `Renderer#render` falls through to
-`render_children` automatically (see `lib/markbridge/renderers/discourse/renderer.rb`).
-You only need to register a Tag when the class needs a non-trivial
-rendering. To remove a built-in binding so this passthrough kicks in,
-use `TagLibrary#unregister`:
+A custom AST class that has *no* Tag bound to it — and no ancestor
+class with one — doesn't need a "passthrough" Tag: `Renderer#render`
+falls through to `render_children` automatically (see
+`lib/markbridge/renderers/discourse/renderer.rb`). You only need to
+register a Tag when the class needs a non-trivial rendering. Note that
+a subclass of a bound node class inherits that class's tag instead —
+see [Subclasses and Ancestry Matching](#subclasses-and-ancestry-matching)
+and `Tag::PASSTHROUGH` when you really want only the children. To
+remove a built-in binding so the passthrough kicks in, use
+`TagLibrary#unregister`:
 
 ```ruby
 library.unregister(AST::Color)  # Color now renders as just its children
@@ -498,6 +503,102 @@ that passes them through unprotected is then caught. Markbridge runs
 its own tags through the same example. When the tag needs a customized
 renderer to resolve its children, override `markbridge_renderer` with
 your configured renderer inside the block.
+
+## Extending the Normalizer
+
+Between parse and render, `Markbridge::Normalizer` rewrites the AST so the
+renderer only gets markup the target format can express — a fenced code block
+inside bold is moved out, a link inside a link is unwrapped. It runs by
+default on every conversion. The pass itself and its default rules are
+described in [AST Normalization](normalization.md); this section covers the
+two parts that matter when you extend Markbridge: adding your own rules, and
+what happens when you subclass an AST node.
+
+### Adding Your Own Rules
+
+Build a fresh normalizer with `Markbridge::Normalizer.default`, add rules
+with `#rule`, and pass it via the `normalize:` keyword (available on all
+`*_to_markdown` methods, `Markbridge.convert`, and `Markbridge.render`):
+
+```ruby
+require "markbridge/all"
+
+normalizer = Markbridge::Normalizer.default
+normalizer.rule(
+  parent: Markbridge::AST::Url,
+  child: Markbridge::AST::Image,
+  strategy: :hoist_after
+)
+
+conversion = Markbridge.convert(
+  "[url=https://example.com][img]https://example.com/a.png[/img][/url]",
+  format: :bbcode,
+  normalize: normalizer
+)
+conversion.diagnostics[:normalization]
+# => [{ parent: "Url", child: "Image", strategy: :hoist_after, count: 1 }]
+```
+
+`#rule` takes a `parent:` class, a `child:` class, and a `strategy:` — one of
+`:keep`, `:hoist_after`, `:unwrap`, `:textify`, `:drop`, or a callable (see
+[Strategies](normalization.md#strategies)). It is chainable. A rule for a
+`(parent, child)` pair that already has one replaces it, so your rules
+override the defaults.
+
+Two things to know:
+
+- `Markbridge::Normalizer.shared_default` — the instance behind
+  `normalize: true` — is frozen, so `#rule` raises on it. Always build a
+  fresh `.default` when you want to customize.
+- `#violations(ast)` lists what the rules would change without changing the
+  tree. Use it as a dry run, or as a lint in your test suite:
+
+```ruby
+Markbridge::Normalizer.default.violations(ast)
+# => [{ parent: "Bold", child: "List", strategy: :hoist_after }]
+```
+
+Build a customized normalizer once and reuse it for every conversion — it
+keeps no per-call state.
+
+### Subclasses and Ancestry Matching
+
+Subclassing a built-in AST node is a common way to mark some nodes for
+special treatment: your handler creates the subclass for certain inputs,
+and everything else keeps working. A subclass inherits its base class
+behavior in all three lookups:
+
+1. **Normalizer rules** — a rule for `Code` also matches a `Code`
+   subclass, on the parent side and on the child side.
+2. **Tag dispatch** — a node whose class has no registered tag renders
+   through the tag of its nearest ancestor class.
+3. **`interface.render_default`** — same ancestry lookup, against the
+   default library.
+
+So this works with no extra registration — a multi-line `LegacyCode`
+inside `Bold` is hoisted out and rendered as a code fence, exactly like a
+plain `Code`:
+
+```ruby
+class LegacyCode < Markbridge::AST::Code
+end
+```
+
+The most specific match wins. To change behavior for the subclass,
+register on the subclass:
+
+- A rule for the exact `(parent, child)` pair overrides an inherited one:
+  `normalizer.rule(parent: AST::Bold, child: LegacyCode, strategy: :drop)`.
+- A tag registered for `LegacyCode` beats the inherited `CodeTag`. Inside
+  it, `interface.render_default(node)` still reaches the stock `CodeTag`,
+  so the custom tag can wrap or delegate.
+- To get plain child rendering instead of the inherited tag, register
+  `Markbridge::Renderers::Discourse::Tag::PASSTHROUGH` for the subclass.
+  It renders only the children (with the element on the parent chain).
+
+Matching stays inside the AST hierarchy: no rule or tag is registered for
+`AST::Element` or `AST::Node` by default, so `unregister(AST::Color)`
+still means "render children only" — there is no ancestor tag to inherit.
 
 ## Plugin Pattern
 
@@ -1004,5 +1105,6 @@ end
 
 - **[BBCode Parser Guide](parsers/bbcode.md)** - Deep dive into parsing
 - **[Discourse Renderer Guide](renderers/discourse.md)** - Learn about rendering
+- **[AST Normalization](normalization.md)** - The pass between parse and render, and its default rules
 - **[Architecture Overview](architecture.md)** - Understand the pipeline
 - **[Performance Guide](performance.md)** - Optimize your extensions

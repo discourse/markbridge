@@ -50,6 +50,11 @@ module Markbridge
       def initialize(rule_set, report)
         @rules = rule_set
         @report = report
+        # Per-run cache for RuleSet#resolve's ancestry analysis. A Walker
+        # lives for one normalize call, so each distinct node class is
+        # analyzed at most once per run while the RuleSet itself stays
+        # free of per-call state.
+        @walk_cache = {}
       end
 
       # Normalize +document+'s subtree in place.
@@ -94,7 +99,7 @@ module Markbridge
         bubble = nil
 
         children.each_with_index do |child, index|
-          strategy, boundary = @rules.resolve(child, stack)
+          strategy, boundary = @rules.resolve(child, stack, @walk_cache)
           strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
 
           if strategy.nil? || strategy == :keep
@@ -129,7 +134,7 @@ module Markbridge
       # +out+ — the shared entry point used by {#emit}'s +:unwrap+ recursion,
       # where +out+ already exists.
       def resolve_into(child, stack, out, bubble)
-        strategy, boundary = @rules.resolve(child, stack)
+        strategy, boundary = @rules.resolve(child, stack, @walk_cache)
         strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
 
         if strategy.nil? || strategy == :keep

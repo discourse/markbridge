@@ -95,8 +95,11 @@ own instance is as fast as the default path — there is no per-call rule
 build.
 
 A rule for a `(parent, child)` pair that already exists is replaced, so your
-`#rule` calls override the defaults. Matching is by exact class
-(`instance_of?`), so a rule for `AST::Url` does not catch a subclass.
+`#rule` calls override the defaults. Matching follows the class ancestry: a
+rule for `AST::Url` also catches an `AST::Url` subclass, on both sides, and
+a rule registered for the more specific class wins. See
+[Subclasses and Ancestry Matching](extending.md#subclasses-and-ancestry-matching)
+for the details.
 
 `Markbridge::Normalizer.shared_default` is the default normalizer, built once
 and frozen; the `normalize: true` path uses it. Do not change it — call

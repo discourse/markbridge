@@ -150,7 +150,10 @@ module Markbridge
     # @return [Array<Hash>] +{parent:, child:, strategy:}+ per occurrence
     def violations(ast)
       found = []
-      collect_violations(ast, EMPTY_STACK, found)
+      # Per-call cache for RuleSet#resolve's ancestry analysis; keeps the
+      # Normalizer instance itself free of state, so a frozen shared
+      # instance stays safe across threads.
+      collect_violations(ast, EMPTY_STACK, found, {})
       found
     end
 
@@ -161,15 +164,15 @@ module Markbridge
 
     private
 
-    def collect_violations(element, ancestors, found)
+    def collect_violations(element, ancestors, found, walk_cache)
       stack = ancestors + [element]
       element.children.each do |child|
-        strategy, boundary = @rules.resolve(child, stack)
+        strategy, boundary = @rules.resolve(child, stack, walk_cache)
         strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
         unless strategy.nil? || strategy == :keep
           found << { parent: demodulize(boundary.class), child: demodulize(child.class), strategy: }
         end
-        collect_violations(child, stack, found) if child.is_a?(AST::Element)
+        collect_violations(child, stack, found, walk_cache) if child.is_a?(AST::Element)
       end
     end
 
