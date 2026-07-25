@@ -15,6 +15,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to eq("`code`")
     end
 
+    it "renders an empty element to nothing" do
+      element = Markbridge::AST::Code.new(language: "ruby")
+
+      result = tag.render(element, interface)
+      expect(result).to eq("")
+    end
+
     it "renders block code with newlines" do
       element = Markbridge::AST::Code.new
       element << Markbridge::AST::Text.new("line1\nline2")

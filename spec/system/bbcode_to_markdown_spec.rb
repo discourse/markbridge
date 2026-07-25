@@ -188,6 +188,11 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq("`code text`")
     end
 
+    it "renders empty code tags to nothing" do
+      result = Markbridge.bbcode_to_markdown("a [code][/code] b")
+      expect(result.markdown).to eq("a  b")
+    end
+
     it "handles nested formatting" do
       result = Markbridge.bbcode_to_markdown("[b][i]bold italic[/i][/b]")
       expect(result.markdown).to eq("***bold italic***")

@@ -25,12 +25,16 @@ module Markbridge
 
           def render(element, interface)
             child_context = interface.with_parent(element)
-            content = interface.render_children(element, context: child_context)
+            content = interface.render_children(element, context: child_context).strip
+
+            # A details block with nothing to show renders to nothing —
+            # an empty [details] shell would only add noise to the output.
+            return "" if content.empty?
 
             return render_html(element.title, content) if interface.html_mode?
 
             opener = element.title ? %([details="#{element.title}"]) : "[details]"
-            "\n\n#{opener}\n#{content.strip}\n[/details]\n\n"
+            "\n\n#{opener}\n#{content}\n[/details]\n\n"
           end
 
           private
