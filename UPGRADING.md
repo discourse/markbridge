@@ -1,6 +1,96 @@
 # Upgrading Markbridge
 
-## Unreleased — AST normalization runs by default
+## 0.4.0 — ancestry matching and forced code blocks
+
+### AST subclasses inherit rules and tags from their base class
+
+Until now, normalizer rules, tag dispatch, and `interface.render_default`
+matched the exact class of a node. A consumer subclass of a built-in AST
+node got none of the base class behavior: no normalizer rules, no tag —
+the renderer fell through to plain child rendering.
+
+All three lookups now match by class ancestry. A subclass without its
+own registration behaves exactly like its base class:
+
+```ruby
+class LegacyCode < Markbridge::AST::Code
+end
+# 0.3.x: renders as bare children (code markers lost), rules ignored
+# 0.4.0: renders through CodeTag, normalizer rules for Code apply
+```
+
+The most specific class wins, and an exact registration always
+overrides an inherited one — a tag or rule registered for the subclass
+itself behaves as before. What to check when upgrading:
+
+- If you registered tags and rules for your subclasses, nothing
+  changes.
+- If a subclass relied on the old fall-through to render only its
+  children, register the new passthrough tag for it:
+
+  ```ruby
+  library.register(LegacyCode, Markbridge::Renderers::Discourse::Tag::PASSTHROUGH)
+  ```
+
+- `TagLibrary#unregister` still removes the binding for the exact
+  class, but for a subclass the ancestor tag then takes over instead
+  of passthrough. Use `Tag::PASSTHROUGH` when you want the children
+  only.
+- `interface.render_default(node)` on a subclass now reaches the stock
+  tag of the base class — the interception pattern from 0.3.0 works
+  for subclasses too.
+
+See the "Subclasses and Ancestry Matching" section in
+[docs/extending.md](docs/extending.md).
+
+### `Normalizer::RuleSet#resolve` takes a walk cache
+
+`RuleSet#resolve(child, ancestors)` is now
+`resolve(child, ancestors, walk_cache)`. The caller creates one Hash
+per tree walk and passes it in; the rule set itself stays free of
+per-call state. This only affects code calling `resolve` directly —
+`Normalizer#normalize`, `#violations`, and the `rule` API are
+unchanged.
+
+### Single-line code blocks keep their fence
+
+`AST::Code` carries a `block:` flag now, and parsers set it where the
+source construct is a code block by definition: BBCode `[code]` and
+`[pre]`, HTML `<pre>`, s9e `CODE`, and MediaWiki indented and `<pre>`
+blocks. Single-line samples from these sources render as a fenced
+block and keep their language:
+
+```ruby
+# Before                          # After
+Markbridge.bbcode_to_markdown("[code=ruby]x[/code]").markdown
+# => "`x`"                        # => "```ruby\nx\n```"
+```
+
+Inline constructs (`[tt]`, `<code>`, `<tt>`) keep the old behavior:
+inline when single-line, fence when the content has a newline.
+Consumers building ASTs directly can pass
+`AST::Code.new(language: "ruby", block: true)` to force a fence.
+
+### Other output changes
+
+- Empty `<code>`, details, and spoiler elements render to nothing
+  instead of `` `` ``, `[details]…[/details]`, and
+  `[spoiler][/spoiler]` shells.
+- The HTML parser converts `<h1>`–`<h6>` to `AST::Heading` (they were
+  unknown tags before, keeping only their text).
+- The HTML code language comes from `language-*` classes (on the
+  element or its `<code>` child), then the `lang` attribute, then a
+  lone class; styling classes like `hljs` no longer end up on the
+  fence line, and an explicit `lang` now beats a lone class.
+
+### New, non-breaking
+
+`require "markbridge/rspec"` ships the shared example
+`"an html_mode safe tag"` to test custom renderer tags against the
+html_mode contract — see "Testing Custom Tags Against the html_mode
+Contract" in [docs/extending.md](docs/extending.md).
+
+## 0.3.1 — AST normalization runs by default
 
 A new `Markbridge::Normalizer` pass runs between the parse-time `yield` hook
 and rendering. It rewrites the AST so the renderer only gets markup the target
