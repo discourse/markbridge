@@ -76,7 +76,6 @@ module Markbridge
         FENCED_CODE_BACKTICK = /\A`{3,}[^`]*$/
         FENCED_CODE_TILDE = /\A~{3,}/
         SETEXT_UNDERLINE_EQUALS = /\A=+[ \t]*$/
-        SETEXT_UNDERLINE_DASH = /\A-+[ \t]*$/
         # Indented code: 4+ spaces, tab at start, or space+tab reaching column 4+
         INDENTED_CODE = /\A(?: {4}|\t| {1,3}\t)/
 
@@ -182,11 +181,11 @@ module Markbridge
           # skip the split and its Array + line-String allocations. A lone
           # `\r` without `\n` stays on the line either way — `/\r?\n/`
           # needs the `\n` — so `include?("\n")` alone decides correctly.
-          return escape_line(text, false) unless text.include?("\n")
+          return escape_line(text) unless text.include?("\n")
 
           # On CRLF input, consume `\r` as part of the line terminator instead
           # of leaving it on the line. A trailing `\r` breaks line-end anchored
-          # regexes (e.g. SETEXT_UNDERLINE_*) and the `ws_end >= line_length`
+          # regexes (e.g. SETEXT_UNDERLINE_EQUALS) and the `ws_end >= line_length`
           # early-out in escape_indented_code, leaking NBSPs onto
           # whitespace-only CRLF lines. The `include?` guard keeps the
           # LF-only fast path on a string split (regex split is ~20% slower
@@ -196,22 +195,19 @@ module Markbridge
           # Pre-allocate result buffer
           bytesize = text.bytesize
           result = String.new(capacity: bytesize + bytesize / 3, encoding: text.encoding)
-          prev_was_paragraph = false
           first = true
 
           lines.each do |line|
             result << "\n" unless first
             first = false
 
-            escaped = escape_line(line, prev_was_paragraph)
-            result << escaped
-            prev_was_paragraph = paragraph_line?(line)
+            result << escape_line(line)
           end
 
           result
         end
 
-        def escape_line(line, prev_was_paragraph)
+        def escape_line(line)
           # No `line.empty?` early-return: it's redundant with the
           # `line.getbyte(indent_len).nil?` guard below, which catches both
           # empty and whitespace-only lines while also preserving object
@@ -229,7 +225,7 @@ module Markbridge
           has_indent = indent_len > 0
           content = has_indent ? line[indent_len..] : line
 
-          escaped, skip_inline = escape_block_level(content, prev_was_paragraph)
+          escaped, skip_inline = escape_block_level(content)
           escaped = escape_inline(escaped) unless skip_inline
 
           if has_indent
@@ -276,7 +272,7 @@ module Markbridge
           "#{nbsp_indent}#{escape_inline(content)}"
         end
 
-        def escape_block_level(content, prev_was_paragraph)
+        def escape_block_level(content)
           first_byte = content.getbyte(0)
 
           case first_byte
@@ -289,7 +285,7 @@ module Markbridge
             return pass_first_char_inline(content) if @allow.include?(:block_quote)
             return escape_first_char_inline(content, "\\>")
           when DASH
-            return escape_block_dash(content, prev_was_paragraph)
+            return escape_block_dash(content)
           when PLUS
             if BULLET_LIST.match?(content)
               return pass_first_char_inline(content) if @allow.include?(:bullet_list)
@@ -302,7 +298,17 @@ module Markbridge
               return escape_all_chars(content, UNDERSCORE, "\\_"), true
             end
           when EQUALS
-            if prev_was_paragraph && SETEXT_UNDERLINE_EQUALS.match?(content)
+            # A line of only `=` is a setext heading underline when a
+            # paragraph line comes before it. The escaper sees a single
+            # text fragment, and the renderer can put that fragment
+            # right after a paragraph line — after a line break, or
+            # after inline markup like `[b]Body[/b]\n===` — so the
+            # previous line is not visible here. The line is therefore
+            # escaped in every position, like every other block
+            # construct. Where no paragraph line comes before it,
+            # Discourse renders `\=` as a literal `=`, so the result
+            # looks the same.
+            if SETEXT_UNDERLINE_EQUALS.match?(content)
               return escape_all_chars(content, EQUALS, "\\="), true
             end
           when BACKTICK
@@ -327,11 +333,8 @@ module Markbridge
           ["#{escaped_char}#{escape_inline(content[1..])}", true]
         end
 
-        def escape_block_dash(content, prev_was_paragraph)
-          if THEMATIC_BREAK_DASH.match?(content) ||
-               (prev_was_paragraph && SETEXT_UNDERLINE_DASH.match?(content))
-            return escape_all_chars(content, DASH, "\\-"), true
-          end
+        def escape_block_dash(content)
+          return escape_all_chars(content, DASH, "\\-"), true if THEMATIC_BREAK_DASH.match?(content)
           if BULLET_LIST.match?(content)
             return pass_first_char_inline(content) if @allow.include?(:bullet_list)
             return escape_first_char_inline(content, "\\-")
@@ -560,56 +563,6 @@ module Markbridge
             2
           else
             1
-          end
-        end
-
-        def paragraph_line?(line)
-          pos = 0
-          line_len = line.bytesize
-          pos += 1 while pos < line_len && line.getbyte(pos) == SPACE
-          first_non_space = pos
-
-          # Empty or whitespace-only lines: getbyte past the end returns nil.
-          return false if line.getbyte(first_non_space).nil?
-
-          # Indented code (4+ spaces or any leading \t) is not a paragraph.
-          # INDENTED_CODE also catches lines where first_non_space > 3, so no
-          # separate numeric boundary check is needed.
-          return false if INDENTED_CODE.match?(line)
-
-          content = first_non_space == 0 ? line : line[first_non_space..]
-
-          # Lines starting with [ are paragraph content (the escaper rewrites [
-          # to \[). block_construct? has no BRACKET_OPEN case arm, so such
-          # lines naturally fall through and !block_construct?(content) == true.
-          !block_construct?(content)
-        end
-
-        # Checks whether content starts with a block-level markdown construct.
-        # Used by both escape_block_level (to decide what to escape) and
-        # paragraph_line? (to decide if setext underlines can follow).
-        def block_construct?(content)
-          case content.getbyte(0)
-          when HASH
-            ATX_HEADING.match?(content)
-          when GT
-            true
-          when DASH
-            BULLET_LIST.match?(content) || THEMATIC_BREAK_DASH.match?(content)
-          when STAR
-            BULLET_LIST.match?(content) || THEMATIC_BREAK_STAR.match?(content)
-          when PLUS
-            BULLET_LIST.match?(content)
-          when UNDERSCORE
-            THEMATIC_BREAK_UNDERSCORE.match?(content)
-          when BACKTICK
-            FENCED_CODE_BACKTICK.match?(content)
-          when TILDE
-            FENCED_CODE_TILDE.match?(content)
-          when DIGIT_0..DIGIT_9
-            ORDERED_LIST.match?(content)
-          else
-            false
           end
         end
       end

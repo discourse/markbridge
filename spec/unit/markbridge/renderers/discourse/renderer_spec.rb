@@ -304,6 +304,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("")
     end
 
+    # Each Text node is escaped on its own, so the escaper never sees the
+    # paragraph line in front of the `=` line. Discourse would cook the
+    # unescaped output as an <h1>.
+    it "escapes a =-only text node that follows a line break" do
+      paragraph = Markbridge::AST::Paragraph.new
+      paragraph << Markbridge::AST::Text.new("Body")
+      paragraph << Markbridge::AST::LineBreak.new
+      paragraph << Markbridge::AST::Text.new("========")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      result = renderer.render_children(paragraph, context:)
+
+      expect(result).to eq("Body\n\\=\\=\\=\\=\\=\\=\\=\\=")
+    end
+
     it "checks against the part's FIRST char when deciding boundary insertion" do
       # Custom tag whose output starts with `*` but ends with non-delimiter `Z`.
       # Combined with a previous sibling ending in `*`, the boundary must be
