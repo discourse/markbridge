@@ -1,5 +1,28 @@
 # Upgrading Markbridge
 
+## 0.4.1 — setext underlines are always escaped
+
+A text line that contains only `=` is now always escaped. Before, the
+escaper escaped it only when it saw a paragraph line directly in front
+of it inside the same text node.
+
+That check was too optimistic. The escaper works on one text fragment
+at a time, and the renderer joins the fragments afterwards.
+A fragment that starts with `===` can therefore end up right after a
+paragraph line — after a line break, or after inline markup — and
+Discourse cooks both lines as a heading:
+
+```ruby
+Markbridge.html_to_markdown("<p>Body:{}<br>========</p>").markdown
+# 0.4.0: "Body:{}\n========"          → cooks as an <h1>
+# 0.4.1: "Body:{}\n\\=\\=\\=\\=\\=\\=\\=\\="  → cooks as two lines of text
+```
+
+No public API changed. The cost is cosmetic: a separator line that has
+no paragraph in front of it now reads `\=\=\=\=` in the raw Markdown.
+Discourse renders `\=` as a literal `=`, so the result looks the same
+as before.
+
 ## 0.4.0 — ancestry matching and forced code blocks
 
 ### AST subclasses inherit rules and tags from their base class

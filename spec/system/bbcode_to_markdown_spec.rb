@@ -534,6 +534,19 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq("**bold text**")
     end
 
+    # The `=` line starts its own text node, so the escaper cannot see the
+    # paragraph line that the inline markup produced before it. Without the
+    # escape, Discourse cooks both lines as an <h1>.
+    it "escapes a =-only line after a bold tag" do
+      result = Markbridge.bbcode_to_markdown("[b]Body[/b]\n===")
+      expect(result.markdown).to eq("**Body**\n\\=\\=\\=")
+    end
+
+    it "escapes a =-only line after text with inline markup" do
+      result = Markbridge.bbcode_to_markdown("Body [i]x[/i]\n===")
+      expect(result.markdown).to eq("Body *x*\n\\=\\=\\=")
+    end
+
     it "inserts an HTML comment to break colliding emphasis delimiters between siblings" do
       # After reorder-with-reopen the Bold ends with *** and the reopened
       # Italic starts with * — adjacent they would form **** and parse

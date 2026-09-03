@@ -383,176 +383,87 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       end
     end
 
-    # Exercises the private `paragraph_line?` and `block_construct?` helpers.
-    # `paragraph_line?` is called on line N to decide whether line N+1 is a
-    # setext heading underline (only `=+` or `-+` with `prev_was_paragraph`
-    # trigger setext escaping). `block_construct?` returns true when the line
-    # starts with a block-level marker (so it is NOT a paragraph).
-    describe "setext heading underline detection (via paragraph_line?/block_construct?)" do
-      # Paragraph ⇒ underline on next line must be escaped.
-      context "when preceded by a paragraph line" do
-        it "escapes = as setext underline" do
-          expect(escaper.escape("text\n=")).to eq("text\n\\=")
-        end
+    # A line that contains only `=` is a setext heading underline when a
+    # paragraph line comes before it. The escaper only sees one text
+    # fragment and cannot know what the renderer puts in front of it, so
+    # it escapes such a line in every position. Discourse renders `\=` as
+    # a literal `=`, so the extra backslashes do not change the result.
+    describe "setext heading underline escaping" do
+      it "escapes a single = on the first line" do
+        expect(escaper.escape("=")).to eq("\\=")
+      end
 
-        it "escapes multiple = chars" do
-          expect(escaper.escape("text\n===")).to eq("text\n\\=\\=\\=")
-        end
+      it "escapes several = on the first line" do
+        expect(escaper.escape("===")).to eq("\\=\\=\\=")
+      end
 
-        it "escapes - as setext underline" do
-          expect(escaper.escape("text\n-")).to eq("text\n\\-")
-        end
+      it "escapes a =-only first line followed by text" do
+        expect(escaper.escape("===\nText")).to eq("\\=\\=\\=\nText")
+      end
 
-        it "escapes paragraph starting with [ (bracket case)" do
-          # content.getbyte(0) == BRACKET_OPEN short-circuits to true.
-          expect(escaper.escape("[link\n=")).to include("\\=")
-        end
+      it "escapes = after a paragraph line" do
+        expect(escaper.escape("text\n=")).to eq("text\n\\=")
+      end
 
-        it "treats first line as not-a-paragraph (no prev line)" do
-          # First-line `=` has prev_was_paragraph == false, so stays bare.
-          expect(escaper.escape("=\nnext")).to eq("=\nnext")
+      it "escapes = after a paragraph line starting with [" do
+        expect(escaper.escape("[link\n=")).to eq("\\[link\n\\=")
+      end
+
+      {
+        "an empty line" => "",
+        "a blank line with spaces" => "   ",
+        "a bullet list item" => "- item",
+        "an ATX heading" => "# title",
+        "a blockquote line" => "> quote",
+        "a thematic break" => "---",
+        "a fenced code marker" => "```",
+        "an ordered list item" => "1. item",
+        "indented code" => "    code",
+        "a tab-indented line" => "\tcode",
+      }.each do |label, prev_line|
+        it "escapes a =-only line after #{label}" do
+          expect(escaper.escape("#{prev_line}\n===")).to end_with("\n\\=\\=\\=")
         end
       end
 
-      # Block constructs ⇒ next-line underline is NOT escaped (not a setext).
-      context "when preceded by a block construct" do
-        {
-          "ATX heading (HASH)" => "# title",
-          "blockquote (GT)" => "> quote",
-          "bullet list with - (DASH)" => "- item",
-          "bullet list with + (PLUS)" => "+ item",
-          "bullet list with * (STAR)" => "* item",
-          "thematic break --- (DASH+THEMATIC)" => "---",
-          "thematic break *** (STAR+THEMATIC)" => "***",
-          "thematic break ___ (UNDERSCORE)" => "___",
-          "fenced code ``` (BACKTICK)" => "```",
-          "fenced code ~~~ (TILDE)" => "~~~",
-          "ordered list starting with 0 (DIGIT_0 boundary)" => "0. zeroth",
-          "ordered list starting with 9 (DIGIT_9 boundary)" => "9. ninth",
-          "ordered list (DIGIT)" => "1. item",
-        }.each do |label, prev_line|
-          it "does NOT escape = after #{label}" do
-            result = escaper.escape("#{prev_line}\n=")
-            expect(result).to end_with("\n=")
-          end
-        end
+      it "escapes a =-only line with trailing spaces" do
+        expect(escaper.escape("===  ")).to eq("\\=\\=\\=  ")
       end
 
-      # First byte matches a `when` clause but the regex inside returns false
-      # ⇒ block_construct? returns false ⇒ treated as paragraph.
-      context "when first byte matches a case branch but no construct matches" do
-        {
-          "# without space (not ATX)" => "#foo",
-          "- without space (not bullet, not thematic)" => "-x",
-          "+ without space (not bullet)" => "+foo",
-          "* without space (not bullet, not thematic)" => "*foo",
-          "single _ (not thematic)" => "_foo",
-          "single ` (not fenced, needs 3+)" => "`foo",
-          "single ~ (not fenced, needs 3+)" => "~foo",
-          "digit without dot/paren (not ordered)" => "1foo",
-        }.each do |label, prev_line|
-          it "escapes = after paragraph starting with #{label}" do
-            result = escaper.escape("#{prev_line}\n=")
-            expect(result).to end_with("\n\\=")
-          end
-        end
+      it "escapes a =-only line with a trailing tab" do
+        expect(escaper.escape("===\t")).to eq("\\=\\=\\=\t")
       end
 
-      # paragraph_line? short-circuits (returns false) for:
-      # - empty lines
-      # - whitespace-only lines
-      # - lines whose non-space content starts with TAB (indented code)
-      # - lines matching INDENTED_CODE (4+ spaces / tab at start)
-      context "when preceded by non-paragraph whitespace/indented lines" do
-        it "does NOT escape = after empty line" do
-          expect(escaper.escape("\n=")).to eq("\n=")
-        end
-
-        it "does NOT escape = after whitespace-only line" do
-          expect(escaper.escape("   \n=")).to eq("   \n=")
-        end
-
-        it "does NOT escape = after tab-indented line (indented code)" do
-          # Tab-indented content is indented code per INDENTED_CODE.
-          result = escaper.escape("\tcode\n=")
-          expect(result).to end_with("\n=")
-        end
-
-        it "does NOT escape = after 4-space-indented line (indented code)" do
-          result = escaper.escape("    code\n=")
-          expect(result).to end_with("\n=")
-        end
-
-        it "does NOT escape = after line with tab after spaces (paragraph_line? short-circuit)" do
-          # Content after spaces starts with TAB ⇒ return false directly.
-          # Uses 3 leading spaces (won't trigger INDENTED_CODE 4+ check first)
-          # then a tab ⇒ hits the `getbyte(first_non_space) == TAB` branch.
-          result = escaper.escape("   \tcode\n=")
-          expect(result).to end_with("\n=")
-        end
+      it "escapes a =-only line indented by up to 3 spaces" do
+        expect(escaper.escape("   ===")).to eq("   \\=\\=\\=")
       end
 
-      context "with line having >3 spaces of indent (uses line, not content, for INDENTED_CODE check)" do
-        it "does NOT escape = after 5-space-indented text (indented code)" do
-          # Falls into INDENTED_CODE.match?(line) check at the end.
-          result = escaper.escape("     word\n=")
-          expect(result).to end_with("\n=")
-        end
+      it "does not escape = followed by text" do
+        expect(escaper.escape("=foo")).to eq("=foo")
       end
 
-      context "with line having 1-3 spaces of indent" do
-        it "still escapes = after 2-space-indented paragraph (block_construct? false, not INDENTED_CODE)" do
-          result = escaper.escape("  text\n=")
-          expect(result).to end_with("\n\\=")
-        end
+      it "does not escape = in the middle of a line" do
+        expect(escaper.escape("a === b")).to eq("a === b")
+      end
 
-        # Forces the space-skip loop to advance past exactly one space.
-        # Kills `first_non_space += 2` mutations: at n=1, content becomes
-        # "---" (block construct) vs "--" (paragraph) under the mutation.
-        it "does NOT escape = after 1-space-indented thematic break --- (space skip step=1)" do
-          result = escaper.escape(" ---\n=")
-          expect(result).to end_with("\n=")
-        end
+      it "does not escape = when a word follows on the same line" do
+        expect(escaper.escape("=== alone")).to eq("=== alone")
+      end
 
-        it "does NOT escape = after 2-space-indented thematic break" do
-          result = escaper.escape("  ---\n=")
-          expect(result).to end_with("\n=")
-        end
+      # A `-`-only line never needed a setext rule of its own: a single
+      # dash is a bullet list marker, two dashes are the ndash pair that
+      # `escape_inline` handles, and three or more are a thematic break.
+      # All three rules escape the line already.
+      it "escapes a single - line as a bullet marker" do
+        expect(escaper.escape("text\n-")).to eq("text\n\\-")
+      end
 
-        it "does NOT escape = after 3-space-indented thematic break" do
-          result = escaper.escape("   ---\n=")
-          expect(result).to end_with("\n=")
-        end
+      it "escapes a -- line as an ndash pair" do
+        expect(escaper.escape("text\n--")).to eq("text\n\\-\\-")
+      end
 
-        # Kills `first_non_space -= 1` mutation: the wrong direction leaves
-        # first_non_space negative, which makes line[-1..] the last character.
-        # "  # heading" should be detected as an indented ATX heading (block
-        # construct, not a paragraph) so the following = must stay bare.
-        # Under the mutation, content becomes "g" (not a block construct)
-        # ⇒ paragraph=true ⇒ = incorrectly escaped.
-        it "does NOT escape = after 2-space-indented ATX heading" do
-          result = escaper.escape("  # heading\n=")
-          expect(result).to end_with("\n=")
-        end
-
-        # Kills `content = if first_non_space == 0` mutations where the ternary
-        # always takes the else branch (line[first_non_space..]). When
-        # first_non_space is 0, this still returns `line` (identical slice),
-        # which is why the mutation survived — but slicing allocates a new
-        # string, so an identity check (same object) kills it.
-        it "does NOT allocate a new string for no-indent paragraphs (ternary optimization)" do
-          # First-line paragraph with no leading spaces. When first_non_space==0
-          # original code uses `line` directly (no slice). Mutation forces a
-          # slice even for first_non_space==0.
-          #
-          # We verify behavior (not allocation): the [ fast-path must fire
-          # on content that == line for first_non_space==0. That's already
-          # covered by "[link\n=" escaping = after bracket paragraph.
-          #
-          # Here we also exercise a no-indent paragraph so content == line.
-          result = escaper.escape("[link\n=")
-          expect(result).to end_with("\n\\=")
-        end
+      it "escapes a --- line as a thematic break" do
+        expect(escaper.escape("text\n---")).to eq("text\n\\-\\-\\-")
       end
     end
 
@@ -617,14 +528,6 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(escaper.escape(nil)).to eq("")
       end
 
-      # Kills the `escape_line(lines[0], false)` → `escape_line(lines[0], true)`
-      # mutation in escape_text. With prev_was_paragraph=true, a lone `=` is
-      # treated as a setext heading underline and gets escaped; original (false)
-      # leaves it bare because there's no previous paragraph.
-      it "treats first-line `=` as not-a-setext-underline (prev_was_paragraph=false)" do
-        expect(escaper.escape("=")).to eq("=")
-      end
-
       # Same identity trick for the hard-line-break guard. When the option
       # is on but the text has no "  \n" sequence, the gsub is skipped and
       # text stays the same object. Mutations that drop the include? guard
@@ -660,13 +563,13 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(escaper.escape("-foo")).to eq("-foo")
       end
 
-      # Kills `prev_was_paragraph && SETEXT_UNDERLINE_DASH.match?` mutations
-      # that reduce to just `prev_was_paragraph` (drop regex / `&& true`).
-      # Input: paragraph + "-foo" ⇒ prev_was_paragraph=true, but SETEXT
-      # regex fails (SETEXT_UNDERLINE_DASH matches dashes+whitespace only).
-      # Under the mutation the `-foo` line would be force-escaped as a
-      # thematic break (`\-foo`) instead of the bare `-foo` passthrough.
-      it "does not setext-escape a dash-prefixed paragraph line (regex must still apply)" do
+      # Kills mutations that drop the `THEMATIC_BREAK_DASH.match?` guard in
+      # escape_block_dash (`if true`, `if content`). `-foo` is neither a
+      # thematic break nor a bullet list, so it has to reach the inline
+      # path and come out as a bare `-foo`; under the mutation it would be
+      # escaped as `\-foo`. The multi-line input also covers the branch on
+      # a line that is not the first one.
+      it "does not thematic-escape a dash-prefixed line (regex must still apply)" do
         expect(escaper.escape("text\n-foo")).to eq("text\n-foo")
       end
 
@@ -674,12 +577,11 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(escaper.escape("*foo")).to eq("\\*foo")
       end
 
-      # Kills `prev_was_paragraph && SETEXT_UNDERLINE_EQUALS.match?` mutations
-      # (drop regex / `&& true` / `&& content`). Input: paragraph + "=foo"
-      # ⇒ prev_was_paragraph=true, regex fails. Under the mutation the
-      # `=foo` line would be force-escaped as a setext heading underline
-      # (`\=foo`). `=` is not in INLINE_SPECIAL so original output is bare.
-      it "does not setext-escape a =-prefixed paragraph line (regex must still apply)" do
+      # Kills mutations that drop the `SETEXT_UNDERLINE_EQUALS.match?` guard
+      # (`if true`, `if content`). `=foo` is not a setext underline, so it
+      # must stay bare — `=` is not in INLINE_SPECIAL either. Under the
+      # mutation the line would come out as `\=foo`.
+      it "does not setext-escape a =-prefixed line (regex must still apply)" do
         expect(escaper.escape("text\n=foo")).to eq("text\n=foo")
       end
     end
