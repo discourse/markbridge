@@ -7,6 +7,14 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       expect(context.parents).to eq([])
     end
 
+    it "is not after a line break by default" do
+      expect(described_class.new.after_line_break?).to be(false)
+    end
+
+    it "stores after_line_break: when given" do
+      expect(described_class.new(after_line_break: true).after_line_break?).to be(true)
+    end
+
     it "creates context with given parents" do
       bold = Markbridge::AST::Bold.new
       italic = Markbridge::AST::Italic.new
@@ -396,6 +404,31 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
     it "is true when constructed with html_mode: true" do
       context = described_class.new([], html_mode: true)
       expect(context.html_mode?).to be true
+    end
+  end
+
+  describe "#with_after_line_break" do
+    it "defaults to false" do
+      expect(described_class.new.after_line_break?).to be(false)
+    end
+
+    it "returns a context flagged as following a hard line break" do
+      context = described_class.new.with_after_line_break(true)
+      expect(context.after_line_break?).to be(true)
+    end
+
+    it "returns self when the flag is unchanged" do
+      context = described_class.new
+      expect(context.with_after_line_break(false)).to equal(context)
+    end
+
+    it "keeps the flag across with_parent and with_html_mode" do
+      bold = Markbridge::AST::Bold.new
+      context = described_class.new.with_after_line_break(true)
+
+      expect(context.with_parent(bold).after_line_break?).to be(true)
+      expect(context.with_parent(bold).parents).to eq([bold])
+      expect(context.with_html_mode(true).after_line_break?).to be(true)
     end
   end
 

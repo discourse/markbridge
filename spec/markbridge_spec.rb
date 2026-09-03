@@ -239,6 +239,18 @@ RSpec.describe Markbridge do
   end
 
   describe ".html_to_markdown" do
+    it "escapes a separator line after <br> so it does not cook as a setext heading" do
+      result = described_class.html_to_markdown("<p>Body:{}<br>========</p>")
+
+      expect(result.markdown).to eq("Body:{}\n\\=\\=\\=\\=\\=\\=\\=\\=")
+    end
+
+    it "keeps a separator line in its own paragraph unescaped" do
+      result = described_class.html_to_markdown("<p>Body:{}</p><p>========</p>")
+
+      expect(result.markdown).to eq("Body:{}\n\n========")
+    end
+
     it "normalizes the AST by default" do
       conversion = described_class.html_to_markdown("<b>hi</b>") { |ast| append_nested_link(ast) }
 

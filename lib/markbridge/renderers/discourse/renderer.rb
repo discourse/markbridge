@@ -92,8 +92,13 @@ module Markbridge
         # @return [String]
         def render_children(node, context:)
           result = +""
+          # The first child inherits the caller's line-break state (so text
+          # wrapped in inline markup right after a <br> still sees it); later
+          # children see it only when their previous sibling was a LineBreak.
+          child_context = context
           node.children.each do |child|
-            part = render(child, context:)
+            part = render(child, context: child_context)
+            child_context = context.with_after_line_break(child.is_a?(AST::LineBreak))
             next if part.empty?
 
             # Integer-byte check avoids allocating substrings for the
@@ -179,7 +184,11 @@ module Markbridge
           elsif context.html_mode?
             @html_escaper.escape(node.text)
           else
-            @escaper.escape(node.text, in_link_label: in_link_label?(context))
+            @escaper.escape(
+              node.text,
+              in_link_label: in_link_label?(context),
+              after_paragraph_line: context.after_line_break?,
+            )
           end
         end
 

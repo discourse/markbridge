@@ -26,8 +26,15 @@ module Markbridge
         # @param html_mode [Boolean] see {#html_mode?}
         # @param parent [RenderContext, nil] enclosing context (chain form)
         # @param element [AST::Element, nil] nearest parent element (chain form)
-        def initialize(parents = [], html_mode: false, parent: nil, element: nil)
+        def initialize(
+          parents = [],
+          html_mode: false,
+          parent: nil,
+          element: nil,
+          after_line_break: false
+        )
           @html_mode = html_mode
+          @after_line_break = after_line_break
           if element
             @parent_context = parent
             @element = element
@@ -63,19 +70,47 @@ module Markbridge
         # @param element [AST::Element]
         # @return [RenderContext]
         def with_parent(element)
-          self.class.new(html_mode: @html_mode, parent: self, element:)
+          self.class.new(
+            html_mode: @html_mode,
+            parent: self,
+            element:,
+            after_line_break: @after_line_break,
+          )
         end
 
         # Create new context with html_mode toggled.
         # @param value [Boolean]
         # @return [RenderContext]
         def with_html_mode(value)
-          self.class.new(html_mode: value, parent: @parent_context, element: @element)
+          self.class.new(
+            html_mode: value,
+            parent: @parent_context,
+            element: @element,
+            after_line_break: @after_line_break,
+          )
+        end
+
+        # Marks the node rendered under this context as the first thing after a
+        # hard line break, so a text escaper can treat its first line as
+        # continuing the paragraph above (setext underline protection).
+        def with_after_line_break(value)
+          return self if value == @after_line_break
+
+          self.class.new(
+            html_mode: @html_mode,
+            parent: @parent_context,
+            element: @element,
+            after_line_break: value,
+          )
         end
 
         # @return [Boolean]
         def html_mode?
           @html_mode
+        end
+
+        def after_line_break?
+          @after_line_break
         end
 
         # Find closest parent that is_a? klass (handles subclasses).

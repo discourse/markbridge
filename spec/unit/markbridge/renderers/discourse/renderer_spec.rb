@@ -23,7 +23,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       result = described_class.new(escaper:).render(Markbridge::AST::Text.new("hi"))
 
       expect(result).to eq("ESCAPED")
-      expect(escaper).to have_received(:escape).with("hi", in_link_label: false)
+      expect(escaper).to have_received(:escape).with(
+        "hi",
+        in_link_label: false,
+        after_paragraph_line: false,
+      )
     end
 
     it "falls back to TagLibrary.default when no tag_library is provided" do
@@ -302,6 +306,49 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       context = Markbridge::Renderers::Discourse::RenderContext.new
       result = renderer.render_children(document, context:)
       expect(result).to eq("")
+    end
+
+    it "escapes a setext underline that directly follows a hard line break" do
+      paragraph = Markbridge::AST::Paragraph.new
+      paragraph << Markbridge::AST::Text.new("Body:{}")
+      paragraph << Markbridge::AST::LineBreak.new
+      paragraph << Markbridge::AST::Text.new("========")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(paragraph, context:)).to eq(
+        "Body:{}\n\\=\\=\\=\\=\\=\\=\\=\\=",
+      )
+    end
+
+    it "escapes a short dash underline after a hard line break" do
+      paragraph = Markbridge::AST::Paragraph.new
+      paragraph << Markbridge::AST::Text.new("Heading")
+      paragraph << Markbridge::AST::LineBreak.new
+      paragraph << Markbridge::AST::Text.new("--")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(paragraph, context:)).to eq("Heading\n\\-\\-")
+    end
+
+    it "carries the line-break state into inline markup wrapping the next text" do
+      paragraph = Markbridge::AST::Paragraph.new
+      paragraph << Markbridge::AST::Text.new("Heading")
+      paragraph << Markbridge::AST::LineBreak.new
+      italic = Markbridge::AST::Italic.new
+      italic << Markbridge::AST::Text.new("===")
+      paragraph << italic
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(paragraph, context:)).to eq("Heading\n*\\=\\=\\=*")
+    end
+
+    it "leaves an equals line alone when nothing precedes it on the line" do
+      paragraph = Markbridge::AST::Paragraph.new
+      paragraph << Markbridge::AST::Text.new("Heading ")
+      paragraph << Markbridge::AST::Text.new("===")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(paragraph, context:)).to eq("Heading ===")
     end
 
     it "checks against the part's FIRST char when deciding boundary insertion" do

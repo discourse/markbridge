@@ -18,6 +18,10 @@ RSpec.describe Markbridge::Renderers::Discourse::IdentityEscaper do
       expect(escaper.escape(input)).to be(input)
     end
 
+    it "accepts and ignores after_paragraph_line (parity with MarkdownEscaper#escape)" do
+      expect(escaper.escape("===", after_paragraph_line: true)).to eq("===")
+    end
+
     it "returns an empty string for nil (parity with MarkdownEscaper#escape)" do
       expect(escaper.escape(nil)).to eq("")
     end

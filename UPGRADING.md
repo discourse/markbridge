@@ -1,5 +1,25 @@
 # Upgrading Markbridge
 
+## 0.4.1 — setext underlines after hard line breaks are escaped
+
+Text that directly follows a `LineBreak` (an HTML `<br>`) is now escaped
+as a continuation of the paragraph above it. A line consisting only of
+`=` or `-` there used to pass through unescaped and cooked as a setext
+heading underline, turning the whole preceding paragraph into an `<h1>`
+or `<h2>`:
+
+```ruby
+Markbridge.html_to_markdown("<p>Body:{}<br>========</p>").markdown
+# 0.4.0: "Body:{}\n========"                (renders as one big heading)
+# 0.4.1: "Body:{}\n\\=\\=\\=\\=\\=\\=\\=\\="  (renders as the literal separator)
+```
+
+`MarkdownEscaper#escape` gained an `after_paragraph_line:` keyword and
+the renderer always passes it; `IdentityEscaper#escape` accepts and
+ignores it. A custom escaper supplied via `Renderer.new(escaper:)` must
+accept the keyword (ignoring it is fine). `RenderContext` exposes the
+state as `after_line_break?` / `with_after_line_break(value)`.
+
 ## 0.4.0 — ancestry matching and forced code blocks
 
 ### AST subclasses inherit rules and tags from their base class

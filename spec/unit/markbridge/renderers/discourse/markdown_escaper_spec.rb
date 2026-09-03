@@ -4,6 +4,21 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
   subject(:escaper) { described_class.new }
 
   describe "#escape" do
+    describe "after_paragraph_line:" do
+      it "escapes a single-line setext underline when the caller reports a preceding paragraph line" do
+        expect(escaper.escape("===", after_paragraph_line: true)).to eq("\\=\\=\\=")
+      end
+
+      it "seeds the paragraph state for the first line of multi-line text" do
+        expect(escaper.escape("===\nText", after_paragraph_line: true)).to eq("\\=\\=\\=\nText")
+      end
+
+      it "defaults to no preceding paragraph line" do
+        expect(escaper.escape("===")).to eq("===")
+        expect(escaper.escape("===\nText")).to eq("===\nText")
+      end
+    end
+
     # Helper to verify escaped output renders as literal text
     # The escaper MAY over-escape (false positives allowed), but MUST escape
     # anything that would otherwise be interpreted as Markdown (no false negatives)

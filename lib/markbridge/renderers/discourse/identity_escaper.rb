@@ -25,7 +25,10 @@ module Markbridge
         #   broken link.
         # @return [String] +text+ with +]+ optionally escaped, or
         #   +""+ when +text+ is nil
-        def escape(text, in_link_label: false)
+        # Other {MarkdownEscaper#escape} options (such as
+        # +after_paragraph_line:+) are accepted and ignored: trusted Markdown
+        # is never escaped.
+        def escape(text, in_link_label: false, **)
           return "" if text.nil?
           return text.gsub("]", "\\]") if in_link_label && text.include?("]")
 

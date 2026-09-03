@@ -137,9 +137,14 @@ module Markbridge
         #   can be spliced into a Markdown link label `[text](url)` without
         #   terminating it early. The default leaves `]` alone because a bare
         #   `]` in prose is harmless (the matching `[` is already escaped).
+        # @param after_paragraph_line [Boolean] when true, treat the first line
+        #   of `text` as continuing a paragraph whose previous line was rendered
+        #   separately (the renderer sets this for text that directly follows a
+        #   hard line break). A line of `=` or `-` there would otherwise cook as
+        #   a setext heading underline for everything above it.
         # @return [String] the escaped text, or empty string if input is nil
         # @note Multi-line HTML tags and blocks are handled by escaping the opening <
-        def escape(text, in_link_label: false)
+        def escape(text, in_link_label: false, after_paragraph_line: false)
           return "" if text.nil?
 
           # Neutralize hard line breaks (trailing 2+ spaces before newline)
@@ -147,7 +152,7 @@ module Markbridge
 
           result =
             if MAYBE_SPECIAL.match?(text) || MAYBE_INDENTED_CODE.match?(text)
-              escape_text(text)
+              escape_text(text, after_paragraph_line)
             else
               text
             end
@@ -177,12 +182,12 @@ module Markbridge
           keys
         end
 
-        def escape_text(text)
+        def escape_text(text, after_paragraph_line = false)
           # Single-line fast path (the common case for inline text nodes):
           # skip the split and its Array + line-String allocations. A lone
           # `\r` without `\n` stays on the line either way — `/\r?\n/`
           # needs the `\n` — so `include?("\n")` alone decides correctly.
-          return escape_line(text, false) unless text.include?("\n")
+          return escape_line(text, after_paragraph_line) unless text.include?("\n")
 
           # On CRLF input, consume `\r` as part of the line terminator instead
           # of leaving it on the line. A trailing `\r` breaks line-end anchored
@@ -196,7 +201,7 @@ module Markbridge
           # Pre-allocate result buffer
           bytesize = text.bytesize
           result = String.new(capacity: bytesize + bytesize / 3, encoding: text.encoding)
-          prev_was_paragraph = false
+          prev_was_paragraph = after_paragraph_line
           first = true
 
           lines.each do |line|

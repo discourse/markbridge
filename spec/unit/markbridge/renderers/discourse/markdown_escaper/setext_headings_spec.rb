@@ -7,6 +7,26 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
     # NOTE: Discourse converts -- to &ndash;, so we must escape each dash
     # individually to prevent issues like \-&ndash;
 
+    context "when the caller reports a preceding paragraph line (after_paragraph_line: true)" do
+      it "escapes a bare = line" do
+        expect(escaper.escape("===", after_paragraph_line: true)).to eq("\\=\\=\\=")
+      end
+
+      it "escapes a bare - line with each dash escaped" do
+        expect(escaper.escape("--", after_paragraph_line: true)).to eq("\\-\\-")
+      end
+
+      it "seeds only the first line of multi-line text" do
+        expect(escaper.escape("===\nText\n===", after_paragraph_line: true)).to eq(
+          "\\=\\=\\=\nText\n\\=\\=\\=",
+        )
+      end
+
+      it "does not escape a bare = line by default" do
+        expect(escaper.escape("===")).to eq("===")
+      end
+    end
+
     context "when = or - line follows paragraph (MUST escape)" do
       it "escapes = underline after paragraph" do
         text = "Heading\n==="
