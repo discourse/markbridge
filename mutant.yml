@@ -115,7 +115,6 @@ matcher:
     # and surface as timeouts, never alive. All Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
-    - Markbridge::Renderers::Discourse::MarkdownEscaper#paragraph_line?
 
 # escape_block_* fallthrough `[content, false]` returns. The `false`
     # → drop-second / `true` mutations on the non-match branch are
@@ -401,20 +400,6 @@ mutation:
     - "send{receiver=send{receiver=self selector=class} selector=new}"
     - "index{receiver=lvar{value=new_cache}}"
 
-# MarkdownEscaper#block_construct?'s `when DIGIT_0..DIGIT_9` range.
-    # Mutations `when DIGIT_0..nil` / `when nil..DIGIT_9` extend the
-    # range to unbounded, but the body is `ORDERED_LIST.match?(content)`
-    # which only matches content starting with `\d+\.` — non-digit bytes
-    # like `:` or `<` land in this arm but produce `false` identically
-    # to the `else false` arm. Dropping `else false` also fine: case
-    # returns nil, `!block_construct?(content)` becomes `!nil == true`
-    # — same as `!false == true` for the `paragraph_line?` caller.
-    # Bucket A.
-    - "case{value=send{receiver=lvar{value=content} selector=getbyte}}"
-
-
-
-
 
 # String.new(capacity:, encoding:) calls are preallocation hints —
     # capacity is a tuning knob with no observable effect on output, and
@@ -464,15 +449,15 @@ mutation:
     - "lvasgn{name=has_indent}"
     - "if{condition=lvar{value=has_indent}}"
 
-    # Nested `line.getbyte(i).<selector>` guards in escape_line and
-    # paragraph_line? (`.nil?` / `!=`). Mutations on selector equality
-    # variants and drop-guard are equivalent because getbyte returns
-    # nil past the end and Integer equality is the same for Fixnum.
+    # Nested `line.getbyte(i).<selector>` guards in escape_line
+    # (`.nil?` / `!=`). Mutations on selector equality variants and
+    # drop-guard are equivalent because getbyte returns nil past the
+    # end and Integer equality is the same for Fixnum.
     - "if{condition=send{receiver=send{receiver=lvar{value=line} selector=getbyte} selector=(nil?,!=)}}"
 
     # Allocation-saving ternary `content = <cond> ? line[N..] : line`
-    # in escape_line and paragraph_line?. Output bytes identical; only
-    # object identity differs, which is an internal contract.
+    # in escape_line. Output bytes identical; only object identity
+    # differs, which is an internal contract.
     - "lvasgn{name=content value=if}"
 
     # escape_block_level's `case first_byte` dispatch. Mutations on
@@ -480,8 +465,7 @@ mutation:
     # branch unreachable. The fallthrough `[content, false]` + inline
     # escaping produces byte-identical output for STAR/UNDERSCORE/
     # BACKTICK/TILDE/BRACKET_OPEN/PIPE inputs because inline escape
-    # wraps the same characters. block_construct?'s different value
-    # shape (`case content.getbyte(0)`) is unaffected.
+    # wraps the same characters.
     - "case{value=lvar{value=first_byte}}"
 
     # escape_regular_char's `if byte < 128` ASCII fast-path. ASCII

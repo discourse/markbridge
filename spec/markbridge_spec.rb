@@ -297,6 +297,15 @@ RSpec.describe Markbridge do
 
       expect(result.markdown).to eq("**hi** extra")
     end
+
+    # The `=` line lands in its own text fragment after the <br>, so the
+    # escaper cannot see the paragraph line in front of it. Without the
+    # escape, Discourse cooks the two lines as an <h1>.
+    it "escapes a =-only line that follows a line break" do
+      result = described_class.html_to_markdown("<p>Body:{}<br>========</p>")
+
+      expect(result.markdown).to eq("Body:{}\n\\=\\=\\=\\=\\=\\=\\=\\=")
+    end
   end
 
   describe ".parse_text_formatter_xml" do
