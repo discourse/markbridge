@@ -926,12 +926,17 @@ class AlignHandler < SimpleHandler
 end
 
 class AlignTag < Tag
+  # Trim blank lines at the edges only; strip would also eat the indent
+  # that keeps a nested list item at its level
+  BLANK_EDGES = /\A(?:[ \t]*\n)+|(?:\n[ \t]*)+\z/
+
   def render(element, interface)
     child_context = interface.with_parent(element)
     content = interface.render_children(element, context: child_context)
 
-    # Discourse uses <div> for alignment
-    "\n\n<div align=\"#{element.alignment}\">#{content}</div>\n\n"
+    # Discourse uses <div> for alignment; the blank lines inside let
+    # CommonMark parse the content as Markdown
+    "\n\n<div align=\"#{element.alignment}\">\n\n#{content.gsub(BLANK_EDGES, "")}\n\n</div>\n\n"
   end
 end
 
