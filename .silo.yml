@@ -8,7 +8,7 @@ image: fedora/44
 # toolchain setup we used to copy-paste here.
 use:
   ruby:
-    versions: [3.3, 3.4, "4.0", jruby]
+    versions: [3.3, 3.4, "4.0", jruby, truffleruby]
     default: "4.0"
 
 setup:
@@ -20,7 +20,7 @@ sync:
 
 update:
   - sudo dnf update -y
-  - rv selfupdate
+  - rv self update
 
 ports:
   - 4567:4567
