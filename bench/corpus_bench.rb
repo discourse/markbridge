@@ -9,6 +9,8 @@
 #
 #   bundle exec ruby --yjit bench/corpus_bench.rb [variant ...]
 #
+# Prefix it with bin/bench-env for repeatable CPU conditions.
+#
 # Reports best-of-N µs/post per corpus (ASCII and multibyte). Compare
 # ascii vs multi within a variant to spot character-index pathologies.
 

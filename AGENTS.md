@@ -206,6 +206,12 @@ automatically when mutation work comes up.
 
 ## Performance Notes
 
+**Run every benchmark through `bin/bench-env`** (e.g. `bin/bench-env
+bundle exec ruby --yjit bench/bench.rb --isolated`). It pins the process
+to the fastest cores and reports power and governor state. Results from
+a laptop on battery, or from an efficiency core, don't compare with
+the numbers in `docs/benchmarks.md`.
+
 **MarkdownEscaper** is a hot path. Benchmark before/after any change to
 `lib/markbridge/renderers/discourse/markdown_escaper.rb` with the
 isolated escape reports (`bundle exec ruby --yjit bench/bench.rb
