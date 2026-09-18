@@ -29,11 +29,25 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(tag.render(element, interface)).to eq("````a`b```c``d````")
     end
 
-    it "pads content that starts with a backtick" do
+    it "pads content that is nothing but backticks" do
       element = Markbridge::AST::Code.new
       element << Markbridge::AST::Text.new("``")
 
       expect(tag.render(element, interface)).to eq("``` `` ```")
+    end
+
+    it "pads content that starts with a backtick" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("`a")
+
+      expect(tag.render(element, interface)).to eq("`` `a ``")
+    end
+
+    it "does not pad content with a space at the end only" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("a ")
+
+      expect(tag.render(element, interface)).to eq("`a `")
     end
 
     it "pads content that ends with a backtick" do

@@ -550,6 +550,103 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.render_children(document, context:)).to eq("**a**~~b~~")
     end
 
+    # Renders two verbatim parts side by side and tells whether the
+    # renderer put the boundary comment between them.
+    def boundary_between?(before, part)
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new(before)
+      document << Markbridge::AST::MarkdownText.new(part)
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+
+      renderer.render_children(document, context:).include?("<!---->")
+    end
+
+    # Bytes at both ends of every range the word-character check uses,
+    # with the byte next to each end. 0x80 is the first non-ASCII byte.
+    {
+      "/" => false,
+      "0" => true,
+      "9" => true,
+      ":" => false,
+      "@" => false,
+      "A" => true,
+      "Z" => true,
+      "[" => false,
+      "`" => false,
+      "a" => true,
+      "z" => true,
+      "{" => false,
+      "\x7F" => false,
+      "\u0080" => true,
+      "\u00E4" => true,
+    }.each do |char, word|
+      it "treats the byte #{char.bytes.last} in front of emphasis as #{word ? "a word" : "no word"} character" do
+        expect(boundary_between?(char, "*\\#*")).to be(word)
+      end
+    end
+
+    # The same for the punctuation check, on the byte after the run.
+    # The `*` probe uses a tilde run, so the star does not join the run.
+    {
+      " " => false,
+      "!" => true,
+      "*" => true,
+      "/" => true,
+      "0" => false,
+      "9" => false,
+      ":" => true,
+      "@" => true,
+      "A" => false,
+      "Z" => false,
+      "[" => true,
+      "`" => true,
+      "a" => false,
+      "z" => false,
+      "{" => true,
+      "~" => true,
+      "\x7F" => false,
+    }.each do |char, punctuation|
+      it "treats the byte #{char.bytes.last} after the run as #{punctuation ? "punctuation" : "no punctuation"}" do
+        run = char == "*" ? "~~" : "*"
+
+        expect(boundary_between?("a", "#{run}#{char}x#{run}")).to be(punctuation)
+      end
+    end
+
+    it "puts no boundary when the part is nothing but a delimiter run" do
+      expect(boundary_between?("a", "**")).to be(false)
+    end
+
+    it "puts no boundary when the run reaches the start of the buffer" do
+      expect(boundary_between?("**", "b")).to be(false)
+    end
+
+    it "looks past the whole run for the byte after it" do
+      expect(boundary_between?("a", "***(x)***")).to be(true)
+    end
+
+    it "looks past the whole run for the byte before it" do
+      expect(boundary_between?("(x)***", "tail")).to be(true)
+    end
+
+    it "does not take the last byte of the part for the byte after the run" do
+      expect(boundary_between?("a", "*(x) tail")).to be(true)
+    end
+
+    it "separates two lists whose classes are subclasses of List" do
+      list_class = Class.new(Markbridge::AST::List)
+      document = Markbridge::AST::Document.new
+      [list_class.new(ordered: false), list_class.new(ordered: false)].each do |list|
+        item = Markbridge::AST::ListItem.new
+        item << Markbridge::AST::Text.new("x")
+        list << item
+        document << list
+      end
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to include("<!---->")
+    end
+
     it "puts a boundary between a word and an underscore run whatever follows the run" do
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::Text.new("item")

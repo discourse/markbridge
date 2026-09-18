@@ -57,6 +57,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
         expect(postprocessor.call(text)).to eq(text)
       end
 
+      it "cleans the text after an indented fence that closes" do
+        expect(postprocessor.call("- item\n\n  ```\n  a\n  ```\n\n\n\n  b")).to eq(
+          "- item\n\n  ```\n  a\n  ```\n\n  b",
+        )
+      end
+
+      it "closes a fence whose closing run has trailing spaces" do
+        expect(postprocessor.call("```\na\n```  \n\n\n\nb")).to eq("```\na\n```  \n\nb")
+      end
+
+      it "keeps a tilde fence open when its info string has a backtick" do
+        text = "~~~ x`y\na\n\n\n\nb\n~~~"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
       it "recognizes a tilde fence" do
         text = "~~~\na\n\n\n\nb\n~~~"
         expect(postprocessor.call(text)).to eq(text)
