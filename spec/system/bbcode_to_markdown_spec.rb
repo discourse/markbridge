@@ -463,6 +463,14 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq("![](https://example.com/photo.jpg)")
     end
 
+    it "converts image with alternative text" do
+      result =
+        Markbridge.bbcode_to_markdown(
+          "[img alt=\"a cat\" width=100]https://example.com/photo.jpg[/img]",
+        )
+      expect(result.markdown).to eq("![a cat|100](https://example.com/photo.jpg)")
+    end
+
     it "converts image with dimensions" do
       result = Markbridge.bbcode_to_markdown("[img=100x200]https://example.com/photo.jpg[/img]")
       expect(result.markdown).to eq("![|100x200](https://example.com/photo.jpg)")

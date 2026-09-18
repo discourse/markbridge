@@ -136,7 +136,6 @@ module CommonMarkRoundTrip
   BOLD_IS_STRONG = "<b> and <strong> share one AST node, the renderer always writes **"
   ASCII_LANGUAGE_ONLY = "the HTML parser takes only an ASCII token as the language of a code block"
 
-  IMAGE_ALT_LOST = "the alt text of an image is dropped, ImageTag writes ![](src)"
   LINK_DESTINATION_PARENTHESES =
     "an unbalanced parenthesis in a link destination is neither escaped nor wrapped in <>"
   BANG_BEFORE_LINK = "a ! in front of a link is not escaped, so the link cooks as an image"
@@ -169,29 +168,6 @@ module CommonMarkRoundTrip
   # Examples that fail because of a defect. Fixing one must remove its entry.
   KNOWN_BUGS =
     by_example(
-      IMAGE_ALT_LOST => [
-        517,
-        520,
-        531,
-        572,
-        573,
-        574,
-        575,
-        576,
-        577,
-        578,
-        579,
-        580,
-        582,
-        583,
-        584,
-        585,
-        586,
-        587,
-        588,
-        589,
-        591,
-      ],
       LINK_DESTINATION_PARENTHESES => [492, 498, 499, 500],
       BANG_BEFORE_LINK => [593],
       MERGED_LISTS => [301, 302, 308],
