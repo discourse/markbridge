@@ -135,15 +135,23 @@ module Markbridge
         # between them CommonMark reads the second list as more items of
         # the first, and the blank line makes the whole list loose.
         LIST_BOUNDARY = "\n\n<!---->\n\n"
+        # Delimiters that open and close only where CommonMark's flanking
+        # rules allow it: emphasis (* _) and strikethrough (~).
+        FLANKING_DELIMITER_BYTES = Set[42, 95, 126].freeze
         BACKSLASH = 92
         BANG = 33
         BRACKET_OPEN = 91
+        UNDERSCORE = 95
+        TILDE = 126
         private_constant :EMPHASIS_BOUNDARY,
                          :EMPHASIS_DELIMITER_BYTES,
                          :LIST_BOUNDARY,
+                         :FLANKING_DELIMITER_BYTES,
                          :BACKSLASH,
                          :BANG,
-                         :BRACKET_OPEN
+                         :BRACKET_OPEN,
+                         :UNDERSCORE,
+                         :TILDE
 
         # Adjusts the end of +result+ where the next +part+ would change
         # how the two sides are read together. +previous+ is the child
@@ -166,7 +174,77 @@ module Markbridge
             # A `!` right in front of a link makes it an image. The escaper
             # leaves a lone `!` alone because it cannot see the next node.
             result.insert(-2, "\\")
+          elsif blocked_opening?(last_byte, part, first_byte) ||
+                blocked_closing?(result, last_byte, first_byte)
+            result << EMPHASIS_BOUNDARY
           end
+        end
+
+        # A delimiter run at the start of +part+ cannot open when a word
+        # character stands in front of it and punctuation follows it
+        # (CommonMark 6.2, left-flanking). `item*\#*` stays literal text.
+        # A `_` run never opens after a word character. The comment
+        # between them is punctuation, so the run can open again.
+        def blocked_opening?(last_byte, part, first_byte)
+          unless blocking_neighbour?(last_byte) && FLANKING_DELIMITER_BYTES.include?(first_byte)
+            return false
+          end
+
+          first_byte == UNDERSCORE || punctuation_byte?(byte_after_run(part, first_byte))
+        end
+
+        # The mirror image at the end of +result+: a run preceded by
+        # punctuation cannot close when a word character follows it, and
+        # a `_` run never closes in front of a word character.
+        def blocked_closing?(result, last_byte, first_byte)
+          unless FLANKING_DELIMITER_BYTES.include?(last_byte) && blocking_neighbour?(first_byte)
+            return false
+          end
+
+          last_byte == UNDERSCORE || punctuation_byte?(byte_before_run(result, last_byte))
+        end
+
+        # A word character, or a tilde. CommonMark counts `~` as punctuation,
+        # but cmark-gfm (commonmarker) does not treat it as one next to an
+        # emphasis delimiter, so strikethrough right next to emphasis with a
+        # punctuation edge needs the boundary as well. markdown-it would not
+        # need it; the comment changes nothing there.
+        def blocking_neighbour?(byte)
+          byte == TILDE || word_byte?(byte)
+        end
+
+        # The first byte after the run of +byte+ that starts +part+.
+        def byte_after_run(part, byte)
+          index = 0
+          index += 1 while part.getbyte(index) == byte
+          part.getbyte(index)
+        end
+
+        # The byte in front of the run of +byte+ that ends +result+, nil
+        # when the run reaches the start of the buffer.
+        def byte_before_run(result, byte)
+          index = -1
+          index -= 1 while result.getbyte(index) == byte
+          result.getbyte(index)
+        end
+
+        # ASCII letters and digits. Every non-ASCII byte counts as a word
+        # character too: a few Unicode punctuation marks are then handled
+        # like letters, which costs a comment that changes nothing.
+        def word_byte?(byte)
+          return false if byte.nil?
+
+          byte >= 128 || byte.between?(48, 57) || byte.between?(65, 90) || byte.between?(97, 122)
+        end
+
+        # ASCII punctuation as CommonMark defines it. A backslash belongs to
+        # it, which is what makes an escaped character at the edge of an
+        # emphasis count as punctuation.
+        def punctuation_byte?(byte)
+          return false if byte.nil?
+
+          byte.between?(33, 47) || byte.between?(58, 64) || byte.between?(91, 96) ||
+            byte.between?(123, 126)
         end
 
         def interface_for(context)
