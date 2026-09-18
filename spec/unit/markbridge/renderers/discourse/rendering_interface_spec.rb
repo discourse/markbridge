@@ -131,6 +131,52 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
+  describe "#previous_sibling and #next_sibling" do
+    let(:first) { Markbridge::AST::Text.new("a") }
+    let(:middle) { Markbridge::AST::Bold.new }
+    let(:last) { Markbridge::AST::Text.new("b") }
+    let(:parent) do
+      paragraph = Markbridge::AST::Paragraph.new
+      paragraph << first << middle << last
+    end
+    let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([parent]) }
+
+    it "returns the neighbours among the children of the parent on the chain" do
+      expect(interface.previous_sibling(middle)).to be(first)
+      expect(interface.next_sibling(middle)).to be(last)
+    end
+
+    it "returns nil at the edges" do
+      expect(interface.previous_sibling(first)).to be_nil
+      expect(interface.next_sibling(last)).to be_nil
+    end
+
+    it "returns nil when the element is not a child of the parent" do
+      stranger = Markbridge::AST::Text.new("x")
+
+      expect(interface.previous_sibling(stranger)).to be_nil
+      expect(interface.next_sibling(stranger)).to be_nil
+    end
+
+    it "finds the element by identity, not by equality" do
+      # Two Text nodes with the same content compare equal. Only the
+      # second one has the Bold in front of it.
+      twin = Markbridge::AST::Text.new("a")
+      parent << Markbridge::AST::Italic.new << twin
+
+      expect(interface.previous_sibling(twin)).to be(parent.children[-2])
+      expect(interface.previous_sibling(first)).to be_nil
+    end
+
+    it "returns nil when the context has no parent" do
+      root_interface =
+        described_class.new(renderer, Markbridge::Renderers::Discourse::RenderContext.new)
+
+      expect(root_interface.previous_sibling(middle)).to be_nil
+      expect(root_interface.next_sibling(middle)).to be_nil
+    end
+  end
+
   describe "#html_mode?" do
     it "delegates to context" do
       context = instance_double(Markbridge::Renderers::Discourse::RenderContext, html_mode?: true)

@@ -34,7 +34,7 @@ module Markbridge
               # that render to nothing (e.g. an empty formatting child)
               # or to whitespace only, which wrap_inline would leave
               # unlinked.
-              href
+              bare_url(element, href, interface)
             else
               interface.wrap_inline(text, "[", "](#{markdown_destination(href)})")
             end
@@ -45,6 +45,25 @@ module Markbridge
           # Unicode-aware, matching the guard in RenderingInterface#wrap_inline.
           def blank?(text)
             !text.match?(/[^[:space:]]/)
+          end
+
+          # A bare URL is linked by the Markdown parser on its own only when
+          # whitespace (or the start of the line) stands in front of it and
+          # nothing sticks to its end. Glued to text it is written as a
+          # Markdown link with the URL as its text, which links everywhere,
+          # also for a relative href. It cannot onebox in that position
+          # anyway, that needs a URL alone on its line.
+          def bare_url(element, href, interface)
+            glued =
+              glued?(interface.previous_sibling(element), /\S\z/) ||
+                glued?(interface.next_sibling(element), /\A\S/)
+            glued ? "[#{href}](#{markdown_destination(href)})" : href
+          end
+
+          # Whether the neighbouring +node+ is text with something other
+          # than whitespace at the edge next to the URL.
+          def glued?(node, edge)
+            node.instance_of?(AST::Text) && node.text.match?(edge)
           end
 
           # CommonMark link destinations cannot contain whitespace unless

@@ -78,6 +78,8 @@ Tags receive `(element, interface)` where interface provides:
   (lets a custom tag intercept only the nodes it cares about)
 - `with_parent(element)` - immutable context chaining
 - `find_parent(klass)`, `count_parents(klass)`, `has_parent?(klass)`
+- `previous_sibling(element)`, `next_sibling(element)` - the neighbours
+  among the children of the parent on the chain
 - `wrap_inline(content, markers)`
 
 ## Module Structure

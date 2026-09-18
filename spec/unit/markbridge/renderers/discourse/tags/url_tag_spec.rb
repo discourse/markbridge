@@ -239,6 +239,80 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
         )
       end
 
+      context "when text stands right next to the URL" do
+        # Renders a bare URL with the given neighbours inside a paragraph,
+        # so the tag can see its siblings.
+        def render_between(before, after)
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new(before) if before
+          url = Markbridge::AST::Url.new(href: "https://example.com")
+          url << Markbridge::AST::Text.new("https://example.com")
+          paragraph << url
+          paragraph << after if after
+
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          tag.render(
+            url,
+            Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context),
+          )
+        end
+
+        it "writes a link with the URL as text when a word ends right in front of the URL" do
+          expect(render_between("see", nil)).to eq("[https://example.com](https://example.com)")
+        end
+
+        it "writes a link with the URL as text when text starts right after the URL" do
+          expect(render_between(nil, Markbridge::AST::Text.new("now"))).to eq(
+            "[https://example.com](https://example.com)",
+          )
+        end
+
+        it "escapes the destination of a glued bare URL like any other" do
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new("see")
+          url = Markbridge::AST::Url.new(href: "Main (Page)")
+          url << Markbridge::AST::Text.new("Main (Page)")
+          paragraph << url
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq("[Main (Page)](<Main \\(Page\\)>)")
+        end
+
+        it "links a relative href glued to text the same way" do
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new("see")
+          url = Markbridge::AST::Url.new(href: "/t/5")
+          url << Markbridge::AST::Text.new("/t/5")
+          paragraph << url
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq("[/t/5](/t/5)")
+        end
+
+        it "keeps the plain href when whitespace stands in front of the URL" do
+          expect(render_between("see ", nil)).to eq("https://example.com")
+        end
+
+        it "keeps the plain href when whitespace follows the URL" do
+          expect(render_between(nil, Markbridge::AST::Text.new(" now"))).to eq(
+            "https://example.com",
+          )
+        end
+
+        it "keeps the plain href when the URL has no neighbours" do
+          expect(render_between(nil, nil)).to eq("https://example.com")
+        end
+
+        it "keeps the plain href when the neighbour is not a text node" do
+          bold = Markbridge::AST::Bold.new
+          bold << Markbridge::AST::Text.new("x")
+
+          expect(render_between(nil, bold)).to eq("https://example.com")
+        end
+      end
+
       it "keeps the <a> form for text-less links in html_mode" do
         html_context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
         html_interface =
