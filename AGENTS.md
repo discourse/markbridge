@@ -204,6 +204,28 @@ expect(token).to match_tag_end("b")
 - Keep tests independent (random order execution)
 - Use `expect`, never `should`
 
+**Round-trip checks against a CommonMark parser** (MRI only, they need
+commonmarker):
+- `spec/integration/markbridge/commonmark_roundtrip_spec.rb` takes the
+  expected HTML of every CommonMark spec example, converts it with the
+  HTML parser and the renderer, cooks the Markdown with commonmarker and
+  compares the result with the HTML it started from. An example that
+  does not round-trip is listed in `INTENDED_DIFFERENCES` or
+  `KNOWN_BUGS` with a reason. The spec fails when a listed example
+  starts to pass, so a bug fix removes its entry in the same commit.
+- `spec/integration/markbridge/renderers/discourse/structure_roundtrip_spec.rb`
+  builds nested documents with `AstGenerator` (`spec/support/`) from a
+  seed, renders and cooks them, and compares the structure of the cooked
+  DOM with the AST. 300 seeds by default; `STRUCTURE_SEEDS=3000
+  bundle exec rspec <file>` runs more. A failure prints the seed, the
+  AST, the Markdown and the HTML. A construct the generator leaves out
+  because of an open bug is marked with a comment that names the bug;
+  the fix removes the exclusion.
+- When a test is about structure (nesting, blank lines, indentation),
+  assert on the cooked HTML (`spec/support/cooked_output.rb`), not on
+  the exact Markdown string. A Markdown expectation written from the
+  current output also fixes the current bug in place.
+
 ## Mutation Testing
 
 The full playbook — wrapper usage, killing/simplifying/ignoring alive
