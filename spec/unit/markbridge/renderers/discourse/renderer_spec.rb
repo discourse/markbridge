@@ -151,6 +151,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.render(email)).to eq("[\\[A\\]](mailto:user@example.com)")
     end
 
+    it "escapes ] in Text content when an ancestor is Image (the alt text is a link label)" do
+      image = Markbridge::AST::Image.new(src: "x.png")
+      text = Markbridge::AST::Text.new("[A]")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([image])
+
+      expect(renderer.render(text, context:)).to eq("\\[A\\]")
+    end
+
     it "does not escape ] in Text content when no link ancestor is present" do
       text = Markbridge::AST::Text.new("plain ] text")
 
