@@ -17,6 +17,7 @@ module Markbridge
                 src: attrs[:src],
                 width: attrs[:width]&.to_i,
                 height: attrs[:height]&.to_i,
+                alt: attrs[:alt],
               )
             parent << node
 

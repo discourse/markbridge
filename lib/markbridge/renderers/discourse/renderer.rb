@@ -203,11 +203,14 @@ module Markbridge
         end
 
         # `]` is structural inside a Markdown link label, so any plain text
-        # rendered under an Url/Email ancestor must escape it. Tags that emit
-        # their own bracketed markup (ImageTag, UploadTag, etc.) skip this
-        # path entirely, so their structural brackets are preserved.
+        # rendered under an Url/Email ancestor must escape it. The alt text
+        # of an image is a link label too (ImageTag renders it as a Text
+        # node under the Image). Tags that emit their own bracketed markup
+        # (ImageTag, UploadTag, etc.) skip this path entirely, so their
+        # structural brackets are preserved.
         def in_link_label?(context)
-          context.has_parent?(AST::Url) || context.has_parent?(AST::Email)
+          context.has_parent?(AST::Url) || context.has_parent?(AST::Email) ||
+            context.has_parent?(AST::Image)
         end
       end
     end

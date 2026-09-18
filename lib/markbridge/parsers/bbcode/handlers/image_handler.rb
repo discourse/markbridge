@@ -10,6 +10,7 @@ module Markbridge
         # - [img=100x100]url[/img]
         # - [img width=100]url[/img]
         # - [img width=100 height=50]url[/img]
+        # - [img alt="a cat"]url[/img]
         class ImageHandler < RawHandler
           def initialize
             super(AST::Image)
@@ -19,7 +20,7 @@ module Markbridge
 
           def create_element(token:, content:)
             width, height = extract_dimensions(token)
-            AST::Image.new(src: content, width:, height:)
+            AST::Image.new(src: content, width:, height:, alt: token.attrs[:alt])
           end
 
           OPTION_DIMENSIONS_PATTERN = /\A(?<width>\d+)(?:x(?<height>\d+))?\z/i
