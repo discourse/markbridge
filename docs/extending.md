@@ -478,7 +478,9 @@ true — inside a CommonMark HTML block (for example the table HTML
 fallback), raw Markdown output would show up as literal text. A tag
 has two valid forms there: a raw HTML fragment, or its normal Markdown
 wrapped in `\n\n…\n\n` (a Markdown island; the blank lines let
-CommonMark parse the inner content).
+CommonMark parse the inner content). `HtmlBlock.island` builds that
+wrap, and `HtmlBlock.safe?` is the check behind the shared example
+below.
 
 Markbridge ships this check as a shared RSpec example. Require it from
 your spec setup and give it your tag and a sample element:
@@ -930,8 +932,12 @@ class AlignTag < Tag
     child_context = interface.with_parent(element)
     content = interface.render_children(element, context: child_context)
 
-    # Discourse uses <div> for alignment
-    "\n\n<div align=\"#{element.alignment}\">#{content}</div>\n\n"
+    # Discourse uses <div> for alignment. A <div> starts a CommonMark
+    # HTML block, so the content only gets parsed as Markdown when it
+    # is wrapped as an island (HtmlBlock.island puts the blank lines
+    # around it and folds the ones the content already has).
+    island = Markbridge::Renderers::Discourse::HtmlBlock.island(content)
+    "\n\n<div align=\"#{element.alignment}\">#{island}</div>\n\n"
   end
 end
 

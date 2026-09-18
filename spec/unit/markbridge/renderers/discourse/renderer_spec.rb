@@ -409,6 +409,56 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("aa")
     end
 
+    it "yields the buffer and the child before appending the child's output" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("a")
+      document << Markbridge::AST::MarkdownText.new("b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      seen = []
+      result =
+        renderer.render_children(document, context:) { |buffer, child| seen << [buffer.dup, child] }
+
+      expect(seen).to eq([["", document.children[0]], ["a", document.children[1]]])
+      expect(result).to eq("ab")
+    end
+
+    it "appends what the block wrote to the buffer" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("a")
+      document << Markbridge::AST::MarkdownText.new("b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      result = renderer.render_children(document, context:) { |buffer, _child| buffer << "|" }
+
+      expect(result).to eq("|a|b")
+    end
+
+    it "does not yield for a child that renders to an empty string" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("")
+      document << Markbridge::AST::MarkdownText.new("b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      seen = []
+      renderer.render_children(document, context:) { |_buffer, child| seen << child }
+
+      expect(seen).to eq([document.children[1]])
+    end
+
+    it "applies the boundary rule to the last byte the block wrote" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("ab")
+      italic = Markbridge::AST::Italic.new
+      italic << Markbridge::AST::Text.new("x")
+      document << italic
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      result = renderer.render_children(document, context:) { |buffer, _child| buffer << "*" }
+
+      expect(result).to eq("*ab*<!---->*x*")
+    end
+
     it "does not insert a boundary when delimiters differ" do
       document = Markbridge::AST::Document.new
       bold = Markbridge::AST::Bold.new
