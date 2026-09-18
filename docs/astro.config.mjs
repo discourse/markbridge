@@ -16,9 +16,6 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Markbridge',
-      components: {
-        Banner: './src/components/DocsBanner.astro',
-      },
       description:
         'Convert BBCode, HTML, MediaWiki, and s9e TextFormatter XML to Markdown in Ruby. Inspect the AST and customize your output.',
       logo: {
@@ -28,10 +25,6 @@ export default defineConfig({
       },
       favicon: '/favicon.svg',
       head: [
-        {
-          tag: 'meta',
-          attrs: { name: 'robots', content: 'noindex' },
-        },
         {
           tag: 'link',
           attrs: { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico', sizes: '32x32' },
