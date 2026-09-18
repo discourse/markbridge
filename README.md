@@ -54,7 +54,7 @@ Build a renderer once with `Markbridge.discourse_renderer(...)` and pass it via 
 
 ## Development
 
-This repository is set up to run inside [silo](https://github.com/gschlager/silo), a lightweight dev-environment tool. The `.silo.yml` file provisions a Fedora container with JRuby and multiple CRuby versions (via [rv](https://rv.dev)), installs dependencies, and starts the playground daemon. If you prefer your own setup, `bin/setup` and `bundle install` are all you need.
+This repository is set up to run inside [silo](https://github.com/gschlager/silo), a development environment tool. The `.silo.yml` file provisions a Fedora container with CRuby, JRuby, TruffleRuby, Node.js, and pnpm. It installs dependencies and starts the playground on port 4567 and the docs site on port 4321. For a Ruby setup outside Silo, use `bin/setup` and `bundle install`. See [docs/README.md](docs/README.md) to run the documentation site.
 
 ## Playground
 

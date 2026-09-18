@@ -1,4 +1,3 @@
+# Allow crawlers to read the noindex meta tag on each page.
 User-agent: *
 Allow: /
-
-Sitemap: https://markbridge.dev/sitemap-index.xml

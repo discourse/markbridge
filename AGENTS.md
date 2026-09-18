@@ -155,7 +155,7 @@ check ships as a shared RSpec example (`require "markbridge/rspec"`,
 then `it_behaves_like "an html_mode safe tag"`), so consumer projects
 can run it against their own tags.
 
-**See `examples/` for complete examples.**
+**See `docs/src/content/docs/customization/extending.md` for complete examples.**
 
 ## Development Workflow
 
@@ -304,12 +304,12 @@ refactors when behavior is equivalent.
 - **docs/src/content/docs/concepts/renderers.md**: Discourse renderer guide
 - **docs/src/content/docs/customization/extending.md**: How to add custom tags and handlers
 - **docs/src/content/docs/concepts/performance.md**: Performance optimization guide
-- **examples/**: Runnable code examples
+- **spec/docs/**: Checks for runnable documentation examples and AST coverage
 - **spec/**: Executable documentation (tests show expected behavior)
 
 ---
 
-**Maintenance**: This file should be updated when core architecture changes. Details that change frequently (file counts, specific line numbers, step-by-step tutorials) are intentionally excluded. Point to examples/ and spec/ for those.
+**Maintenance**: This file should be updated when core architecture changes. Details that change frequently (file counts, specific line numbers, step-by-step tutorials) are intentionally excluded. Point to the docs site and spec/ for those.
 
 **Last Updated**: 2025-11-26
 **Version**: 0.1.0
