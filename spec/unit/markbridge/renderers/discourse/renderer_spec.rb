@@ -389,6 +389,40 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("**x**<!---->**y**")
     end
 
+    it "escapes a ! at the end of the buffer when the next part starts with [" do
+      # Otherwise `![foo](/url)` cooks as an image.
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("Look!")
+      link = Markbridge::AST::Url.new(href: "/url")
+      link << Markbridge::AST::Text.new("foo")
+      document << link
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("Look\\![foo](/url)")
+    end
+
+    it "leaves a ! that is already escaped alone" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("Look\\!")
+      link = Markbridge::AST::Url.new(href: "/url")
+      link << Markbridge::AST::Text.new("foo")
+      document << link
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("Look\\![foo](/url)")
+    end
+
+    it "leaves a ! alone when the next part does not start with [" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("Look!")
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("x")
+      document << bold
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("Look!**x**")
+    end
+
     it "inserts a boundary between adjacent code spans so backtick runs don't merge" do
       # "`a``b`" would parse as ONE code span containing a``b, not two.
       document = Markbridge::AST::Document.new

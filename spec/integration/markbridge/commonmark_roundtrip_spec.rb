@@ -136,7 +136,6 @@ module CommonMarkRoundTrip
   BOLD_IS_STRONG = "<b> and <strong> share one AST node, the renderer always writes **"
   ASCII_LANGUAGE_ONLY = "the HTML parser takes only an ASCII token as the language of a code block"
 
-  BANG_BEFORE_LINK = "a ! in front of a link is not escaped, so the link cooks as an image"
   MERGED_LISTS = "two adjacent lists of the same kind merge into one loose list"
   BARE_URL_AFTER_WORD =
     "a link whose text is its href renders as the bare URL, which is not linked again " \
@@ -159,12 +158,7 @@ module CommonMarkRoundTrip
     )
 
   # Examples that fail because of a defect. Fixing one must remove its entry.
-  KNOWN_BUGS =
-    by_example(
-      BANG_BEFORE_LINK => [593],
-      MERGED_LISTS => [301, 302, 308],
-      BARE_URL_AFTER_WORD => [480, 481],
-    )
+  KNOWN_BUGS = by_example(MERGED_LISTS => [301, 302, 308], BARE_URL_AFTER_WORD => [480, 481])
 
   module_function
 
