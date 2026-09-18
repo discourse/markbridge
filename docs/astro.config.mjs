@@ -40,7 +40,6 @@ export default defineConfig({
         }),
       ],
       components: {
-        Banner: './src/components/DocsBanner.astro',
         Footer: './src/components/DocsFooter.astro',
       },
       description:
@@ -60,10 +59,6 @@ export default defineConfig({
         {
           tag: 'link',
           attrs: { rel: 'describedby', type: 'text/plain', href: '/llms.txt' },
-        },
-        {
-          tag: 'meta',
-          attrs: { name: 'robots', content: 'noindex' },
         },
         {
           tag: 'link',
