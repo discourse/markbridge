@@ -25,13 +25,8 @@ class AstGenerator
   # Tokens the escaper has to neutralize. They are placed in nested
   # positions on purpose: inside a list item or a quote they end up at the
   # start of a line, where CommonMark reads them as block markers.
-  #
-  # A bare "1." is left out. MarkdownEscaper escapes an ordered-list
-  # marker only when a space or a tab follows it, so a line that is just
-  # "1." cooks to an empty <ol><li></li></ol>. "- " and "# " at the end of
-  # a line are escaped, only the ordered marker is not. The token with
-  # text after it stays in, it covers the line-start case.
   TRICKY_TOKENS = [
+    "1.",
     "*",
     "_",
     "#",

@@ -67,9 +67,10 @@ module Markbridge
         # Block-level patterns
         ATX_HEADING = /\A\#{1,6}(?=[ \t]|$)/
         BLOCK_QUOTE = /\A>/
-        # List markers followed by space, tab, or end of line
+        # List markers followed by space, tab, or end of line. A marker
+        # alone on a line is an empty list item.
         BULLET_LIST = /\A[-+*](?=[ \t]|$)/
-        ORDERED_LIST = /\A(\d+)([.)])(?=[ \t])/
+        ORDERED_LIST = /\A(\d+)([.)])(?=[ \t]|$)/
         THEMATIC_BREAK_DASH = /\A(?:-[ \t]*){3,}$/
         THEMATIC_BREAK_STAR = /\A(?:\*[ \t]*){3,}$/
         THEMATIC_BREAK_UNDERSCORE = /\A(?:_[ \t]*){3,}$/
