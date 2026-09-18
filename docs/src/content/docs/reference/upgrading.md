@@ -14,6 +14,7 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - Parentheses in a link destination are escaped: `[text](https://example.com/a\(b\))`.
 - A run of `#` at the end of a heading gets a backslash, so it stays visible: `### foo \###`.
 - A horizontal rule inside a list item is written as `* * *`. As `---` it ended the list when it was the first thing in the item.
+- A `!` directly in front of a link gets a backslash, so `Look![here](url)` does not cook as an image.
 
 ## Upgrading to 0.4.2
 

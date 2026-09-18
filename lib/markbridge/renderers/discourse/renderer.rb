@@ -112,16 +112,7 @@ module Markbridge
             next if part.empty?
 
             yield(result, child) if block_given?
-
-            # Integer-byte check avoids allocating substrings for the
-            # per-child adjacency probe. EMPHASIS_DELIMITER_BYTES.include?
-            # over a 4-element Set is O(1). On an empty buffer getbyte
-            # returns nil, which matches no byte of a non-empty part, so
-            # the first child needs no extra guard.
-            if (last_byte = result.getbyte(-1)) == part.getbyte(0) &&
-                 EMPHASIS_DELIMITER_BYTES.include?(last_byte)
-              result << EMPHASIS_BOUNDARY
-            end
+            join(result, part)
             result << part
           end
           result
@@ -138,7 +129,31 @@ module Markbridge
         # Bytes where adjacent runs merge into a single longer run during
         # Markdown parsing: emphasis (* _), strikethrough (~), code spans (`).
         EMPHASIS_DELIMITER_BYTES = Set[42, 95, 126, 96].freeze
-        private_constant :EMPHASIS_BOUNDARY, :EMPHASIS_DELIMITER_BYTES
+        BACKSLASH = 92
+        BANG = 33
+        BRACKET_OPEN = 91
+        private_constant :EMPHASIS_BOUNDARY,
+                         :EMPHASIS_DELIMITER_BYTES,
+                         :BACKSLASH,
+                         :BANG,
+                         :BRACKET_OPEN
+
+        # Adjusts the end of +result+ where the next +part+ would change
+        # how the characters on both sides are read. Works on bytes, so
+        # the check per child allocates nothing. On an empty buffer
+        # getbyte returns nil, which matches no byte of a non-empty part.
+        def join(result, part)
+          last_byte = result.getbyte(-1)
+          first_byte = part.getbyte(0)
+
+          if last_byte == first_byte && EMPHASIS_DELIMITER_BYTES.include?(last_byte)
+            result << EMPHASIS_BOUNDARY
+          elsif last_byte == BANG && first_byte == BRACKET_OPEN && result.getbyte(-2) != BACKSLASH
+            # A `!` right in front of a link makes it an image. The escaper
+            # leaves a lone `!` alone because it cannot see the next node.
+            result.insert(-2, "\\")
+          end
+        end
 
         def interface_for(context)
           @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)
