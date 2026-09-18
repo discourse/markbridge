@@ -16,3 +16,15 @@ If Markdown edits stop appearing in development, run `pnpm astro dev stop` and r
 The site shows a work-in-progress notice and includes a `noindex` robots meta tag on every page. Keep crawling allowed in `public/robots.txt` so search engines can read that tag. When the docs are ready for indexing, remove the robots meta entry and the `Banner` override from `astro.config.mjs`, delete `src/components/DocsBanner.astro`, and restore the sitemap URL in `public/robots.txt`.
 
 Run `bundle exec rspec spec/docs` from the repository root to check AST coverage and Ruby examples. Every `ruby` code block runs in a separate process. Use a `spec:before` comment for setup or `spec:continue` to include earlier examples. Use `rb` for API signatures and examples of removed APIs that cannot run.
+
+## Text exports
+
+The site generates Markdown text with `starlight-llms-txt`. Start with `/llms.txt` for links to the full documentation, a shorter collection, and topic files under `/_llms-txt/`. The footer links to the index and the current page's topic. A topic can contain several pages; it is not necessarily a copy of the current page alone.
+
+`src/data/text-exports.mjs` defines the topics and their page paths. A topic's label determines its generated filename, so keep its `slug` in sync when renaming it. `pnpm build` checks these links and verifies that Ruby examples, tag tables, and landing-page card links survive conversion. Run `pnpm check:text` to repeat those checks on an existing build.
+
+The source version comes from `lib/markbridge/version.rb` and appears in the text files and page footer. It identifies the repository version; the docs may include changes that are not released yet. Version-file changes also trigger the docs workflow.
+
+Exports remove hidden test comments, heading helper links, and duplicate dark-theme diagrams. Notes, warnings, code indentation, and normal paragraph spacing are retained. The shorter collection omits the changelog, upgrade history, and benchmark results; those remain in the full export and their topic files.
+
+Plain-text exports do not contain the HTML pages' `noindex` metadata. Coordinate their publication with the indexing follow-up in [PR #89](https://github.com/discourse/markbridge/pull/89).

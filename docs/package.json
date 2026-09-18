@@ -6,15 +6,17 @@
   "scripts": {
     "dev": "node ./scripts/generate-changelog.mjs && astro dev --host",
     "start": "node ./scripts/generate-changelog.mjs && astro dev --host",
-    "build": "node ./scripts/generate-changelog.mjs && astro build",
+    "build": "node ./scripts/generate-changelog.mjs && astro build && node ./scripts/check-text-exports.mjs",
     "preview": "astro preview",
     "changelog": "node ./scripts/generate-changelog.mjs",
-    "astro": "astro"
+    "astro": "astro",
+    "check:text": "node ./scripts/check-text-exports.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.1",
     "astro": "^7.3.3",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.4",
+    "starlight-llms-txt": "^0.12.0"
   },
   "engines": {
     "node": ">=22.12.0"
