@@ -448,24 +448,27 @@ AST::List.new(ordered: true, children: [...])
 
 **Location:** `Markbridge::Renderers::Discourse::Tags::ListItemTag`
 
-**Renders:** `AST::ListItem` → List item with proper indentation
+**Renders:** `AST::ListItem` → List item with its content indented
 
 **Features:**
-- Calculates nesting depth via `count_parents(AST::List)`
-- Indents by 2 spaces per ancestor list
-- Adds trailing newline
-- Handles nested content
+- Puts the marker in front of the first line
+- Moves every other line of the content right by the width of the
+  marker (2 columns for `- `, 3 for `1. `)
+- An item never indents itself, so the indentation of a nested item is
+  relative to the item that holds it, whatever the nesting depth is
+- Attaches a nested list directly to the content in front of it, so
+  the list stays tight — unless that content ends with a line that
+  opens an HTML block, where the blank line has to stay
+- Adds a trailing newline
 
 **Example:**
 ```ruby
 # Top-level item
 AST::ListItem.new([AST::Text.new("Item")])
-# Context: count_parents(List) = 1
 # => "- Item\n"
 
-# Nested item (inside another list)
-# Context: count_parents(List) = 2
-# => "  - Nested\n"
+# Nested item: the same output, the outer item adds the indentation
+# => "- Nested\n" → "  - Nested\n" once the outer item indents it
 ```
 
 **Builder pattern (November 2025):**
@@ -542,7 +545,7 @@ Complete mapping of AST nodes to Discourse Markdown:
 | `AST::Code` (block) | ` ```lang\ncode\n``` ` | N/A | Contains newlines or has `block: true` |
 | `AST::List` (unordered) | `- item` | N/A | Bullet list |
 | `AST::List` (ordered) | `1. item` | N/A | Numbered list |
-| `AST::ListItem` | Indented item | N/A | 2 spaces per nesting level |
+| `AST::ListItem` | Indented item | N/A | Continuation lines use the marker width (2 columns for `- `, 3 for `1. `) |
 | `AST::Url` | `[text](href)` | Plain text | Only safe protocols |
 | `AST::LineBreak` | `\n` | N/A | Single newline |
 | `AST::HorizontalRule` | `\n\n---\n\n` | N/A | Surrounded by blank lines |
@@ -577,15 +580,16 @@ end
 def render(element, interface)
   # Count nesting levels
   depth = interface.count_parents(AST::List)
-  indent = "  " * depth
 
-  "#{indent}- Item content"
+  "#{"  " * depth}Item content"
 end
 ```
 
 **Used by:**
-- ListItemTag for indentation
 - Custom tags that need nesting awareness
+
+`ListItemTag` does not use it: it indents the content of one item
+relative to that item's own marker, so it needs no depth at all.
 
 ### Block vs Inline Context
 

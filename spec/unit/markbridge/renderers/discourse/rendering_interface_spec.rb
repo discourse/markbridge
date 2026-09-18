@@ -71,6 +71,28 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
 
       expect(renderer).to have_received(:render_children).with(element, context: other_context)
     end
+
+    it "passes an optional block on to the renderer" do
+      element = Markbridge::AST::Bold.new
+      element << Markbridge::AST::MarkdownText.new("a")
+      element << Markbridge::AST::MarkdownText.new("b")
+
+      seen = []
+      result = interface.render_children(element) { |buffer, child| seen << [buffer.dup, child] }
+
+      expect(seen).to eq([["", element.children[0]], ["a", element.children[1]]])
+      expect(result).to eq("ab")
+    end
+
+    it "keeps what the block wrote to the buffer" do
+      element = Markbridge::AST::Bold.new
+      element << Markbridge::AST::MarkdownText.new("a")
+      element << Markbridge::AST::MarkdownText.new("b")
+
+      result = interface.render_children(element) { |buffer, _child| buffer << "|" }
+
+      expect(result).to eq("|a|b")
+    end
   end
 
   describe "context delegation" do

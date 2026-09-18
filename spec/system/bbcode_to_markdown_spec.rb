@@ -131,6 +131,72 @@ RSpec.describe "BBCode to Markdown Conversion" do
       end
     end
 
+    describe "nested list indentation" do
+      it "indents a continuation line to the content column of its own item" do
+        result = Markbridge.bbcode_to_markdown("[list][*]a[list][*]b[br]more[/list][/list]")
+
+        expect(result.markdown).to eq("- a\n  - b\n    more")
+      end
+
+      it "keeps the continuation line at the content column three levels down" do
+        result =
+          Markbridge.bbcode_to_markdown(
+            "[list][*]a[list][*]b[list][*]c[br]more[/list][/list][/list]",
+          )
+
+        expect(result.markdown).to eq("- a\n  - b\n    - c\n      more")
+      end
+
+      it "gives an ordered item three spaces of continuation indentation" do
+        result = Markbridge.bbcode_to_markdown("[list=1][*]a[br]more[/list]")
+
+        expect(result.markdown).to eq("1. a\n   more")
+      end
+
+      it "indents a quote inside a nested item as one unit" do
+        result =
+          Markbridge.bbcode_to_markdown("[list][*]a[list][*]b[quote]q1\nq2[/quote][/list][/list]")
+
+        expect(result.markdown).to eq("- a\n  - b\n\n    > q1\n    > q2")
+      end
+
+      it "keeps a code block inside its item when ordered and unordered lists alternate" do
+        result =
+          Markbridge.bbcode_to_markdown(
+            "[list=1][*]a[list][*]b[list=1][*]c[code]x\ny[/code][/list][/list][/list]",
+          )
+
+        expect(result.markdown).to eq(
+          "1. a\n   - b\n     1. c\n\n        ```\n        x\n        y\n        ```",
+        )
+      end
+
+      it "keeps the boundary comment between two emphasis siblings in a list item" do
+        result = Markbridge.bbcode_to_markdown("[list][*][b]a[/b][i]b[/i][/list]")
+
+        expect(result.markdown).to eq("- **a**<!---->*b*")
+      end
+
+      it "drops a blank line the source put in front of a nested list" do
+        result = Markbridge.bbcode_to_markdown("[list][*]parent\n\n[list][*]a[/list][/list]")
+
+        expect(result.markdown).to eq("- parent\n  - a")
+      end
+
+      it "keeps the blank line after an HTML table in front of a nested list" do
+        result =
+          Markbridge.bbcode_to_markdown(
+            "[list][*]item[table][tr][td]a[/td][/tr][tr][td]b[/td][td]c[/td][/tr][/table]" \
+              "[list][*]x[/list][/list]",
+          )
+
+        expect(result.markdown).to eq(
+          "- item\n\n  <table>\n  <tr><td>a</td></tr>\n  <tr><td>b</td><td>c</td></tr>\n" \
+            "  </table>\n\n  - x",
+        )
+      end
+    end
+
     describe "lists with formatted content" do
       it "preserves formatting within list items" do
         bbcode = <<~BBCODE
@@ -153,6 +219,45 @@ RSpec.describe "BBCode to Markdown Conversion" do
         expect(result.markdown).to eq(expected)
       end
 
+      it "keeps content after a nested code block inside its list item" do
+        result =
+          Markbridge.bbcode_to_markdown(
+            "[list][*]outer[list][*][code]  x[/code][/list]after[/list]",
+          )
+
+        expect(result.markdown).to eq("- outer\n  - ```\n      x\n    ```\n  after")
+      end
+
+      it "preserves indentation when code is the item's only content" do
+        result = Markbridge.bbcode_to_markdown("[list][*][code]  x[/code][/list]")
+
+        expect(result.markdown).to eq("- ```\n    x\n  ```")
+      end
+
+      # CodeTag switches to a tilde wrapper because the code has backticks.
+      it "preserves indentation in code that contains a backtick fence" do
+        result =
+          Markbridge.bbcode_to_markdown("[list][*]parent[code]```ruby\n  x\n```[/code][/list]")
+
+        expect(result.markdown).to eq("- parent\n\n  ~~~\n  ```ruby\n    x\n  ```\n  ~~~")
+      end
+
+      it "preserves indentation inside code nested in a list item" do
+        result =
+          Markbridge.bbcode_to_markdown("[list][*]parent[code]def f\n  return 1\nend[/code][/list]")
+
+        expect(result.markdown).to eq("- parent\n\n  ```\n  def f\n    return 1\n  end\n  ```")
+      end
+
+      it "keeps a code fence at its item's content column when deeply nested" do
+        result =
+          Markbridge.bbcode_to_markdown(
+            "[list][*]a[list][*]b[list][*]c[code]x[/code][/list][/list][/list]",
+          )
+
+        expect(result.markdown).to eq("- a\n  - b\n    - c\n\n      ```\n      x\n      ```")
+      end
+
       it "handles complex nested content in lists" do
         bbcode = <<~BBCODE
           [list]
@@ -167,7 +272,7 @@ RSpec.describe "BBCode to Markdown Conversion" do
         # the line before it keeps its trailing space from the source.
         expected =
           "- Item with **bold** and *italic*\n" \
-            "  - Nested with \n\n      ```\n      code\n      ```"
+            "  - Nested with \n\n    ```\n    code\n    ```"
 
         result = Markbridge.bbcode_to_markdown(bbcode)
         expect(result.markdown).to eq(expected)
@@ -482,22 +587,87 @@ RSpec.describe "BBCode to Markdown Conversion" do
   describe "alignment" do
     it "converts center alignment" do
       result = Markbridge.bbcode_to_markdown("[center]centered text[/center]")
-      expect(result.markdown).to eq('<div align="center">centered text</div>')
+      expect(result.markdown).to eq(%(<div align="center">\n\ncentered text\n\n</div>))
     end
 
     it "converts right alignment" do
       result = Markbridge.bbcode_to_markdown("[right]right-aligned[/right]")
-      expect(result.markdown).to eq('<div align="right">right-aligned</div>')
+      expect(result.markdown).to eq(%(<div align="right">\n\nright-aligned\n\n</div>))
+    end
+
+    it "parses a link inside an aligned block as Markdown" do
+      result =
+        Markbridge.bbcode_to_markdown("[center][url=https://example.com]a link[/url][/center]")
+      expect(result.markdown).to eq(
+        %(<div align="center">\n\n[a link](https://example.com)\n\n</div>),
+      )
+    end
+
+    it "keeps one blank line per side around content that brackets itself" do
+      result = Markbridge.bbcode_to_markdown("[center][list][*]a[*]b[/list][/center]")
+      expect(result.markdown).to eq(%(<div align="center">\n\n- a\n- b\n\n</div>))
+    end
+
+    it "keeps a nested list's items indented and its island boundary intact" do
+      result =
+        Markbridge.bbcode_to_markdown(
+          "[list][*]parent[center][list][*]a[*]b[/list][/center][/list]",
+        )
+      expect(result.markdown).to eq(
+        %(- parent\n\n  <div align="center">\n\n  - a\n  - b\n\n  </div>),
+      )
+    end
+
+    it "keeps that shape when the source supplies its own blank lines" do
+      result =
+        Markbridge.bbcode_to_markdown(
+          "[list][*]parent[center]\n\n[list][*]a[*]b[/list][/center][/list]",
+        )
+      expect(result.markdown).to eq(
+        %(- parent\n\n  <div align="center">\n\n  - a\n  - b\n\n  </div>),
+      )
+    end
+
+    it "parses a link inside an aligned block nested in a list item" do
+      result =
+        Markbridge.bbcode_to_markdown(
+          "[list][*]parent[center][url=https://example.com]a link[/url][/center][/list]",
+        )
+      expect(result.markdown).to eq(
+        %(- parent\n\n  <div align="center">\n\n  [a link](https://example.com)\n\n  </div>),
+      )
+    end
+
+    it "keeps the closing div aligned with its list at two levels of nesting" do
+      result =
+        Markbridge.bbcode_to_markdown(
+          "[list][*]outer[list][*]parent[center][list][*]a[*]b[/list][/center]" \
+            "[list][*]c[/list][/list][/list]",
+        )
+      expect(result.markdown).to eq(
+        "- outer\n  - parent\n\n    <div align=\"center\">\n\n    - a\n    - b\n\n" \
+          "    </div>\n\n    - c",
+      )
     end
 
     it "separates two consecutive aligned blocks with a blank line" do
       result = Markbridge.bbcode_to_markdown("[left]a[/left][right]b[/right]")
-      expect(result.markdown).to eq(%(<div align="left">a</div>\n\n<div align="right">b</div>))
+      expect(result.markdown).to eq(
+        %(<div align="left">\n\na\n\n</div>\n\n<div align="right">\n\nb\n\n</div>),
+      )
     end
 
     it "separates an aligned block from trailing text with a blank line" do
       result = Markbridge.bbcode_to_markdown("[center]a[/center]after")
-      expect(result.markdown).to eq(%(<div align="center">a</div>\n\nafter))
+      expect(result.markdown).to eq(%(<div align="center">\n\na\n\n</div>\n\nafter))
+    end
+
+    it "keeps the aligned div tight inside an HTML table" do
+      result =
+        Markbridge.bbcode_to_markdown(
+          "[table][tr][td][center][b]c[/b][/center][/td][/tr][tr][td]x[/td][td]y[/td][/tr][/table]",
+        )
+      expect(result.markdown).to include(%(<td><div align="center"><strong>c</strong></div></td>))
     end
   end
 

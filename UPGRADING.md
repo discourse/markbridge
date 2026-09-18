@@ -1,5 +1,94 @@
 # Upgrading Markbridge
 
+## 0.4.2 — aligned blocks and nested list indentation
+
+### Aligned blocks are Markdown islands
+
+`[center]…[/center]` and friends render a `<div align="…">`. A line
+that starts with `<div` opens a CommonMark HTML block, and inside such
+a block nothing is parsed as Markdown until the next blank line. Every
+link, every bit of bold, every image inside an aligned block therefore
+reached the reader as literal text. The content now sits between blank
+lines:
+
+```ruby
+Markbridge.bbcode_to_markdown("[center][url=https://example.com]a link[/url][/center]").markdown
+# 0.4.1: %(<div align="center">[a link](https://example.com)</div>)
+#        → cooks to the source text of the link
+# 0.4.2: %(<div align="center">\n\n[a link](https://example.com)\n\n</div>)
+#        → cooks to an <a>
+```
+
+The blank lines make CommonMark wrap the content in a `<p>`, so an
+aligned block picks up a paragraph margin. Inside the HTML fallback of
+a table the tight form stays, because a blank line would end the
+surrounding block.
+
+### Nested list items are indented relative to their parent item
+
+A list item used to compute its indentation from the number of
+ancestor lists, and the item that held it indented every continuation
+line once more on top of that. The two mechanisms added up, so
+continuation lines drifted two columns per level, and a code fence
+three levels deep ended up far enough right that CommonMark read it as
+an indented code block — the fence characters showed up as text.
+
+An item no longer indents itself. It renders its content at column
+zero, and the item that holds it moves the whole content right by the
+width of its own marker:
+
+```ruby
+Markbridge.bbcode_to_markdown("[list][*]a[list][*]b[br]more[/list][/list]").markdown
+# 0.4.1: "- a\n  - b\n      more"
+# 0.4.2: "- a\n  - b\n    more"
+```
+
+Continuation lines under an ordered marker now get 3 spaces instead of
+2, which is the content column CommonMark expects for `1. `. If you
+assert on exact Markdown anywhere, those expectations need updating.
+
+### `HtmlBlockSafety` is now `HtmlBlock`
+
+Everything about CommonMark HTML blocks lives in one module. `safe?`
+is unchanged, two methods came along:
+
+```ruby
+HtmlBlock = Markbridge::Renderers::Discourse::HtmlBlock
+HtmlBlock.safe?(output)   # as before
+HtmlBlock.opens?("</div>") # => true, the line starts an HTML block
+HtmlBlock.island("- a")    # => "\n\n- a\n\n"
+```
+
+Rename the constant if you referenced `HtmlBlockSafety` directly. The
+shared RSpec example ("an html_mode safe tag") is unchanged.
+
+### `ListItemBuilder#build` lost its `indent:` keyword
+
+```ruby
+builder.build(content, marker: "- ", indent: "  ") # 0.4.1
+builder.build(content, marker: "- ")               # 0.4.2
+```
+
+The builder no longer looks at the content to decide anything. It puts
+the marker in front of the first line and moves every other non-empty
+line right by the width of the marker. Blank lines stay empty.
+
+### `render_children` takes an optional block
+
+`Renderer#render_children` and `RenderingInterface#render_children`
+now yield the buffer built so far and the child about to be appended,
+right before appending. A tag can adjust the buffer at that join point
+without iterating the children itself, which would lose the
+emphasis-boundary rule:
+
+```ruby
+interface.render_children(element, context:) do |buffer, child|
+  buffer.rstrip! if child.is_a?(Markbridge::AST::List)
+end
+```
+
+Calls without a block behave as before.
+
 ## 0.4.1 — setext underlines are always escaped
 
 A text line that contains only `=` is now always escaped. Before, the
