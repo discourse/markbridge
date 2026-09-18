@@ -3,6 +3,17 @@ usage: opensource
 integration:
   name: rspec
 
+# Pick a subject's tests from the per-test coverage recording simplecov
+# writes to `coverage/coverage.json`, instead of from example-group names.
+# Name-based selection misses a killing example that sits under a
+# different describe block, which reported mutations alive that the suite
+# actually kills. Requires `COVERAGE=1 bundle exec rspec` before mutant;
+# CI does that in the step before. `context_map` rather than `auto` so a
+# missing recording is an error instead of a silent fall back to the
+# name-based selection, which gives different results.
+selection:
+  strategy: context_map
+
 requires:
   - markbridge/all
 

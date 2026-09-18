@@ -30,6 +30,10 @@ jobs:
           ruby-version: '4.0'
           bundler-cache: true
 
+      # mutant.yml selects a subject's tests from this recording.
+      - name: Record per-test coverage
+        run: COVERAGE=1 bundle exec rspec
+
       - name: Run mutant
         run: bin/mutant run
 

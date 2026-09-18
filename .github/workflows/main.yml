@@ -77,6 +77,10 @@ jobs:
           ruby-version: '4.0'
           bundler-cache: true
 
+      # mutant.yml selects a subject's tests from this recording.
+      - name: Record per-test coverage
+        run: COVERAGE=1 bundle exec rspec
+
       # On PR: mutate subjects changed since main.
       # On push to main: mutate subjects changed by this push.
       - name: Run mutant

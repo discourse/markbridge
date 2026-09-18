@@ -5,6 +5,10 @@ if ENV["COVERAGE"]
   SimpleCov.start do
     command_name "RSpec"
     add_filter "/spec/"
+    # Records which example covered which line. Mutant reads this from
+    # `coverage/coverage.json` and selects a subject's tests by the lines
+    # they actually executed, instead of by example-group name.
+    track_tests
   end
 end
 

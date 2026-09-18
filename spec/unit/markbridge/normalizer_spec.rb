@@ -148,6 +148,23 @@ RSpec.describe Markbridge::Normalizer do
     end
   end
 
+  describe "#freeze" do
+    # `#rule` adds to the rule set, it does not assign an ivar on the
+    # normalizer. Freezing the normalizer alone would therefore still
+    # let a rule through; the rule set has to be frozen as well.
+    it "freezes the rule set, so no rule can be added afterwards" do
+      normalizer.freeze
+
+      expect {
+        normalizer.rule(
+          parent: Markbridge::AST::Url,
+          child: Markbridge::AST::Image,
+          strategy: :drop,
+        )
+      }.to raise_error(FrozenError)
+    end
+  end
+
   describe "#rule" do
     it "is chainable" do
       expect(
