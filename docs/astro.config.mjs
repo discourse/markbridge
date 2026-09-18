@@ -1,6 +1,9 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightLlmsTxt from 'starlight-llms-txt';
+import { docsVersion, versionNote } from './scripts/docs-version.mjs';
+import { textExports } from './src/data/text-exports.mjs';
 
 export default defineConfig({
   site: 'https://markbridge.dev',
@@ -16,8 +19,26 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Markbridge',
+      plugins: [
+        starlightLlmsTxt({
+          projectName: `Markbridge ${docsVersion}`,
+          details: `${versionNote} The shipped renderer produces Discourse-flavored Markdown. The parsers and AST are renderer-agnostic.`,
+          promote: ['getting-started', 'introduction', 'format-guides/**', 'customization/**'],
+          demote: ['changelog', 'reference/upgrading', 'concepts/benchmarks'],
+          exclude: ['changelog', 'reference/upgrading', 'concepts/benchmarks'],
+          customSelectors: { all: ['.sl-anchor-link', '.diagram-dark'] },
+          // Subsets also use these options. Keep their examples, notes, and spacing.
+          minify: { note: false, tip: false, details: false, whitespace: false },
+          customSets: textExports.map(({ label, paths }) => ({
+            label,
+            paths,
+            description: versionNote,
+          })),
+        }),
+      ],
       components: {
         Banner: './src/components/DocsBanner.astro',
+        Footer: './src/components/DocsFooter.astro',
       },
       description:
         'Convert BBCode, HTML, MediaWiki, and s9e TextFormatter XML to Markdown in Ruby. Inspect the AST and customize your output.',
@@ -27,7 +48,16 @@ export default defineConfig({
         replacesTitle: false,
       },
       favicon: '/favicon.svg',
+      routeMiddleware: './src/text-export-links.ts',
       head: [
+        {
+          tag: 'meta',
+          attrs: { name: 'markbridge-version', content: docsVersion },
+        },
+        {
+          tag: 'link',
+          attrs: { rel: 'describedby', type: 'text/plain', href: '/llms.txt' },
+        },
         {
           tag: 'meta',
           attrs: { name: 'robots', content: 'noindex' },
