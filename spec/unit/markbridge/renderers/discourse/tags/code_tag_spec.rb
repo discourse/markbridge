@@ -15,6 +15,58 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to eq("`code`")
     end
 
+    it "uses a longer delimiter when the content contains a backtick" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("a`b")
+
+      expect(tag.render(element, interface)).to eq("``a`b``")
+    end
+
+    it "sizes the delimiter by the longest backtick run in the content" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("a`b```c``d")
+
+      expect(tag.render(element, interface)).to eq("````a`b```c``d````")
+    end
+
+    it "pads content that starts with a backtick" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("``")
+
+      expect(tag.render(element, interface)).to eq("``` `` ```")
+    end
+
+    it "pads content that ends with a backtick" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("a`")
+
+      expect(tag.render(element, interface)).to eq("`` a` ``")
+    end
+
+    it "pads content that starts and ends with a space" do
+      # CommonMark strips one space from each end of a span that has
+      # both, so the padding keeps the content's own spaces.
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new(" a ")
+
+      expect(tag.render(element, interface)).to eq("`  a  `")
+    end
+
+    it "does not pad content with a space on one side only" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new(" a")
+
+      expect(tag.render(element, interface)).to eq("` a`")
+    end
+
+    it "does not pad content that is only spaces" do
+      # A span of spaces only is not stripped by CommonMark.
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("  ")
+
+      expect(tag.render(element, interface)).to eq("`  `")
+    end
+
     it "renders an empty element to nothing" do
       element = Markbridge::AST::Code.new(language: "ruby")
 
