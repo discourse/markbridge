@@ -25,7 +25,7 @@ matcher:
     - "Markbridge*"
   ignore:
 
-# Central-dispatcher methods. The surviving mutations here are all
+# Central-dispatcher method. The surviving mutations here are all
     # flow-control permutations (`if X && Y && Z` → variants that OR
     # across branches, `if X` → `if true/false/nil`, `next` drops,
     # etc.) where the observable output is identical because a
@@ -34,7 +34,6 @@ matcher:
     # unlikely to surface in the public API. The behaviour pinned by
     # the 49 mediawiki specs covers every reachable state transition.
     - Markbridge::Parsers::MediaWiki::InlineParser#parse_html_tag
-    - Markbridge::Parsers::MediaWiki::InlineParser#dispatch_html_tag
 
     # parse_tag_at_cursor: mutations on the `attrs = closing ||
     # tag_name.nil? ? {} : scan_attributes` ternary. The `closing ||`
@@ -173,16 +172,6 @@ matcher:
     # without changing observable output. Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_text
 
-    # Reordering#handle_close's `current_handler == closing_handler`
-    # fast-path. `Base#handle_close` (reached via `super`) performs
-    # the SAME check and pops identically, so every mutation that
-    # skips or mis-routes the fast-path produces behaviorally
-    # identical output via super. The fast-path exists purely to
-    # avoid the cost of `try_reorder` + `try_reopen` reconciliation
-    # walks on the hot path (~4x speedup on well-formed input).
-    # Not observable through the public parser API. Bucket A.
-    - Markbridge::Parsers::BBCode::ClosingStrategies::Reordering#handle_close
-
     # Renderer#render's `@interface_cache` housekeeping (root_call
     # detection + ensure-block cache reset). The cache memoizes
     # RenderingInterface instances by context.object_id for the
@@ -221,16 +210,6 @@ matcher:
     # calling the helper on a non-apostrophe position, which no public
     # input can produce.
     - Markbridge::Parsers::MediaWiki::InlineParser#consecutive_apostrophes_at
-
-    # MediaWiki Parser#initialize's block_given? conditional and the
-    # InlineTagRegistry kwarg plumbing. Mutations on `if block_given?`
-    # (`if true` / `if false`) and on the `inline_tag_registry ||`
-    # fallback are equivalent when the parser is always invoked with
-    # the default registry (as by the public API). The block form is
-    # a convenience constructor tested by parser_spec but the
-    # inline_tag_registry kwarg vs block_given? routing has no
-    # observable difference in parser output for identical inputs.
-    - Markbridge::Parsers::MediaWiki::Parser#initialize
 
     # TagLibrary#initialize_copy's `super` call. Ruby's default
     # Object#initialize_copy is a no-op for our purposes (we re-dup
@@ -376,7 +355,6 @@ mutation:
     # line 30 for the index→fetch variant.
     - "send{receiver=send{receiver=self selector=class} selector=new}"
     - "index{receiver=lvar{value=new_cache}}"
-
 
 # String.new(capacity:, encoding:) calls are preallocation hints —
     # capacity is a tuning knob with no observable effect on output, and
