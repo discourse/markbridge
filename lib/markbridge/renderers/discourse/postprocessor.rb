@@ -51,11 +51,16 @@ module Markbridge
         # @param text [String]
         # @return [String]
         def call(text)
-          cleaned = text.match?(FENCE_RUN) ? clean_around_fences(text) : clean(text)
-          cleaned.strip # Trim leading/trailing whitespace
+          clean_document(text).strip # Trim leading/trailing whitespace
         end
 
         private
+
+        # Text without any fence run takes the plain path; the line loop
+        # gives the same result for it, only slower.
+        def clean_document(text)
+          text.match?(FENCE_RUN) ? clean_around_fences(text) : clean(text)
+        end
 
         def clean(text)
           text = text.gsub(TRAILING_INVISIBLE_RE, "") if @strip_trailing_invisibles
@@ -104,7 +109,7 @@ module Markbridge
           return nil unless match
 
           run = match[1]
-          return nil if run.start_with?("`") && match.post_match.include?("`")
+          return nil if run.include?("`") && match.post_match.include?("`")
 
           run
         end
@@ -116,7 +121,7 @@ module Markbridge
         # @return [Boolean]
         def closes_fence?(line, run)
           candidate = line.strip
-          candidate.length >= run.length && candidate.count(run[0]) == candidate.length
+          candidate.length >= run.length && candidate.squeeze == run.squeeze
         end
 
         DEFAULT = new

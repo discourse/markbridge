@@ -163,6 +163,15 @@ matcher:
     # without changing observable output. Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_text
 
+    # Postprocessor#clean_document's `text.match?(FENCE_RUN) ?` guard.
+    # Both branches produce the same text: clean_around_fences finds no
+    # fence, collects every line as prose and runs clean over it once.
+    # The guard only keeps documents without a fence off the line loop.
+    # Alive mutations (`if true`, `if text`, `if FENCE_RUN`, collapse
+    # to always-loop) all take the loop without an observable change.
+    # The method holds nothing but this ternary. Bucket A.
+    - Markbridge::Renderers::Discourse::Postprocessor#clean_document
+
     # Renderer#render's `@interface_cache` housekeeping (root_call
     # detection + ensure-block cache reset). The cache memoizes
     # RenderingInterface instances by context.object_id for the

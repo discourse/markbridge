@@ -16,28 +16,23 @@ module Markbridge
 
             return render_html(src, alt, width, height) if interface.html_mode?
 
-            dimensions =
-              if width && height
-                "|#{width}x#{height}"
-              elsif width
-                "|#{width}"
-              else
-                ""
-              end
+            # A height alone means nothing to Discourse.
+            size = ("#{width}x#{height}" if width && height) || width
 
-            "![#{alt}#{dimensions}](#{src})"
+            "![#{alt}#{"|#{size}" if size}](#{src})"
           end
 
           private
 
           # The alt text goes through the renderer like any other text, so
           # it is escaped for the place it lands in: a Markdown link label,
-          # or an HTML attribute in html_mode.
+          # or an HTML attribute in html_mode. A missing alt renders to
+          # nothing, the escapers turn nil into an empty string.
           def render_alt(element, interface)
-            alt = element.alt
-            return "" if alt.nil? || alt.empty?
-
-            interface.render_node(AST::Text.new(alt), context: interface.with_parent(element))
+            interface.render_node(
+              AST::Text.new(element.alt),
+              context: interface.with_parent(element),
+            )
           end
 
           def render_html(src, alt, width, height)

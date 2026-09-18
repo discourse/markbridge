@@ -35,6 +35,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::HeadingTag do
       expect(tag.render(element, interface)).to eq("\n\n### foo \\###\n\n")
     end
 
+    it "keeps a run of # followed by spaces at the end of the heading as text" do
+      # Spaces after the run do not stop it from being the closing sequence.
+      element = Markbridge::AST::Heading.new(level: 2)
+      element << Markbridge::AST::Text.new("foo # ")
+
+      expect(tag.render(element, interface)).to eq("\n\n## foo \\# \n\n")
+    end
+
     it "leaves a # that is not preceded by whitespace alone" do
       # Without the space in front it is not a closing sequence.
       element = Markbridge::AST::Heading.new(level: 1)
