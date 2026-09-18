@@ -222,6 +222,56 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
         )
       end
 
+      context "when text stands right next to the URL" do
+        # Renders a bare URL with the given neighbours inside a paragraph,
+        # so the tag can see its siblings.
+        def render_between(before, after)
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new(before) if before
+          url = Markbridge::AST::Url.new(href: "https://example.com")
+          url << Markbridge::AST::Text.new("https://example.com")
+          paragraph << url
+          paragraph << after if after
+
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          tag.render(
+            url,
+            Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context),
+          )
+        end
+
+        it "writes an autolink when a word ends right in front of the URL" do
+          expect(render_between("see", nil)).to eq("<https://example.com>")
+        end
+
+        it "writes an autolink when text starts right after the URL" do
+          expect(render_between(nil, Markbridge::AST::Text.new("now"))).to eq(
+            "<https://example.com>",
+          )
+        end
+
+        it "keeps the plain href when whitespace stands in front of the URL" do
+          expect(render_between("see ", nil)).to eq("https://example.com")
+        end
+
+        it "keeps the plain href when whitespace follows the URL" do
+          expect(render_between(nil, Markbridge::AST::Text.new(" now"))).to eq(
+            "https://example.com",
+          )
+        end
+
+        it "keeps the plain href when the URL has no neighbours" do
+          expect(render_between(nil, nil)).to eq("https://example.com")
+        end
+
+        it "keeps the plain href when the neighbour is not a text node" do
+          bold = Markbridge::AST::Bold.new
+          bold << Markbridge::AST::Text.new("x")
+
+          expect(render_between(nil, bold)).to eq("https://example.com")
+        end
+      end
+
       it "keeps the <a> form for text-less links in html_mode" do
         html_context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
         html_interface =

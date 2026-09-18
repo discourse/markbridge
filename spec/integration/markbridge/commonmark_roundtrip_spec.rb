@@ -136,10 +136,6 @@ module CommonMarkRoundTrip
   BOLD_IS_STRONG = "<b> and <strong> share one AST node, the renderer always writes **"
   ASCII_LANGUAGE_ONLY = "the HTML parser takes only an ASCII token as the language of a code block"
 
-  BARE_URL_AFTER_WORD =
-    "a link whose text is its href renders as the bare URL, which is not linked again " \
-      "when a word sits directly in front of it"
-
   # Turn {reason => [ids]} into {id => reason}.
   def self.by_example(groups)
     groups.each_with_object({}) { |(reason, ids), map| ids.each { |id| map[id] = reason } }.freeze
@@ -157,7 +153,7 @@ module CommonMarkRoundTrip
     )
 
   # Examples that fail because of a defect. Fixing one must remove its entry.
-  KNOWN_BUGS = by_example(BARE_URL_AFTER_WORD => [480, 481])
+  KNOWN_BUGS = by_example({})
 
   module_function
 
