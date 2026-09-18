@@ -9,6 +9,11 @@ description: Run mutant, read mutation reports, fix alive mutations, and verify 
 
 - Always through the wrapper: `bin/mutant run`, never
   `bundle exec mutant`.
+- Record coverage first: `COVERAGE=1 bundle exec rspec`. `mutant.yml`
+  sets `selection.strategy: context_map`, so mutant picks a subject's
+  tests from `coverage/coverage.json` and refuses to run without it.
+  Re-record after changing specs, or mutant selects tests by the old
+  line numbers.
 - Scope runs to what changed — a subject expression
   (`bin/mutant run 'Markbridge::Parsers::BBCode::Scanner*'`) or
   `--since origin/main`. Full runs are for CI.
@@ -77,12 +82,19 @@ Ask, in this order:
 
 ## Project-specific traps
 
-- **Test selection is by example-group name.** Mutant picks the specs
-  whose describe-strings match the subject (`#initialize` examples for
-  `Foo#initialize`). A killing example in the wrong describe block is
-  invisible to the run — it passes rspec and the mutation stays alive.
-  Put behavior-pinning examples under the describe of the method they
-  kill mutations in.
+- **Test selection is by recorded coverage, and once-per-process code
+  breaks it.** Mutant picks the specs that actually executed the
+  subject's lines. A line behind a memo (`@shared_default ||= ...`)
+  runs exactly once in the suite, so the recording credits whichever
+  example happened to touch the memo first — a different one on every
+  seed, usually unrelated to the subject. The real killer is then never
+  selected and the mutation reports alive. Symptom: a subject that dies
+  under `--selection expression` but survives the default run. Fix it
+  with an example that reaches the method directly on a fresh instance,
+  under the describe of that method, so the recording credits it every
+  time (see `Normalizer#freeze` in `spec/unit/markbridge/normalizer_spec.rb`).
+  Keep putting behavior-pinning examples under the describe of the
+  method they kill mutations in.
 - **Public API only.** No `send`/`__send__` to reach private methods
   and no test-only subclasses that publicize them. If a mutation is
   only observable by calling a private directly, that is what the
