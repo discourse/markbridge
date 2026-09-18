@@ -1,0 +1,44 @@
+name: Full mutation run
+
+on:
+  schedule:
+    # Mondays at 04:00 UTC.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+# The per-push `mutation` job in main.yml only mutates subjects that the
+# diff touched, so a commit that changes no Ruby mutates nothing. This
+# job drops `--since` and mutates every subject the matcher in
+# `mutant.yml` selects.
+jobs:
+  mutation-full:
+    runs-on: ubuntu-latest
+
+    # The run takes roughly 6 minutes on a 20-core machine; a GitHub
+    # runner has fewer cores, so leave room.
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      - name: Run mutant
+        run: bin/mutant run
+
+      # The session file lists every surviving mutation with its diff,
+      # which is what you need to act on a failed run.
+      - name: Upload mutant session
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutant-session
+          path: .mutant/results/*.json
+          retention-days: 14
