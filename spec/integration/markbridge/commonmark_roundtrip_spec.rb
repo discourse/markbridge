@@ -136,8 +136,6 @@ module CommonMarkRoundTrip
   BOLD_IS_STRONG = "<b> and <strong> share one AST node, the renderer always writes **"
   ASCII_LANGUAGE_ONLY = "the HTML parser takes only an ASCII token as the language of a code block"
 
-  LINK_DESTINATION_PARENTHESES =
-    "an unbalanced parenthesis in a link destination is neither escaped nor wrapped in <>"
   BANG_BEFORE_LINK = "a ! in front of a link is not escaped, so the link cooks as an image"
   MERGED_LISTS = "two adjacent lists of the same kind merge into one loose list"
   RULE_IN_LIST_ITEM =
@@ -168,7 +166,6 @@ module CommonMarkRoundTrip
   # Examples that fail because of a defect. Fixing one must remove its entry.
   KNOWN_BUGS =
     by_example(
-      LINK_DESTINATION_PARENTHESES => [492, 498, 499, 500],
       BANG_BEFORE_LINK => [593],
       MERGED_LISTS => [301, 302, 308],
       RULE_IN_LIST_ITEM => [61],
