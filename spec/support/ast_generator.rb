@@ -61,7 +61,17 @@ class AstGenerator
 
   # Inline code stays on one line and carries no backtick, so the renderer
   # can wrap it in a single pair of backticks.
-  INLINE_CODE_SNIPPETS = ["puts x", "a<b", "foo_bar", "a | b", "1 * 2"].freeze
+  INLINE_CODE_SNIPPETS = [
+    "puts x",
+    "a<b",
+    "foo_bar",
+    "a | b",
+    "1 * 2",
+    "a`b",
+    "``",
+    " x ",
+    "`",
+  ].freeze
 
   ALIGNMENTS = %w[left center right].freeze
 

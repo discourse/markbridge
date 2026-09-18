@@ -28,8 +28,23 @@ module Markbridge
 
           private
 
+          # The delimiter is one backtick longer than the longest backtick
+          # run in the content. A space on each side keeps a backtick at
+          # the edge of the content away from the delimiter. Content that
+          # starts and ends with a space gets the same padding, because
+          # CommonMark strips one space from each end of such a span.
           def render_inline(content)
-            "`#{content}`"
+            longest_run = content.scan(/`+/).map(&:length).max || 0
+            delimiter = "`" * (longest_run + 1)
+            padding = needs_padding?(content) ? " " : ""
+
+            "#{delimiter}#{padding}#{content}#{padding}#{delimiter}"
+          end
+
+          def needs_padding?(content)
+            return true if content.start_with?("`") || content.end_with?("`")
+
+            content.start_with?(" ") && content.end_with?(" ") && !content.strip.empty?
           end
 
           # Leading and trailing blank lines: the trailing one keeps an
