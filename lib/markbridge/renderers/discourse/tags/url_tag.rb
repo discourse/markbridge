@@ -49,8 +49,12 @@ module Markbridge
 
           # CommonMark link destinations cannot contain whitespace unless
           # wrapped in <> — relevant for relative targets like MediaWiki
-          # page names ("Main Page").
+          # page names ("Main Page"). An unbalanced parenthesis ends the
+          # destination early, so every parenthesis gets a backslash;
+          # balanced ones would be fine, but the check is not worth it.
           def markdown_destination(href)
+            href = href.gsub(/[()]/) { |char| "\\#{char}" } if href.include?("(") ||
+              href.include?(")")
             href.match?(/\s/) ? "<#{href}>" : href
           end
 

@@ -11,6 +11,7 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - The postprocessor leaves fenced code blocks alone. Blank lines and whitespace-only lines inside a fence stay as they are.
 - Inline code picks a backtick delimiter longer than any backtick run in the content, and pads the content with a space when it starts or ends with a backtick or with spaces on both sides: `` `a`b` `` becomes ``` ``a`b`` ```.
 - Images carry their alternative text. `AST::Image` has a new `alt:` keyword, the HTML, BBCode and TextFormatter parsers fill it, and the renderer writes `![alt|WxH](src)` in Markdown and `alt="…"` in html_mode.
+- Parentheses in a link destination are escaped: `[text](https://example.com/a\(b\))`.
 
 ## Upgrading to 0.4.2
 

@@ -15,6 +15,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       expect(result).to eq("[Example](https://example.com)")
     end
 
+    it "escapes parentheses in the destination" do
+      element = Markbridge::AST::Url.new(href: "https://example.com/a(b)c)")
+      element << Markbridge::AST::Text.new("Example")
+
+      expect(tag.render(element, interface)).to eq("[Example](https://example.com/a\\(b\\)c\\))")
+    end
+
+    it "escapes parentheses inside a destination that also needs angle brackets" do
+      element = Markbridge::AST::Url.new(href: "Main (Page)")
+      element << Markbridge::AST::Text.new("Example")
+
+      expect(tag.render(element, interface)).to eq("[Example](<Main \\(Page\\)>)")
+    end
+
+    it "leaves a destination without parentheses alone" do
+      element = Markbridge::AST::Url.new(href: "https://example.com/a?b=c&d=e")
+      element << Markbridge::AST::Text.new("Example")
+
+      expect(tag.render(element, interface)).to eq("[Example](https://example.com/a?b=c&d=e)")
+    end
+
     it "renders http URLs" do
       element = Markbridge::AST::Url.new(href: "http://example.com")
       element << Markbridge::AST::Text.new("Example")
