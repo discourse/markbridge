@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import { docsVersion, versionNote } from './scripts/docs-version.mjs';
+import { pageTextExports } from './scripts/page-text-exports.mjs';
 import { textExports } from './src/data/text-exports.mjs';
 
 export default defineConfig({
@@ -29,10 +30,12 @@ export default defineConfig({
           customSelectors: { all: ['.sl-anchor-link', '.diagram-dark'] },
           // Subsets also use these options. Keep their examples, notes, and spacing.
           minify: { note: false, tip: false, details: false, whitespace: false },
-          customSets: textExports.map(({ label, paths }) => ({
-            label,
-            paths,
-            description: versionNote,
+          customSets: [...textExports, ...pageTextExports].map((entry) => ({
+            label: entry.label,
+            paths: entry.paths,
+            description: versionNote + ('id' in entry
+              ? ` Source page: https://markbridge.dev/${entry.id === 'index' ? '' : `${entry.id}/`}`
+              : ''),
           })),
         }),
       ],

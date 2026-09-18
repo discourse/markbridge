@@ -19,9 +19,9 @@ Run `bundle exec rspec spec/docs` from the repository root to check AST coverage
 
 ## Text exports
 
-The site generates Markdown text with `starlight-llms-txt`. Start with `/llms.txt` for links to the full documentation, a shorter collection, and topic files under `/_llms-txt/`. The footer links to the index and the current page's topic. A topic can contain several pages; it is not necessarily a copy of the current page alone.
+The site generates Markdown text with `starlight-llms-txt`. Start with `/llms.txt` for links to the full documentation, a shorter collection, and topic files under `/_llms-txt/`. Each content page also has its own file, such as `/_llms-txt/page-concepts-ast.txt`. These `.txt` files contain Markdown. The footer links to the index, the current page, and its topic. HTML metadata identifies the individual file as an alternate representation. A topic can contain several pages; it is not necessarily a copy of the current page alone.
 
-`src/data/text-exports.mjs` defines the topics and their page paths. A topic's label determines its generated filename, so keep its `slug` in sync when renaming it. `pnpm build` checks these links and verifies that Ruby examples, tag tables, and landing-page card links survive conversion. Run `pnpm check:text` to repeat those checks on an existing build.
+`src/data/text-exports.mjs` defines the topics. `scripts/page-text-exports.mjs` discovers individual Markdown and MDX pages in `src/content/docs/`. It maps directory index pages to their Starlight IDs and rejects unsupported IDs or duplicate export filenames. Restart the dev server after adding or renaming a page so its export is discovered. All exports use the plugin’s `customSets` option; there is no separate Markdown converter. A topic's label determines its generated filename, so keep its `slug` in sync when renaming it. `pnpm build` checks these links and verifies that Ruby examples, tag tables, and landing-page card links survive conversion. Run `pnpm check:text` to repeat those checks on an existing build.
 
 The source version comes from `lib/markbridge/version.rb` and appears in the text files and page footer. It identifies the repository version; the docs may include changes that are not released yet. Version-file changes also trigger the docs workflow.
 
