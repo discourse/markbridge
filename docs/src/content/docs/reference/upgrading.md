@@ -17,6 +17,7 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - A `!` directly in front of a link gets a backslash, so `Look![here](url)` does not cook as an image.
 - Two lists of the same kind that follow each other are separated by an HTML comment between blank lines (`<!---->`), so they do not merge into one loose list. A list without items renders to nothing.
 - Emphasis or strikethrough whose content starts or ends with punctuation gets the `<!---->` boundary comment when a word character or a strikethrough stands right next to it, for example `item<!---->*\#*`. Without it CommonMark's flanking rules keep the delimiters as text.
+- A list directly inside a list item is followed by a blank line, so text after it stays in the outer item instead of becoming a continuation line of the last nested item. A list inside a quote or an aligned block inside an item is a block with blank lines on both sides.
 
 ## Upgrading to 0.4.2
 
