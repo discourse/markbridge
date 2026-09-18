@@ -3,6 +3,7 @@ import DefaultFooter from '@astrojs/starlight/components/Footer.astro';
 import { textExportForPage, textExportHref } from '../data/text-exports.mjs';
 
 const { id, head } = Astro.locals.starlightRoute;
+const pageHref = head.find(({ tag, attrs }) => tag === 'link' && attrs?.rel === 'alternate' && attrs?.title === 'This page as Markdown')?.attrs?.href;
 const section = textExportForPage(id);
 const version = head.find(({ tag, attrs }) => tag === 'meta' && attrs?.name === 'markbridge-version')?.attrs?.content;
 ---
@@ -10,6 +11,7 @@ const version = head.find(({ tag, attrs }) => tag === 'meta' && attrs?.name === 
 <div class="text-exports" data-pagefind-ignore>
   <span>Source version: Markbridge {version}</span>
   <a href="/llms.txt">Documentation text index</a>
+  {pageHref && <a href={pageHref}>This page as Markdown</a>}
   {section && <a href={textExportHref(section.slug)}>{section.label} as Markdown</a>}
 </div>
 <DefaultFooter />

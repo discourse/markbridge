@@ -24,3 +24,16 @@ export function textExportForPage(id) {
 export function textExportHref(slug) {
   return `/_llms-txt/${slug}.txt`;
 }
+
+/** @param {string} id */
+export function pageTextExportForPage(id) {
+  if (!/^[a-z0-9]+(?:[-/][a-z0-9]+)*$/.test(id)) {
+    throw new Error(`Unsupported documentation export ID: ${id}`);
+  }
+  return {
+    id,
+    label: `Page ${id.replaceAll('/', ' ')}`,
+    paths: [id],
+    slug: `page-${id.replaceAll('/', '-')}`,
+  };
+}

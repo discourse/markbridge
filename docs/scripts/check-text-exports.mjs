@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { docsVersion } from './docs-version.mjs';
+import { pageTextExports } from './page-text-exports.mjs';
 import { textExports, textExportHref } from '../src/data/text-exports.mjs';
 
 const docsDir = fileURLToPath(new URL('../', import.meta.url));
@@ -12,7 +13,7 @@ const index = readOutput('llms.txt');
 const full = readOutput('llms-full.txt');
 const paths = ['llms.txt', 'llms-full.txt', 'llms-small.txt'];
 
-for (const { slug } of textExports) {
+for (const { slug } of [...textExports, ...pageTextExports]) {
   const href = textExportHref(slug);
   assert.ok(index.includes(href), `Missing index link: ${href}`);
   paths.push(href.slice(1));
@@ -51,6 +52,17 @@ const expectedBlocks = sourceFiles(join(docsDir, 'src/content/docs'))
   .flatMap((path) => rubyBlocks(readFileSync(path, 'utf8')));
 const actualBlocks = rubyBlocks(full);
 assert.deepEqual(actualBlocks.toSorted(), expectedBlocks.toSorted(), 'Exported Ruby examples differ from source');
+
+for (const { id, source, slug } of pageTextExports) {
+  const text = readOutput(textExportHref(slug));
+  const markdown = readFileSync(join(docsDir, 'src/content/docs', source), 'utf8');
+  assert.deepEqual(rubyBlocks(text), rubyBlocks(markdown), `Ruby examples differ on ${id}`);
+  assert.ok(text.includes(`https://markbridge.dev/${id === 'index' ? '' : `${id}/`}`), `Missing page URL: ${id}`);
+  const html = readOutput(id === 'index' ? 'index.html' : `${id}/index.html`);
+  assert.ok(html.includes(`href="${textExportHref(slug)}"`), `Missing individual export link: ${id}`);
+  assert.match(html, /rel="alternate"[^>]*title="This page as Markdown"/, `Missing alternate link: ${id}`);
+  assert.ok(html.includes('This page as Markdown'), `Missing footer link: ${id}`);
+}
 
 const htmlGuide = readOutput('_llms-txt/html.txt');
 assert.match(htmlGuide, /\|[^\n]*HTML[^\n]*Renders as[^\n]*AST node[^\n]*\|/, 'HTML tag table missing');
