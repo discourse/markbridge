@@ -136,8 +136,9 @@ module Markbridge
         # the first, and the blank line makes the whole list loose.
         LIST_BOUNDARY = "\n\n<!---->\n\n"
         # Delimiters that open and close only where CommonMark's flanking
-        # rules allow it: emphasis (* _) and strikethrough (~).
-        FLANKING_DELIMITER_BYTES = Set[42, 95, 126].freeze
+        # rules allow it: emphasis (* _) and strikethrough (~), with the
+        # pattern that finds the first byte outside a run of each.
+        FLANKING_DELIMITERS = { 42 => /[^*]/, 95 => /[^_]/, 126 => /[^~]/ }.freeze
         BACKSLASH = 92
         BANG = 33
         BRACKET_OPEN = 91
@@ -146,7 +147,7 @@ module Markbridge
         private_constant :EMPHASIS_BOUNDARY,
                          :EMPHASIS_DELIMITER_BYTES,
                          :LIST_BOUNDARY,
-                         :FLANKING_DELIMITER_BYTES,
+                         :FLANKING_DELIMITERS,
                          :BACKSLASH,
                          :BANG,
                          :BRACKET_OPEN,
@@ -159,21 +160,18 @@ module Markbridge
         # checks allocate nothing per child. On an empty buffer getbyte
         # returns nil, which matches no byte of a non-empty part.
         def join(result, previous, child, part)
-          if child.is_a?(AST::List) && previous.is_a?(AST::List) &&
-               child.ordered? == previous.ordered?
-            result << LIST_BOUNDARY
-            return
-          end
-
           last_byte = result.getbyte(-1)
           first_byte = part.getbyte(0)
 
-          if last_byte == first_byte && EMPHASIS_DELIMITER_BYTES.include?(last_byte)
+          if child.is_a?(AST::List) && previous.is_a?(AST::List) &&
+               child.ordered? == previous.ordered?
+            result << LIST_BOUNDARY
+          elsif last_byte == first_byte && EMPHASIS_DELIMITER_BYTES.include?(last_byte)
             result << EMPHASIS_BOUNDARY
-          elsif last_byte == BANG && first_byte == BRACKET_OPEN && result.getbyte(-2) != BACKSLASH
+          elsif last_byte == BANG && first_byte == BRACKET_OPEN
             # A `!` right in front of a link makes it an image. The escaper
             # leaves a lone `!` alone because it cannot see the next node.
-            result.insert(-2, "\\")
+            result.insert(-2, "\\") unless result.getbyte(-2) == BACKSLASH
           elsif blocked_opening?(last_byte, part, first_byte) ||
                 blocked_closing?(result, last_byte, first_byte)
             result << EMPHASIS_BOUNDARY
@@ -186,9 +184,7 @@ module Markbridge
         # A `_` run never opens after a word character. The comment
         # between them is punctuation, so the run can open again.
         def blocked_opening?(last_byte, part, first_byte)
-          unless blocking_neighbour?(last_byte) && FLANKING_DELIMITER_BYTES.include?(first_byte)
-            return false
-          end
+          return false unless blocking_neighbour?(last_byte) && FLANKING_DELIMITERS.key?(first_byte)
 
           first_byte == UNDERSCORE || punctuation_byte?(byte_after_run(part, first_byte))
         end
@@ -197,9 +193,7 @@ module Markbridge
         # punctuation cannot close when a word character follows it, and
         # a `_` run never closes in front of a word character.
         def blocked_closing?(result, last_byte, first_byte)
-          unless FLANKING_DELIMITER_BYTES.include?(last_byte) && blocking_neighbour?(first_byte)
-            return false
-          end
+          return false unless FLANKING_DELIMITERS.key?(last_byte) && blocking_neighbour?(first_byte)
 
           last_byte == UNDERSCORE || punctuation_byte?(byte_before_run(result, last_byte))
         end
@@ -213,19 +207,18 @@ module Markbridge
           byte == TILDE || word_byte?(byte)
         end
 
-        # The first byte after the run of +byte+ that starts +part+.
+        # The first byte after the run of +byte+ that starts +part+, nil
+        # when the part is nothing but the run.
         def byte_after_run(part, byte)
-          index = 0
-          index += 1 while part.getbyte(index) == byte
-          part.getbyte(index)
+          index = part.byteindex(FLANKING_DELIMITERS.fetch(byte))
+          index && part.getbyte(index)
         end
 
         # The byte in front of the run of +byte+ that ends +result+, nil
         # when the run reaches the start of the buffer.
         def byte_before_run(result, byte)
-          index = -1
-          index -= 1 while result.getbyte(index) == byte
-          result.getbyte(index)
+          index = result.byterindex(FLANKING_DELIMITERS.fetch(byte))
+          index && result.getbyte(index)
         end
 
         # ASCII letters and digits. Every non-ASCII byte counts as a word

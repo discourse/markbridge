@@ -36,7 +36,7 @@ module Markbridge
           def render_inline(content)
             longest_run = content.scan(/`+/).map(&:length).max || 0
             delimiter = "`" * (longest_run + 1)
-            padding = needs_padding?(content) ? " " : ""
+            padding = " " if needs_padding?(content)
 
             "#{delimiter}#{padding}#{content}#{padding}#{delimiter}"
           end
@@ -44,7 +44,10 @@ module Markbridge
           def needs_padding?(content)
             return true if content.start_with?("`") || content.end_with?("`")
 
-            content.start_with?(" ") && content.end_with?(" ") && !content.strip.empty?
+            # A span of spaces only is not stripped by CommonMark, so it
+            # needs no padding.
+            content.start_with?(" ") && content.end_with?(" ") &&
+              content.count(" ") < content.length
           end
 
           # Leading and trailing blank lines: the trailing one keeps an

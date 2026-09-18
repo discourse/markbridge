@@ -129,7 +129,7 @@ module Markbridge
           index = siblings.index { |child| child.equal?(element) }
           return nil if index.nil? || (index + offset).negative?
 
-          siblings[index + offset]
+          siblings.at(index + offset)
         end
 
         # Wrap content in markers, keeping leading/trailing whitespace

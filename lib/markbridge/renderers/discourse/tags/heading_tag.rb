@@ -29,8 +29,6 @@ module Markbridge
           # A backslash in front of the run keeps it as text. The escaper
           # does not do this, it only knows about # at the start of a line.
           def keep_trailing_hashes(content)
-            return content unless content.end_with?("#")
-
             content.sub(CLOSING_SEQUENCE) { |run| "\\#{run}" }
           end
         end
