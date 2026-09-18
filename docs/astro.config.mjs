@@ -17,7 +17,7 @@ export default defineConfig({
     starlight({
       title: 'Markbridge',
       description:
-        'Extensible Ruby pipeline that turns BBCode, HTML, and other markup into Discourse-ready Markdown via a parse → AST → render flow.',
+        'Convert BBCode, HTML, MediaWiki, and s9e TextFormatter XML to Markdown in Ruby. Inspect the AST and customize your output.',
       logo: {
         src: './src/assets/markbridge-icon.svg',
         alt: 'Markbridge',
@@ -49,6 +49,10 @@ export default defineConfig({
           tag: 'script',
           attrs: { src: '/diagram-zoom.js', defer: true },
         },
+        {
+          tag: 'script',
+          attrs: { src: '/table-scroll.js', defer: true },
+        },
       ],
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/discourse/markbridge' },
@@ -64,7 +68,7 @@ export default defineConfig({
       },
       sidebar: [
         { label: 'Introduction', slug: 'introduction' },
-        { label: 'Getting Started', slug: 'getting-started' },
+        { label: 'Get started', slug: 'getting-started' },
         {
           label: 'Format guides',
           items: [
@@ -94,6 +98,7 @@ export default defineConfig({
             { label: 'Renderers', slug: 'concepts/renderers' },
             { label: 'AST normalization', slug: 'concepts/normalization' },
             { label: 'Performance', slug: 'concepts/performance' },
+            { label: 'Benchmark results', slug: 'concepts/benchmarks' },
           ],
         },
         {

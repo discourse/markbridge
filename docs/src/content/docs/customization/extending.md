@@ -5,13 +5,13 @@ description: Add support for new tags, customize rendering, and swap behavior wi
 
 Markbridge has two places to plug in: **handlers** teach a parser to recognize new tags, and **renderer tags** turn AST nodes into Markdown. Both live in registries, so you add your own on top of the defaults without forking the gem.
 
-## Two ends to wire up
+## Connect parsing and rendering
 
 ```
 custom BBCode tag  →  custom handler  →  custom AST node  →  custom renderer tag  →  Markdown
 ```
 
-Most of the time you need *both* ends: the parser has to produce a node, and the renderer has to know how to print it. Miss one and your tag either vanishes or comes out as plain text.
+To support a new tag, register a handler that creates an AST node. Then choose how that node should render. You can register a renderer tag or inherit one from a built-in AST class.
 
 ## Adding a custom BBCode tag
 
@@ -75,8 +75,13 @@ The block form is the quickest path:
 ```ruby
 callout_tag =
   Markbridge::Renderers::Discourse::Tag.new do |element, interface|
-    inner = interface.render_children(element)
-    "> [!#{element.variant.upcase}]\n> #{inner.gsub("\n", "\n> ")}\n"
+    context = interface.with_parent(element)
+    inner = interface.render_children(element, context:)
+    if interface.html_mode?
+      "<aside>#{inner}</aside>"
+    else
+      "> [!#{element.variant.upcase}]\n> #{inner.gsub("\n", "\n> ")}\n"
+    end
   end
 ```
 
@@ -96,12 +101,12 @@ renderer = Markbridge.discourse_renderer(
 <!-- spec:continue -->
 ```ruby
 result = Markbridge.bbcode_to_markdown(
-  "[callout=warning]Heads up![/callout]",
+  "[callout=warning]Check this setting.[/callout]",
   handlers:,
   renderer:,
 )
 result.markdown
-# => "> [!WARNING]\n> Heads up!\n"
+# => "> [!WARNING]\n> Check this setting."
 ```
 
 ## The rendering interface
@@ -123,6 +128,64 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 Use `find_parent` / `has_parent?` to render differently inside specific ancestors (e.g. a code span inside a table cell).
 
 A Tag must return a String — returning `nil` (or anything else) raises a `TypeError`. To handle only some nodes, defer the rest with `render_default(node)` instead of falling through to `nil`.
+
+## Rendering inside HTML blocks
+
+Tables with uneven rows, multiline cells, or nested tables use HTML output. Inside these tables, `interface.html_mode?` is `true`. Each custom tag must return either:
+
+- An HTML equivalent, with user-controlled text and attributes escaped using `Markbridge::Renderers::Discourse::HtmlEscaper`.
+- Its Markdown wrapped with `Markbridge::Renderers::Discourse::HtmlBlock.island(markdown)`. This adds blank lines so CommonMark can parse the Markdown. It also adds paragraph spacing, so prefer HTML when a suitable element exists.
+
+The callout example above uses `<aside>` in HTML mode. Child tags receive the same HTML mode through the context.
+
+Test your tag with the shared RSpec example. Use content with Markdown characters so the check can detect unescaped output:
+
+<!-- spec:before
+require "rspec"
+require "markbridge/all"
+CalloutTag = Markbridge::Renderers::Discourse::Tags::BoldTag
+Callout = Markbridge::AST::Bold
+-->
+```ruby
+require "markbridge/rspec"
+
+RSpec.describe CalloutTag do
+  it_behaves_like "an html_mode safe tag" do
+    let(:tag) { described_class.new }
+    let(:element) do
+      node = Callout.new
+      node << Markbridge::AST::Text.new("body *with* Markdown characters")
+      node
+    end
+  end
+end
+```
+
+Use your own tag and AST classes in place of `CalloutTag` and `Callout`. Override `markbridge_renderer` inside the example if your children need a custom tag library. This structural check complements tests for your expected output.
+
+## AST subclasses
+
+A subclass inherits its base class's normalizer rules and renderer tag. You can add data or identify a group of nodes without repeating the built-in behavior:
+
+```ruby
+class LegacyCode < Markbridge::AST::Code
+end
+```
+
+A `LegacyCode` node uses `CodeTag`. Normalizer rules for `AST::Code` also apply to it. An exact registration for the subclass takes priority over an inherited registration. `interface.render_default(node)` uses the stock tag of the nearest matching class, even when your renderer overrides that class.
+
+To keep only the children instead of using the inherited tag:
+
+<!-- spec:before
+class LegacyCode < Markbridge::AST::Code; end
+-->
+```ruby
+renderer = Markbridge.discourse_renderer(
+  tags: { LegacyCode => Markbridge::Renderers::Discourse::Tag::PASSTHROUGH }
+)
+```
+
+Removing the subclass registration with `unregister:` allows the ancestor tag to apply again. See [AST normalization](/concepts/normalization/) to add rules for your own classes.
 
 ## HTML and TextFormatter parsers
 
@@ -165,9 +228,11 @@ renderer = Markbridge.discourse_renderer(
   tags: {
     Markbridge::AST::Url =>
       Markbridge::Renderers::Discourse::Tag.new do |element, interface|
-        # Custom link rendering — e.g., prefix internal links
-        href = element.href.start_with?("/") ? "https://forum.example.com#{element.href}" : element.href
-        "[#{interface.render_children(element)}](#{href})"
+        next interface.render_default(element) unless element.href&.start_with?("/")
+
+        link = Markbridge::AST::Url.new(href: "https://forum.example.com#{element.href}")
+        element.children.each { |child| link << child }
+        interface.render_default(link)
       end,
   }
 )
@@ -234,7 +299,7 @@ library.auto_register!
 
 ## Migration use cases
 
-When you extend Markbridge for a Discourse migration — links to resolve later, uploads to track, mentions to look up — the same three parts apply. The renderer Tag stays a simple formatter that returns the placeholder string, and the importer reads the placeholder nodes back off `conversion.ast.descendants(...)` afterwards. The [Placeholders](/migrating/placeholders/) page is the full guide; this page only covers the general mechanics.
+When you extend Markbridge for a Discourse migration — links to resolve later, uploads to track, mentions to look up — the same three parts apply. The renderer Tag stays a simple formatter that returns the placeholder string, and you read the placeholder nodes from `conversion.ast.descendants(...)` after conversion. The [Placeholders](/migrating/placeholders/) page is the full guide; this page only covers the general mechanics.
 
 ## When to customize vs. fork
 

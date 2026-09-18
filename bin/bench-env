@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Runs a benchmark command under repeatable CPU conditions.
+#
+#   bin/bench-env bundle exec ruby --yjit bench/bench.rb --isolated
+#   bin/bench-env rv run --ruby jruby bundle exec ruby bench/sustained_bench.rb
+#
+# It pins the command to the fastest cores of the machine and prints
+# what it found, so a result can be compared with an earlier one. Power
+# state and CPU governor are only reported, not changed — changing them
+# needs root.
+set -euo pipefail
+
+if [ $# -eq 0 ]; then
+  echo "usage: bin/bench-env <command> [args...]" >&2
+  exit 1
+fi
+
+note() { printf 'bench-env: %s\n' "$1" >&2; }
+
+# Laptop chips mix fast and slow cores. A benchmark that lands on a
+# slow core loses 30% or more, so pick the cores whose maximum
+# frequency is within 15% of the fastest one. Background threads of the
+# JVM engines need more than one core, so this keeps a group, not a
+# single core. On a machine where all cores are equal it selects all of
+# them.
+select_cpus() {
+  local best=0 freq name list="" dir
+  for dir in /sys/devices/system/cpu/cpu[0-9]*; do
+    freq=$(cat "$dir/cpufreq/cpuinfo_max_freq" 2>/dev/null) || continue
+    [ "$freq" -gt "$best" ] && best=$freq
+  done
+  [ "$best" -eq 0 ] && return 1
+
+  for dir in /sys/devices/system/cpu/cpu[0-9]*; do
+    freq=$(cat "$dir/cpufreq/cpuinfo_max_freq" 2>/dev/null) || continue
+    name=${dir##*/cpu}
+    if [ $((freq * 100 / best)) -ge 85 ]; then
+      list="${list:+$list$'\n'}$name"
+    fi
+  done
+
+  printf '%s %s' "$(printf '%s' "$list" | sort -n | paste -sd,)" "$best"
+}
+
+on_ac_power() {
+  local supply
+  for supply in /sys/class/power_supply/*; do
+    [ "$(cat "$supply/type" 2>/dev/null)" = "Mains" ] || continue
+    [ "$(cat "$supply/online" 2>/dev/null)" = "1" ] && return 0
+  done
+  return 1
+}
+
+if on_ac_power; then
+  note "on AC power"
+else
+  note "WARNING: running on battery — the CPU will be throttled and the numbers are not comparable"
+fi
+
+governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo unknown)
+if [ "$governor" = "performance" ]; then
+  note "governor performance"
+else
+  note "WARNING: governor is '$governor', not 'performance'"
+  note "set it with: sudo cpupower frequency-set -g performance"
+fi
+
+if cpus_and_freq=$(select_cpus) && command -v taskset > /dev/null; then
+  cpus=${cpus_and_freq% *}
+  max_khz=${cpus_and_freq#* }
+  note "pinning to CPUs $cpus (max $((max_khz / 1000)) MHz)"
+  exec taskset -c "$cpus" "$@"
+fi
+
+note "no CPU pinning (taskset or cpufreq data missing)"
+exec "$@"

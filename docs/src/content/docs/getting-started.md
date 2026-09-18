@@ -1,13 +1,13 @@
 ---
-title: Getting Started
-description: Install Markbridge and run your first conversion in under five minutes.
+title: Get started
+description: Install Markbridge, convert your first document, and read the result.
 ---
 
-This page takes you from install to a working conversion in about five minutes. For the big picture first — what Markbridge is and how it's put together — start with the [Introduction](/introduction/).
+Install Markbridge, choose the parser for your input, and read the converted Markdown. See the [Introduction](/introduction/) for an overview of the library.
 
 ## Requirements
 
-Ruby 3.3 or newer (CRuby, or the latest TruffleRuby or JRuby).
+You need Ruby 3.3 or newer. Markbridge supports CRuby, JRuby, and TruffleRuby.
 
 ## Install
 
@@ -34,7 +34,13 @@ puts result.markdown
 # => **Hello** [world](https://example.com)!
 ```
 
-`require "markbridge/bbcode"` loads the BBCode parser plus the Discourse renderer. Swap `bbcode` for `html`, `mediawiki`, or `textformatter` for the other formats, or use `markbridge/all` to load all four at once. HTML and TextFormatter pull in Nokogiri; BBCode and MediaWiki don't.
+`require "markbridge/bbcode"` loads the BBCode parser plus the Discourse renderer. Swap `bbcode` for `html`, `mediawiki`, or `textformatter` for the other formats, or use `markbridge/all` to load all four at once. For HTML or TextFormatter, also add Nokogiri to your bundle:
+
+```bash
+bundle add nokogiri
+```
+
+BBCode and MediaWiki do not need Nokogiri.
 
 `*_to_markdown` returns a `Markbridge::Conversion` value object, not a plain string. The rendered Markdown is on `.markdown`; `.to_s` delegates to it so `puts result` and string interpolation `"#{result}"` work. The Conversion also carries `.unknown_tags`, `.diagnostics`, and `.errors` — see [Result objects](/concepts/result-objects/) for the full shape.
 
@@ -49,7 +55,7 @@ Pick the method that matches your input:
 | `Markbridge.mediawiki_to_markdown` | MediaWiki wikitext | [MediaWiki](/format-guides/mediawiki/) |
 | `Markbridge.text_formatter_xml_to_markdown` | <span class="nowrap">s9e/TextFormatter</span> XML (phpBB 3.2+) | [TextFormatter](/format-guides/textformatter/) |
 
-`Markbridge.convert(input, format: :bbcode)` dispatches to the right one when the format isn't fixed at the call site (handy in migration loops that handle multiple formats).
+`Markbridge.convert(input, format: :bbcode)` dispatches to the right one when the format isn't fixed at the call site (useful when your application accepts several formats).
 
 Each `*_to_markdown` method has a matching `parse_*` method that returns a `Parse` (with the AST and unknown-tag data) instead of rendering — useful when you want to inspect, transform, or re-render with a custom renderer.
 
@@ -63,9 +69,9 @@ RENDERER = Markbridge.discourse_renderer(escape_hard_line_breaks: true)
 result = Markbridge.bbcode_to_markdown("hi   \nthere", renderer: RENDERER)
 ```
 
-See [Customizing the renderer](/customization/customizing-renderer/) for the full set of knobs (custom tags, dropping tags, custom escaper, postprocessor).
+See [Customizing the renderer](/customization/customizing-renderer/) for all options (custom tags, dropping tags, custom escaper, postprocessor).
 
-## Where to next
+## Next steps
 
 - **Converting your format?** See the [format guides](/format-guides/) for full tag coverage.
 - **Customizing the output?** See [Customizing the renderer](/customization/customizing-renderer/).

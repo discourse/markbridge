@@ -347,7 +347,7 @@ module Markbridge
           consumed = lines[start_index..].take_while { |line| line.start_with?(" ") }
           content = consumed.map { |line| line[1..] }.join("\n")
 
-          code = AST::Code.new
+          code = AST::Code.new(block: true)
           code << AST::Text.new(content)
           @document << code
 
@@ -372,7 +372,7 @@ module Markbridge
           combined = consumed.join("\n")
           content = combined.sub(PRE_TAG_OPEN, "").sub(PRE_TAG_CLOSE_TRAILING, "")
 
-          code = AST::Code.new
+          code = AST::Code.new(block: true)
           code << AST::Text.new(content)
           @document << code
 

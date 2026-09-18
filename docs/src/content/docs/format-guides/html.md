@@ -44,7 +44,9 @@ parse.ast
 | `<s>`, `<strike>`, `<del>` | `~~strike~~` | `AST::Strikethrough` |
 | `<u>` | `<u>underline</u>` | `AST::Underline` |
 | `<sup>`, `<sub>` | `<sup>…</sup>` / `<sub>…</sub>` | `AST::Superscript`, `AST::Subscript` |
-| `<code>`, `<pre>`, `<tt>` | Code span or fenced block | `AST::Code` |
+| `<code>`, `<tt>` | Code span; fenced block for multiline content | `AST::Code` |
+| `<pre>` | Fenced code block, including single-line content | `AST::Code` |
+| `<h1>`–`<h6>` | `#` through `######` headings | `AST::Heading` |
 | `<a href="...">` | `[text](href)` | `AST::Url` |
 | `<img src alt>` | `![](src)` | `AST::Image` |
 | `<blockquote>` | `[quote]…[/quote]` | `AST::Quote` |
@@ -60,6 +62,25 @@ parse.ast
 `<thead>`, `<tbody>`, `<tfoot>` are transparent — their children are processed as if the wrapper weren't there. Unregistered tags are skipped, but their children are still processed (graceful degradation).
 
 For the authoritative list, see [`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/html/handler_registry.rb).
+
+## Code languages
+
+For syntax highlighting, the parser uses the first valid language from:
+
+1. A `language-*` class on the element.
+2. A `language-*` class on its direct `<code>` child.
+3. The element's `lang` attribute.
+4. A single class on the element or its direct `<code>` child.
+
+The language must contain only letters, digits, underscores, plus signs, or hyphens, and start with a letter or digit. A class list such as `hljs codeblock` does not become a language.
+
+```ruby
+require "markbridge/html"
+
+result = Markbridge.html_to_markdown('<pre><code class="language-ruby">puts 1</code></pre>')
+result.markdown
+# => "```ruby\nputs 1\n```"
+```
 
 ## Parser characteristics
 

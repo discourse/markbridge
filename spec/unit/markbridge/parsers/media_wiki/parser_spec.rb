@@ -280,6 +280,11 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(code).to be_a(Markbridge::AST::Code)
       expect(code.children.first.text).to eq("line 1\nline 2\nline 3")
     end
+
+    it "marks the code element as a block" do
+      doc = parse(" preformatted line")
+      expect(doc.children.first.block).to be true
+    end
   end
 
   describe "<pre> blocks" do
@@ -300,6 +305,11 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
     it "recognises <pre> even when preceded by whitespace" do
       doc = parse("\t<pre>code</pre>")
       expect(doc.children.first).to be_a(Markbridge::AST::Code)
+    end
+
+    it "marks the code element as a block" do
+      doc = parse("<pre>code here</pre>")
+      expect(doc.children.first.block).to be true
     end
 
     it "recognises case-insensitive <PRE>" do

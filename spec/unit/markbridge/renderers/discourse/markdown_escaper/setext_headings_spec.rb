@@ -39,10 +39,20 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       end
     end
 
-    context "when = is standalone (MAY escape - false positives OK)" do
-      it "may or may not escape standalone ===" do
-        result = escaper.escape("===")
-        expect(result).to eq("===").or eq("\\=\\=\\=")
+    context "when the = line has no paragraph before it (MUST escape)" do
+      # The escaper only sees one text fragment. The renderer can place
+      # that fragment after a paragraph line, so a `=`-only line is always
+      # escaped. Discourse shows `\=` as a literal `=`.
+      it "escapes a standalone ===" do
+        expect(escaper.escape("===")).to eq("\\=\\=\\=")
+      end
+
+      it "escapes === after a blank line" do
+        expect(escaper.escape("Text\n\n===")).to eq("Text\n\n\\=\\=\\=")
+      end
+
+      it "escapes === after a list item" do
+        expect(escaper.escape("- item\n===")).to eq("\\- item\n\\=\\=\\=")
       end
     end
 

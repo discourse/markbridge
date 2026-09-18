@@ -13,7 +13,9 @@ module Markbridge
           def process(element:, parent:, processor: nil)
             attrs = extract_attributes(element)
             lang = attrs[:lang] || attrs[:language]
-            node = AST::Code.new(language: lang)
+            # s9e CODE is always a block, so the flag keeps the fenced form
+            # even for single-line content.
+            node = AST::Code.new(language: lang, block: true)
             parent << node
 
             # Return node to signal: process children into this node

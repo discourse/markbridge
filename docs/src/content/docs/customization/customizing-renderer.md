@@ -66,7 +66,7 @@ Map a class to `nil` to unregister it (same as listing it under `unregister:`).
 
 ### `unregister:` — drop AST classes
 
-Listed AST classes fall through to `render_children`, which renders only their text content with surrounding markup discarded. Useful when the source format has tags you want to ignore (sizing, color) without writing pass-through Tags.
+Removing a built-in tag keeps its children, including their formatting. For a subclass, removing its own tag allows the nearest registered ancestor tag to apply. Use `Tag::PASSTHROUGH` to render only the children when an ancestor has a tag.
 
 ```ruby
 Markbridge.discourse_renderer(
@@ -135,7 +135,7 @@ end
 Markbridge.discourse_renderer(postprocessor: StripDoubleSpaces.new)
 ```
 
-Pass the bare base class (`Postprocessor.new`) to keep the default cleanup; pass a no-op (`->(s) { s }` won't work — it must respond to `#call(text)`) if you want raw output.
+Pass the bare base class (`Postprocessor.new`) to keep the default cleanup; pass `->(text) { text }` if you want output without cleanup.
 
 ## Build once, reuse everywhere
 
@@ -157,18 +157,6 @@ end
 ```
 
 There's no shared default `Renderer` instance — each bare call wraps a fresh (cheap) `Renderer` around the shared default tag library. Pass `renderer:` to reuse one instance across calls and carry your customizations.
-
-## Coming from `Markbridge.configure`
-
-Markbridge no longer exposes a global `Markbridge.configuration` or `Markbridge.configure` block. Every customization moves into a renderer.
-
-| Old | New |
-|-----|-----|
-| `Markbridge.configure { \|c\| c.escape_hard_line_breaks = true }` | `Markbridge.discourse_renderer(escape_hard_line_breaks: true)` |
-| `Markbridge.default_tag_library.register(klass, tag)` | `Markbridge.discourse_renderer(tags: { klass => tag })` |
-| `Markbridge.reset_defaults!` | (not needed — every call builds fresh unless you pass `renderer:`) |
-
-Per-call `tag_library:` and `escaper:` kwargs on `*_to_markdown` are also gone; they all flow through `renderer:`.
 
 ## See also
 

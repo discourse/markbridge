@@ -9,6 +9,8 @@
 #
 #   bundle exec ruby --yjit bench/corpus_bench.rb [variant ...]
 #
+# Prefix it with bin/bench-env for repeatable CPU conditions.
+#
 # Reports best-of-N µs/post per corpus (ASCII and multibyte). Compare
 # ascii vs multi within a variant to spot character-index pathologies.
 
@@ -119,7 +121,7 @@ VARIANTS = {
     lambda do |corpus, tag|
       parser = Markbridge::Parsers::BBCode::Parser.new
       asts = corpus.map { |post| parser.parse(post) }
-      normalizer = Markbridge::Normalizer.shared_for(:discourse)
+      normalizer = Markbridge::Normalizer.shared_default
       report("norm_only/#{tag}", asts) { |ast| normalizer.normalize(ast) }
     end,
   ],

@@ -1,102 +1,71 @@
 ---
 title: Performance
-description: Where Markbridge is tuned and how to measure it on your own workload.
+description: Reuse your configuration, process large inputs, and measure conversion speed.
 ---
 
-Markbridge is designed to run on large batches of forum content. The pipeline is O(n) in input size and avoids the quadratic traps common to regex-based approaches.
+Measure performance with representative input. Document size, nesting, custom handlers, and your Ruby engine all affect conversion time.
 
-## Where time is spent
+## Reuse your configuration
 
-**Scanner (BBCode)** is the hottest path for large inputs. It uses:
+The default handler registries and tag library are shared and frozen. Use `.default` to build a fresh registry when you need to customize it.
 
-- Index-based character access (`@input[@pos]`, not slice-based reads).
-- Bounded backtracking — positions are saved and restored, never rewound blindly.
-- Regex only for character classes.
-- Minimal string allocations — buffers are reused across tokens.
+Build a custom renderer once and reuse it across conversions:
 
-**HTML / TextFormatter** delegate tokenization to Nokogiri (libxml2 on MRI and TruffleRuby; Xerces/NekoHTML on JRuby). The walker on top is a straight depth-first traversal.
-
-**MediaWiki** is line-based — one pass through the lines, with a small inline parser for intra-line formatting.
-
-**Renderer**:
-
-- Single-pass depth-first walk.
-- Parent lookups (`has_parent?`, `find_parent`) walk `RenderContext`'s linked parent chain — one small allocation per nested level, and nesting depth stays shallow.
-- `Text` nodes auto-merge during AST construction, so the tree is smaller than the raw token stream.
-
-## Bounded operations
-
-A few hard caps prevent pathological input from hanging the parser:
-
-| Limit | Value | Location |
-|---|---|---|
-| Max nesting depth | 100 | `ParserState` |
-| Max auto-close depth | 5 | `ClosingStrategies::TagReconciler` |
-
-Exceeding the max nesting depth raises `MaxDepthExceededError`. The auto-close depth fails quietly — the parser stops searching for a matching opener and continues. The same bound limits how far `Reordering` will peek ahead when reconciling mismatched closes.
-
-## Ruby version and YJIT
-
-Markbridge targets Ruby 3.3+ on CRuby, and also runs on the latest TruffleRuby and JRuby (their own JITs cover the hot paths). On CRuby, enabling YJIT gives a consistent speedup on the parsing and rendering hot paths:
-
-```bash
-ruby --yjit your_script.rb
-```
-
-Or in-process:
-
+<!-- spec:before
+posts = [Struct.new(:body).new("[b]Hello[/b]")]
+-->
 ```ruby
-RubyVM::YJIT.enable if defined?(RubyVM::YJIT)
+renderer = Markbridge.discourse_renderer(escape_hard_line_breaks: true)
+
+posts.each do |post|
+  result = Markbridge.bbcode_to_markdown(post.body, renderer:)
+  puts result.markdown
+end
 ```
 
-## Memory
+The renderer stores no per-document state. Your custom handlers and tags should follow the same rule if you share them across calls or threads.
 
-Markbridge renders fully in memory — no streaming API. For a single post this is negligible; for a batch of millions, stream at the caller:
+## Process one document at a time
+
+Each conversion builds its AST and output in memory. For large collections, read and write one document at a time instead of keeping every result.
 
 <!-- spec:before
 require "csv"
-csv_data = "id,body\n1,[b]hi[/b]\n"
+csv_data = "id,body\n1,[b]Hello[/b]\n"
 CSV.define_singleton_method(:foreach) do |_path, **opts, &block|
   CSV.parse(csv_data, **opts, &block)
 end
-output_db = Class.new { def insert(*); end }.new
 -->
 ```ruby
+require "csv"
+require "markbridge/bbcode"
+
 CSV.foreach("posts.csv", headers: true) do |row|
-  markdown = Markbridge.bbcode_to_markdown(row["body"])
-  output_db.insert(row["id"], markdown)
+  result = Markbridge.bbcode_to_markdown(row["body"])
+  puts result.markdown
 end
 ```
 
-Don't accumulate ASTs or rendered output across iterations — let Ruby GC them as you go.
+## Parser limits
 
-## Reusing handlers and renderers
+The BBCode parser limits nesting to 100 levels. Its built-in handlers preserve an opening tag as text when that limit is reached and record `depth_exceeded_count` in the diagnostics. A custom handler that calls `ParserState#push` without a token can raise `MaxDepthExceededError` at that limit.
 
-The default handler registry and tag library are built once and shared (frozen) across the process, so a bare `*_to_markdown` call reuses them — it only allocates the thin parser and renderer that wrap them. That's already cheap. In a tight loop you can still shave those wrapper allocations (and carry your customizations) by building a renderer once and passing it:
+Closing strategies search at most five levels when reconciling mismatched tags. These limits keep searches bounded on deeply nested input.
 
-<!-- spec:before
-posts = [Struct.new(:body).new("[b]hi[/b]")]
--->
-```ruby
-HANDLERS = Markbridge::Parsers::BBCode::HandlerRegistry.default
-RENDERER = Markbridge.discourse_renderer(
-  escape_hard_line_breaks: true,
-  # custom tags, unregistered tags, custom escaper, etc.
-)
+## How parsing works
 
-posts.each do |post|
-  Markbridge.bbcode_to_markdown(post.body, handlers: HANDLERS, renderer: RENDERER)
-end
-```
+- **BBCode:** the scanner uses byte offsets and integer checks for ASCII syntax. Offsets remain on character boundaries for multibyte input.
+- **HTML and TextFormatter:** Nokogiri parses the input before Markbridge walks the document. Pass an existing Nokogiri node if your code has already parsed it.
+- **MediaWiki:** the parser reads block syntax by line and uses a separate parser for inline markup.
 
-The `Renderer` is safe to reuse across thousands of posts — it holds no per-post state.
+Adjacent text nodes merge during AST construction. The renderer walks the resulting tree and uses a parent context for nested content.
 
-## Measuring on your workload
+## Measure your workload
 
-The numbers that matter are from your data. A minimal script:
+Read input before timing if you want to measure conversion without file access:
 
 <!-- spec:before
-File.define_singleton_method(:readlines) { |_path, **| ["[b]hi[/b]", "[i]world[/i]"] }
+File.define_singleton_method(:readlines) { |_path, **| ["[b]Hello[/b]", "[i]world[/i]"] }
 -->
 ```ruby
 require "benchmark"
@@ -104,19 +73,29 @@ require "markbridge/bbcode"
 
 inputs = File.readlines("corpus.txt", chomp: true)
 
-Benchmark.bm(20) do |x|
-  x.report("bbcode_to_markdown") do
-    inputs.each { |s| Markbridge.bbcode_to_markdown(s) }
+Benchmark.bm do |benchmark|
+  benchmark.report("conversion") do
+    inputs.each { |input| Markbridge.bbcode_to_markdown(input) }
   end
 end
 ```
 
-For profiling specific inputs, reach for `ruby-prof` or `stackprof` and focus on the scanner and the renderer — those are the only two places that touch every character or every node.
+On CRuby, compare runs with YJIT enabled:
 
-## When it's slow anyway
+```bash
+ruby --yjit your_script.rb
+```
 
-Almost always, one of:
+JRuby and TruffleRuby have their own JIT compilers. Allow time for warmup and compare both startup time and sustained conversion speed.
 
-1. **Custom handler doing real work.** A handler that parses attribute JSON, hits the filesystem, etc., dwarfs everything else. Profile the handler, not Markbridge.
-2. **Input that blows past the depth limit.** Deeply nested inputs can still be expensive even below the cap. Consider a Strict closing strategy to fail faster on adversarial input.
-3. **Rendering inside a tight outer loop.** If you're reusing the same tag library per call, make sure it's built outside the loop (see above).
+## Repository benchmarks
+
+Run benchmarks through `bin/bench-env`. It selects the fastest CPU cores and reports power and governor settings. Compare runs on AC power with the same governor.
+
+```bash
+bin/bench-env bundle exec ruby --yjit bench/bench.rb --isolated
+DURATION=60 WINDOW=5 POSTS=2000 CORPUS=ascii bin/bench-env bundle exec ruby --yjit bench/sustained_bench.rb
+DURATION=60 WINDOW=5 POSTS=2000 CORPUS=multi bin/bench-env bundle exec ruby --yjit bench/sustained_bench.rb
+```
+
+Run the ASCII and multibyte corpora in separate processes. See [Benchmark results](/concepts/benchmarks/) for recorded measurements and their limits.

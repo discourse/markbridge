@@ -72,7 +72,7 @@ normalizer.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Image, str
 Markbridge.convert(input, format: :bbcode, normalize: normalizer)
 ```
 
-Build a customized normalizer once and reuse it. `#normalize` and `#violations` keep no state on the instance, so one frozen instance is safe for every conversion, also across threads — passing your own is as fast as the default path. A rule for a `(parent, child)` pair that already exists is replaced, so your `#rule` calls override the defaults. Matching is by exact class (`instance_of?`), so a rule for `AST::Url` doesn't catch a subclass.
+Build a customized normalizer once and reuse it. `#normalize` and `#violations` keep no state on the instance, so one frozen instance is safe for every conversion, also across threads — passing your own is as fast as the default path. A rule for a `(parent, child)` pair that already exists is replaced, so your `#rule` calls override the defaults. Rules match subclasses too, for both `parent:` and `child:`. A rule for a more specific class takes priority. See [AST subclasses](/customization/extending/#ast-subclasses).
 
 `Markbridge::Normalizer.shared_default` is the default normalizer, built once and frozen; the `normalize: true` path uses it. Don't mutate it — call `.default` for a fresh, customizable one.
 

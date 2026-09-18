@@ -14,8 +14,8 @@ The renderer takes an `AST::Document` and produces a Markdown string. It lives u
 ```
 renderer.render(document)
   for each child node:
-    tag = tag_library[child.class]
-    tag.render(child, interface)
+    tag = tag_library[child.class] || tag_library.resolve(child.class)
+    render with the tag, or render the children if no tag matches
 ```
 
 The renderer holds no state beyond the running output and the context. All decisions about markup (`**`, `_`, backticks, etc.) live in the individual `Tag` classes.
@@ -27,7 +27,11 @@ A `Tag` is any class (or block) that responds to `render(element, interface)`:
 ```ruby
 class BoldTag < Markbridge::Renderers::Discourse::Tag
   def render(element, interface)
-    interface.wrap_inline(interface.render_children(element), "**")
+    context = interface.with_parent(element)
+    content = interface.render_children(element, context:)
+    return "<strong>#{content}</strong>" if interface.html_mode?
+
+    interface.wrap_inline(content, "**")
   end
 end
 ```
@@ -36,7 +40,13 @@ For simple cases, the block constructor is often enough:
 
 ```ruby
 Markbridge::Renderers::Discourse::Tag.new do |element, interface|
-  "**" + interface.render_children(element) + "**"
+  context = interface.with_parent(element)
+  content = interface.render_children(element, context:)
+  if interface.html_mode?
+    "<strong>#{content}</strong>"
+  else
+    interface.wrap_inline(content, "**")
+  end
 end
 ```
 
@@ -47,7 +57,7 @@ end
 | Method | Use |
 |---|---|
 | `render_children(element)` | Recurse into children, concatenate output |
-| `with_parent(element)` | Return a new interface that treats `element` as parent |
+| `with_parent(element)` | Return a new context that treats `element` as parent |
 | `find_parent(klass)` | Walk ancestors for a specific class |
 | `has_parent?(klass)` | Boolean ancestor check |
 | `count_parents(klass)` | How deep a specific ancestor is (nested lists, quotes) |
@@ -61,7 +71,7 @@ The interface decouples tags from the renderer: you could write a second rendere
 
 Behind the interface is a `RenderContext` — an immutable, linked parent chain. Creating a child context (via `with_parent`) links a new instance to the current one; the old one is untouched. `has_parent?` / `find_parent` walk that chain, so each nested level is a single fixed-size allocation rather than a copied parent array, and nesting depth stays shallow in practice.
 
-This immutability is load-bearing: it keeps the renderer side-effect free during a walk, which makes reasoning about nested tags much simpler.
+A child context does not change the context used by its siblings.
 
 ## TagLibrary
 
@@ -77,11 +87,11 @@ end
 ```ruby
 RENDERER = Markbridge.discourse_renderer(
   tags: { Markbridge::AST::Url => MyUrlTag.new },     # override
-  unregister: [Markbridge::AST::Color],               # drop entirely
+  unregister: [Markbridge::AST::Color],               # render children only
 )
 ```
 
-Unknown AST classes (and unregistered ones) fall through to `render_children`, so a node with no registered tag won't crash rendering — it renders its children only, with the surrounding markup discarded.
+The renderer checks the node's class, then its nearest registered ancestor class. If neither has a tag, it renders only the children. To render only the children of a subclass with an inherited tag, register `Tag::PASSTHROUGH`. See [AST subclasses](/customization/extending/#ast-subclasses).
 
 For lower-level use, `TagLibrary.new.auto_register!` discovers convention-paired classes (`BoldTag` → `AST::Bold`, etc.) under `Markbridge::Renderers::Discourse::Tags::*`. Consumer-defined tag classes still need explicit registration.
 

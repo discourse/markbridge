@@ -121,6 +121,17 @@ RSpec.describe Markbridge::Normalizer do
       end
     end
 
+    it "flags a single-line code span with the block flag set, in any inline container" do
+      described_class::INLINE_CONTAINERS.each do |container|
+        forced = el(Markbridge::AST::Code, text("x"), block: true)
+
+        expect(described_class.default.violations(doc(wrap(container, forced)))).to contain_exactly(
+          { parent: short(container), child: "Code", strategy: :hoist_after },
+        ),
+        "forced block code in #{container}"
+      end
+    end
+
     it "does not flag a node that is both an inline container and a block against itself" do
       # Heading is in INLINE_CONTAINERS and in BLOCK_NODES. build_rules must not
       # add a (Heading, Heading) hoist rule, or a heading in a heading would move.

@@ -2,7 +2,7 @@
   "name": "docs",
   "type": "module",
   "version": "0.0.1",
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@12.4.2",
   "scripts": {
     "dev": "node ./scripts/generate-changelog.mjs && astro dev --host",
     "start": "node ./scripts/generate-changelog.mjs && astro dev --host",
@@ -12,8 +12,11 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.41.1",
-    "astro": "^7.0.3",
-    "sharp": "^0.35.2"
+    "@astrojs/starlight": "^0.42.1",
+    "astro": "^7.3.3",
+    "sharp": "^0.35.4"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

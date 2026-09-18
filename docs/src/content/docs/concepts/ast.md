@@ -3,7 +3,7 @@ title: The AST
 description: Node types, invariants, and how the tree gets built.
 ---
 
-The AST is the pipeline's waist: every parser produces it, and the renderer consumes it. It deliberately knows nothing about input or output formats.
+Every parser produces an abstract syntax tree (AST). The tree stores content and structure independently of the input syntax and renderer.
 
 ## Node hierarchy
 
@@ -39,7 +39,7 @@ AST::Node (base)
     │   ├── AST::Email             — email address
     │   ├── AST::Image             — src, alt attributes
     │   ├── AST::Attachment
-    │   ├── AST::Code              — optional lang
+    │   ├── AST::Code              — language and block flag
     │   └── AST::Color, AST::Size, AST::Align
     ├── Lists
     │   ├── AST::List              — ordered / unordered
@@ -55,7 +55,7 @@ AST::Node (base)
 - **Children are always `AST::Node` instances.** `Element#<<` validates on insert.
 - **Adjacent `Text` nodes auto-merge.** Inserting `Text("a")` then `Text("b")` results in a single `Text("ab")` child — not two.
 - **Leaves have no children.** `LineBreak` and `HorizontalRule` extend `Node` directly, not `Element`, and will reject children.
-- **No public setters.** Once a node is built, its attributes are read-only (`attr_reader`, not `attr_accessor`).
+- **Node attributes are read-only.** You can edit the tree with `<<`, `replace_child`, and `replace_children`.
 
 ## Building and inspecting
 
@@ -72,7 +72,19 @@ doc.children.first.children.length # => 1
 
 ## Walking the tree
 
-The renderer walks depth-first, dispatching each node through the `TagLibrary`. For custom traversal, iterate `children` yourself — there's no built-in visitor because the rendering interface already covers the common cases.
+Use `each_descendant` to visit nodes in depth-first order, or `descendants(klass)` to collect nodes of a given class. Subclasses match too.
+
+```ruby
+parse = Markbridge.parse_bbcode("[b]Hello[/b] [url=/about]About[/url]")
+links = parse.ast.descendants(Markbridge::AST::Url)
+links.map(&:href) # => ["/about"]
+```
+
+`replace_child(old_node, new_node)` replaces a direct child at the same position. During traversal, each element uses a copy of its child list. Replacing a child is supported, but the walk continues through the original node. Added children may not be visited during that walk.
+
+## Code spans and blocks
+
+`AST::Code.new(language: "ruby", block: true)` forces a fenced block, even for one line. Without `block: true`, single-line content renders as a code span and multiline content renders as a fenced block. Empty code nodes produce no output.
 
 ## Why a shared AST matters
 

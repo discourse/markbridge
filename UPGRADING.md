@@ -1,11 +1,5 @@
 # Upgrading Markbridge
 
-The upgrade guide now lives on the docs site:
+Read the [upgrade guide](https://markbridge.dev/reference/upgrading/) for API and output changes between releases.
 
-**https://markbridge.dev/reference/upgrading/**
-
-It covers the breaking changes between releases (the `Conversion`/`Parse`
-result types, the single `renderer:` kwarg, signature changes) and the new
-capabilities the redesign added (`allow:`, `escape: false`, editing the AST
-between parse and render, pre-parsed Nokogiri input, AST traversal helpers,
-and `AST::Details`).
+The source is in [docs/src/content/docs/reference/upgrading.md](docs/src/content/docs/reference/upgrading.md).

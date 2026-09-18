@@ -16,9 +16,16 @@
     if (dialog) return dialog;
     dialog = document.createElement('dialog');
     dialog.className = 'diagram-zoom-dialog';
+    dialog.setAttribute('aria-label', 'Enlarged diagram');
     content = document.createElement('div');
     content.className = 'diagram-zoom-content';
     dialog.appendChild(content);
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'diagram-zoom-close';
+    close.textContent = 'Close diagram';
+    close.addEventListener('click', () => dialog.close());
+    dialog.appendChild(close);
     dialog.addEventListener('click', (event) => {
       if (event.target === dialog) dialog.close();
     });
@@ -46,6 +53,22 @@
     content.appendChild(clone);
     dialog.showModal();
   }
+
+  function prepareDiagrams() {
+    document.querySelectorAll('figure.diagram').forEach((figure) => {
+      if (figure.querySelector('button')) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'diagram-zoom-trigger';
+      button.setAttribute('aria-label', 'Enlarge diagram');
+      button.setAttribute('aria-haspopup', 'dialog');
+      button.append(...figure.childNodes);
+      figure.appendChild(button);
+    });
+  }
+
+  prepareDiagrams();
+  document.addEventListener('astro:page-load', prepareDiagrams);
 
   document.addEventListener('click', (event) => {
     if (!event.target.closest) return;

@@ -71,6 +71,28 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
 
       expect(renderer).to have_received(:render_children).with(element, context: other_context)
     end
+
+    it "passes an optional block on to the renderer" do
+      element = Markbridge::AST::Bold.new
+      element << Markbridge::AST::MarkdownText.new("a")
+      element << Markbridge::AST::MarkdownText.new("b")
+
+      seen = []
+      result = interface.render_children(element) { |buffer, child| seen << [buffer.dup, child] }
+
+      expect(seen).to eq([["", element.children[0]], ["a", element.children[1]]])
+      expect(result).to eq("ab")
+    end
+
+    it "keeps what the block wrote to the buffer" do
+      element = Markbridge::AST::Bold.new
+      element << Markbridge::AST::MarkdownText.new("a")
+      element << Markbridge::AST::MarkdownText.new("b")
+
+      result = interface.render_children(element) { |buffer, _child| buffer << "|" }
+
+      expect(result).to eq("|a|b")
+    end
   end
 
   describe "context delegation" do
@@ -147,6 +169,35 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
 
     it "returns false for non-Element values (e.g. AST::Text)" do
       expect(interface.block_context?(Markbridge::AST::Text.new("hi"))).to be false
+    end
+
+    it "returns true for a single-line AST::Code with block: true" do
+      code = Markbridge::AST::Code.new(block: true)
+      code << Markbridge::AST::Text.new("inline")
+
+      expect(interface.block_context?(code)).to be true
+    end
+
+    it "returns false for a single-line AST::Code without the block flag" do
+      code = Markbridge::AST::Code.new
+      code << Markbridge::AST::Text.new("inline")
+
+      expect(interface.block_context?(code)).to be false
+    end
+
+    it "returns true for a multi-line AST::Code without the block flag" do
+      code = Markbridge::AST::Code.new
+      code << Markbridge::AST::Text.new("line1\nline2")
+
+      expect(interface.block_context?(code)).to be true
+    end
+
+    it "returns true for a single-line AST::Code subclass with block: true" do
+      subclass = Class.new(Markbridge::AST::Code)
+      code = subclass.new(block: true)
+      code << Markbridge::AST::Text.new("inline")
+
+      expect(interface.block_context?(code)).to be true
     end
 
     it "returns true when an Element child contains a newline in its text" do

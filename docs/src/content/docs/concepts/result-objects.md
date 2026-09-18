@@ -1,6 +1,6 @@
 ---
 title: Result objects
-description: What Markbridge hands back — the Conversion from *_to_markdown, and the Parse from parse_*.
+description: Read Markdown, AST nodes, unknown tags, and diagnostics from Conversion and Parse results.
 ---
 
 Markbridge's convenience methods don't return a plain string. The render methods return a `Conversion`; the parse-only methods return a `Parse`. Both carry their data alongside the result, so you never need a side channel.

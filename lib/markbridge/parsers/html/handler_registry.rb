@@ -132,6 +132,7 @@ module Markbridge
             registry.register("a", Handlers::UrlHandler.new)
             registry.register("img", Handlers::ImageHandler.new)
             registry.register("blockquote", Handlers::QuoteHandler.new)
+            registry.register(%w[h1 h2 h3 h4 h5 h6], Handlers::HeadingHandler.new)
             registry.register("br", Handlers::SelfClosingHandler.new(AST::LineBreak))
             registry.register("hr", Handlers::SelfClosingHandler.new(AST::HorizontalRule))
             registry.register(%w[ul ol], Handlers::ListHandler.new)

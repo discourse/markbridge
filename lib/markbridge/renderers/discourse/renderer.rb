@@ -12,8 +12,9 @@ module Markbridge
           @escaper = escaper || MarkdownEscaper.new
           @html_escaper = html_escaper || HtmlEscaper
           @postprocessor = postprocessor || Postprocessor::DEFAULT
-          # @interface_cache is lazily initialized in #render's top-level
-          # call and reset to nil after the call completes.
+          # @interface_cache, @resolved_tags, and @resolved_default_tags
+          # are lazily initialized during a top-level #render /
+          # #render_default call and reset to nil after the call completes.
         end
 
         # Render a node to Markdown
@@ -28,7 +29,10 @@ module Markbridge
           root_call = @interface_cache.nil?
           @interface_cache = {} if root_call
 
-          tag = @tag_library[node.class]
+          # Exact-class hit first (a single Hash lookup, the common case),
+          # then the memoized ancestry fallback so a subclass without its
+          # own tag renders through its nearest ancestor's tag.
+          tag = @tag_library[node.class] || resolved_tag(node.class)
           if tag
             result = tag.render(node, interface_for(context))
             unless result.is_a?(String)
@@ -43,7 +47,11 @@ module Markbridge
 
           render_without_tag(node, context)
         ensure
-          @interface_cache = nil if root_call
+          if root_call
+            @interface_cache = nil
+            @resolved_tags = nil
+            @resolved_default_tags = nil
+          end
         end
 
         # Render a node with the stock tag for its class, ignoring any
@@ -66,28 +74,51 @@ module Markbridge
           root_call = @interface_cache.nil?
           @interface_cache = {} if root_call
 
-          tag = default_tag_library[node.class]
+          tag = default_tag_library[node.class] || resolved_default_tag(node.class)
           return tag.render(node, interface_for(context)) if tag
 
           render_without_tag(node, context)
         ensure
-          @interface_cache = nil if root_call
+          if root_call
+            @interface_cache = nil
+            @resolved_tags = nil
+            @resolved_default_tags = nil
+          end
         end
 
         # Render all children of a node
+        #
+        # With a block, the block runs at every join point, right before
+        # a non-empty child output is appended. It receives the buffer
+        # built so far and the child about to be rendered into it, and
+        # may change the buffer in place. A tag uses this to adjust the
+        # text in front of a specific child without iterating the
+        # children itself, which would lose the emphasis-boundary rule
+        # below.
+        #
         # @param node [AST::Element]
         # @param context [RenderContext] rendering context
+        # @yieldparam result [String] the buffer built so far
+        # @yieldparam child [AST::Node] the child about to be appended
         # @return [String]
+        # @example Attach a nested list directly to the text in front of it
+        #   interface.render_children(item, context:) do |buffer, child|
+        #     buffer.rstrip! if child.is_a?(AST::List)
+        #   end
         def render_children(node, context:)
           result = +""
           node.children.each do |child|
             part = render(child, context:)
             next if part.empty?
 
+            yield(result, child) if block_given?
+
             # Integer-byte check avoids allocating substrings for the
             # per-child adjacency probe. EMPHASIS_DELIMITER_BYTES.include?
-            # over a 4-element Set is O(1).
-            if !result.empty? && (last_byte = result.getbyte(-1)) == part.getbyte(0) &&
+            # over a 4-element Set is O(1). On an empty buffer getbyte
+            # returns nil, which matches no byte of a non-empty part, so
+            # the first child needs no extra guard.
+            if (last_byte = result.getbyte(-1)) == part.getbyte(0) &&
                  EMPHASIS_DELIMITER_BYTES.include?(last_byte)
               result << EMPHASIS_BOUNDARY
             end
@@ -111,6 +142,24 @@ module Markbridge
 
         def interface_for(context)
           @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)
+        end
+
+        # Ancestry fallback for tag dispatch (see TagLibrary#resolve),
+        # memoized per top-level render call — the tag library can change
+        # between calls, so the cache must not outlive one call (it is
+        # reset in #render's ensure). +fetch+ stores nil results too, so a
+        # class that resolves to no tag is walked once per call, not once
+        # per node.
+        def resolved_tag(node_class)
+          cache = @resolved_tags ||= {}
+          cache.fetch(node_class) { cache[node_class] = @tag_library.resolve(node_class) }
+        end
+
+        # Same as {#resolved_tag}, against the default library backing
+        # #render_default.
+        def resolved_default_tag(node_class)
+          cache = @resolved_default_tags ||= {}
+          cache.fetch(node_class) { cache[node_class] = default_tag_library.resolve(node_class) }
         end
 
         # Pristine default library backing #render_default. Built lazily —
@@ -138,7 +187,7 @@ module Markbridge
         # parses the content as Markdown before the closing tags reopen another
         # HTML block.
         def render_markdown_text(node, context)
-          context.html_mode? ? "\n\n#{node.text}\n\n" : node.text
+          context.html_mode? ? HtmlBlock.island(node.text) : node.text
         end
 
         def render_text(node, context)

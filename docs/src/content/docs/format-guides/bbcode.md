@@ -29,7 +29,7 @@ parse.ast
 
 ## Supported tags
 
-All tag names are case-insensitive. Aliases in the same row behave identically.
+All tag names are case-insensitive. Aliases in the same row use the same handler.
 
 <div class="format-tags">
 
@@ -48,7 +48,8 @@ All tag names are case-insensitive. Aliases in the same row behave identically.
 
 | Tags | Renders as | AST node |
 |---|---|---|
-| `[code]`, `[pre]`, `[tt]` | Code span or fenced block | `AST::Code` |
+| `[code]`, `[pre]` | Fenced code block, including single-line content | `AST::Code` |
+| `[tt]` | Code span; fenced block for multiline content | `AST::Code` |
 
 ### Links, images, attachments
 

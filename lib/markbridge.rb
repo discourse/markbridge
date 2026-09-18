@@ -276,8 +276,10 @@ module Markbridge
     #   library to start from. Defaults to a fresh {TagLibrary.default}.
     #   When supplied, it is +dup+'d before any +tags:+ / +unregister:+
     #   mutation, so the caller's library is left untouched.
-    # @param unregister [Array<Class>, nil] AST classes to drop from
-    #   the library so they fall through to +render_children+.
+    # @param unregister [Array<Class>, nil] AST classes whose binding to
+    #   drop from the library. A built-in class then renders as just its
+    #   children; a subclass of a bound class falls back to the nearest
+    #   ancestor's tag (see {Renderers::Discourse::TagLibrary#unregister}).
     # @param escaper [#escape, nil] when given, used as-is; +escape:+,
     #   +escape_hard_line_breaks:+, and +allow:+ are then ignored.
     # @param escape [Boolean] when +false+, the renderer is built with

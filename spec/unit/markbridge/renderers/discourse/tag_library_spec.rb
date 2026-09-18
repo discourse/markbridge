@@ -34,11 +34,66 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
     end
   end
 
+  describe "#resolve" do
+    let(:tag) { Markbridge::Renderers::Discourse::Tag.new { |_, _| "x" } }
+
+    it "returns the tag of the nearest ancestor with a registered tag" do
+      library.register(Markbridge::AST::Bold, tag)
+      subclass = Class.new(Markbridge::AST::Bold)
+
+      expect(library.resolve(subclass)).to be(tag)
+    end
+
+    it "prefers the nearest ancestor when several ancestors have tags" do
+      middle_tag = Markbridge::Renderers::Discourse::Tag.new { |_, _| "m" }
+      middle = Class.new(Markbridge::AST::Bold)
+      leaf = Class.new(middle)
+      library.register(Markbridge::AST::Bold, tag)
+      library.register(middle, middle_tag)
+
+      expect(library.resolve(leaf)).to be(middle_tag)
+    end
+
+    it "skips the exact class itself — that lookup is #[]" do
+      library.register(Markbridge::AST::Bold, tag)
+
+      expect(library.resolve(Markbridge::AST::Bold)).to be_nil
+    end
+
+    it "returns nil when no ancestor has a tag" do
+      expect(library.resolve(Class.new(Markbridge::AST::Bold))).to be_nil
+    end
+
+    it "finds a tag registered for AST::Node, the top of the walk" do
+      library.register(Markbridge::AST::Node, tag)
+
+      expect(library.resolve(Markbridge::AST::Bold)).to be(tag)
+    end
+
+    it "never walks outside the AST hierarchy" do
+      library.register(Object, tag)
+
+      expect(library.resolve(Markbridge::AST::Bold)).to be_nil
+    end
+
+    it "returns nil for a class without a superclass" do
+      expect(library.resolve(BasicObject)).to be_nil
+    end
+  end
+
   describe ".default" do
     let(:default_library) { described_class.default }
 
     it "returns a TagLibrary" do
       expect(default_library).to be_a(described_class)
+    end
+
+    it "registers no tag for AST::Element or AST::Node" do
+      # Ancestry dispatch and the unregister-for-passthrough idiom both
+      # count on this: with a tag on Element or Node, every unregistered
+      # element class would suddenly inherit it.
+      expect(default_library[Markbridge::AST::Element]).to be_nil
+      expect(default_library[Markbridge::AST::Node]).to be_nil
     end
 
     Markbridge::Renderers::Discourse::Tags.constants.each do |const_name|
@@ -280,8 +335,9 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
   end
 
   describe "#freeze" do
+    let(:tag) { Markbridge::Renderers::Discourse::Tag.new { |_, _| "x" } }
+
     it "makes register raise instead of silently mutating shared state" do
-      tag = Markbridge::Renderers::Discourse::Tag.new { |_, _| "x" }
       frozen = described_class.new.freeze
 
       expect { frozen.register(Markbridge::AST::Bold, tag) }.to raise_error(FrozenError)
@@ -291,6 +347,83 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
       library = described_class.new
 
       expect(library.freeze).to be(library)
+    end
+
+    it "flattens inherited tags into exact bindings for known subclasses" do
+      subclass = Class.new(Markbridge::AST::Bold)
+      library.register(Markbridge::AST::Bold, tag)
+
+      library.freeze
+
+      # The exact-class lookup now hits directly — no ancestry walk left.
+      expect(library[subclass]).to be(tag)
+    end
+
+    it "prefers the nearest ancestor when flattening" do
+      middle_tag = Markbridge::Renderers::Discourse::Tag.new { |_, _| "m" }
+      middle = Class.new(Markbridge::AST::Bold)
+      leaf = Class.new(middle)
+      library.register(Markbridge::AST::Bold, tag)
+      library.register(middle, middle_tag)
+
+      library.freeze
+
+      expect(library[leaf]).to be(middle_tag)
+    end
+
+    it "adds no binding for classes whose ancestry resolves to no tag" do
+      subclass = Class.new(Markbridge::AST::Element)
+      library.register(Markbridge::AST::Bold, tag)
+
+      library.freeze
+
+      expect(library[subclass]).to be_nil
+      expect(library[Markbridge::AST::Text]).to be_nil
+      # Not even a nil binding — the class must stay absent from the
+      # internal Hash, or iteration and key checks would report it.
+      expect(library.map { |klass, _| klass }).not_to include(subclass, Markbridge::AST::Text)
+    end
+
+    it "leaves explicit bindings alone" do
+      subclass = Class.new(Markbridge::AST::Bold)
+      own_tag = Markbridge::Renderers::Discourse::Tag.new { |_, _| "own" }
+      library.register(Markbridge::AST::Bold, tag)
+      library.register(subclass, own_tag)
+
+      library.freeze
+
+      expect(library[subclass]).to be(own_tag)
+    end
+  end
+
+  describe "#dup of a frozen library" do
+    let(:tag) { Markbridge::Renderers::Discourse::Tag.new { |_, _| "x" } }
+
+    it "drops the flattened entries so the copy goes back to lazy resolution" do
+      subclass = Class.new(Markbridge::AST::Bold)
+      library.register(Markbridge::AST::Bold, tag)
+      library.freeze
+      expect(library[subclass]).to be(tag) # flattened
+
+      copy = library.dup
+
+      # The copy is mutable; a later register on the base class must win
+      # again, so no baked-in entry may remain.
+      expect(copy[subclass]).to be_nil
+      expect(copy.resolve(subclass)).to be(tag)
+      expect(copy[Markbridge::AST::Bold]).to be(tag)
+    end
+
+    it "lets a base class override on the copy reach known subclasses again" do
+      subclass = Class.new(Markbridge::AST::Bold)
+      library.register(Markbridge::AST::Bold, tag)
+      library.freeze
+
+      copy = library.dup
+      other = Markbridge::Renderers::Discourse::Tag.new { |_, _| "other" }
+      copy.register(Markbridge::AST::Bold, other)
+
+      expect(copy.resolve(subclass)).to be(other)
     end
   end
 end

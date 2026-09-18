@@ -16,6 +16,28 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
       )
     end
 
+    it "strips whitespace on both sides of the body" do
+      element = Markbridge::AST::Details.new(title: "Show more")
+      element << Markbridge::AST::Text.new(" \nhidden body\n ")
+
+      expect(tag.render(element, interface)).to eq(
+        %(\n\n[details="Show more"]\nhidden body\n[/details]\n\n),
+      )
+    end
+
+    it "renders an element with no content to nothing" do
+      element = Markbridge::AST::Details.new(title: "Empty")
+
+      expect(tag.render(element, interface)).to eq("")
+    end
+
+    it "renders whitespace-only content to nothing" do
+      element = Markbridge::AST::Details.new(title: "Empty")
+      element << Markbridge::AST::Text.new(" \n ")
+
+      expect(tag.render(element, interface)).to eq("")
+    end
+
     it "omits the =\"…\" when no title is set, producing bare [details]" do
       element = Markbridge::AST::Details.new
       element << Markbridge::AST::Text.new("body")

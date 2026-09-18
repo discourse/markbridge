@@ -14,6 +14,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
       expect(tag.render(element, interface)).to eq("[spoiler]hidden[/spoiler]")
     end
 
+    it "renders an empty element to nothing" do
+      element = Markbridge::AST::Spoiler.new(title: "Click me")
+
+      expect(tag.render(element, interface)).to eq("")
+    end
+
     it "uses [spoiler=title] form when a title is set" do
       element = Markbridge::AST::Spoiler.new(title: "Click me")
       element << Markbridge::AST::Text.new("hidden")

@@ -43,7 +43,7 @@ Inside `<r>`, formatted children use **uppercase element names** by convention (
 | `<I>` | `*italic*` | `AST::Italic` |
 | `<S>` | `~~strike~~` | `AST::Strikethrough` |
 | `<U>` | `<u>underline</u>` | `AST::Underline` |
-| `<CODE>` | Code span or fenced block | `AST::Code` |
+| `<CODE>` | Fenced code block, including single-line content | `AST::Code` |
 | `<URL>` | `[text](href)` | `AST::Url` |
 | `<EMAIL>` | `[text](mailto:addr)` | `AST::Url` |
 | `<IMG>` | `![](src)` | `AST::Image` |

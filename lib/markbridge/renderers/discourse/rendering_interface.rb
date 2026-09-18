@@ -26,8 +26,10 @@ module Markbridge
           @renderer.render_default(node, context:)
         end
 
-        def render_children(element, context: @context)
-          @renderer.render_children(element, context:)
+        # An optional block runs at every join point, before a non-empty
+        # child output is appended — see Renderer#render_children.
+        def render_children(element, context: @context, &block)
+          @renderer.render_children(element, context:, &block)
         end
 
         # Context operations
@@ -65,6 +67,10 @@ module Markbridge
         def block_context?(node)
           # Check if it's a block-level element type (but not code, which can be inline)
           return true if node.instance_of?(AST::List) || node.instance_of?(AST::HorizontalRule)
+          # A Code node whose source construct is a block by definition keeps
+          # its block form even with single-line content (is_a?, so Code
+          # subclasses inherit the behavior).
+          return true if node.is_a?(AST::Code) && node.block
           return false unless node.is_a?(AST::Element)
 
           # Check if content has newlines

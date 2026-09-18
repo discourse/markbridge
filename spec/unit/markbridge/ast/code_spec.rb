@@ -18,6 +18,18 @@ RSpec.describe Markbridge::AST::Code do
     end
   end
 
+  describe "#block" do
+    it "returns nil by default" do
+      element = described_class.new
+      expect(element.block).to be_nil
+    end
+
+    it "returns true when set" do
+      element = described_class.new(block: true)
+      expect(element.block).to be true
+    end
+  end
+
   it "can have children" do
     element = described_class.new(language: "python")
     text = Markbridge::AST::Text.new("print('hello')")

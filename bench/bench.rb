@@ -7,6 +7,10 @@
 #   bundle exec ruby --yjit bench/bench.rb            # suite mode
 #   bundle exec ruby --yjit bench/bench.rb --isolated # one process per report
 #
+# Run it through bin/bench-env to pin the process to the fastest cores
+# and to see whether the machine is on AC power with the performance
+# governor. Numbers taken under different conditions don't compare.
+#
 # Suite mode runs all reports in one process. It's faster to run
 # but YJIT compiles all report paths concurrently, so they compete for
 # the JIT budget and inline-decision heuristics — the resulting

@@ -147,8 +147,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       item << Markbridge::AST::Text.new("nested")
       inner_list << item
 
-      # Outer list adds 2-space indent to inner items.
-      expect(tag.render(inner_list, interface)).to eq("\n  - nested\n")
+      # A nested item does not indent itself; the item that holds the
+      # nested list indents its whole content.
+      expect(tag.render(inner_list, interface)).to eq("\n- nested\n")
     end
 
     context "in html_mode" do

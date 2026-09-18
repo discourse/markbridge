@@ -76,12 +76,12 @@ RSpec.describe "phpBB3 XML to Markdown" do
       expect(result.markdown).to eq("[Contact us](mailto:user@example.com)")
     end
 
-    it "converts inline code" do
+    it "renders single-line CODE as a fenced block" do
       xml = "<r><CODE>var x = 1</CODE></r>"
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result.markdown).to eq("`var x = 1`")
+      expect(result.markdown).to eq("```\nvar x = 1\n```")
     end
 
     it "converts nested formatting" do

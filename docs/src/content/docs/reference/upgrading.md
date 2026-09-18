@@ -3,7 +3,66 @@ title: Upgrading
 description: Breaking-change notes between Markbridge releases.
 ---
 
-## 0.3.1 — AST normalization runs by default
+## Upgrading to 0.4.2
+
+Check output assertions for aligned blocks and nested lists:
+
+- Aligned content has blank lines inside its `<div>` so links and formatting render as Markdown. In an HTML table, alignment uses HTML content without those blank lines.
+- List continuation lines use the width of their parent marker: two spaces for `- ` and three for `1. `. Nested items receive indentation from their parent item.
+
+If your extensions use these helpers, update them:
+
+| API | Action |
+|---|---|
+| `HtmlBlockSafety` | Rename references to `Markbridge::Renderers::Discourse::HtmlBlock`. |
+| `ListItemBuilder#build` | Remove the `indent:` keyword. The builder indents continuation lines using the marker width. |
+
+`HtmlBlock.safe?(output)` checks HTML-mode output. `HtmlBlock.island(markdown)` wraps Markdown in blank lines, and `HtmlBlock.opens?(line)` checks whether a line opens a CommonMark HTML block.
+
+`render_children` accepts a block with the output buffer and the child about to be appended. Use it when your custom tag needs to adjust spacing between children:
+
+```rb
+interface.render_children(element, context:) do |buffer, child|
+  buffer.rstrip! if child.is_a?(Markbridge::AST::List)
+end
+```
+
+## Upgrading to 0.4.1
+
+Lines containing only `=` characters are escaped, including lines at the start of a text node. This keeps a separator after a line break or inline element from becoming a heading. Update assertions that compare raw Markdown; the rendered equals signs remain visible.
+
+## Upgrading to 0.4.0
+
+### Review your AST subclasses
+
+Normalizer rules, tag dispatch, and `interface.render_default` match class ancestry. A subclass without its own registration inherits the behavior of its nearest matching base class.
+
+If you want a subclass to render only its children, register `Tag::PASSTHROUGH` for it. Removing its tag with `unregister:` allows an ancestor tag to apply. See [AST subclasses](/customization/extending/#ast-subclasses).
+
+If you call `Normalizer::RuleSet#resolve` directly, pass a third argument: a Hash used as a cache for that tree walk. The public `normalize`, `violations`, and `rule` methods keep their signatures.
+
+### Check code block output
+
+BBCode `[code]` and `[pre]`, HTML `<pre>`, TextFormatter `<CODE>`, and MediaWiki indented and `<pre>` blocks render as fenced blocks even for one line. Language hints stay on the fence.
+
+```ruby
+require "markbridge/bbcode"
+
+Markbridge.bbcode_to_markdown("[code=ruby]puts 1[/code]").markdown
+# => "```ruby\nputs 1\n```"
+```
+
+When you build nodes yourself, set `AST::Code.new(block: true)` to force a block. Inline forms such as `[tt]` and `<code>` stay inline unless they contain a newline.
+
+### Check HTML and empty elements
+
+- HTML `<h1>` through `<h6>` render as headings.
+- HTML code language detection checks `language-*` classes before `lang`, then a single class name. See [Code languages](/format-guides/html/#code-languages).
+- Empty code, details, and spoiler elements produce no output.
+
+Use the [shared HTML-mode example](/customization/extending/#rendering-inside-html-blocks) to check your custom tags.
+
+## Upgrading to 0.3.1
 
 A new `Markbridge::Normalizer` pass runs between the parse-time `yield` hook and rendering, and it's **on by default** for every `*_to_markdown` call, `convert`, and `render`. It rewrites nesting that Markdown can't express, so you may see different output with no code change on your side:
 

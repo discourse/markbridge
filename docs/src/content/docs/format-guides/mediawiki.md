@@ -51,7 +51,7 @@ MediaWiki accepts a small set of inline HTML. Markbridge honors:
 
 `<nowiki>`, `<code>`, `<pre>`, `<br>`, `<s>`, `<del>`, `<u>`, `<ins>`, `<sup>`, `<sub>`.
 
-Inside `<nowiki>`, wiki syntax is preserved as literal text.
+Inside `<nowiki>`, wiki syntax is preserved as literal text. Indented code and `<pre>` content render as fenced code blocks, even for a single line. `<code>` stays inline unless its content contains a newline.
 
 ## Using the parser directly
 

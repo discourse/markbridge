@@ -16,11 +16,13 @@
 # This spec catches the regression where a new tag emits Markdown into
 # an HTML block — the Markdown would render literally rather than being
 # interpreted.
+#
+# It runs through the shared example that ships in `markbridge/rspec`,
+# so consumers' custom tags go through exactly this check.
+require "markbridge/rspec"
+
 RSpec.describe "html_mode rendering contract" do
   let(:library) { Markbridge::Renderers::Discourse::TagLibrary.default }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
-  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
   ELEMENT_FACTORIES = {
     Markbridge::AST::Heading => -> { Markbridge::AST::Heading.new(level: 1) },
@@ -42,16 +44,6 @@ RSpec.describe "html_mode rendering contract" do
     Markbridge::AST::Poll => -> { Markbridge::AST::Poll.new(options: %w[a b]) },
   }.freeze
 
-  # Reject obvious Markdown sigils that would surface as literal text
-  # inside an HTML block: emphasis (`*`, `_`, `~`) and link middles
-  # (`](`). Allow them only when the output is a `\n\n…\n\n` Markdown
-  # island, since the blank-line wrap signals deliberate re-parsing.
-  def html_block_safe?(output)
-    return true if output.empty?
-    return true if output.start_with?("\n\n") && output.end_with?("\n\n")
-    !output.match?(/[*_~]|\]\(/)
-  end
-
   def build_element(element_class)
     element = ELEMENT_FACTORIES.fetch(element_class) { -> { element_class.new } }.call
     if element.is_a?(Markbridge::AST::Element) && element.children.empty?
@@ -64,14 +56,11 @@ RSpec.describe "html_mode rendering contract" do
     element_class = Markbridge::Renderers::Discourse::TagLibrary.default.ast_class_for(tag_constant)
     next unless element_class
 
-    it "#{tag_constant} produces output safe to splice into an HTML block" do
-      element = build_element(element_class)
-      output = library[element_class].render(element, interface)
-
-      expect(html_block_safe?(output)).to be(true),
-      "Expected #{tag_constant} to render as raw HTML or " \
-        "a \\n\\n-wrapped Markdown island in html_mode, " \
-        "got: #{output.inspect}"
+    describe tag_constant.to_s do
+      it_behaves_like "an html_mode safe tag" do
+        let(:tag) { library[element_class] }
+        let(:element) { build_element(element_class) }
+      end
     end
   end
 end
