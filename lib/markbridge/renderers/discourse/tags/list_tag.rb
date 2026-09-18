@@ -14,6 +14,11 @@ module Markbridge
                 .map { |child| interface.render_node(child, context: child_context) }
                 .join
 
+            # A list without items renders to nothing, like the other
+            # containers. Blank lines alone would still count as a list
+            # for the separator between two lists of the same kind.
+            return "" if content.empty?
+
             if interface.html_mode?
               tag_name = element.ordered? ? "ol" : "ul"
               return "<#{tag_name}>#{content}</#{tag_name}>"

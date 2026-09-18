@@ -20,6 +20,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       expect(result).to include("- item")
     end
 
+    it "renders a list without items to nothing" do
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      list = Markbridge::AST::List.new(ordered: false)
+
+      expect(tag.render(list, interface)).to eq("")
+    end
+
+    it "renders a list whose items are all empty to nothing" do
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      list = Markbridge::AST::List.new(ordered: false)
+      list << Markbridge::AST::ListItem.new
+
+      expect(tag.render(list, interface)).to eq("")
+    end
+
     it "passes list in context to children" do
       context = Markbridge::Renderers::Discourse::RenderContext.new
       interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)

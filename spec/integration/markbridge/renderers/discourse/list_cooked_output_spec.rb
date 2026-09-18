@@ -53,6 +53,13 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
     expect(doc.css("ul > li > ul > li").map(&:text)).to eq(["x"])
   end
 
+  it "cooks two lists of the same kind into two lists" do
+    html = fragment("[list][*]a[/list][list][*]b[/list]")
+
+    expect(html.css("ul").size).to eq(2)
+    expect(html.css("p")).to be_empty
+  end
+
   context "when a list item starts with < but opens no HTML block" do
     it "leaves a list under an autolink tight" do
       html = cook("[list][*]<https://example.com>\n[list][*]child[/list][*]sibling[/list]")
