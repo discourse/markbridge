@@ -138,9 +138,6 @@ module CommonMarkRoundTrip
 
   BANG_BEFORE_LINK = "a ! in front of a link is not escaped, so the link cooks as an image"
   MERGED_LISTS = "two adjacent lists of the same kind merge into one loose list"
-  RULE_IN_LIST_ITEM =
-    "a horizontal rule inside a list item is written as ---, which cooks as a thematic " \
-      "break and ends the list"
   BARE_URL_AFTER_WORD =
     "a link whose text is its href renders as the bare URL, which is not linked again " \
       "when a word sits directly in front of it"
@@ -166,7 +163,6 @@ module CommonMarkRoundTrip
     by_example(
       BANG_BEFORE_LINK => [593],
       MERGED_LISTS => [301, 302, 308],
-      RULE_IN_LIST_ITEM => [61],
       BARE_URL_AFTER_WORD => [480, 481],
     )
 
