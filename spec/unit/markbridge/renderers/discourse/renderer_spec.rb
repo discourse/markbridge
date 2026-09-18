@@ -295,6 +295,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   end
 
   describe "#render_children" do
+    def list_with_item(ordered:, text:)
+      list = Markbridge::AST::List.new(ordered:)
+      item = Markbridge::AST::ListItem.new
+      item << Markbridge::AST::Text.new(text)
+      list << item
+    end
+
     it "renders all children" do
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::Text.new("hello ")
@@ -387,6 +394,54 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       result = renderer.render_children(document, context:)
 
       expect(result).to eq("**x**<!---->**y**")
+    end
+
+    it "separates two lists of the same kind with a comment between blank lines" do
+      document = Markbridge::AST::Document.new
+      document << list_with_item(ordered: false, text: "a")
+      document << list_with_item(ordered: false, text: "b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      # The tags bracket their output with blank lines of their own; the
+      # postprocessor collapses them later.
+      expect(renderer.render_children(document, context:)).to match(/- a\n+<!---->\n+- b/)
+    end
+
+    it "separates two ordered lists" do
+      document = Markbridge::AST::Document.new
+      document << list_with_item(ordered: true, text: "a")
+      document << list_with_item(ordered: true, text: "b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to include("<!---->")
+    end
+
+    it "does not separate an ordered list from an unordered one" do
+      # A change of list kind starts a new list on its own.
+      document = Markbridge::AST::Document.new
+      document << list_with_item(ordered: false, text: "a")
+      document << list_with_item(ordered: true, text: "b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).not_to include("<!---->")
+    end
+
+    it "does not separate a list from text that follows it" do
+      document = Markbridge::AST::Document.new
+      document << list_with_item(ordered: false, text: "a")
+      document << Markbridge::AST::Text.new("after")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).not_to include("<!---->")
+    end
+
+    it "does not separate two lists when the first one renders to nothing" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::List.new(ordered: false)
+      document << list_with_item(ordered: false, text: "b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).not_to include("<!---->")
     end
 
     it "escapes a ! at the end of the buffer when the next part starts with [" do
