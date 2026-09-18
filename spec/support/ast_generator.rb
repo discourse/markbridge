@@ -50,10 +50,12 @@ class AstGenerator
   ].freeze
 
   # Lines for block code. Some carry leading spaces, some carry fence
-  # characters, so the renderer has to widen the fence it picks. No blank
-  # lines: the postprocessor clears whitespace-only lines and collapses
-  # runs of newlines, which would change the code text.
+  # characters, so the renderer has to widen the fence it picks.
   CODE_LINES = ["x = 1", "  indented", "end", "```", "~~~", "a | b", "# comment"].freeze
+
+  # Lines that may follow the first one: a blank line and a line of
+  # spaces have to survive the postprocessor unchanged.
+  CODE_CONTINUATION_LINES = (CODE_LINES + ["", "  "]).freeze
 
   CODE_LANGUAGES = [nil, "ruby", "text"].freeze
 
@@ -334,7 +336,9 @@ class AstGenerator
 
   def code_block
     code = spend { AST::Code.new(language: CODE_LANGUAGES.sample(random: @random), block: true) }
-    lines = Array.new(1 + @random.rand(3)) { CODE_LINES.sample(random: @random) }
+    # The first line always has content, so the block is never empty.
+    lines = [CODE_LINES.sample(random: @random)]
+    @random.rand(3).times { lines << CODE_CONTINUATION_LINES.sample(random: @random) }
     code << AST::Text.new(lines.join("\n"))
     code
   end

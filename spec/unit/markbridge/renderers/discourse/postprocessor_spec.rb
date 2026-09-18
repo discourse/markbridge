@@ -25,6 +25,84 @@ RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
       expect(postprocessor.call("a\n\nb")).to eq("a\n\nb")
     end
 
+    context "with fenced code blocks" do
+      it "keeps blank lines inside a fence" do
+        text = "```\na\n\n\n\nb\n```"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "keeps whitespace-only lines inside a fence" do
+        text = "```\na\n   \nb\n```"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "still cleans the text before and after a fence" do
+        expect(postprocessor.call("a\n\n\n\n```\nx\n\n\n```\n\n\n\nb")).to eq(
+          "a\n\n```\nx\n\n\n```\n\nb",
+        )
+      end
+
+      it "recognizes an indented fence, as inside a list item" do
+        text = "- item\n\n  ```\n  a\n\n\n  b\n  ```"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "recognizes a fence that follows a list marker on the same line" do
+        text = "- ```\n  a\n\n\n  b\n  ```"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "recognizes a fence behind two nested list markers" do
+        text = "1. - ~~~\n     a\n\n\n     b\n     ~~~"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "recognizes a tilde fence" do
+        text = "~~~\na\n\n\n\nb\n~~~"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "does not close a tilde fence on a backtick line" do
+        text = "~~~\na\n```\n\n\n\nb\n~~~"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "does not close a fence with a shorter run" do
+        text = "````\na\n```\n\n\n\nb\n````"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "closes a fence with a longer run" do
+        expect(postprocessor.call("```\na\n`````\n\n\n\nb")).to eq("```\na\n`````\n\nb")
+      end
+
+      it "does not close a fence on a line that has text after the run" do
+        text = "```\na\n``` x\n\n\n\nb\n```"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "runs an unclosed fence to the end of the text" do
+        text = "```\na\n\n\n\nb"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "does not treat a backtick run followed by a backtick as a fence" do
+        expect(postprocessor.call("``` a ` b\n\n\n\nc")).to eq("``` a ` b\n\nc")
+      end
+
+      it "cleans text with a fence character run that opens no fence" do
+        expect(postprocessor.call("`` a\n\n\n\nb")).to eq("`` a\n\nb")
+      end
+
+      it "does not strip trailing invisibles inside a fence" do
+        zwsp = "\u200B"
+        text = "```\nx#{zwsp}\n```\n\ny#{zwsp}"
+        expect(described_class.new(strip_trailing_invisibles: true).call(text)).to eq(
+          "```\nx#{zwsp}\n```\n\ny",
+        )
+      end
+    end
+
     context "with the default strip_trailing_invisibles: false" do
       it "keeps trailing ZWSP at line ends" do
         # U+200B is a real character in the output; default Postprocessor
