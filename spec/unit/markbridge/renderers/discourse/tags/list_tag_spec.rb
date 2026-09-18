@@ -150,6 +150,30 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       expect(result).to eq("\n- inner\n\n")
     end
 
+    it "treats a list inside a ListItem subclass as nested" do
+      item_class = Class.new(Markbridge::AST::ListItem)
+      context = Markbridge::Renderers::Discourse::RenderContext.new([item_class.new])
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      list = Markbridge::AST::List.new(ordered: false)
+      item = Markbridge::AST::ListItem.new
+      item << Markbridge::AST::Text.new("inner")
+      list << item
+
+      expect(tag.render(list, interface)).to eq("\n- inner\n\n")
+    end
+
+    it "treats a list inside a List subclass as nested" do
+      list_class = Class.new(Markbridge::AST::List)
+      context = Markbridge::Renderers::Discourse::RenderContext.new([list_class.new])
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      list = Markbridge::AST::List.new(ordered: false)
+      item = Markbridge::AST::ListItem.new
+      item << Markbridge::AST::Text.new("inner")
+      list << item
+
+      expect(tag.render(list, interface)).to eq("\n- inner\n\n")
+    end
+
     it "treats a list inside a quote inside a list item as a block" do
       quote = Markbridge::AST::Quote.new
       context =
