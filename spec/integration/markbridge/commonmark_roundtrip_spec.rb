@@ -136,10 +136,6 @@ module CommonMarkRoundTrip
   BOLD_IS_STRONG = "<b> and <strong> share one AST node, the renderer always writes **"
   ASCII_LANGUAGE_ONLY = "the HTML parser takes only an ASCII token as the language of a code block"
 
-  INLINE_CODE_BACKTICKS =
-    "inline code containing backticks is written with a single backtick delimiter"
-  INLINE_CODE_SPACES =
-    "inline code that starts or ends with a space loses it, the delimiter is not padded"
   IMAGE_ALT_LOST = "the alt text of an image is dropped, ImageTag writes ![](src)"
   LINK_DESTINATION_PARENTHESES =
     "an unbalanced parenthesis in a link destination is neither escaped nor wrapped in <>"
@@ -173,8 +169,6 @@ module CommonMarkRoundTrip
   # Examples that fail because of a defect. Fixing one must remove its entry.
   KNOWN_BUGS =
     by_example(
-      INLINE_CODE_BACKTICKS => [17, 329, 330, 339],
-      INLINE_CODE_SPACES => [331],
       IMAGE_ALT_LOST => [
         517,
         520,
