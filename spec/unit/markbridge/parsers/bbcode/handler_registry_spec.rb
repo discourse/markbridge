@@ -560,6 +560,32 @@ RSpec.describe Markbridge::Parsers::BBCode::HandlerRegistry do
       frozen = described_class.new.freeze
 
       expect { frozen.register("b", fake_handler) }.to raise_error(FrozenError)
+      # register writes the tag-name map first. Without that map frozen the
+      # write would land before a later line raises, and the handler would
+      # stay behind in a registry every parser shares.
+      expect(frozen["b"]).to be_nil
+    end
+
+    # An empty tag name list writes nothing to the tag-name map, and a
+    # handler that is not auto-closeable skips the auto-closeable set, so
+    # the error can only come from the element-class map behind them.
+    it "freezes the element-class map" do
+      frozen = described_class.new.freeze
+
+      expect { frozen.register([], fake_handler(auto_closeable: false)) }.to raise_error(
+        FrozenError,
+      )
+    end
+
+    # Same empty tag name list, but an auto-closeable handler now writes
+    # the set before the element-class map is reached. The element-class
+    # map raises either way, so the set has to be checked for leftovers.
+    it "freezes the auto-closeable element set" do
+      frozen = described_class.new.freeze
+      handler = fake_handler(element_class: Markbridge::AST::Bold, auto_closeable: true)
+
+      expect { frozen.register([], handler) }.to raise_error(FrozenError)
+      expect(frozen.auto_closeable?(Markbridge::AST::Bold)).to be(false)
     end
 
     it "makes closing_strategy= raise" do

@@ -32,8 +32,13 @@ module Markbridge
         def register(tag_names, handler)
           element_class = handler.element_class
           Array(tag_names).each { |tag_name| @handlers[tag_name.to_s.downcase] = handler }
-          @element_handlers[element_class] = handler
+          # The conditional write goes first. Both writes are independent and
+          # keyed by element_class, so the order makes no difference to a
+          # successful register. On a frozen registry it decides which
+          # collection raises, and only a write that can be skipped lets a
+          # spec reach the one behind it.
           @auto_closeable_elements << element_class if handler.auto_closeable?
+          @element_handlers[element_class] = handler
           self
         end
 

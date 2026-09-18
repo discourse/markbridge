@@ -67,16 +67,6 @@ matcher:
     - Markbridge::Parsers::HTML::HandlerRegistry#[]
     - Markbridge::Parsers::TextFormatter::HandlerRegistry#[]
 
-    # HandlerRegistry#freeze deep-freezes three internal collections.
-    # `register` writes @handlers first and raises FrozenError there,
-    # which shields drops of the later `@element_handlers.freeze` /
-    # `@auto_closeable_elements.freeze` lines from observation — the
-    # only public writer never reaches those hashes on a frozen
-    # registry. Tried: register-raises spec (kills the override drop
-    # and @handlers.freeze variants, can't reach the shielded lines).
-    # Bucket A.
-    - Markbridge::Parsers::BBCode::HandlerRegistry#freeze
-
     # Parser#normalize_line_endings' `match?` guard. The guard only
     # skips the gsub copy when the input has no CR/LS/PS; mutations
     # that force the gsub branch (`if true`, `if input`,
