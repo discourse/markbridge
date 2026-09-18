@@ -24,10 +24,15 @@ module Markbridge
               return "<#{tag_name}>#{content}</#{tag_name}>"
             end
 
-            nested = interface.has_parent?(AST::List) || interface.has_parent?(AST::ListItem)
-
-            if nested
-              "\n#{content}"
+            # A list right inside a list item starts on the line after the
+            # item text, so the list stays tight. The blank line after it
+            # keeps whatever follows in the item from becoming a
+            # continuation line of the last nested item. Everywhere else
+            # (also inside a quote or an aligned block that sits in an
+            # item) the list is a block with blank lines on both sides.
+            parent = interface.context.element
+            if parent.is_a?(AST::ListItem) || parent.is_a?(AST::List)
+              "\n#{content}\n"
             else
               "\n\n#{content}\n\n"
             end

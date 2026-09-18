@@ -138,7 +138,7 @@ class AstGenerator
   def document
     @budget = MAX_NODES
     document = AST::Document.new
-    fill_block_container(document, depth: 1, headings: true, in_list: false)
+    fill_block_container(document, depth: 1, headings: true)
     document
   end
 
@@ -152,19 +152,10 @@ class AstGenerator
   # @param container [Markbridge::AST::Element]
   # @param depth [Integer] the container's own nesting level
   # @param headings [Boolean] whether a Heading may be placed here
-  # @param in_list [Boolean] whether a List or ListItem is an ancestor
   # @return [void]
-  def fill_block_container(container, depth:, headings:, in_list:)
+  def fill_block_container(container, depth:, headings:)
     inline_run(container)
-    (1 + @random.rand(3)).times do
-      add_block(container, depth:, headings:, in_list:)
-      # Below a list, a List is the last block its container may hold.
-      # ListTag asks whether any ancestor is a List or a ListItem, and in
-      # that case it drops the blank lines around the list. Whatever
-      # follows then sits at the indentation of the last nested item and
-      # CommonMark reads it as a continuation line of that item.
-      break if in_list && container.children.last.is_a?(AST::List)
-    end
+    (1 + @random.rand(3)).times { add_block(container, depth:, headings:) }
   end
 
   # Appends one block, unless the budget is used up. Two Lists never end up
@@ -172,10 +163,10 @@ class AstGenerator
   # which is a separate bug, so a text run goes between them.
   #
   # @return [void]
-  def add_block(container, depth:, headings:, in_list:)
+  def add_block(container, depth:, headings:)
     return if exhausted?
 
-    block = build_block(depth:, headings:, in_list:)
+    block = build_block(depth:, headings:)
     return if block.nil?
 
     inline_run(container) if block.is_a?(AST::List) && container.children.last.is_a?(AST::List)
@@ -183,7 +174,7 @@ class AstGenerator
   end
 
   # @return [Markbridge::AST::Node, nil]
-  def build_block(depth:, headings:, in_list:)
+  def build_block(depth:, headings:)
     choices = %i[paragraph code_block rule]
     choices << :heading if headings
     choices.concat(%i[list quote align]) if depth < MAX_DEPTH
@@ -200,9 +191,9 @@ class AstGenerator
     when :list
       list(depth:)
     when :quote
-      quote(depth:, in_list:)
+      quote(depth:)
     when :align
-      align(depth:, in_list:)
+      align(depth:)
     end
   end
 
@@ -219,17 +210,17 @@ class AstGenerator
     heading
   end
 
-  def quote(depth:, in_list:)
+  def quote(depth:)
     # No author: an attributed quote renders Discourse BBCode, which
     # commonmarker does not know.
     quote = spend { AST::Quote.new }
-    fill_block_container(quote, depth: depth + 1, headings: true, in_list:)
+    fill_block_container(quote, depth: depth + 1, headings: true)
     quote
   end
 
-  def align(depth:, in_list:)
+  def align(depth:)
     align = spend { AST::Align.new(alignment: ALIGNMENTS.sample(random: @random)) }
-    fill_block_container(align, depth: depth + 1, headings: true, in_list:)
+    fill_block_container(align, depth: depth + 1, headings: true)
     align
   end
 
@@ -247,7 +238,6 @@ class AstGenerator
   # LineBreak, and sometimes nested blocks. The continuation line is the
   # case the indentation bug hid in. A Heading stays out: a heading in an
   # item is unusual in a forum post and would only widen the spec.
-  # A nested List ends the item, see {#fill_block_container}.
   def list_item(depth:)
     item = spend { AST::ListItem.new }
     inline_run(item)
@@ -257,10 +247,7 @@ class AstGenerator
       inline_run(item)
     end
 
-    (@random.rand(3)).times do
-      add_block(item, depth:, headings: false, in_list: true)
-      break if item.children.last.is_a?(AST::List)
-    end
+    @random.rand(3).times { add_block(item, depth:, headings: false) }
     item
   end
 
