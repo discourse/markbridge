@@ -136,9 +136,6 @@ module CommonMarkRoundTrip
   BOLD_IS_STRONG = "<b> and <strong> share one AST node, the renderer always writes **"
   ASCII_LANGUAGE_ONLY = "the HTML parser takes only an ASCII token as the language of a code block"
 
-  CODE_BLOCK_BLANK_LINES =
-    "the postprocessor collapses runs of blank lines and clears whitespace-only lines " \
-      "inside a code fence"
   INLINE_CODE_BACKTICKS =
     "inline code containing backticks is written with a single backtick delimiter"
   INLINE_CODE_SPACES =
@@ -176,7 +173,6 @@ module CommonMarkRoundTrip
   # Examples that fail because of a defect. Fixing one must remove its entry.
   KNOWN_BUGS =
     by_example(
-      CODE_BLOCK_BLANK_LINES => [111, 112, 129, 264, 318],
       INLINE_CODE_BACKTICKS => [17, 329, 330, 339],
       INLINE_CODE_SPACES => [331],
       IMAGE_ALT_LOST => [
