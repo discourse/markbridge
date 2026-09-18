@@ -107,13 +107,15 @@ module Markbridge
         #   end
         def render_children(node, context:)
           result = +""
+          previous = nil
           node.children.each do |child|
             part = render(child, context:)
             next if part.empty?
 
             yield(result, child) if block_given?
-            join(result, part)
+            join(result, previous, child, part)
             result << part
+            previous = child
           end
           result
         end
@@ -129,20 +131,32 @@ module Markbridge
         # Bytes where adjacent runs merge into a single longer run during
         # Markdown parsing: emphasis (* _), strikethrough (~), code spans (`).
         EMPHASIS_DELIMITER_BYTES = Set[42, 95, 126, 96].freeze
+        # Inserted between two lists of the same kind. Without something
+        # between them CommonMark reads the second list as more items of
+        # the first, and the blank line makes the whole list loose.
+        LIST_BOUNDARY = "\n\n<!---->\n\n"
         BACKSLASH = 92
         BANG = 33
         BRACKET_OPEN = 91
         private_constant :EMPHASIS_BOUNDARY,
                          :EMPHASIS_DELIMITER_BYTES,
+                         :LIST_BOUNDARY,
                          :BACKSLASH,
                          :BANG,
                          :BRACKET_OPEN
 
         # Adjusts the end of +result+ where the next +part+ would change
-        # how the characters on both sides are read. Works on bytes, so
-        # the check per child allocates nothing. On an empty buffer
-        # getbyte returns nil, which matches no byte of a non-empty part.
-        def join(result, part)
+        # how the two sides are read together. +previous+ is the child
+        # whose output ends the buffer (nil for the first one). The byte
+        # checks allocate nothing per child. On an empty buffer getbyte
+        # returns nil, which matches no byte of a non-empty part.
+        def join(result, previous, child, part)
+          if child.is_a?(AST::List) && previous.is_a?(AST::List) &&
+               child.ordered? == previous.ordered?
+            result << LIST_BOUNDARY
+            return
+          end
+
           last_byte = result.getbyte(-1)
           first_byte = part.getbyte(0)
 

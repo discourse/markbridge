@@ -344,6 +344,16 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq(expected)
     end
 
+    it "separates two lists of the same kind" do
+      result = Markbridge.bbcode_to_markdown("[list][*]a[/list][list][*]b[/list]")
+      expect(result.markdown).to eq("- a\n\n<!---->\n\n- b")
+    end
+
+    it "does not separate an unordered list from an ordered one" do
+      result = Markbridge.bbcode_to_markdown("[list][*]a[/list][list=1][*]b[/list]")
+      expect(result.markdown).to eq("- a\n\n1. b")
+    end
+
     it "converts simple ordered list" do
       bbcode = <<~BBCODE
         [list=1]
