@@ -141,8 +141,6 @@ module CommonMarkRoundTrip
   RULE_IN_LIST_ITEM =
     "a horizontal rule inside a list item is written as ---, which cooks as a thematic " \
       "break and ends the list"
-  HEADING_TRAILING_HASHES =
-    "a # at the end of a heading is not escaped and is eaten as the closing sequence"
   BARE_URL_AFTER_WORD =
     "a link whose text is its href renders as the bare URL, which is not linked again " \
       "when a word sits directly in front of it"
@@ -169,7 +167,6 @@ module CommonMarkRoundTrip
       BANG_BEFORE_LINK => [593],
       MERGED_LISTS => [301, 302, 308],
       RULE_IN_LIST_ITEM => [61],
-      HEADING_TRAILING_HASHES => [76],
       BARE_URL_AFTER_WORD => [480, 481],
     )
 

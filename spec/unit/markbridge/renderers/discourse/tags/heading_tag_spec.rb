@@ -28,6 +28,28 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::HeadingTag do
       expect(tag.render(element, interface)).to eq("\n\n### Title\n\n")
     end
 
+    it "keeps a run of # at the end of the heading as text" do
+      element = Markbridge::AST::Heading.new(level: 3)
+      element << Markbridge::AST::Text.new("foo ###")
+
+      expect(tag.render(element, interface)).to eq("\n\n### foo \\###\n\n")
+    end
+
+    it "leaves a # that is not preceded by whitespace alone" do
+      # Without the space in front it is not a closing sequence.
+      element = Markbridge::AST::Heading.new(level: 1)
+      element << Markbridge::AST::Text.new("C#")
+
+      expect(tag.render(element, interface)).to eq("\n\n# C#\n\n")
+    end
+
+    it "leaves a # in the middle of the heading alone" do
+      element = Markbridge::AST::Heading.new(level: 1)
+      element << Markbridge::AST::Text.new("a # b")
+
+      expect(tag.render(element, interface)).to eq("\n\n# a # b\n\n")
+    end
+
     let(:element_class) { Markbridge::AST::Heading }
     let(:element_factory) { Markbridge::AST::Heading.new(level: 2) }
     it_behaves_like "a tag that propagates parent context"
