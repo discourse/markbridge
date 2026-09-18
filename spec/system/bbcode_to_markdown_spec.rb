@@ -439,6 +439,18 @@ RSpec.describe "BBCode to Markdown Conversion" do
     end
   end
 
+  describe "emphasis next to a word" do
+    it "keeps emphasis that starts with punctuation working after a word" do
+      result = Markbridge.bbcode_to_markdown("item[i]#[/i]")
+      expect(result.markdown).to eq("item<!---->*\\#*")
+    end
+
+    it "keeps emphasis that ends with punctuation working in front of a word" do
+      result = Markbridge.bbcode_to_markdown("[b]*bold*[/b]tail")
+      expect(result.markdown).to eq("**\\*bold\\***<!---->tail")
+    end
+  end
+
   describe "text next to a link" do
     it "keeps a ! in front of a link from turning it into an image" do
       result = Markbridge.bbcode_to_markdown("Look![url=https://example.com]here[/url]")

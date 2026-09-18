@@ -308,21 +308,17 @@ class AstGenerator
     node = spend { klass == AST::Url ? AST::Url.new(href: pick_href) : klass.new }
 
     # A Url with the href as its only text renders as a bare URL, which is
-    # a different construct. Plain words keep it a real link label.
+    # a different construct. A plain word first keeps it a real link
+    # label. Everything after it may be a tricky token, also at the end:
+    # emphasis that starts or ends with punctuation next to a word is
+    # what the renderer's boundary comment is for.
     node << text_node(tricky: false)
-    extra = 0
-    (@random.rand(2)).times do
-      break if exhausted?
-      node << inline_node(open: open + [klass], inline_depth: inline_depth + 1, line_breaks:)
-      extra += 1
-    end
-
-    # Emphasis ends on a word, not on punctuation. `**` and `*` only open
-    # and close next to a word (CommonMark's flanking rules), and the
-    # renderer has no fallback for that: `item*\#*` cooks to the literal
-    # text `item*#*` instead of emphasis. A link label has no such rule,
-    # so a Url may end on anything.
-    node << text_node(tricky: false) if extra.positive? && klass != AST::Url
+    @random
+      .rand(2)
+      .times do
+        break if exhausted?
+        node << inline_node(open: open + [klass], inline_depth: inline_depth + 1, line_breaks:)
+      end
     node
   end
 
