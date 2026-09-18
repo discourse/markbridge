@@ -276,10 +276,13 @@ module Markbridge
         end
 
         # The tag-less rendering paths shared by #render and #render_default.
+        # An element without a tag still goes on the parent chain, like
+        # Tag::PASSTHROUGH does, so its children can ask for their parent
+        # and their siblings (the Document is the usual case).
         def render_without_tag(node, context)
           case node
           when AST::Element # Document is an Element subclass
-            render_children(node, context:)
+            render_children(node, context: context.with_parent(node))
           when AST::MarkdownText
             render_markdown_text(node, context)
           when AST::Text

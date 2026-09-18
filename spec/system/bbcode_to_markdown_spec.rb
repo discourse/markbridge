@@ -488,6 +488,17 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq("https://example.com")
     end
 
+    it "writes a bare url glued to text as a link with the url as text" do
+      result = Markbridge.bbcode_to_markdown("a[url=https://example.com]https://example.com[/url]b")
+      expect(result.markdown).to eq("a[https://example.com](https://example.com)b")
+    end
+
+    it "keeps a bare url between spaces plain" do
+      result =
+        Markbridge.bbcode_to_markdown("see [url=https://example.com]https://example.com[/url] now")
+      expect(result.markdown).to eq("see https://example.com now")
+    end
+
     it "converts url with formatted content" do
       result = Markbridge.bbcode_to_markdown("[url=https://example.com][b]Bold link[/b][/url]")
       expect(result.markdown).to eq("[**Bold link**](https://example.com)")

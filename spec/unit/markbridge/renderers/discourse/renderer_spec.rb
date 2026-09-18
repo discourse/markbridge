@@ -86,6 +86,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("hello")
     end
 
+    it "puts an element without a tag on the parent chain for its children" do
+      # The Document has no tag. Its children can still ask for their
+      # siblings: the bare URL sees the text in front of it.
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("see")
+      url = Markbridge::AST::Url.new(href: "https://example.com")
+      url << Markbridge::AST::Text.new("https://example.com")
+      document << url
+
+      expect(renderer.render(document)).to eq("see[https://example.com](https://example.com)")
+    end
+
     it "renders text nodes" do
       text = Markbridge::AST::Text.new("hello world")
       result = renderer.render(text)
