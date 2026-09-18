@@ -4,7 +4,6 @@ if ENV["COVERAGE"]
   require "simplecov"
   SimpleCov.start do
     command_name "RSpec"
-    add_filter "/examples/"
     add_filter "/spec/"
   end
 end

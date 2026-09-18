@@ -1,17 +1,16 @@
 # Markbridge
 
-Markbridge converts BBCode into Discourse-flavored Markdown through a clean parse → AST → render pipeline. It is intended for forum migrations and any workflow that needs predictable BBCode handling.
+Markbridge converts BBCode, HTML, MediaWiki wikitext, and s9e/TextFormatter XML into Discourse-flavored Markdown through a clean parse → AST → render pipeline. It's built for forum migrations into Discourse, but works for any job that needs predictable, repeatable conversion.
+
+Full documentation lives at **[markbridge.dev](https://markbridge.dev)**.
 
 ## How it works
 
-1. **Parse BBCode** – `Markbridge::Parsers::BBCode::Parser` tokenizes input and builds an `AST::Document`, reconciling nesting and collecting raw content where needed.
-2. **Transform AST** – The AST captures semantic nodes such as text, formatting elements, lists, URLs, and code blocks that are renderer-agnostic.
-3. **Render to Markdown** – `Markbridge::Renderers::Discourse::Renderer` walks the tree with a tag library to emit Discourse-compatible Markdown, then normalizes spacing for final output.
+Every conversion runs the same three steps:
 
-Refer to the component guides for more detail:
-
-* [BBCode parser](docs/parsers/bbcode.md)
-* [Discourse renderer](docs/renderers/discourse.md)
+1. **Parse** – a format-specific parser turns the input into an `AST::Document`. Unknown tags are counted, not raised — the parser keeps going.
+2. **AST** – a renderer-agnostic tree of text, formatting, lists, links, and so on. The same tree comes out no matter which format went in.
+3. **Render** – `Markbridge::Renderers::Discourse::Renderer` walks the tree and emits Discourse-compatible Markdown.
 
 ## Installation
 
@@ -33,33 +32,29 @@ gem install markbridge
 require "markbridge/bbcode"
 
 bbcode = "[b]Hello[/b] [url=https://example.com]world[/url]!"
-markdown = Markbridge.bbcode_to_markdown(bbcode)
+result = Markbridge.bbcode_to_markdown(bbcode)
 
-puts markdown
+puts result.markdown
 # => "**Hello** [world](https://example.com)!"
 ```
 
-## Configuration
+Swap `bbcode` for `html`, `mediawiki`, or `textformatter` for the other formats, or `require "markbridge/all"` to load everything.
 
-```ruby
-Markbridge.configure do |config|
-  # Strip trailing spaces before newlines to prevent hard line breaks (<br/>).
-  # Defaults to false (Discourse has this disabled by default).
-  config.escape_hard_line_breaks = true
-end
-```
+`*_to_markdown` returns a `Markbridge::Conversion`, not a plain string. The rendered Markdown is on `.markdown` (and `.to_s` delegates to it, so `puts result` works). The same object also carries `.unknown_tags`, `.diagnostics`, and `.errors` — handy when you're migrating a forum and want to know what showed up.
 
-Configuration applies to all `*_to_markdown` convenience methods (`bbcode_to_markdown`, `html_to_markdown`, etc.).
+## Customizing output
+
+Build a renderer once with `Markbridge.discourse_renderer(...)` and pass it via `renderer:` — custom tags, a custom escaper, dropping tags, and more. See [Customizing the renderer](https://markbridge.dev/customization/customizing-renderer/), and [Migrating to Discourse](https://markbridge.dev/migrating/overview/) for the full forum-migration workflow.
 
 ## Learn more
 
-* See `examples/` for runnable scripts such as `examples/basic_usage.rb`.
-* Browse integration and unit coverage under `spec/` to understand supported tags and edge cases.
-* Use `bin/console` during development for interactive exploration.
+* [markbridge.dev](https://markbridge.dev) – guides, format references, and the architecture deep-dive.
+* `spec/` – executable documentation of every supported tag and edge case.
+* `bin/console` – an interactive prompt for poking at things during development.
 
 ## Development
 
-This repository is set up to run inside [silo](https://github.com/gschlager/silo), a lightweight dev-environment tool. The `.silo.yml` file provisions a Fedora container with JRuby and multiple CRuby versions (via [rv](https://rv.dev)), installs dependencies, and starts the playground daemon. If you prefer your own setup, `bin/setup` and `bundle install` are all you need.
+This repository is set up to run inside [silo](https://github.com/gschlager/silo), a development environment tool. The `.silo.yml` file provisions a Fedora container with CRuby, JRuby, TruffleRuby, Node.js, and pnpm. It installs dependencies and starts the playground on port 4567 and the docs site on port 4321. For a Ruby setup outside Silo, use `bin/setup` and `bundle install`. See [docs/README.md](docs/README.md) to run the documentation site.
 
 ## Playground
 

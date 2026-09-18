@@ -1,0 +1,80 @@
+---
+title: Markbridge
+description: Convert BBCode, HTML, MediaWiki, and s9e TextFormatter XML to Markdown in Ruby.
+template: splash
+hero:
+  title: Your markup, in Markdown.
+  tagline: Convert BBCode, HTML, MediaWiki, and s9e TextFormatter XML with one Ruby library. Inspect the content and choose how it renders.
+  image:
+    file: ../../assets/markbridge-icon.svg
+    alt: Markbridge logo
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Migrating a forum?
+      link: /migrating/overview/
+      icon: right-arrow
+      variant: secondary
+    - text: View on GitHub
+      link: https://github.com/discourse/markbridge
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+## Start with a conversion
+
+```ruby
+require "markbridge/bbcode"
+
+result = Markbridge.bbcode_to_markdown(
+  "[b]Hello[/b] [url=https://example.com]world[/url]!"
+)
+
+result.markdown # => "**Hello** [world](https://example.com)!"
+```
+
+The shipped renderer produces **Discourse-flavored Markdown**. The parsers and AST are independent of the renderer, so you can use the same parsed content for your own output format.
+
+## Choose your input format
+
+<CardGrid>
+  <LinkCard title="BBCode" href="/format-guides/bbcode/" description="Convert bracket tags for formatting, quotes, lists, tables, and attachments." />
+  <LinkCard title="HTML" href="/format-guides/html/" description="Convert HTML strings or work directly with a Nokogiri document." />
+  <LinkCard title="MediaWiki" href="/format-guides/mediawiki/" description="Convert wikitext headings, links, lists, tables, and code." />
+  <LinkCard title="s9e TextFormatter" href="/format-guides/textformatter/" description="Read stored XML from phpBB and other TextFormatter applications." />
+</CardGrid>
+
+## Keep control of the output
+
+<CardGrid>
+  <Card title="Review your content" icon="document">
+    Read the Markdown, unknown tags, and diagnostics from one result. Use them to find content that needs attention.
+    [Understand result objects](/concepts/result-objects/).
+  </Card>
+  <Card title="Use your own rules" icon="puzzle">
+    Add a parser handler, edit the AST, or customize a renderer tag. Reuse your configuration across conversions.
+    [Customize Markbridge](/customization/).
+  </Card>
+</CardGrid>
+
+## From markup to Markdown
+
+<Steps>
+
+1. **Parse your input.** Each parser builds the same kind of AST.
+2. **Inspect or edit the AST.** Your code can change nodes before normalization prepares them for Markdown.
+3. **Render the result.** Use the Discourse renderer or write your own renderer for the shared AST.
+
+</Steps>
+
+Read the [architecture guide](/concepts/architecture/) for the details.
+
+## Migrating to Discourse
+
+You can convert post bodies, track unknown tags, and resolve uploads, users, and internal links in your own code. The migration guide explains how these parts work together.
+
+<LinkCard title="Plan your forum migration" href="/migrating/overview/" description="Convert posts, review the results, and handle references to your source data." />

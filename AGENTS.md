@@ -4,7 +4,7 @@ Quick reference guide for AI assistants working on the Markbridge codebase.
 
 ## Project Overview
 
-**Markbridge** converts BBCode to Discourse-flavored Markdown using a **Parse → AST → Render** pipeline.
+**Markbridge** converts BBCode, HTML, MediaWiki, and s9e TextFormatter XML to Markdown using a **Parse → AST → Render** pipeline. The shipped renderer produces Discourse-flavored Markdown. The parsers and AST are renderer-agnostic.
 
 **Design Philosophy:**
 - Graceful degradation (unknown tags preserved, no exceptions)
@@ -155,7 +155,7 @@ check ships as a shared RSpec example (`require "markbridge/rspec"`,
 then `it_behaves_like "an html_mode safe tag"`), so consumer projects
 can run it against their own tags.
 
-**See `examples/` for complete examples.**
+**See `docs/src/content/docs/customization/extending.md` for complete examples.**
 
 ## Development Workflow
 
@@ -217,7 +217,7 @@ automatically when mutation work comes up.
 bundle exec ruby --yjit bench/bench.rb --isolated`). It pins the process
 to the fastest cores and reports power and governor state. Results from
 a laptop on battery, or from an efficiency core, don't compare with
-the numbers in `docs/benchmarks.md`.
+the numbers in `docs/src/content/docs/concepts/benchmarks.md`.
 
 **MarkdownEscaper** is a hot path. Benchmark before/after any change to
 `lib/markbridge/renderers/discourse/markdown_escaper.rb` with the
@@ -299,17 +299,17 @@ refactors when behavior is equivalent.
 
 - **This file**: Quick reference and architecture
 - **README.md**: User-facing quick start
-- **docs/architecture.md**: System architecture and design patterns
-- **docs/parsers/**: BBCode, HTML, and TextFormatter parser guides
-- **docs/renderers/**: Discourse renderer guide
-- **docs/extending.md**: How to add custom tags and handlers
-- **docs/performance.md**: Performance optimization guide
-- **examples/**: Runnable code examples
+- **docs/src/content/docs/concepts/architecture.md**: System architecture and design patterns
+- **docs/src/content/docs/format-guides/**: BBCode, HTML, and TextFormatter parser guides
+- **docs/src/content/docs/concepts/renderers.md**: Discourse renderer guide
+- **docs/src/content/docs/customization/extending.md**: How to add custom tags and handlers
+- **docs/src/content/docs/concepts/performance.md**: Performance optimization guide
+- **spec/docs/**: Checks for runnable documentation examples and AST coverage
 - **spec/**: Executable documentation (tests show expected behavior)
 
 ---
 
-**Maintenance**: This file should be updated when core architecture changes. Details that change frequently (file counts, specific line numbers, step-by-step tutorials) are intentionally excluded. Point to examples/ and spec/ for those.
+**Maintenance**: This file should be updated when core architecture changes. Details that change frequently (file counts, specific line numbers, step-by-step tutorials) are intentionally excluded. Point to the docs site and spec/ for those.
 
 **Last Updated**: 2025-11-26
 **Version**: 0.1.0

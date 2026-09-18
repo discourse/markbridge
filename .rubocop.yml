@@ -18,5 +18,6 @@ Lint/UnusedMethodArgument:
 
 RSpec/DescribeClass:
   Exclude:
+    - spec/docs/**/*
     - spec/integration/**/*
     - spec/system/**/*
