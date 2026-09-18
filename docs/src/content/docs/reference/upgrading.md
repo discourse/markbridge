@@ -8,6 +8,7 @@ description: Breaking-change notes between Markbridge releases.
 The round-trip specs (see the Testing section of AGENTS.md) found a number of output defects. The fixes change the Markdown for the cases below, so check output assertions that cover them:
 
 - A fenced code block whose content ends with a newline no longer gets a blank line before the closing fence. `<pre><code>x\n</code></pre>` and `[code]x\n[/code]` render as ` ```\nx\n``` `.
+- The postprocessor leaves fenced code blocks alone. Blank lines and whitespace-only lines inside a fence stay as they are.
 
 ## Upgrading to 0.4.2
 
