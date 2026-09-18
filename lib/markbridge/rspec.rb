@@ -39,7 +39,7 @@ RSpec.shared_examples "an html_mode safe tag" do
   it "renders html_mode output that is safe inside an HTML block" do
     output = tag.render(element, markbridge_html_mode_interface)
 
-    expect(Markbridge::Renderers::Discourse::HtmlBlockSafety.safe?(output)).to be(true),
+    expect(Markbridge::Renderers::Discourse::HtmlBlock.safe?(output)).to be(true),
     "Expected #{tag.class} to render raw HTML or a \\n\\n-wrapped " \
       "Markdown island in html_mode, got: #{output.inspect}"
   end

@@ -162,29 +162,6 @@ matcher:
     # without changing observable output. Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_text
 
-    # ListItemTag#calculate_indent's `if list_count <= 1; return ""`
-    # early-return is a perf optimization (saves the parents.each
-    # walk on the common top-level-list case — material on JRuby
-    # where it's ~25% of list-rendering time). Mutations to the
-    # comparison (`< 1`, `== 1`, `<= 0`, `eql?(1)`, `equal?(1)`,
-    # `if false`, drop-if) all produce the same final indent string
-    # because the loop body returns "" anyway when list_count is
-    # 0 or 1 (the only matching ancestor is the immediate parent,
-    # which is skipped via `break if found == list_count`). The
-    # killable case (loop iterates non-List parents) is covered by
-    # the "ignores non-List parents" spec. Bucket A.
-    - Markbridge::Renderers::Discourse::Tags::ListItemTag#calculate_indent
-
-# ListItemBuilder#build's `lines.size < 2` fast-path. When lines
-    # has exactly 1 element, format_multiline with empty
-    # continuation_lines produces byte-identical output to the early
-    # return (first_line + "\n"). When lines has 0 elements,
-    # `lines[1..]` returns nil (not []), so the fast-path is
-    # load-bearing to avoid a NoMethodError. Mutations `< 1` /
-    # `<= 0` would drop the size==1 case into format_multiline — no
-    # observable output difference, pure perf. Bucket A.
-    - Markbridge::Renderers::Discourse::Builders::ListItemBuilder#build
-
     # Reordering#handle_close's `current_handler == closing_handler`
     # fast-path. `Base#handle_close` (reached via `super`) performs
     # the SAME check and pops identically, so every mutation that
@@ -209,17 +186,6 @@ matcher:
     # rendering behavior is pinned by the renderer specs.
     - Markbridge::Renderers::Discourse::Renderer#render
     - Markbridge::Renderers::Discourse::Renderer#render_default
-
-    # Renderer#render_children's `if part.empty?; next; end` fast-path
-    # avoids the per-child boundary check for child renderers that
-    # produce no output (comments, ignored tags). Dropping the guard
-    # is equivalent: `result << ""` is a no-op, and the boundary
-    # check short-circuits via `result.getbyte(-1) == part.getbyte(0)`
-    # (nil == nil ignored because `!result.empty?` guards it — but
-    # even dropping THAT guard, nil == real-byte is false). Bucket A.
-    # Test-observable only as a perf regression on empty-part-heavy
-    # input, which isn't realistic through the public parse API.
-    - Markbridge::Renderers::Discourse::Renderer#render_children
 
     # MediaWiki InlineParser depth-bookkeeping. The remaining alive
     # mutations on `#initialize`'s `depth: 0` default and on
@@ -436,6 +402,18 @@ mutation:
     # (the fast-path allocation-identity isn't observable through the
     # public API because split + result-buffer allocate regardless).
     - "if{condition=send{receiver=send{receiver=lvar{value=lines} selector=size} selector=(==)}}"
+
+    # ListItemBuilder#build's `lines.size < 2` guard. The guard is
+    # needed for empty content, where `lines[1..]` returns nil instead
+    # of an empty array. For content with exactly one line the mutation
+    # `lines.size < 1` is equivalent: the map runs over an empty array
+    # and join gives back the same first line. So the guard only saves
+    # the array and map allocations of the single-line case, which is
+    # the common one for list items, and nothing observable through
+    # #build can tell the two apart. The pattern covers the comparison
+    # only, so the guard itself still gets mutated, and `lines.size <`
+    # appears nowhere else in lib.
+    - "send{receiver=send{receiver=lvar{value=lines} selector=size} selector=<}"
 
     # escape_line's `while indent_len < 3` bound. Mutations to the
     # bound (<4, <167, etc.) are equivalent because the upstream

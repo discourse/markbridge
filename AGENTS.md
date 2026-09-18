@@ -134,12 +134,19 @@ except across blank lines. Every tag must pick one of two forms when
    form when the tag has a natural HTML representation.
 
 2. **Markdown island** — wrap the tag's normal Markdown output in
-   `\n\n…\n\n`. The blank lines close the HTML block; CommonMark parses
-   the inner content as Markdown; the next blank line re-opens the
-   block. Cost: blank-line wrapping forces a `<p>` margin around
-   inline content, so use this form only for tags with no clean HTML
-   equivalent (e.g. `EventTag`/`PollTag` stubs that defer rendering to
-   downstream BBCode plugins).
+   `\n\n…\n\n` via `HtmlBlock.island`. The blank lines close the HTML
+   block; CommonMark parses the inner content as Markdown; the next
+   blank line re-opens the block. Cost: blank-line wrapping forces a
+   `<p>` margin around inline content, so use this form only for tags
+   with no clean HTML equivalent (e.g. `EventTag`/`PollTag` stubs that
+   defer rendering to downstream BBCode plugins).
+
+`Markbridge::Renderers::Discourse::HtmlBlock` owns everything about
+HTML blocks: `island` builds the wrap, `opens?` says whether a line
+starts a block (`ListItemTag` asks before it drops a blank line in
+front of a nested list), and `safe?` is the check the contract spec
+runs. `AlignTag` uses the island form outside html_mode too, because
+its own `<div>` opens a block.
 
 `spec/integration/markbridge/renderers/discourse/html_mode_contract_spec.rb`
 enforces this structurally: every registered tag is rendered in

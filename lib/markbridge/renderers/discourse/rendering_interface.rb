@@ -26,8 +26,10 @@ module Markbridge
           @renderer.render_default(node, context:)
         end
 
-        def render_children(element, context: @context)
-          @renderer.render_children(element, context:)
+        # An optional block runs at every join point, before a non-empty
+        # child output is appended — see Renderer#render_children.
+        def render_children(element, context: @context, &block)
+          @renderer.render_children(element, context:, &block)
         end
 
         # Context operations
