@@ -13,6 +13,7 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - Images carry their alternative text. `AST::Image` has a new `alt:` keyword, the HTML, BBCode and TextFormatter parsers fill it, and the renderer writes `![alt|WxH](src)` in Markdown and `alt="…"` in html_mode.
 - Parentheses in a link destination are escaped: `[text](https://example.com/a\(b\))`.
 - A run of `#` at the end of a heading gets a backslash, so it stays visible: `### foo \###`.
+- A horizontal rule inside a list item is written as `* * *`. As `---` it ended the list when it was the first thing in the item.
 
 ## Upgrading to 0.4.2
 

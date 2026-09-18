@@ -429,6 +429,13 @@ RSpec.describe "BBCode to Markdown Conversion" do
     end
   end
 
+  describe "horizontal rules" do
+    it "keeps a rule that starts a list item inside the list" do
+      result = Markbridge.bbcode_to_markdown("[list][*]Foo[*][hr][*]Bar[/list]")
+      expect(result.markdown).to eq("- Foo\n- * * *\n- Bar")
+    end
+  end
+
   describe "urls" do
     it "converts url with href option" do
       result = Markbridge.bbcode_to_markdown("[url=https://example.com]Click here[/url]")
