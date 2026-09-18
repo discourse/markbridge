@@ -38,7 +38,11 @@ module Markbridge
           # from prior raw text or inline content.
           def render_block(content, language)
             fence = calculate_fence(content)
-            "\n\n#{fence}#{language}\n#{content}\n#{fence}\n\n"
+            # The newline in front of the closing fence is part of the fence
+            # syntax, not of the code. A content that already ends with a
+            # newline (as <pre> content from HTML usually does) would
+            # otherwise cook with a blank line too many at the end.
+            "\n\n#{fence}#{language}\n#{content.chomp}\n#{fence}\n\n"
           end
 
           def render_html_block(content, language)

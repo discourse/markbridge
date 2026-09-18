@@ -22,6 +22,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to eq("")
     end
 
+    it "does not add a blank line when the content ends with a newline" do
+      element = Markbridge::AST::Code.new(block: true)
+      element << Markbridge::AST::Text.new("x\n")
+
+      expect(tag.render(element, interface)).to eq("\n\n```\nx\n```\n\n")
+    end
+
+    it "keeps a blank line at the end of the content when there are two newlines" do
+      element = Markbridge::AST::Code.new(block: true)
+      element << Markbridge::AST::Text.new("x\n\n")
+
+      expect(tag.render(element, interface)).to eq("\n\n```\nx\n\n```\n\n")
+    end
+
+    it "drops a trailing carriage return and newline pair together" do
+      element = Markbridge::AST::Code.new(block: true)
+      element << Markbridge::AST::Text.new("x\r\n")
+
+      expect(tag.render(element, interface)).to eq("\n\n```\nx\n```\n\n")
+    end
+
     it "renders single-line content as a fenced block when block is true" do
       element = Markbridge::AST::Code.new(language: "ruby", block: true)
       element << Markbridge::AST::Text.new("x")
