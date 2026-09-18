@@ -30,6 +30,25 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       end
     end
 
+    context "when the marker is alone on the line (MUST escape)" do
+      it "escapes 1. at the end of the line" do
+        # A marker with nothing after it is an empty list item.
+        expect(escaper.escape("1.")).to eq("1\\.")
+      end
+
+      it "escapes 1) at the end of the line" do
+        expect(escaper.escape("1)")).to eq("1\\)")
+      end
+
+      it "escapes a multi-digit marker at the end of the line" do
+        expect(escaper.escape("12.")).to eq("12\\.")
+      end
+
+      it "escapes a marker alone on a line in the middle of the text" do
+        expect(escaper.escape("a\n\n1.\n\nb")).to eq("a\n\n1\\.\n\nb")
+      end
+    end
+
     context "when digit(s) + ) at line start followed by space (MUST escape)" do
       it "escapes 1) at line start" do
         expect(escaper.escape("1) First item")).to eq("1\\) First item")
