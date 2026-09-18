@@ -3,6 +3,25 @@ title: Upgrading
 description: Breaking-change notes between Markbridge releases.
 ---
 
+## Upgrading to 0.4.3
+
+The round-trip specs (see the Testing section of AGENTS.md) found a number of output defects. The fixes change the Markdown for the cases below, so check output assertions that cover them:
+
+- A fenced code block whose content ends with a newline no longer gets a blank line before the closing fence. `<pre><code>x\n</code></pre>` and `[code]x\n[/code]` render as ` ```\nx\n``` `.
+- The postprocessor leaves fenced code blocks alone. Blank lines and whitespace-only lines inside a fence stay as they are.
+- Inline code picks a backtick delimiter longer than any backtick run in the content, and pads the content with a space when it starts or ends with a backtick or with spaces on both sides: `` `a`b` `` becomes ``` ``a`b`` ```.
+- Images carry their alternative text. `AST::Image` has a new `alt:` keyword, the HTML, BBCode and TextFormatter parsers fill it, and the renderer writes `![alt|WxH](src)` in Markdown and `alt="…"` in html_mode.
+- Parentheses in a link destination are escaped: `[text](https://example.com/a\(b\))`.
+- A run of `#` at the end of a heading gets a backslash, so it stays visible: `### foo \###`.
+- A horizontal rule inside a list item is written as `* * *`. As `---` it ended the list when it was the first thing in the item.
+- A `!` directly in front of a link gets a backslash, so `Look![here](url)` does not cook as an image.
+- Two lists of the same kind that follow each other are separated by an HTML comment between blank lines (`<!---->`), so they do not merge into one loose list. A list without items renders to nothing.
+- Emphasis or strikethrough whose content starts or ends with punctuation gets the `<!---->` boundary comment when a word character or a strikethrough stands right next to it, for example `item<!---->*\#*`. Without it CommonMark's flanking rules keep the delimiters as text.
+- A list directly inside a list item is followed by a blank line, so text after it stays in the outer item instead of becoming a continuation line of the last nested item. A list inside a quote or an aligned block inside an item is a block with blank lines on both sides.
+- An ordered-list marker alone on a line (`1.` or `1)`) is escaped like one followed by text. It cooked to an empty list item before.
+- A bare URL with text right next to it (no whitespace between) is written as an autolink, `<https://example.com>`, because a Markdown parser does not link it on its own there. A bare URL with whitespace around it stays plain and can still onebox.
+- `RenderingInterface` has `previous_sibling(element)` and `next_sibling(element)`. An element without a tag (such as the `Document`) is now on the parent chain for its children, the same way `Tag::PASSTHROUGH` does it, so `has_parent?(AST::Document)` is true for top-level content.
+
 ## Upgrading to 0.4.2
 
 Check output assertions for aligned blocks and nested lists:

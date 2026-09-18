@@ -61,6 +61,22 @@ module Markbridge
           @context.root?
         end
 
+        # The node in front of +element+ among the children of its parent,
+        # the element on top of the parent chain. nil when +element+ is the
+        # first child, or when the parent is not known.
+        # @param element [AST::Node]
+        # @return [AST::Node, nil]
+        def previous_sibling(element)
+          sibling(element, -1)
+        end
+
+        # The node after +element+ among the children of its parent.
+        # @param element [AST::Node]
+        # @return [AST::Node, nil]
+        def next_sibling(element)
+          sibling(element, 1)
+        end
+
         # Check if element should be rendered in block context
         # @param node [AST::Node] container node or leaf like HorizontalRule
         # @return [Boolean]
@@ -105,6 +121,16 @@ module Markbridge
         end
 
         private
+
+        def sibling(element, offset)
+          siblings = @context.element&.children
+          return nil if siblings.nil?
+
+          index = siblings.index { |child| child.equal?(element) }
+          return nil if index.nil? || (index + offset).negative?
+
+          siblings.at(index + offset)
+        end
 
         # Wrap content in markers, keeping leading/trailing whitespace
         # outside the markers (Unicode-aware, since CommonMark's flanking

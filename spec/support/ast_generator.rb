@@ -25,13 +25,8 @@ class AstGenerator
   # Tokens the escaper has to neutralize. They are placed in nested
   # positions on purpose: inside a list item or a quote they end up at the
   # start of a line, where CommonMark reads them as block markers.
-  #
-  # A bare "1." is left out. MarkdownEscaper escapes an ordered-list
-  # marker only when a space or a tab follows it, so a line that is just
-  # "1." cooks to an empty <ol><li></li></ol>. "- " and "# " at the end of
-  # a line are escaped, only the ordered marker is not. The token with
-  # text after it stays in, it covers the line-start case.
   TRICKY_TOKENS = [
+    "1.",
     "*",
     "_",
     "#",
@@ -50,16 +45,28 @@ class AstGenerator
   ].freeze
 
   # Lines for block code. Some carry leading spaces, some carry fence
-  # characters, so the renderer has to widen the fence it picks. No blank
-  # lines: the postprocessor clears whitespace-only lines and collapses
-  # runs of newlines, which would change the code text.
+  # characters, so the renderer has to widen the fence it picks.
   CODE_LINES = ["x = 1", "  indented", "end", "```", "~~~", "a | b", "# comment"].freeze
+
+  # Lines that may follow the first one: a blank line and a line of
+  # spaces have to survive the postprocessor unchanged.
+  CODE_CONTINUATION_LINES = (CODE_LINES + ["", "  "]).freeze
 
   CODE_LANGUAGES = [nil, "ruby", "text"].freeze
 
   # Inline code stays on one line and carries no backtick, so the renderer
   # can wrap it in a single pair of backticks.
-  INLINE_CODE_SNIPPETS = ["puts x", "a<b", "foo_bar", "a | b", "1 * 2"].freeze
+  INLINE_CODE_SNIPPETS = [
+    "puts x",
+    "a<b",
+    "foo_bar",
+    "a | b",
+    "1 * 2",
+    "a`b",
+    "``",
+    " x ",
+    "`",
+  ].freeze
 
   ALIGNMENTS = %w[left center right].freeze
 
@@ -126,7 +133,7 @@ class AstGenerator
   def document
     @budget = MAX_NODES
     document = AST::Document.new
-    fill_block_container(document, depth: 1, headings: true, in_list: false)
+    fill_block_container(document, depth: 1, headings: true)
     document
   end
 
@@ -140,19 +147,10 @@ class AstGenerator
   # @param container [Markbridge::AST::Element]
   # @param depth [Integer] the container's own nesting level
   # @param headings [Boolean] whether a Heading may be placed here
-  # @param in_list [Boolean] whether a List or ListItem is an ancestor
   # @return [void]
-  def fill_block_container(container, depth:, headings:, in_list:)
+  def fill_block_container(container, depth:, headings:)
     inline_run(container)
-    (1 + @random.rand(3)).times do
-      add_block(container, depth:, headings:, in_list:)
-      # Below a list, a List is the last block its container may hold.
-      # ListTag asks whether any ancestor is a List or a ListItem, and in
-      # that case it drops the blank lines around the list. Whatever
-      # follows then sits at the indentation of the last nested item and
-      # CommonMark reads it as a continuation line of that item.
-      break if in_list && container.children.last.is_a?(AST::List)
-    end
+    (1 + @random.rand(3)).times { add_block(container, depth:, headings:) }
   end
 
   # Appends one block, unless the budget is used up. Two Lists never end up
@@ -160,10 +158,10 @@ class AstGenerator
   # which is a separate bug, so a text run goes between them.
   #
   # @return [void]
-  def add_block(container, depth:, headings:, in_list:)
+  def add_block(container, depth:, headings:)
     return if exhausted?
 
-    block = build_block(depth:, headings:, in_list:)
+    block = build_block(depth:, headings:)
     return if block.nil?
 
     inline_run(container) if block.is_a?(AST::List) && container.children.last.is_a?(AST::List)
@@ -171,7 +169,7 @@ class AstGenerator
   end
 
   # @return [Markbridge::AST::Node, nil]
-  def build_block(depth:, headings:, in_list:)
+  def build_block(depth:, headings:)
     choices = %i[paragraph code_block rule]
     choices << :heading if headings
     choices.concat(%i[list quote align]) if depth < MAX_DEPTH
@@ -188,9 +186,9 @@ class AstGenerator
     when :list
       list(depth:)
     when :quote
-      quote(depth:, in_list:)
+      quote(depth:)
     when :align
-      align(depth:, in_list:)
+      align(depth:)
     end
   end
 
@@ -207,17 +205,17 @@ class AstGenerator
     heading
   end
 
-  def quote(depth:, in_list:)
+  def quote(depth:)
     # No author: an attributed quote renders Discourse BBCode, which
     # commonmarker does not know.
     quote = spend { AST::Quote.new }
-    fill_block_container(quote, depth: depth + 1, headings: true, in_list:)
+    fill_block_container(quote, depth: depth + 1, headings: true)
     quote
   end
 
-  def align(depth:, in_list:)
+  def align(depth:)
     align = spend { AST::Align.new(alignment: ALIGNMENTS.sample(random: @random)) }
-    fill_block_container(align, depth: depth + 1, headings: true, in_list:)
+    fill_block_container(align, depth: depth + 1, headings: true)
     align
   end
 
@@ -235,7 +233,6 @@ class AstGenerator
   # LineBreak, and sometimes nested blocks. The continuation line is the
   # case the indentation bug hid in. A Heading stays out: a heading in an
   # item is unusual in a forum post and would only widen the spec.
-  # A nested List ends the item, see {#fill_block_container}.
   def list_item(depth:)
     item = spend { AST::ListItem.new }
     inline_run(item)
@@ -245,10 +242,7 @@ class AstGenerator
       inline_run(item)
     end
 
-    (@random.rand(3)).times do
-      add_block(item, depth:, headings: false, in_list: true)
-      break if item.children.last.is_a?(AST::List)
-    end
+    @random.rand(3).times { add_block(item, depth:, headings: false) }
     item
   end
 
@@ -296,21 +290,17 @@ class AstGenerator
     node = spend { klass == AST::Url ? AST::Url.new(href: pick_href) : klass.new }
 
     # A Url with the href as its only text renders as a bare URL, which is
-    # a different construct. Plain words keep it a real link label.
+    # a different construct. A plain word first keeps it a real link
+    # label. Everything after it may be a tricky token, also at the end:
+    # emphasis that starts or ends with punctuation next to a word is
+    # what the renderer's boundary comment is for.
     node << text_node(tricky: false)
-    extra = 0
-    (@random.rand(2)).times do
-      break if exhausted?
-      node << inline_node(open: open + [klass], inline_depth: inline_depth + 1, line_breaks:)
-      extra += 1
-    end
-
-    # Emphasis ends on a word, not on punctuation. `**` and `*` only open
-    # and close next to a word (CommonMark's flanking rules), and the
-    # renderer has no fallback for that: `item*\#*` cooks to the literal
-    # text `item*#*` instead of emphasis. A link label has no such rule,
-    # so a Url may end on anything.
-    node << text_node(tricky: false) if extra.positive? && klass != AST::Url
+    @random
+      .rand(2)
+      .times do
+        break if exhausted?
+        node << inline_node(open: open + [klass], inline_depth: inline_depth + 1, line_breaks:)
+      end
     node
   end
 
@@ -334,7 +324,9 @@ class AstGenerator
 
   def code_block
     code = spend { AST::Code.new(language: CODE_LANGUAGES.sample(random: @random), block: true) }
-    lines = Array.new(1 + @random.rand(3)) { CODE_LINES.sample(random: @random) }
+    # The first line always has content, so the block is never empty.
+    lines = [CODE_LINES.sample(random: @random)]
+    @random.rand(3).times { lines << CODE_CONTINUATION_LINES.sample(random: @random) }
     code << AST::Text.new(lines.join("\n"))
     code
   end

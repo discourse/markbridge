@@ -86,6 +86,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("hello")
     end
 
+    it "puts an element without a tag on the parent chain for its children" do
+      # The Document has no tag. Its children can still ask for their
+      # siblings: the bare URL sees the text in front of it.
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("see")
+      url = Markbridge::AST::Url.new(href: "https://example.com")
+      url << Markbridge::AST::Text.new("https://example.com")
+      document << url
+
+      expect(renderer.render(document)).to eq("see<https://example.com>")
+    end
+
     it "renders text nodes" do
       text = Markbridge::AST::Text.new("hello world")
       result = renderer.render(text)
@@ -149,6 +161,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       email << Markbridge::AST::Text.new("[A]")
 
       expect(renderer.render(email)).to eq("[\\[A\\]](mailto:user@example.com)")
+    end
+
+    it "escapes ] in Text content when an ancestor is Image (the alt text is a link label)" do
+      image = Markbridge::AST::Image.new(src: "x.png")
+      text = Markbridge::AST::Text.new("[A]")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([image])
+
+      expect(renderer.render(text, context:)).to eq("\\[A\\]")
     end
 
     it "does not escape ] in Text content when no link ancestor is present" do
@@ -287,6 +307,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   end
 
   describe "#render_children" do
+    def list_with_item(ordered:, text:)
+      list = Markbridge::AST::List.new(ordered:)
+      item = Markbridge::AST::ListItem.new
+      item << Markbridge::AST::Text.new(text)
+      list << item
+    end
+
     it "renders all children" do
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::Text.new("hello ")
@@ -379,6 +406,345 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       result = renderer.render_children(document, context:)
 
       expect(result).to eq("**x**<!---->**y**")
+    end
+
+    it "puts a boundary between a word and emphasis that starts with punctuation" do
+      # `item*\#*` cannot open the emphasis: the `*` has a word character
+      # in front and punctuation after it (CommonMark's flanking rules).
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("item")
+      italic = Markbridge::AST::Italic.new
+      italic << Markbridge::AST::Text.new("#")
+      document << italic
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("item<!---->*\\#*")
+    end
+
+    it "puts a boundary between emphasis that ends with punctuation and a word" do
+      document = Markbridge::AST::Document.new
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("*bold*")
+      document << bold
+      document << Markbridge::AST::Text.new("tail")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("**\\*bold\\***<!---->tail")
+    end
+
+    it "puts a boundary between a word and strikethrough that starts with punctuation" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("w")
+      strike = Markbridge::AST::Strikethrough.new
+      strike << Markbridge::AST::Text.new("# heading")
+      document << strike
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("w<!---->~~\\# heading~~")
+    end
+
+    it "treats a non-ASCII letter in front of the emphasis as a word character" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("ä")
+      italic = Markbridge::AST::Italic.new
+      italic << Markbridge::AST::Text.new("#")
+      document << italic
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("ä<!---->*\\#*")
+    end
+
+    it "leaves emphasis that starts with a word character alone" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("item")
+      italic = Markbridge::AST::Italic.new
+      italic << Markbridge::AST::Text.new("x")
+      document << italic
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("item*x*")
+    end
+
+    it "leaves emphasis alone when whitespace stands in front of it" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("item ")
+      italic = Markbridge::AST::Italic.new
+      italic << Markbridge::AST::Text.new("#")
+      document << italic
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("item *\\#*")
+    end
+
+    it "leaves emphasis alone when punctuation stands in front of it" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("(")
+      italic = Markbridge::AST::Italic.new
+      italic << Markbridge::AST::Text.new("#")
+      document << italic
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("(*\\#*")
+    end
+
+    it "leaves emphasis that ends with a word character alone in front of a word" do
+      document = Markbridge::AST::Document.new
+      italic = Markbridge::AST::Italic.new
+      italic << Markbridge::AST::Text.new("x")
+      document << italic
+      document << Markbridge::AST::Text.new("tail")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("*x*tail")
+    end
+
+    it "leaves emphasis that ends with punctuation alone in front of whitespace" do
+      document = Markbridge::AST::Document.new
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("*bold*")
+      document << bold
+      document << Markbridge::AST::Text.new(" tail")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("**\\*bold\\*** tail")
+    end
+
+    it "puts a boundary between emphasis that ends with punctuation and strikethrough" do
+      # cmark-gfm does not count the tilde as punctuation there, so the
+      # closing `**` would stay text.
+      document = Markbridge::AST::Document.new
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("a*")
+      document << bold
+      strike = Markbridge::AST::Strikethrough.new
+      strike << Markbridge::AST::Text.new("b")
+      document << strike
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("**a\\***<!---->~~b~~")
+    end
+
+    it "puts a boundary between strikethrough and emphasis that starts with punctuation" do
+      document = Markbridge::AST::Document.new
+      strike = Markbridge::AST::Strikethrough.new
+      strike << Markbridge::AST::Text.new("a")
+      document << strike
+      italic = Markbridge::AST::Italic.new
+      italic << Markbridge::AST::Text.new("#")
+      document << italic
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("~~a~~<!---->*\\#*")
+    end
+
+    it "leaves emphasis that ends with a word character alone in front of strikethrough" do
+      document = Markbridge::AST::Document.new
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("a")
+      document << bold
+      strike = Markbridge::AST::Strikethrough.new
+      strike << Markbridge::AST::Text.new("b")
+      document << strike
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("**a**~~b~~")
+    end
+
+    # Renders two verbatim parts side by side and tells whether the
+    # renderer put the boundary comment between them.
+    def boundary_between?(before, part)
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new(before)
+      document << Markbridge::AST::MarkdownText.new(part)
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+
+      renderer.render_children(document, context:).include?("<!---->")
+    end
+
+    # Bytes at both ends of every range the word-character check uses,
+    # with the byte next to each end. 0x80 is the first non-ASCII byte.
+    {
+      "/" => false,
+      "0" => true,
+      "9" => true,
+      ":" => false,
+      "@" => false,
+      "A" => true,
+      "Z" => true,
+      "[" => false,
+      "`" => false,
+      "a" => true,
+      "z" => true,
+      "{" => false,
+      "\x7F" => false,
+      "\u0080" => true,
+      "\u00E4" => true,
+    }.each do |char, word|
+      it "treats the byte #{char.bytes.last} in front of emphasis as #{word ? "a word" : "no word"} character" do
+        expect(boundary_between?(char, "*\\#*")).to be(word)
+      end
+    end
+
+    # The same for the punctuation check, on the byte after the run.
+    # The `*` probe uses a tilde run, so the star does not join the run.
+    {
+      " " => false,
+      "!" => true,
+      "*" => true,
+      "/" => true,
+      "0" => false,
+      "9" => false,
+      ":" => true,
+      "@" => true,
+      "A" => false,
+      "Z" => false,
+      "[" => true,
+      "`" => true,
+      "a" => false,
+      "z" => false,
+      "{" => true,
+      "~" => true,
+      "\x7F" => false,
+    }.each do |char, punctuation|
+      it "treats the byte #{char.bytes.last} after the run as #{punctuation ? "punctuation" : "no punctuation"}" do
+        run = char == "*" ? "~~" : "*"
+
+        expect(boundary_between?("a", "#{run}#{char}x#{run}")).to be(punctuation)
+      end
+    end
+
+    it "puts no boundary when the part is nothing but a delimiter run" do
+      expect(boundary_between?("a", "**")).to be(false)
+    end
+
+    it "puts no boundary when the run reaches the start of the buffer" do
+      expect(boundary_between?("**", "b")).to be(false)
+    end
+
+    it "looks past the whole run for the byte after it" do
+      expect(boundary_between?("a", "***(x)***")).to be(true)
+    end
+
+    it "looks past the whole run for the byte before it" do
+      expect(boundary_between?("(x)***", "tail")).to be(true)
+    end
+
+    it "does not take the last byte of the part for the byte after the run" do
+      expect(boundary_between?("a", "*(x) tail")).to be(true)
+    end
+
+    it "separates two lists whose classes are subclasses of List" do
+      list_class = Class.new(Markbridge::AST::List)
+      document = Markbridge::AST::Document.new
+      [list_class.new(ordered: false), list_class.new(ordered: false)].each do |list|
+        item = Markbridge::AST::ListItem.new
+        item << Markbridge::AST::Text.new("x")
+        list << item
+        document << list
+      end
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to include("<!---->")
+    end
+
+    it "puts a boundary between a word and an underscore run whatever follows the run" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("item")
+      document << Markbridge::AST::MarkdownText.new("_x_")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("item<!---->_x_")
+    end
+
+    it "puts a boundary between an underscore run and a word whatever precedes the run" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("_x_")
+      document << Markbridge::AST::Text.new("tail")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("_x_<!---->tail")
+    end
+
+    it "separates two lists of the same kind with a comment between blank lines" do
+      document = Markbridge::AST::Document.new
+      document << list_with_item(ordered: false, text: "a")
+      document << list_with_item(ordered: false, text: "b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      # The tags bracket their output with blank lines of their own; the
+      # postprocessor collapses them later.
+      expect(renderer.render_children(document, context:)).to match(/- a\n+<!---->\n+- b/)
+    end
+
+    it "separates two ordered lists" do
+      document = Markbridge::AST::Document.new
+      document << list_with_item(ordered: true, text: "a")
+      document << list_with_item(ordered: true, text: "b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to include("<!---->")
+    end
+
+    it "does not separate an ordered list from an unordered one" do
+      # A change of list kind starts a new list on its own.
+      document = Markbridge::AST::Document.new
+      document << list_with_item(ordered: false, text: "a")
+      document << list_with_item(ordered: true, text: "b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).not_to include("<!---->")
+    end
+
+    it "does not separate a list from text that follows it" do
+      document = Markbridge::AST::Document.new
+      document << list_with_item(ordered: false, text: "a")
+      document << Markbridge::AST::Text.new("after")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).not_to include("<!---->")
+    end
+
+    it "does not separate two lists when the first one renders to nothing" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::List.new(ordered: false)
+      document << list_with_item(ordered: false, text: "b")
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).not_to include("<!---->")
+    end
+
+    it "escapes a ! at the end of the buffer when the next part starts with [" do
+      # Otherwise `![foo](/url)` cooks as an image.
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("Look!")
+      link = Markbridge::AST::Url.new(href: "/url")
+      link << Markbridge::AST::Text.new("foo")
+      document << link
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("Look\\![foo](/url)")
+    end
+
+    it "leaves a ! that is already escaped alone" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("Look\\!")
+      link = Markbridge::AST::Url.new(href: "/url")
+      link << Markbridge::AST::Text.new("foo")
+      document << link
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("Look\\![foo](/url)")
+    end
+
+    it "leaves a ! alone when the next part does not start with [" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("Look!")
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("x")
+      document << bold
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("Look!**x**")
     end
 
     it "inserts a boundary between adjacent code spans so backtick runs don't merge" do

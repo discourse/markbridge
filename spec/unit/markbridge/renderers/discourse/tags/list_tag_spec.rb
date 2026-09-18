@@ -20,6 +20,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       expect(result).to include("- item")
     end
 
+    it "renders a list without items to nothing" do
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      list = Markbridge::AST::List.new(ordered: false)
+
+      expect(tag.render(list, interface)).to eq("")
+    end
+
+    it "renders a list whose items are all empty to nothing" do
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      list = Markbridge::AST::List.new(ordered: false)
+      list << Markbridge::AST::ListItem.new
+
+      expect(tag.render(list, interface)).to eq("")
+    end
+
     it "passes list in context to children" do
       context = Markbridge::Renderers::Discourse::RenderContext.new
       interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
@@ -48,7 +65,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
 
       expect(result).to start_with("\n")
       expect(result).not_to start_with("\n\n")
-      expect(result).not_to end_with("\n\n")
+      # One blank line after the list, so text that follows it in the
+      # same item starts its own paragraph.
+      expect(result).to end_with("- nested item\n\n")
     end
 
     it "handles document as parent in context" do
@@ -128,11 +147,48 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
 
       result = tag.render(list, interface)
 
-      expect(result).to start_with("\n")
-      expect(result).not_to start_with("\n\n")
-      expect(result).not_to end_with("\n\n")
-      # Content must be present (kills `"\n#{content}"` → `"\n#{nil}"`)
-      expect(result).to include("- inner")
+      expect(result).to eq("\n- inner\n\n")
+    end
+
+    it "treats a list inside a ListItem subclass as nested" do
+      item_class = Class.new(Markbridge::AST::ListItem)
+      context = Markbridge::Renderers::Discourse::RenderContext.new([item_class.new])
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      list = Markbridge::AST::List.new(ordered: false)
+      item = Markbridge::AST::ListItem.new
+      item << Markbridge::AST::Text.new("inner")
+      list << item
+
+      expect(tag.render(list, interface)).to eq("\n- inner\n\n")
+    end
+
+    it "treats a list inside a List subclass as nested" do
+      list_class = Class.new(Markbridge::AST::List)
+      context = Markbridge::Renderers::Discourse::RenderContext.new([list_class.new])
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      list = Markbridge::AST::List.new(ordered: false)
+      item = Markbridge::AST::ListItem.new
+      item << Markbridge::AST::Text.new("inner")
+      list << item
+
+      expect(tag.render(list, interface)).to eq("\n- inner\n\n")
+    end
+
+    it "treats a list inside a quote inside a list item as a block" do
+      quote = Markbridge::AST::Quote.new
+      context =
+        Markbridge::Renderers::Discourse::RenderContext.new(
+          [Markbridge::AST::List.new, Markbridge::AST::ListItem.new, quote],
+        )
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      list = Markbridge::AST::List.new(ordered: false)
+      item = Markbridge::AST::ListItem.new
+      item << Markbridge::AST::Text.new("inner")
+      list << item
+
+      # Only the direct parent counts. Text after the list inside the
+      # quote would otherwise continue the last item.
+      expect(tag.render(list, interface)).to eq("\n\n- inner\n\n\n")
     end
 
     # Same identity tightening for the nested branch: kills mutations on
@@ -149,7 +205,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
 
       # A nested item does not indent itself; the item that holds the
       # nested list indents its whole content.
-      expect(tag.render(inner_list, interface)).to eq("\n- nested\n")
+      expect(tag.render(inner_list, interface)).to eq("\n- nested\n\n")
     end
 
     context "in html_mode" do

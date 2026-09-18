@@ -107,22 +107,15 @@ module Markbridge
         #   end
         def render_children(node, context:)
           result = +""
+          previous = nil
           node.children.each do |child|
             part = render(child, context:)
             next if part.empty?
 
             yield(result, child) if block_given?
-
-            # Integer-byte check avoids allocating substrings for the
-            # per-child adjacency probe. EMPHASIS_DELIMITER_BYTES.include?
-            # over a 4-element Set is O(1). On an empty buffer getbyte
-            # returns nil, which matches no byte of a non-empty part, so
-            # the first child needs no extra guard.
-            if (last_byte = result.getbyte(-1)) == part.getbyte(0) &&
-                 EMPHASIS_DELIMITER_BYTES.include?(last_byte)
-              result << EMPHASIS_BOUNDARY
-            end
+            join(result, previous, child, part)
             result << part
+            previous = child
           end
           result
         end
@@ -138,7 +131,114 @@ module Markbridge
         # Bytes where adjacent runs merge into a single longer run during
         # Markdown parsing: emphasis (* _), strikethrough (~), code spans (`).
         EMPHASIS_DELIMITER_BYTES = Set[42, 95, 126, 96].freeze
-        private_constant :EMPHASIS_BOUNDARY, :EMPHASIS_DELIMITER_BYTES
+        # Inserted between two lists of the same kind. Without something
+        # between them CommonMark reads the second list as more items of
+        # the first, and the blank line makes the whole list loose.
+        LIST_BOUNDARY = "\n\n<!---->\n\n"
+        # Delimiters that open and close only where CommonMark's flanking
+        # rules allow it: emphasis (* _) and strikethrough (~), with the
+        # pattern that finds the first byte outside a run of each.
+        FLANKING_DELIMITERS = { 42 => /[^*]/, 95 => /[^_]/, 126 => /[^~]/ }.freeze
+        BACKSLASH = 92
+        BANG = 33
+        BRACKET_OPEN = 91
+        UNDERSCORE = 95
+        TILDE = 126
+        private_constant :EMPHASIS_BOUNDARY,
+                         :EMPHASIS_DELIMITER_BYTES,
+                         :LIST_BOUNDARY,
+                         :FLANKING_DELIMITERS,
+                         :BACKSLASH,
+                         :BANG,
+                         :BRACKET_OPEN,
+                         :UNDERSCORE,
+                         :TILDE
+
+        # Adjusts the end of +result+ where the next +part+ would change
+        # how the two sides are read together. +previous+ is the child
+        # whose output ends the buffer (nil for the first one). The byte
+        # checks allocate nothing per child. On an empty buffer getbyte
+        # returns nil, which matches no byte of a non-empty part.
+        def join(result, previous, child, part)
+          last_byte = result.getbyte(-1)
+          first_byte = part.getbyte(0)
+
+          if child.is_a?(AST::List) && previous.is_a?(AST::List) &&
+               child.ordered? == previous.ordered?
+            result << LIST_BOUNDARY
+          elsif last_byte == first_byte && EMPHASIS_DELIMITER_BYTES.include?(last_byte)
+            result << EMPHASIS_BOUNDARY
+          elsif last_byte == BANG && first_byte == BRACKET_OPEN
+            # A `!` right in front of a link makes it an image. The escaper
+            # leaves a lone `!` alone because it cannot see the next node.
+            result.insert(-2, "\\") unless result.getbyte(-2) == BACKSLASH
+          elsif blocked_opening?(last_byte, part, first_byte) ||
+                blocked_closing?(result, last_byte, first_byte)
+            result << EMPHASIS_BOUNDARY
+          end
+        end
+
+        # A delimiter run at the start of +part+ cannot open when a word
+        # character stands in front of it and punctuation follows it
+        # (CommonMark 6.2, left-flanking). `item*\#*` stays literal text.
+        # A `_` run never opens after a word character. The comment
+        # between them is punctuation, so the run can open again.
+        def blocked_opening?(last_byte, part, first_byte)
+          return false unless blocking_neighbour?(last_byte) && FLANKING_DELIMITERS.key?(first_byte)
+
+          first_byte == UNDERSCORE || punctuation_byte?(byte_after_run(part, first_byte))
+        end
+
+        # The mirror image at the end of +result+: a run preceded by
+        # punctuation cannot close when a word character follows it, and
+        # a `_` run never closes in front of a word character.
+        def blocked_closing?(result, last_byte, first_byte)
+          return false unless FLANKING_DELIMITERS.key?(last_byte) && blocking_neighbour?(first_byte)
+
+          last_byte == UNDERSCORE || punctuation_byte?(byte_before_run(result, last_byte))
+        end
+
+        # A word character, or a tilde. CommonMark counts `~` as punctuation,
+        # but cmark-gfm (commonmarker) does not treat it as one next to an
+        # emphasis delimiter, so strikethrough right next to emphasis with a
+        # punctuation edge needs the boundary as well. markdown-it would not
+        # need it; the comment changes nothing there.
+        def blocking_neighbour?(byte)
+          byte == TILDE || word_byte?(byte)
+        end
+
+        # The first byte after the run of +byte+ that starts +part+, nil
+        # when the part is nothing but the run.
+        def byte_after_run(part, byte)
+          index = part.byteindex(FLANKING_DELIMITERS.fetch(byte))
+          index && part.getbyte(index)
+        end
+
+        # The byte in front of the run of +byte+ that ends +result+, nil
+        # when the run reaches the start of the buffer.
+        def byte_before_run(result, byte)
+          index = result.byterindex(FLANKING_DELIMITERS.fetch(byte))
+          index && result.getbyte(index)
+        end
+
+        # ASCII letters and digits. Every non-ASCII byte counts as a word
+        # character too: a few Unicode punctuation marks are then handled
+        # like letters, which costs a comment that changes nothing.
+        def word_byte?(byte)
+          return false if byte.nil?
+
+          byte >= 128 || byte.between?(48, 57) || byte.between?(65, 90) || byte.between?(97, 122)
+        end
+
+        # ASCII punctuation as CommonMark defines it. A backslash belongs to
+        # it, which is what makes an escaped character at the edge of an
+        # emphasis count as punctuation.
+        def punctuation_byte?(byte)
+          return false if byte.nil?
+
+          byte.between?(33, 47) || byte.between?(58, 64) || byte.between?(91, 96) ||
+            byte.between?(123, 126)
+        end
 
         def interface_for(context)
           @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)
@@ -169,10 +269,13 @@ module Markbridge
         end
 
         # The tag-less rendering paths shared by #render and #render_default.
+        # An element without a tag still goes on the parent chain, like
+        # Tag::PASSTHROUGH does, so its children can ask for their parent
+        # and their siblings (the Document is the usual case).
         def render_without_tag(node, context)
           case node
           when AST::Element # Document is an Element subclass
-            render_children(node, context:)
+            render_children(node, context: context.with_parent(node))
           when AST::MarkdownText
             render_markdown_text(node, context)
           when AST::Text
@@ -203,11 +306,14 @@ module Markbridge
         end
 
         # `]` is structural inside a Markdown link label, so any plain text
-        # rendered under an Url/Email ancestor must escape it. Tags that emit
-        # their own bracketed markup (ImageTag, UploadTag, etc.) skip this
-        # path entirely, so their structural brackets are preserved.
+        # rendered under an Url/Email ancestor must escape it. The alt text
+        # of an image is a link label too (ImageTag renders it as a Text
+        # node under the Image). Tags that emit their own bracketed markup
+        # (ImageTag, UploadTag, etc.) skip this path entirely, so their
+        # structural brackets are preserved.
         def in_link_label?(context)
-          context.has_parent?(AST::Url) || context.has_parent?(AST::Email)
+          context.has_parent?(AST::Url) || context.has_parent?(AST::Email) ||
+            context.has_parent?(AST::Image)
         end
       end
     end

@@ -32,7 +32,7 @@ module Markbridge
               # Url#bare? judges the AST (so label escaping can't confuse
               # it); the rendered-text check additionally catches labels
               # that render to nothing (e.g. an empty formatting child).
-              href
+              bare_url(element, href, interface)
             else
               "[#{text}](#{markdown_destination(href)})"
             end
@@ -40,10 +40,33 @@ module Markbridge
 
           private
 
+          # A bare URL is linked by the Markdown parser on its own only when
+          # whitespace (or the start of the line) stands in front of it and
+          # nothing sticks to its end. Glued to text it is written as an
+          # autolink, `<href>`, which links everywhere. It cannot onebox in
+          # that position anyway, that needs a URL alone on its line.
+          def bare_url(element, href, interface)
+            glued =
+              glued?(interface.previous_sibling(element), /\S\z/) ||
+                glued?(interface.next_sibling(element), /\A\S/)
+            glued ? "<#{href}>" : href
+          end
+
+          # Whether the neighbouring +node+ is text with something other
+          # than whitespace at the edge next to the URL.
+          def glued?(node, edge)
+            node.instance_of?(AST::Text) && node.text.match?(edge)
+          end
+
           # CommonMark link destinations cannot contain whitespace unless
           # wrapped in <> — relevant for relative targets like MediaWiki
-          # page names ("Main Page").
+          # page names ("Main Page"). An unbalanced parenthesis ends the
+          # destination early, so every parenthesis gets a backslash;
+          # balanced ones would be fine, but the check is not worth it.
+          # gsub returns a copy also without a match, the cost of that is
+          # smaller than a guard that no test can tell apart.
           def markdown_destination(href)
+            href = href.gsub(/[()]/) { |char| "\\#{char}" }
             href.match?(/\s/) ? "<#{href}>" : href
           end
 
