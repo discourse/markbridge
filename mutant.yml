@@ -163,13 +163,13 @@ matcher:
     # without changing observable output. Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_text
 
-    # Postprocessor#clean_document's `text.match?(FENCE_RUN) ?` guard.
+    # Postprocessor#clean_document's `text.include?("```") || ...` gate.
     # Both branches produce the same text: clean_around_fences finds no
-    # fence, collects every line as prose and runs clean over it once.
-    # The guard only keeps documents without a fence off the line loop.
-    # Alive mutations (`if true`, `if text`, `if FENCE_RUN`, collapse
-    # to always-loop) all take the loop without an observable change.
-    # The method holds nothing but this ternary. Bucket A.
+    # fence and runs clean over the whole text once. The gate only keeps
+    # documents without a fence off the fence scan. Alive mutations
+    # (`if true`, `if text`, the dropped include?, collapse to
+    # always-scan) all take the scan without an observable change. The
+    # method holds nothing but this ternary. Bucket A.
     - Markbridge::Renderers::Discourse::Postprocessor#clean_document
 
     # Renderer#render's `@interface_cache` housekeeping (root_call
@@ -316,6 +316,23 @@ mutation:
     - "index{receiver=lvar{value=header_row}}"
     - "index{receiver=lvar{value=cell}}"
     - "index{receiver=send{selector=first}}"
+
+    # Postprocessor#clean's two guards in front of its gsubs
+    # (`prose.include?("\n\n\n")` and `prose.match?(WHITESPACE_LINE)`).
+    # gsub without a match returns an equal copy, so dropping either
+    # guard changes nothing observable; each only saves that copy for
+    # the common text that has nothing to clean. `prose` is the local's
+    # name only in the postprocessor.
+    - "if{condition=send{receiver=lvar{value=prose} selector=include?}}"
+    - "if{condition=send{receiver=lvar{value=prose} selector=match?}}"
+
+    # UrlTag#markdown_destination's `href.match?(/[()]/) ?` guard. Both
+    # branches give the same destination: gsub without a match returns
+    # an equal copy. The guard only saves that copy on the common link
+    # without parentheses. `if true`, `if href` and the collapse to
+    # always-gsub are the alive mutations. The local is named
+    # `destination` nowhere else, and `href.match?` is only used here.
+    - "if{condition=send{receiver=lvar{value=href} selector=match?}}"
 
     # `rows_data[header_idx]` / `rows_data[0...header_idx]` / ... —
     # `.at` / `.fetch` equivalences (valid index by construction) and
