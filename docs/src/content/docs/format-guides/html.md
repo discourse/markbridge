@@ -86,6 +86,7 @@ result.markdown
 
 - **Uses Nokogiri's HTML fragment parser** — handles malformed input without raising.
 - **Stateless handlers** — simpler than BBCode's open/close callback API. A handler is an object responding to `#process(element:, parent:)`.
+- **Collapses whitespace like a browser** — runs of whitespace become one space, and a space at the start or end of a line (a block boundary) or right after another space is dropped, wherever the inline boundaries fall: `<b>a </b> b` keeps one space. Text inside `<pre>`, `<code>`, `<textarea>` and `<tt>` is kept verbatim. Both tag sets are configurable on the `HandlerRegistry` (`block_level_tags`, `whitespace_preserving_tags`).
 
 ```ruby
 class AsideHandler < Markbridge::Parsers::HTML::Handlers::BaseHandler

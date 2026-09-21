@@ -602,6 +602,126 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(doc.children[2]).to be_a(Markbridge::AST::Paragraph)
     end
 
+    it "keeps a space at an inline element's edge in the middle of a line" do
+      # Browsers collapse whitespace across inline boundaries, so the
+      # space separates the words; the renderer moves it outside the
+      # markers.
+      doc = parser.parse("a<b> b </b>c")
+
+      expect(doc.children[1].children[0].text).to eq(" b ")
+    end
+
+    it "collapses a space inside an inline element against the space after it" do
+      doc = parser.parse("<b>a </b> b")
+
+      expect(doc.children[0].children[0].text).to eq("a ")
+      expect(doc.children[1].text).to eq("b")
+    end
+
+    it "collapses a space before an inline element against the space inside it" do
+      doc = parser.parse("a <b> b</b>")
+
+      expect(doc.children[0].text).to eq("a ")
+      expect(doc.children[1].children[0].text).to eq("b")
+    end
+
+    it "drops a space at the start of a block even inside an inline element" do
+      doc = parser.parse("<p><b> x</b></p>")
+
+      expect(doc.children[0].children[0].children[0].text).to eq("x")
+    end
+
+    it "drops a space at the end of a block even inside an inline element" do
+      doc = parser.parse("<p><b>x </b></p><p>y</p>")
+
+      expect(doc.children[0].children[0].children[0].text).to eq("x")
+    end
+
+    it "drops a space at the end of a block inside nested inline elements" do
+      doc = parser.parse("<p><b><i>x </i></b></p><p>y</p>")
+
+      expect(doc.children[0].children[0].children[0].children[0].text).to eq("x")
+    end
+
+    it "keeps the space before a leaf that ends a block" do
+      # The image is content on the line, so the space before it is not
+      # at the end of the line.
+      doc = parser.parse("<p><b>a </b><img src=\"/i.png\"></p>")
+
+      paragraph = doc.children[0]
+      expect(paragraph.children[0].children[0].text).to eq("a ")
+      expect(paragraph.children[1]).to be_a(Markbridge::AST::Image)
+    end
+
+    it "keeps the space after a leaf at the start of a block" do
+      doc = parser.parse("<p><img src=\"/i.png\"> a</p>")
+
+      expect(doc.children[0].children[1].text).to eq(" a")
+    end
+
+    it "keeps a space after preserved whitespace" do
+      # A trailing space inside <code> is content, not a collapsible
+      # space, so the space after the element does not collapse into it.
+      doc = parser.parse("<code>x </code> y")
+
+      expect(doc.children[0].children[0].text).to eq("x ")
+      expect(doc.children[1].text).to eq(" y")
+    end
+
+    it "keeps a space after text the parser itself preserved" do
+      # A custom preserving tag without a handler is the only way to get
+      # the parser to walk children in preserving mode (pre/code/tt use
+      # RawHandler, which flattens content without walking). Preserved
+      # text is content, so the space after the element neither starts
+      # a line nor collapses into the preserved one.
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.whitespace_preserving_tags << "poem"
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<poem>x </poem> y")
+
+      expect(doc.children[0].text).to eq("x  y")
+    end
+
+    it "keeps a space before text the parser itself preserved" do
+      # The preserved text follows the inline element on the same line,
+      # so the space at the element's edge is not at the end of a line.
+      registry = Markbridge::Parsers::HTML::HandlerRegistry.default
+      registry.whitespace_preserving_tags << "poem"
+      custom_parser = described_class.new(handlers: registry)
+
+      doc = custom_parser.parse("<b>a </b><poem>x </poem>")
+
+      expect(doc.children[0].children[0].text).to eq("a ")
+      expect(doc.children[1].text).to eq("x ")
+    end
+
+    it "collapses the spaces around an element its handler dropped" do
+      # A handler that returns nil without appending anything leaves no
+      # content on the line, so the space before and the space after
+      # the element are adjacent and collapse into one. A handler that
+      # appends a leaf (image, line break) keeps both.
+      dropping_handler =
+        Class.new(Markbridge::Parsers::HTML::Handlers::BaseHandler) do
+          def process(element:, parent:)
+            nil
+          end
+        end
+      custom_parser =
+        described_class.new { |registry| registry.register("x-drop", dropping_handler.new) }
+
+      doc = custom_parser.parse("a <x-drop></x-drop> b")
+
+      expect(doc.children.size).to eq(1)
+      expect(doc.children[0].text).to eq("a b")
+    end
+
+    it "drops a space after a block closes" do
+      doc = parser.parse("<p>a</p> b")
+
+      expect(doc.children[1].text).to eq("b")
+    end
+
     it "does not trim trailing whitespace before an inline tag like <span>" do
       # <span> is not in block_level_tags, so its preceding whitespace is
       # preserved as part of the inline flow.

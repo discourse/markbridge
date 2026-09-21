@@ -28,17 +28,24 @@ module Markbridge
 
             if interface.html_mode?
               %(<a href="#{HtmlEscaper.escape(href)}">#{text}</a>)
-            elsif element.bare? || text.empty?
+            elsif element.bare? || blank?(text)
               # Url#bare? judges the AST (so label escaping can't confuse
               # it); the rendered-text check additionally catches labels
-              # that render to nothing (e.g. an empty formatting child).
+              # that render to nothing (e.g. an empty formatting child)
+              # or to whitespace only, which wrap_inline would leave
+              # unlinked.
               href
             else
-              "[#{text}](#{markdown_destination(href)})"
+              interface.wrap_inline(text, "[", "](#{markdown_destination(href)})")
             end
           end
 
           private
+
+          # Unicode-aware, matching the guard in RenderingInterface#wrap_inline.
+          def blank?(text)
+            !text.match?(/[^[:space:]]/)
+          end
 
           # CommonMark link destinations cannot contain whitespace unless
           # wrapped in <> — relevant for relative targets like MediaWiki
