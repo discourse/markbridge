@@ -191,7 +191,7 @@ module Markbridge
 
           if ast_element
             process_children(node, ast_element)
-          elsif parent.children.size != size
+          elsif parent.children.size > size
             # The handler appended a leaf (image, line break, ...), which
             # is content on the current line like a word.
             @line_start = false

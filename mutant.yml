@@ -308,15 +308,6 @@ mutation:
     - "index{receiver=lvar{value=cell}}"
     - "index{receiver=send{selector=first}}"
 
-    # HTML::Parser#dispatch_element's `parent.children.size != size`
-    # leaf-detection guard. `!=` ↔ `!equal?` on two small Integers is
-    # the Fixnum identity equivalence (same class as the `>=` variants
-    # above); the guard's own branches are pinned by the "collapses the
-    # spaces around an element its handler dropped" spec. The receiver
-    # chain `parent.children.size` scopes the pattern to that one
-    # comparison.
-    - "send{receiver=send{receiver=send{receiver=lvar{value=parent} selector=children} selector=size} selector=(!=)}"
-
     # `rows_data[header_idx]` / `rows_data[0...header_idx]` / ... —
     # `.at` / `.fetch` equivalences (valid index by construction) and
     # `nil...X` == `0...X` range equivalences in render_markdown.
