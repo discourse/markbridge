@@ -20,7 +20,7 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - A list directly inside a list item is followed by a blank line, so text after it stays in the outer item instead of becoming a continuation line of the last nested item. A list inside a quote or an aligned block inside an item is a block with blank lines on both sides.
 - An ordered-list marker alone on a line (`1.` or `1)`) is escaped like one followed by text. It cooked to an empty list item before.
 - A bare URL with text right next to it (no whitespace between) is written as a link with the URL as its text, `[https://example.com](https://example.com)`, because a Markdown parser does not link it on its own there. A bare URL with whitespace around it stays plain and can still onebox.
-- `RenderingInterface` has `previous_sibling(element)` and `next_sibling(element)`. An element without a tag (such as the `Document`) is now on the parent chain for its children, the same way `Tag::PASSTHROUGH` does it, so `has_parent?(AST::Document)` is true for top-level content.
+- `RenderingInterface` has `previous_sibling(element)` and `next_sibling(element)`. They look at the children of the element on top of the parent chain, or of `RenderContext#root` when the chain is empty: the renderer sets the root to the element without a tag whose children it renders (the `Document`), without putting it on the chain.
 
 ## Upgrading to 0.4.2
 

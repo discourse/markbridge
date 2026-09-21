@@ -5,6 +5,11 @@ module Markbridge
     module Discourse
       module Tags
         class ListTag < Tag
+          # An HTML comment between blank lines: invisible when cooked, and
+          # a block of its own that ends the list before it.
+          LIST_SEPARATOR = "\n\n<!---->\n\n"
+          private_constant :LIST_SEPARATOR
+
           def render(element, interface)
             child_context = interface.with_parent(element)
 
@@ -31,11 +36,21 @@ module Markbridge
             # (also inside a quote or an aligned block that sits in an
             # item) the list is a block with blank lines on both sides.
             parent = interface.context.element
-            if parent.is_a?(AST::ListItem) || parent.is_a?(AST::List)
-              "\n#{content}\n"
-            else
-              "\n\n#{content}\n\n"
-            end
+            list =
+              if parent.is_a?(AST::ListItem) || parent.is_a?(AST::List)
+                "\n#{content}\n"
+              else
+                "\n\n#{content}\n\n"
+              end
+
+            # Two lists of the same kind in a row need something between
+            # them, or CommonMark reads the second as more items of the
+            # first and the blank line makes the whole list loose. A change
+            # of kind starts a new list on its own.
+            previous = interface.previous_sibling(element)
+            return list unless previous.is_a?(AST::List) && previous.ordered? == element.ordered?
+
+            "#{LIST_SEPARATOR}#{list}"
           end
         end
       end

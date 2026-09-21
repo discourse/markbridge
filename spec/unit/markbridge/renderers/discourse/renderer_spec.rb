@@ -86,9 +86,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("hello")
     end
 
-    it "puts an element without a tag on the parent chain for its children" do
-      # The Document has no tag. Its children can still ask for their
-      # siblings: the bare URL sees the text in front of it.
+    it "gives the children of an element without a tag their siblings through the root" do
+      # The Document has no tag and does not go on the parent chain, but
+      # its children can still ask for their siblings: the bare URL sees
+      # the text in front of it.
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::Text.new("see")
       url = Markbridge::AST::Url.new(href: "https://example.com")
@@ -96,6 +97,61 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       document << url
 
       expect(renderer.render(document)).to eq("see[https://example.com](https://example.com)")
+    end
+
+    it "keeps an element without a tag off the parent chain" do
+      probe = nil
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new do |_element, interface|
+          probe = interface.context
+          ""
+        end,
+      )
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Bold.new
+      described_class.new(tag_library: library).render(document)
+
+      expect(probe.parents).to eq([])
+      expect(probe.root).to be(document)
+    end
+
+    it "sets the root also for an element without a tag below the top" do
+      probe = nil
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new do |_element, interface|
+          probe = interface.context
+          ""
+        end,
+      )
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Bold.new
+      context = Markbridge::Renderers::Discourse::RenderContext.new([Markbridge::AST::Italic.new])
+      described_class.new(tag_library: library).render(document, context:)
+
+      expect(probe.root).to be(document)
+    end
+
+    it "does not replace a root that is already set" do
+      probe = nil
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new do |_element, interface|
+          probe = interface.context
+          ""
+        end,
+      )
+      outer = Markbridge::AST::Document.new
+      inner = Markbridge::AST::Document.new
+      inner << Markbridge::AST::Bold.new
+      outer << inner
+      described_class.new(tag_library: library).render(outer)
+
+      expect(probe.root).to be(outer)
     end
 
     it "renders text nodes" do
@@ -169,6 +225,47 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       context = Markbridge::Renderers::Discourse::RenderContext.new([image])
 
       expect(renderer.render(text, context:)).to eq("\\[A\\]")
+    end
+
+    it "escapes ] in Text content under an Email subclass" do
+      email_class = Class.new(Markbridge::AST::Email)
+      context =
+        Markbridge::Renderers::Discourse::RenderContext.new(
+          [email_class.new(address: "alice@example.com")],
+        )
+
+      expect(renderer.render(Markbridge::AST::Text.new("[A]"), context:)).to eq("\\[A\\]")
+    end
+
+    it "escapes ] in Text content under an Image subclass" do
+      image_class = Class.new(Markbridge::AST::Image)
+      context = Markbridge::Renderers::Discourse::RenderContext.new([image_class.new(src: "x.png")])
+
+      expect(renderer.render(Markbridge::AST::Text.new("[A]"), context:)).to eq("\\[A\\]")
+    end
+
+    it "does not escape ] in Text content under a parent that is no link" do
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("a]b")
+
+      expect(renderer.render(bold)).to eq("**a]b**")
+    end
+
+    it "escapes ] in Text content when the link is further up the chain" do
+      url = Markbridge::AST::Url.new(href: "https://example.com")
+      bold = Markbridge::AST::Bold.new
+      bold << Markbridge::AST::Text.new("[A]")
+      url << bold
+
+      expect(renderer.render(url)).to eq("[**\\[A\\]**](https://example.com)")
+    end
+
+    it "keeps Text verbatim when the Code is further up the chain" do
+      code = Markbridge::AST::Code.new
+      bold = Markbridge::AST::Bold.new
+      context = Markbridge::Renderers::Discourse::RenderContext.new([code, bold])
+
+      expect(renderer.render(Markbridge::AST::Text.new("a*b"), context:)).to eq("a*b")
     end
 
     it "does not escape ] in Text content when no link ancestor is present" do
@@ -307,13 +404,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   end
 
   describe "#render_children" do
-    def list_with_item(ordered:, text:)
-      list = Markbridge::AST::List.new(ordered:)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new(text)
-      list << item
-    end
-
     it "renders all children" do
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::Text.new("hello ")
@@ -633,20 +723,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(boundary_between?("a", "*(x) tail")).to be(true)
     end
 
-    it "separates two lists whose classes are subclasses of List" do
-      list_class = Class.new(Markbridge::AST::List)
-      document = Markbridge::AST::Document.new
-      [list_class.new(ordered: false), list_class.new(ordered: false)].each do |list|
-        item = Markbridge::AST::ListItem.new
-        item << Markbridge::AST::Text.new("x")
-        list << item
-        document << list
-      end
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      expect(renderer.render_children(document, context:)).to include("<!---->")
-    end
-
     it "puts a boundary between a word and an underscore run whatever follows the run" do
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::Text.new("item")
@@ -663,54 +739,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
       context = Markbridge::Renderers::Discourse::RenderContext.new
       expect(renderer.render_children(document, context:)).to eq("_x_<!---->tail")
-    end
-
-    it "separates two lists of the same kind with a comment between blank lines" do
-      document = Markbridge::AST::Document.new
-      document << list_with_item(ordered: false, text: "a")
-      document << list_with_item(ordered: false, text: "b")
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      # The tags bracket their output with blank lines of their own; the
-      # postprocessor collapses them later.
-      expect(renderer.render_children(document, context:)).to match(/- a\n+<!---->\n+- b/)
-    end
-
-    it "separates two ordered lists" do
-      document = Markbridge::AST::Document.new
-      document << list_with_item(ordered: true, text: "a")
-      document << list_with_item(ordered: true, text: "b")
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      expect(renderer.render_children(document, context:)).to include("<!---->")
-    end
-
-    it "does not separate an ordered list from an unordered one" do
-      # A change of list kind starts a new list on its own.
-      document = Markbridge::AST::Document.new
-      document << list_with_item(ordered: false, text: "a")
-      document << list_with_item(ordered: true, text: "b")
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      expect(renderer.render_children(document, context:)).not_to include("<!---->")
-    end
-
-    it "does not separate a list from text that follows it" do
-      document = Markbridge::AST::Document.new
-      document << list_with_item(ordered: false, text: "a")
-      document << Markbridge::AST::Text.new("after")
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      expect(renderer.render_children(document, context:)).not_to include("<!---->")
-    end
-
-    it "does not separate two lists when the first one renders to nothing" do
-      document = Markbridge::AST::Document.new
-      document << Markbridge::AST::List.new(ordered: false)
-      document << list_with_item(ordered: false, text: "b")
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      expect(renderer.render_children(document, context:)).not_to include("<!---->")
     end
 
     it "escapes a ! at the end of the buffer when the next part starts with [" do

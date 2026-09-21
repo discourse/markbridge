@@ -177,6 +177,33 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
+  describe "#previous_sibling and #next_sibling with a root element" do
+    let(:first) { Markbridge::AST::Text.new("a") }
+    let(:middle) { Markbridge::AST::Bold.new }
+    let(:last) { Markbridge::AST::Text.new("b") }
+    let(:parent) do
+      paragraph = Markbridge::AST::Paragraph.new
+      paragraph << first << middle << last
+    end
+
+    it "falls back to the root element when the chain is empty" do
+      context = Markbridge::Renderers::Discourse::RenderContext.new.with_root(parent)
+      root_interface = described_class.new(renderer, context)
+
+      expect(root_interface.previous_sibling(middle)).to be(first)
+      expect(root_interface.next_sibling(middle)).to be(last)
+    end
+
+    it "prefers the element on the chain over the root" do
+      other = Markbridge::AST::Paragraph.new
+      other << Markbridge::AST::Text.new("x")
+      context = Markbridge::Renderers::Discourse::RenderContext.new([parent], root: other)
+      chain_interface = described_class.new(renderer, context)
+
+      expect(chain_interface.previous_sibling(middle)).to be(first)
+    end
+  end
+
   describe "#html_mode?" do
     it "delegates to context" do
       context = instance_double(Markbridge::Renderers::Discourse::RenderContext, html_mode?: true)
