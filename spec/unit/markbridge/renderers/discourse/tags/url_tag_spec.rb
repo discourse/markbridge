@@ -172,6 +172,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
         expect(tag.render(element, interface)).to eq("https://example.com")
       end
 
+      it "renders the plain href when the label is only whitespace" do
+        # The HTML parser keeps a space at an inline element's edge, so
+        # `<a href="…"> </a>` reaches the tag with a " " label. wrap_inline
+        # would return the bare space and lose the link.
+        element = Markbridge::AST::Url.new(href: "https://example.com")
+        element << Markbridge::AST::Text.new(" ")
+
+        expect(tag.render(element, interface)).to eq("https://example.com")
+      end
+
+      it "keeps edge whitespace of the label outside the link markers" do
+        element = Markbridge::AST::Url.new(href: "https://example.com")
+        element << Markbridge::AST::Text.new(" label ")
+
+        expect(tag.render(element, interface)).to eq(" [label](https://example.com) ")
+      end
+
       it "detects bareness on the AST, unaffected by Markdown escaping of the label" do
         # The rendered label would be "https://example.com/a\_b" — comparing
         # rendered text against the href would miss this bare URL.

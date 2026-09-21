@@ -70,9 +70,21 @@ module Markbridge
           # a <pre> keep their semantics.
           @preserve_depth = initial_preserve_depth(doc)
 
+          # Whitespace collapsing follows the browser rule (CSS Text
+          # §4.1.1): a collapsible space is dropped at the start of a
+          # line, at the end of a line, and right after another
+          # collapsible space — wherever the inline boundaries fall, so
+          # `<b>a </b> b` keeps one space and `<p><b>x </b></p>` none.
+          # A line starts at the parse root and on every block-level tag
+          # boundary. @space_tail is the element whose last child is a
+          # collapsible Text ending in a space (the candidate for the
+          # end-of-line trim), or nil.
+          @line_start = true
+          @space_tail = nil
+
           # Process all nodes
           children.each { |node| process_node(node, document) }
-          trim_trailing_whitespace(document)
+          end_line
 
           document
         end
@@ -117,17 +129,27 @@ module Markbridge
 
           if @preserve_depth.positive?
             parent << AST::Text.new(text)
+            # Preserved whitespace is content: it neither starts a line
+            # nor collapses against a space that follows it.
+            @line_start = false
+            @space_tail = nil
             return
           end
 
-          text = text.gsub(WHITESPACE_RUN, " ") if text.match?(COLLAPSIBLE_WHITESPACE)
-          # Drop leading whitespace at the start of an element's content,
-          # matching the browser rule that whitespace at the beginning of a
-          # block (or before any inline content) is collapsed away.
-          text = text.lstrip if parent.children.empty?
+          text = collapse_whitespace(text)
+          text = text.lstrip if @line_start || @space_tail
           return if text.empty?
 
           parent << AST::Text.new(text)
+          @line_start = false
+          @space_tail = (parent if text.end_with?(" "))
+        end
+
+        # Collapse runs of whitespace to a single space.
+        # @param text [String]
+        # @return [String]
+        def collapse_whitespace(text)
+          text.match?(COLLAPSIBLE_WHITESPACE) ? text.gsub(WHITESPACE_RUN, " ") : text
         end
 
         # Process an element node
@@ -137,19 +159,21 @@ module Markbridge
           tag_name = node.name
           return if IGNORED_TAGS.include?(tag_name)
 
-          # Drop whitespace that sits between content and the start of a
-          # block-level tag, matching browser behavior where such whitespace
-          # collapses against the block boundary. Applies whether or not a
-          # handler is registered, so unknown tags like <div> or <section>
-          # still collapse the whitespace before them.
-          trim_trailing_whitespace(parent) if @handlers.block_level_tags.include?(tag_name)
+          # A block-level tag ends the line before it and the line inside
+          # it, matching browser behavior where whitespace collapses
+          # against the block boundary. Applies whether or not a handler
+          # is registered, so unknown tags like <div> or <section> still
+          # end lines.
+          block = @handlers.block_level_tags.include?(tag_name)
+          end_line if block
 
           preserving = @handlers.whitespace_preserving_tags.include?(tag_name)
           @preserve_depth += 1 if preserving
 
-          dispatch_element(node, tag_name, parent, preserving)
+          dispatch_element(node, tag_name, parent)
 
           @preserve_depth -= 1 if preserving
+          end_line if block
         end
 
         # Dispatch an element to its handler (or the unknown-tag path) and
@@ -157,18 +181,22 @@ module Markbridge
         # @param node [Nokogiri::XML::Element]
         # @param tag_name [String]
         # @param parent [AST::Element]
-        # @param preserving [Boolean] whether this tag preserves whitespace
-        def dispatch_element(node, tag_name, parent, preserving)
+        def dispatch_element(node, tag_name, parent)
           handler = @handlers[tag_name]
           return handle_unknown_tag(node, parent) unless handler
 
           # Handler returns element if children should be processed, nil otherwise
+          size = parent.children.size
           ast_element = handler.process(element: node, parent:)
 
-          return unless ast_element
-
-          process_children(node, ast_element)
-          trim_trailing_whitespace(ast_element) unless preserving
+          if ast_element
+            process_children(node, ast_element)
+          elsif parent.children.size > size
+            # The handler appended a leaf (image, line break, ...), which
+            # is content on the current line like a word.
+            @line_start = false
+            @space_tail = nil
+          end
         end
 
         # Handle unknown tag by tracking it and ignoring the wrapper
@@ -178,6 +206,16 @@ module Markbridge
         def handle_unknown_tag(node, parent)
           @unknown_tags[node.name] += 1
           process_children(node, parent)
+        end
+
+        # End the current line: the collapsible space that closed it goes,
+        # and the next collapsible space starts a line. @space_tail is
+        # not cleared here: the trim is idempotent, so a stale tail is
+        # harmless until the next text or leaf on the new line resets it,
+        # and @line_start already covers the lstrip.
+        def end_line
+          trim_trailing_whitespace(@space_tail) if @space_tail
+          @line_start = true
         end
 
         # Number of whitespace-preserving elements enclosing the parse

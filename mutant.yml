@@ -79,14 +79,15 @@ matcher:
     - Markbridge::Parsers::MediaWiki::Parser#normalize_line_endings
 
     # HTML::Parser fast-path guards with output-equivalent slow paths:
-    # process_text_node's COLLAPSIBLE_WHITESPACE gate (forcing the gsub
+    # collapse_whitespace's COLLAPSIBLE_WHITESPACE gate (forcing the gsub
     # on single-space prose rebuilds an equal string) and
     # trim_trailing_whitespace's TRAILING_STRIPPABLE gate (forcing the
     # rstrip+pop+re-add on an untrimmed text produces a value-equal
     # AST). Both guards exist purely to avoid per-node copies; the
     # behavioral branches around them are pinned by the whitespace-
-    # handling specs. Bucket A.
-    - Markbridge::Parsers::HTML::Parser#process_text_node
+    # handling specs. Bucket A. The gate lives in its own method so the
+    # line-state logic in process_text_node stays under mutation.
+    - Markbridge::Parsers::HTML::Parser#collapse_whitespace
     - Markbridge::Parsers::HTML::Parser#trim_trailing_whitespace
 
     # RenderingInterface#apply_markers' EDGE_WHITESPACE fast path.
