@@ -72,6 +72,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
         expect(postprocessor.call(text)).to eq(text)
       end
 
+      it "closes a fence opened behind a list marker on a line without the marker" do
+        expect(postprocessor.call("- ```\n  a\n  ```\n\n\n\n- b")).to eq("- ```\n  a\n  ```\n\n- b")
+      end
+
+      it "handles an opening fence on the last line" do
+        expect(postprocessor.call("a\n\n\n\n```")).to eq("a\n\n```")
+      end
+
+      it "keeps looking for a fence after a backtick run that opens none" do
+        text = "``` x`y\n```\na\n\n\n\nb\n```"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "leaves a code span with a long delimiter and the text around it alone" do
+        expect(postprocessor.call("a ```` x ```` b\n\n\n\nc")).to eq("a ```` x ```` b\n\nc")
+      end
+
       it "recognizes a tilde fence" do
         text = "~~~\na\n\n\n\nb\n~~~"
         expect(postprocessor.call(text)).to eq(text)
