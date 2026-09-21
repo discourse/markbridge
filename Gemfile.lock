@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    markbridge (0.4.2)
+    markbridge (0.4.3)
 
 GEM
   remote: https://rubygems.org/
@@ -347,7 +347,7 @@ CHECKSUMS
   lefthook (2.1.14) sha256=f162a0938c925237031dc8a01c3094ebd62e3300b47c4ad0b21a1df18b1d2936
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
   logger (1.7.0) sha256=196edec7cc44b66cfb40f9755ce11b392f21f7967696af15d274dde7edff0203
-  markbridge (0.4.2)
+  markbridge (0.4.3)
   mustermann (3.1.1) sha256=4c6170c7234d5499c345562ba7c7dfe73e1754286dcc1abb053064d66a127198
   mutant (0.17.0) sha256=07d2e154367c349f9591a53f23af08c059cbe297c95dcf593f181c27cfdde909
   mutant-rspec (0.17.0) sha256=3a19f1de5c8dce9102b9adcbff63827461e12b96a2e78b436206990be52bb0a8
