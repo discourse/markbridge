@@ -399,6 +399,51 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
     end
   end
 
+  describe "#root and #with_root" do
+    let(:document) { Markbridge::AST::Document.new }
+
+    it "is nil by default" do
+      expect(described_class.new.root).to be_nil
+    end
+
+    it "stores root: when given" do
+      expect(described_class.new(root: document).root).to be(document)
+    end
+
+    it "returns a context with the root set and the chain unchanged" do
+      bold = Markbridge::AST::Bold.new
+      context = described_class.new([bold]).with_root(document)
+
+      expect(context.root).to be(document)
+      expect(context.parents).to eq([bold])
+      expect(context.depth).to eq(1)
+    end
+
+    it "keeps the root across with_parent and with_html_mode" do
+      bold = Markbridge::AST::Bold.new
+      context = described_class.new.with_root(document)
+
+      expect(context.with_parent(bold).root).to be(document)
+      expect(context.with_html_mode(true).root).to be(document)
+      expect(context.with_html_mode(true).html_mode?).to be(true)
+    end
+
+    it "passes the root down the chain built from a parents array" do
+      bold = Markbridge::AST::Bold.new
+      italic = Markbridge::AST::Italic.new
+      context = described_class.new([bold, italic], root: document)
+
+      expect(context.parent_context.root).to be(document)
+    end
+
+    it "does not count the root as a parent" do
+      context = described_class.new.with_root(document)
+
+      expect(context.root?).to be(true)
+      expect(context.has_parent?(Markbridge::AST::Document)).to be(false)
+    end
+  end
+
   describe "#with_html_mode" do
     it "returns a new context with html_mode set" do
       context = described_class.new

@@ -61,9 +61,10 @@ module Markbridge
           @context.root?
         end
 
-        # The node in front of +element+ among the children of its parent,
-        # the element on top of the parent chain. nil when +element+ is the
-        # first child, or when the parent is not known.
+        # The node in front of +element+ among the children of its parent:
+        # the element on top of the parent chain, or the root element when
+        # the chain is empty. nil when +element+ is the first child, or when
+        # the parent is not known.
         # @param element [AST::Node]
         # @return [AST::Node, nil]
         def previous_sibling(element)
@@ -123,8 +124,10 @@ module Markbridge
         private
 
         def sibling(element, offset)
-          siblings = @context.element&.children
-          return nil if siblings.nil?
+          parent = @context.element || @context.root
+          return nil if parent.nil?
+
+          siblings = parent.children
 
           index = siblings.index { |child| child.equal?(element) }
           return nil if index.nil? || (index + offset).negative?

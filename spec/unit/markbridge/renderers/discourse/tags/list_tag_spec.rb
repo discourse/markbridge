@@ -208,6 +208,81 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       expect(tag.render(inner_list, interface)).to eq("\n- nested\n\n")
     end
 
+    context "with a list of the same kind in front of it" do
+      def list_with_item(ordered:, text:)
+        list = Markbridge::AST::List.new(ordered:)
+        item = Markbridge::AST::ListItem.new
+        item << Markbridge::AST::Text.new(text)
+        list << item
+      end
+
+      # Renders +list+ as a child of a document that holds +siblings+ in
+      # order, so the tag can see what stands in front of it.
+      def render_in_document(list, *siblings)
+        document = Markbridge::AST::Document.new
+        siblings.each { |sibling| document << sibling }
+        context = Markbridge::Renderers::Discourse::RenderContext.new([document])
+        tag.render(
+          list,
+          Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context),
+        )
+      end
+
+      it "puts a comment between blank lines in front of the list" do
+        first = list_with_item(ordered: false, text: "a")
+        second = list_with_item(ordered: false, text: "b")
+
+        expect(render_in_document(second, first, second)).to eq("\n\n<!---->\n\n\n\n- b\n\n\n")
+      end
+
+      it "separates two ordered lists" do
+        first = list_with_item(ordered: true, text: "a")
+        second = list_with_item(ordered: true, text: "b")
+
+        expect(render_in_document(second, first, second)).to start_with("\n\n<!---->")
+      end
+
+      it "separates two lists whose classes are subclasses of List" do
+        list_class = Class.new(Markbridge::AST::List)
+        first = list_class.new(ordered: false)
+        first << (Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a"))
+        second = list_class.new(ordered: false)
+        second << (Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("b"))
+
+        expect(render_in_document(second, first, second)).to start_with("\n\n<!---->")
+      end
+
+      it "does not separate an ordered list from an unordered one" do
+        # A change of list kind starts a new list on its own.
+        first = list_with_item(ordered: false, text: "a")
+        second = list_with_item(ordered: true, text: "b")
+
+        expect(render_in_document(second, first, second)).to eq("\n\n1. b\n\n\n")
+      end
+
+      it "does not separate a list from text in front of it" do
+        list = list_with_item(ordered: false, text: "a")
+
+        expect(render_in_document(list, Markbridge::AST::Text.new("before"), list)).to eq(
+          "\n\n- a\n\n\n",
+        )
+      end
+
+      it "does not separate the first list in the document" do
+        list = list_with_item(ordered: false, text: "a")
+
+        expect(render_in_document(list, list)).to eq("\n\n- a\n\n\n")
+      end
+
+      it "does not separate a list whose parent is not known" do
+        list = list_with_item(ordered: false, text: "a")
+        context = Markbridge::Renderers::Discourse::RenderContext.new
+        interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+        expect(tag.render(list, interface)).to eq("\n\n- a\n\n\n")
+      end
+    end
+
     context "in html_mode" do
       let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
       let(:interface) do
