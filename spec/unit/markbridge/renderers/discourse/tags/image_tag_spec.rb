@@ -20,6 +20,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
       expect(tag.render(element, interface)).to eq("![a cat](https://example.com/image.png)")
     end
 
+    it "escapes parentheses in the image destination" do
+      opening = Markbridge::AST::Image.new(src: "https://example.com/a(b.png", alt: "opening")
+      closing = Markbridge::AST::Image.new(src: "https://example.com/a)b.png", alt: "closing")
+
+      expect(tag.render(opening, interface)).to eq("![opening](https://example.com/a\\(b.png)")
+      expect(tag.render(closing, interface)).to eq("![closing](https://example.com/a\\)b.png)")
+    end
+
     it "puts the alt text in front of the dimensions" do
       element =
         Markbridge::AST::Image.new(
