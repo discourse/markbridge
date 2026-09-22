@@ -51,8 +51,8 @@ module Markbridge
           # whitespace (or the start of the line) stands in front of it and
           # nothing sticks to its end. Glued to text it is written as a
           # Markdown link with the URL as its text, which links everywhere,
-          # also for a relative href. It cannot onebox in that position
-          # anyway, that needs a URL alone on its line.
+          # also for a relative href. The glued form is not recognized as
+          # a bare URL, so it cannot produce an inline onebox either.
           def bare_url(element, href, interface)
             glued =
               glued?(interface.previous_sibling(element), /\S\z/) ||
