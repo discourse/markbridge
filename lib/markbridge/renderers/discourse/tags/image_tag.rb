@@ -19,7 +19,7 @@ module Markbridge
             # A height alone means nothing to Discourse.
             size = ("#{width}x#{height}" if width && height) || width
 
-            "![#{alt}#{"|#{size}" if size}](#{src})"
+            "![#{alt}#{"|#{size}" if size}](#{markdown_destination(src)})"
           end
 
           private
@@ -33,6 +33,13 @@ module Markbridge
               AST::Text.new(element.alt),
               context: interface.with_parent(element),
             )
+          end
+
+          # An unbalanced parenthesis ends a CommonMark destination early.
+          # Most image sources contain neither character, so avoid allocating
+          # a copy on that common path.
+          def markdown_destination(src)
+            src&.match?(/[()]/) ? src.gsub(/[()]/) { |char| "\\#{char}" } : src
           end
 
           def render_html(src, alt, width, height)
