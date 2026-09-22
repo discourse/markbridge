@@ -291,6 +291,49 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
           expect(tag.render(url, interface)).to eq("[/t/5](/t/5)")
         end
 
+        it "uses the escaped text as the label, not the raw href" do
+          # A raw `]` would end the label early, a raw `_` could start
+          # emphasis in it.
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new("see")
+          url = Markbridge::AST::Url.new(href: "https://example.com/a]b_c")
+          url << Markbridge::AST::Text.new("https://example.com/a]b_c")
+          paragraph << url
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq(
+            "[https://example.com/a\\]b\\_c](https://example.com/a]b_c)",
+          )
+        end
+
+        it "renders the href as the label when the link has no text" do
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new("see")
+          url = Markbridge::AST::Url.new(href: "https://example.com/a_b")
+          paragraph << url
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq(
+            "[https://example.com/a\\_b](https://example.com/a_b)",
+          )
+        end
+
+        it "renders the href as the label when the label renders to nothing" do
+          paragraph = Markbridge::AST::Paragraph.new
+          url = Markbridge::AST::Url.new(href: "https://example.com/a_b")
+          url << Markbridge::AST::Bold.new
+          paragraph << url
+          paragraph << Markbridge::AST::Text.new("now")
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq(
+            "[https://example.com/a\\_b](https://example.com/a_b)",
+          )
+        end
+
         it "keeps the plain href when whitespace stands in front of the URL" do
           expect(render_between("see ", nil)).to eq("https://example.com")
         end

@@ -34,7 +34,7 @@ module Markbridge
               # that render to nothing (e.g. an empty formatting child)
               # or to whitespace only, which wrap_inline would leave
               # unlinked.
-              bare_url(element, href, interface)
+              bare_url(element, href, text, interface)
             else
               interface.wrap_inline(text, "[", "](#{markdown_destination(href)})")
             end
@@ -53,11 +53,24 @@ module Markbridge
           # Markdown link with the URL as its text, which links everywhere,
           # also for a relative href. The glued form is not recognized as
           # a bare URL, so it cannot produce an inline onebox either.
-          def bare_url(element, href, interface)
+          #
+          # The label of that link is the rendered +text+, not the raw
+          # href: the renderer has already escaped it for a link label,
+          # a raw `]` in the href would end the label early. A link
+          # without text, or with a label that renders to nothing, gets
+          # the href rendered as text instead.
+          def bare_url(element, href, text, interface)
             glued =
               glued?(interface.previous_sibling(element), /\S\z/) ||
                 glued?(interface.next_sibling(element), /\A\S/)
-            glued ? "[#{href}](#{markdown_destination(href)})" : href
+            return href unless glued
+
+            label = blank?(text) ? href_as_text(element, href, interface) : text
+            "[#{label}](#{markdown_destination(href)})"
+          end
+
+          def href_as_text(element, href, interface)
+            interface.render_node(AST::Text.new(href), context: interface.with_parent(element))
           end
 
           # Whether the neighbouring +node+ is text with something other
