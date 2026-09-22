@@ -326,13 +326,15 @@ mutation:
     - "if{condition=send{receiver=lvar{value=prose} selector=include?}}"
     - "if{condition=send{receiver=lvar{value=prose} selector=match?}}"
 
-    # UrlTag#markdown_destination's `href.match?(/[()\\]/) ?` guard. Both
-    # branches give the same destination: gsub without a match returns
-    # an equal copy. The guard only saves that copy on the common link
-    # without parentheses. `if true`, `if href` and the collapse to
-    # always-gsub are the alive mutations. The local is named
-    # `destination` nowhere else, and `href.match?` is only used here.
-    - "if{condition=send{receiver=lvar{value=href} selector=match?}}"
+    # UrlTag#markdown_destination's `if destination.match?(/[()\\]/)`
+    # guard. Both branches give the same destination: gsub without a
+    # match returns an equal copy. The guard only saves that copy on the
+    # common link without these characters. `if true`, `if destination`
+    # and the collapse to always-gsub are the alive mutations. The
+    # parameter is named `destination` only there, so the pattern reaches
+    # nothing else; keyed on `href` it also covered the scheme check in
+    # UrlTag#linkable?, which is an `if href.match?(...)` too.
+    - "if{condition=send{receiver=lvar{value=destination} selector=match?}}"
 
     # `rows_data[header_idx]` / `rows_data[0...header_idx]` / ... —
     # `.at` / `.fetch` equivalences (valid index by construction) and
