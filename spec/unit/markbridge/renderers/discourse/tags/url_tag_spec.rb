@@ -22,6 +22,19 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       expect(tag.render(element, interface)).to eq("[Example](https://example.com/a\\(b\\)c\\))")
     end
 
+    it "doubles a backslash in the destination" do
+      # `\)` would escape the parenthesis that closes the destination, and
+      # `\\)` right before a closing parenthesis of the href would escape
+      # only the backslash and end the destination at that parenthesis.
+      trailing = Markbridge::AST::Url.new(href: "https://example.com/a\\")
+      trailing << Markbridge::AST::Text.new("Example")
+      before_paren = Markbridge::AST::Url.new(href: "https://example.com/a\\)b")
+      before_paren << Markbridge::AST::Text.new("Example")
+
+      expect(tag.render(trailing, interface)).to eq("[Example](https://example.com/a\\\\)")
+      expect(tag.render(before_paren, interface)).to eq("[Example](https://example.com/a\\\\\\)b)")
+    end
+
     it "escapes parentheses inside a destination that also needs angle brackets" do
       element = Markbridge::AST::Url.new(href: "Main (Page)")
       element << Markbridge::AST::Text.new("Example")

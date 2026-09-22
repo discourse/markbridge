@@ -326,7 +326,7 @@ mutation:
     - "if{condition=send{receiver=lvar{value=prose} selector=include?}}"
     - "if{condition=send{receiver=lvar{value=prose} selector=match?}}"
 
-    # UrlTag#markdown_destination's `href.match?(/[()]/) ?` guard. Both
+    # UrlTag#markdown_destination's `href.match?(/[()\\]/) ?` guard. Both
     # branches give the same destination: gsub without a match returns
     # an equal copy. The guard only saves that copy on the common link
     # without parentheses. `if true`, `if href` and the collapse to

@@ -35,11 +35,13 @@ module Markbridge
             )
           end
 
-          # An unbalanced parenthesis ends a CommonMark destination early.
-          # Most image sources contain neither character, so avoid allocating
-          # a copy on that common path.
+          # An unbalanced parenthesis ends a CommonMark destination early. A
+          # backslash of the source is doubled, or it would escape the
+          # parenthesis after it, also the one that closes the destination.
+          # Most image sources contain none of these characters, so the
+          # match? in front saves the copy that gsub makes.
           def markdown_destination(src)
-            src&.match?(/[()]/) ? src.gsub(/[()]/) { |char| "\\#{char}" } : src
+            src&.match?(/[()\\]/) ? src.gsub(/[()\\]/) { |char| "\\#{char}" } : src
           end
 
           def render_html(src, alt, width, height)

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "nokogiri"
+require "uri"
 
 # Asserts on the Markdown string alone and a wrong indentation stays
 # invisible: the string still looks plausible while CommonMark reads a code
@@ -137,7 +138,14 @@ RSpec.describe "renderer structure round-trip", skip: CookedOutput::SKIP_REASON 
       when "code"
         [skeleton("code", text: node.text)]
       when "a"
-        [skeleton("a", children: actual_skeleton(node.children), href: node["href"])]
+        # commonmarker percent-encodes `]` and `\` in a destination.
+        [
+          skeleton(
+            "a",
+            children: actual_skeleton(node.children),
+            href: URI.decode_uri_component(node["href"]),
+          ),
+        ]
       when *STRUCTURAL_ELEMENTS
         [
           skeleton(
