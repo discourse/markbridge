@@ -88,9 +88,18 @@ module Markbridge
           # parenthesis after it, also the one that closes the destination.
           # The match? in front saves the copy that gsub makes also without
           # a match (a link is rendered often, these characters are rare).
-          def markdown_destination(href)
-            destination = href.match?(/[()\\]/) ? href.gsub(/[()\\]/) { |char| "\\#{char}" } : href
-            destination.match?(/\s/) ? "<#{destination}>" : destination
+          # The parameter is not named href like everywhere else: the
+          # mutant ignore pattern for that guard is keyed on the name, and
+          # `href.match?` under an `if` also is the scheme check in
+          # linkable?, which must stay under mutation.
+          def markdown_destination(destination)
+            escaped =
+              if destination.match?(/[()\\]/)
+                destination.gsub(/[()\\]/) { |char| "\\#{char}" }
+              else
+                destination
+              end
+            escaped.match?(/\s/) ? "<#{escaped}>" : escaped
           end
 
           def linkable?(href)
