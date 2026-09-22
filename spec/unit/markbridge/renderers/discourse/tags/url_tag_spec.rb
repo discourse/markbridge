@@ -321,21 +321,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
         end
 
         it "renders the href as the label when the link has no text" do
+          # The `]` is only escaped for text under the link, so the href
+          # has to be rendered as a child of the link, not on its own.
           paragraph = Markbridge::AST::Paragraph.new
           paragraph << Markbridge::AST::Text.new("see")
-          url = Markbridge::AST::Url.new(href: "https://example.com/a_b")
+          url = Markbridge::AST::Url.new(href: "https://example.com/a]b")
           paragraph << url
           context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
           interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
 
           expect(tag.render(url, interface)).to eq(
-            "[https://example.com/a\\_b](https://example.com/a_b)",
+            "[https://example.com/a\\]b](https://example.com/a]b)",
           )
         end
 
         it "renders the href as the label when the label renders to nothing" do
           paragraph = Markbridge::AST::Paragraph.new
-          url = Markbridge::AST::Url.new(href: "https://example.com/a_b")
+          url = Markbridge::AST::Url.new(href: "https://example.com/a]b")
           url << Markbridge::AST::Bold.new
           paragraph << url
           paragraph << Markbridge::AST::Text.new("now")
@@ -343,7 +345,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
           interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
 
           expect(tag.render(url, interface)).to eq(
-            "[https://example.com/a\\_b](https://example.com/a_b)",
+            "[https://example.com/a\\]b](https://example.com/a]b)",
           )
         end
 
