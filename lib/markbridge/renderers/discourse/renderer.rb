@@ -197,7 +197,7 @@ module Markbridge
           elsif last_byte == BANG && first_byte == BRACKET_OPEN
             # A `!` right in front of a link makes it an image. The escaper
             # leaves a lone `!` alone because it cannot see the next node.
-            result.insert(-2, "\\") unless result.getbyte(-2) == BACKSLASH
+            result.insert(-2, "\\") unless escaped_bang?(result)
           elsif last_byte && blocked_flanking?(result, last_byte, part, first_byte)
             result << EMPHASIS_BOUNDARY
           end
@@ -252,6 +252,19 @@ module Markbridge
         def byte_before_run(result, byte)
           index = result.byterindex(FLANKING_DELIMITERS.fetch(byte))
           index && result.getbyte(index)
+        end
+
+        # Whether the `!` at the end of +result+ is escaped. Only an odd
+        # run of backslashes escapes it: `\\!` is an escaped backslash
+        # followed by an active `!`.
+        def escaped_bang?(result)
+          index = result.bytesize - 2
+          count = 0
+          while index >= 0 && result.getbyte(index) == BACKSLASH
+            count += 1
+            index -= 1
+          end
+          count.odd?
         end
 
         def interface_for(context)
