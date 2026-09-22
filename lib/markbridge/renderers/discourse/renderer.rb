@@ -256,15 +256,17 @@ module Markbridge
 
         # Whether the `!` at the end of +result+ is escaped. Only an odd
         # run of backslashes escapes it: `\\!` is an escaped backslash
-        # followed by an active `!`.
+        # followed by an active `!`. When the run reaches the start of the
+        # buffer the index turns negative and getbyte wraps around to the
+        # `!` at the end, which stops the loop.
         def escaped_bang?(result)
+          escaped = false
           index = result.bytesize - 2
-          count = 0
-          while index >= 0 && result.getbyte(index) == BACKSLASH
-            count += 1
+          while result.getbyte(index) == BACKSLASH
+            escaped = !escaped
             index -= 1
           end
-          count.odd?
+          escaped
         end
 
         def interface_for(context)
