@@ -468,6 +468,11 @@ RSpec.describe "BBCode to Markdown Conversion" do
       result = Markbridge.bbcode_to_markdown("Look![url=https://example.com]here[/url]")
       expect(result.markdown).to eq("Look\\![here](https://example.com)")
     end
+
+    it "keeps a ! after a literal backslash from turning the link into an image" do
+      result = Markbridge.bbcode_to_markdown("Look\\![url=https://example.com]here[/url]")
+      expect(result.markdown).to eq("Look\\\\\\![here](https://example.com)")
+    end
   end
 
   describe "horizontal rules" do

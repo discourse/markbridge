@@ -764,6 +764,40 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.render_children(document, context:)).to eq("Look\\![foo](/url)")
     end
 
+    it "escapes a ! that follows an escaped backslash" do
+      # `\\!` is an escaped backslash and an active `!`.
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("Look\\\\!")
+      link = Markbridge::AST::Url.new(href: "/url")
+      link << Markbridge::AST::Text.new("foo")
+      document << link
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("Look\\\\\\![foo](/url)")
+    end
+
+    it "leaves a ! alone after an odd run of backslashes" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("Look\\\\\\!")
+      link = Markbridge::AST::Url.new(href: "/url")
+      link << Markbridge::AST::Text.new("foo")
+      document << link
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("Look\\\\\\![foo](/url)")
+    end
+
+    it "counts a backslash run that reaches the start of the buffer" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::MarkdownText.new("\\\\!")
+      link = Markbridge::AST::Url.new(href: "/url")
+      link << Markbridge::AST::Text.new("foo")
+      document << link
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("\\\\\\![foo](/url)")
+    end
+
     it "leaves a ! alone when the next part does not start with [" do
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::Text.new("Look!")
