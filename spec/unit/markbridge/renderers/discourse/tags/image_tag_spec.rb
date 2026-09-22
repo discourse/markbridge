@@ -28,6 +28,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
       expect(tag.render(closing, interface)).to eq("![closing](https://example.com/a\\)b.png)")
     end
 
+    it "doubles a backslash in the image destination" do
+      trailing = Markbridge::AST::Image.new(src: "https://example.com/a\\", alt: "trailing")
+      before_paren = Markbridge::AST::Image.new(src: "https://example.com/a\\)b.png", alt: "paren")
+
+      expect(tag.render(trailing, interface)).to eq("![trailing](https://example.com/a\\\\)")
+      expect(tag.render(before_paren, interface)).to eq(
+        "![paren](https://example.com/a\\\\\\)b.png)",
+      )
+    end
+
     it "puts the alt text in front of the dimensions" do
       element =
         Markbridge::AST::Image.new(

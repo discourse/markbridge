@@ -83,11 +83,13 @@ module Markbridge
           # wrapped in <> — relevant for relative targets like MediaWiki
           # page names ("Main Page"). An unbalanced parenthesis ends the
           # destination early, so every parenthesis gets a backslash;
-          # balanced ones would be fine, but the check is not worth it. The
-          # match? in front saves the copy that gsub makes also without a
-          # match (a link is rendered often, a parenthesis in it is rare).
+          # balanced ones would be fine, but the check is not worth it. A
+          # backslash of the href is doubled, or it would escape the
+          # parenthesis after it, also the one that closes the destination.
+          # The match? in front saves the copy that gsub makes also without
+          # a match (a link is rendered often, these characters are rare).
           def markdown_destination(href)
-            destination = href.match?(/[()]/) ? href.gsub(/[()]/) { |char| "\\#{char}" } : href
+            destination = href.match?(/[()\\]/) ? href.gsub(/[()\\]/) { |char| "\\#{char}" } : href
             destination.match?(/\s/) ? "<#{destination}>" : destination
           end
 

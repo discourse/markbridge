@@ -70,14 +70,18 @@ class AstGenerator
 
   ALIGNMENTS = %w[left center right].freeze
 
-  # No parentheses and no whitespace, so the link destination needs no
-  # angle brackets and no balancing.
-  HREFS = %w[
-    https://example.com
-    https://example.com/path
-    https://example.com/a_b
-    https://example.com/q?x=1&y=2
-    /relative/path
+  # No whitespace, so no destination needs angle brackets. The three
+  # before the relative path carry characters that need an escape in a
+  # Markdown destination (a `]` cannot sit in a %w list).
+  HREFS = [
+    "https://example.com",
+    "https://example.com/path",
+    "https://example.com/a_b",
+    "https://example.com/q?x=1&y=2",
+    "https://example.com/a(b)c",
+    "https://example.com/a]b",
+    "https://example.com/a\\",
+    "/relative/path",
   ].freeze
 
   INLINE_WRAPPERS = [AST::Bold, AST::Italic, AST::Strikethrough, AST::Url].freeze
