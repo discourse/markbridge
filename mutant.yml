@@ -336,6 +336,21 @@ mutation:
     # UrlTag#linkable?, which is an `if href.match?(...)` too.
     - "if{condition=send{receiver=lvar{value=destination} selector=match?}}"
 
+    # ImageTag#markdown_destination's `src&.match?(/[()\\]/) ?` guard, the
+    # same guard as above with a safe navigation call (src can be nil).
+    # `if src` and `src&.match?(//)` are the alive mutations, both still
+    # escape every source that needs it. `src&.match?` is used only there.
+    - "if{condition=csend{receiver=lvar{value=src} selector=match?}}"
+
+    # UrlTag#bare_url's `blank?(text) ? href_as_text(...) : text`. The
+    # rendered text of a bare URL is the escaped href, so rendering the
+    # href as text every time gives the same label; the branch only
+    # saves a Text node and a second escape, which is a quarter of the
+    # time of a glued link. `if true`, `if text` and the collapse to
+    # always-href_as_text are the alive mutations. `blank?` stands alone
+    # as an `if` condition only there.
+    - "if{condition=send{selector=blank?}}"
+
     # `rows_data[header_idx]` / `rows_data[0...header_idx]` / ... —
     # `.at` / `.fetch` equivalences (valid index by construction) and
     # `nil...X` == `0...X` range equivalences in render_markdown.
