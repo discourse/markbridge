@@ -72,6 +72,19 @@ RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
         expect(postprocessor.call(text)).to eq(text)
       end
 
+      # Both fence kinds in one document, in both orders: the scan has to
+      # take whichever comes first, and the blank lines inside each block
+      # have to survive while the ones between them are collapsed.
+      it "keeps a backtick block and a tilde block that follows it" do
+        text = "```\nx\n\n\n\ny\n```\n\n\n\n~~~\np\n\n\n\nq\n~~~"
+        expect(postprocessor.call(text)).to eq("```\nx\n\n\n\ny\n```\n\n~~~\np\n\n\n\nq\n~~~")
+      end
+
+      it "keeps a tilde block and a backtick block that follows it" do
+        text = "~~~\nx\n\n\n\ny\n~~~\n\n\n\n```\np\n\n\n\nq\n```"
+        expect(postprocessor.call(text)).to eq("~~~\nx\n\n\n\ny\n~~~\n\n```\np\n\n\n\nq\n```")
+      end
+
       it "closes a fence opened behind a list marker on a line without the marker" do
         expect(postprocessor.call("- ```\n  a\n  ```\n\n\n\n- b")).to eq("- ```\n  a\n  ```\n\n- b")
       end

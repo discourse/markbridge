@@ -163,13 +163,13 @@ matcher:
     # without changing observable output. Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_text
 
-    # Postprocessor#clean_document's `text.include?("```") || ...` gate.
-    # Both branches produce the same text: clean_around_fences finds no
-    # fence and runs clean over the whole text once. The gate only keeps
-    # documents without a fence off the fence scan. Alive mutations
-    # (`if true`, `if text`, the dropped include?, collapse to
-    # always-scan) all take the scan without an observable change. The
-    # method holds nothing but this ternary. Bucket A.
+    # Postprocessor#clean_document's `include?(BACKTICK_FENCE) ||
+    # include?(TILDE_FENCE)` gate. Both branches produce the same text:
+    # clean_around_fences finds no fence and runs clean over the whole
+    # text once. The gate only keeps documents without a fence off the
+    # fence scan. Alive mutations (`if true`, `if text`, the dropped
+    # include?, collapse to always-scan) all take the scan without an
+    # observable change. The method holds nothing but this gate. Bucket A.
     - Markbridge::Renderers::Discourse::Postprocessor#clean_document
 
     # Renderer#render's `@interface_cache` housekeeping (root_call

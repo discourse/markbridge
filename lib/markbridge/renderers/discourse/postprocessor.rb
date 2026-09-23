@@ -36,7 +36,8 @@ module Markbridge
         # over the whole text; the line around it is then checked with the
         # anchored patterns below. An anchored pattern alone is tried at
         # every byte of the text and costs many times more.
-        FENCE_RUN = /```|~~~/
+        BACKTICK_FENCE = "```"
+        TILDE_FENCE = "~~~"
         # A line that opens a fence: optional indentation and list markers
         # (a fence inside a list item is indented, and one that starts an
         # item follows the marker on the same line) and a run of at least
@@ -45,7 +46,7 @@ module Markbridge
         # A line that closes a fence: a run of backticks or tildes alone,
         # whitespace around it allowed.
         CLOSING_LINE = /\A[ \t]*(`{3,}|~{3,})[ \t]*\z/
-        private_constant :FENCE_RUN, :OPENING_LINE, :CLOSING_LINE
+        private_constant :BACKTICK_FENCE, :TILDE_FENCE, :OPENING_LINE, :CLOSING_LINE
 
         # @param strip_trailing_invisibles [Boolean] when true, strips
         #   trailing invisible characters (NBSP and zero-width format
@@ -67,7 +68,11 @@ module Markbridge
         # in front of every backtick and tilde in text, so three in a row
         # only occur in a fence or in a code span with a long delimiter.
         def clean_document(text)
-          text.include?("```") || text.include?("~~~") ? clean_around_fences(text) : clean(text)
+          if text.include?(BACKTICK_FENCE) || text.include?(TILDE_FENCE)
+            clean_around_fences(text)
+          else
+            clean(text)
+          end
         end
 
         # Three or more newlines in a row; the gsub brings them down to two.
@@ -97,7 +102,7 @@ module Markbridge
           prose_start = 0
           search_from = 0
 
-          while (candidate = text.byteindex(FENCE_RUN, search_from))
+          while (candidate = fence_index(text, search_from))
             line_start = (text.byterindex("\n", candidate) || -1) + 1
             line_end = text.byteindex("\n", candidate) || text.bytesize
             run = opening_run(text.byteslice(line_start, line_end - line_start))
@@ -116,6 +121,22 @@ module Markbridge
           end
 
           result << clean(text.byteslice(prose_start, text.bytesize - prose_start))
+        end
+
+        # The offset of the next fence run of either kind at or after
+        # +from+, else nil. Two string searches beat one regex with an
+        # alternation: a string search runs as a byte search, the regex
+        # walks the text with the engine.
+        # @param text [String]
+        # @param from [Integer] byte offset to start at
+        # @return [Integer, nil]
+        def fence_index(text, from)
+          backtick = text.byteindex(BACKTICK_FENCE, from)
+          tilde = text.byteindex(TILDE_FENCE, from)
+          return tilde unless backtick
+          return backtick unless tilde
+
+          backtick < tilde ? backtick : tilde
         end
 
         # The run when +line+ opens a fenced code block, else nil. A
