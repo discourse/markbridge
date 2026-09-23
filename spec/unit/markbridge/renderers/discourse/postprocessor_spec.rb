@@ -63,6 +63,17 @@ RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
         )
       end
 
+      it "hands back a fenced document that has nothing to clean" do
+        text = "```\na\n```\n\nb"
+        expect(postprocessor.call(text)).to eq(text)
+      end
+
+      it "clears a whitespace-only line next to a fence" do
+        # The only thing to clean here is the line of spaces, and there is
+        # no run of three newlines anywhere.
+        expect(postprocessor.call("```\na\n```\n   \nb")).to eq("```\na\n```\n\nb")
+      end
+
       it "closes a fence whose closing run has trailing spaces" do
         expect(postprocessor.call("```\na\n```  \n\n\n\nb")).to eq("```\na\n```  \n\nb")
       end
