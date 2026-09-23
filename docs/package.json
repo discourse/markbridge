@@ -13,7 +13,7 @@
     "check:text": "node ./scripts/check-text-exports.mjs"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.42.1",
+    "@astrojs/starlight": "^0.42.2",
     "astro": "^7.3.3",
     "sharp": "^0.35.4",
     "starlight-llms-txt": "^0.12.0"
