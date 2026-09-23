@@ -87,10 +87,21 @@ module Corpus
     parts = []
     parts << paragraph(rng, words)
     parts << "[b]#{sentence(rng, words, 4)}[/b] and [i]#{sentence(rng, words, 3)}[/i]"
+    parts << glued_emphasis(rng, words)
     parts << paragraph(rng, words)
     parts << construct(rng, words)
     parts << paragraph(rng, words)
     parts.join("\n\n")
+  end
+
+  # Emphasis with no space between the delimiter and the word next to
+  # it, and content that ends in punctuation. CommonMark's flanking
+  # rules make the renderer look at the bytes around such a run before
+  # it can decide whether the Markdown form works at all, and the
+  # spaced form above never reaches that code.
+  def glued_emphasis(rng, words)
+    "#{sentence(rng, words, 1)}[b]#{sentence(rng, words, 3)}![/b]and" \
+      "[i]#{sentence(rng, words, 2)}?[/i]#{sentence(rng, words, 1)}"
   end
 
   def construct(rng, words)
@@ -120,6 +131,8 @@ module Corpus
     parts << "== #{sentence(rng, words, 3)} =="
     parts << "#{paragraph(rng, words)} It's #{words[rng.rand(words.size)]}'s turn."
     parts << "'''#{sentence(rng, words, 4)}''' and ''#{sentence(rng, words, 3)}''"
+    parts << "#{sentence(rng, words, 1)}'''#{sentence(rng, words, 3)}!'''and" \
+      "''#{sentence(rng, words, 2)}?''#{sentence(rng, words, 1)}"
     parts << paragraph(rng, words)
     parts << mediawiki_construct(rng, words)
     parts << paragraph(rng, words)
@@ -148,6 +161,8 @@ module Corpus
     parts = []
     parts << "<p>#{paragraph(rng, words)}</p>"
     parts << "<p><strong>#{sentence(rng, words, 4)}</strong> and <em>#{sentence(rng, words, 3)}</em></p>"
+    parts << "<p>#{sentence(rng, words, 1)}<strong>#{sentence(rng, words, 3)}!</strong>and" \
+      "<em>#{sentence(rng, words, 2)}?</em>#{sentence(rng, words, 1)}</p>"
     parts << "<p>#{paragraph(rng, words)}</p>"
     parts << html_construct(rng, words)
     parts << "<p>#{paragraph(rng, words)}</p>"
@@ -177,6 +192,8 @@ module Corpus
     parts << sentence(rng, words, 10)
     parts << "<B><s>[b]</s>#{sentence(rng, words, 4)}<e>[/b]</e></B> and " \
       "<I><s>[i]</s>#{sentence(rng, words, 3)}<e>[/i]</e></I>"
+    parts << "#{sentence(rng, words, 1)}<B><s>[b]</s>#{sentence(rng, words, 3)}!<e>[/b]</e></B>and" \
+      "<I><s>[i]</s>#{sentence(rng, words, 2)}?<e>[/i]</e></I>#{sentence(rng, words, 1)}"
     parts << sentence(rng, words, 12)
     parts << text_formatter_construct(rng, words)
     parts << sentence(rng, words, 10)

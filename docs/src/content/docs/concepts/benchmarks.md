@@ -97,6 +97,16 @@ few seconds. `bench/sustained_bench.rb` measures the opposite case:
 seconds per corpus, with the throughput of every 5 second window
 printed. This is closer to a bulk migration than a micro report is.
 
+:::caution[The corpus changed on 2026-09-23]
+The posts gained emphasis that sits directly against a word, with
+content that ends in punctuation. CommonMark's flanking rules make the
+renderer inspect the bytes around such a run, and the corpus did not
+reach that code before. A post of that shape costs about 25% more than
+one where every delimiter has a space around it, so the numbers below
+were measured on an easier corpus and are not comparable with a run of
+the current one.
+:::
+
 ```sh
 DURATION=60 WINDOW=5 POSTS=2000 CORPUS=ascii bin/bench-env bundle exec ruby --yjit bench/sustained_bench.rb
 ```
