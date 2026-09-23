@@ -117,14 +117,14 @@ matcher:
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
 
-# escape_block_* fallthrough `[content, false]` returns. The `false`
-    # → drop-second / `true` mutations on the non-match branch are
-    # equivalent because content that doesn't match the specific
-    # block pattern is handed to inline escape which produces
-    # identical bytes (or bytes that don't affect the truthiness
-    # check on skip_inline in the caller). Bucket A — covered across
+# escape_block_* fallthrough `content` returns. A method that hands
+    # the content back says "no block construct here", and the caller
+    # then inline-escapes it. Mutations on the non-match branch are
+    # equivalent because content that doesn't match the specific block
+    # pattern is handed to inline escape either way, which produces
+    # identical bytes. Bucket A — covered across
     # escape_block_ordered_list, escape_block_dash, escape_block_star,
-    # and the outermost escape_block_level `[content, false]` for
+    # and the outermost escape_block_level fallthrough for
     # non-construct content.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_ordered_list
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_dash
@@ -491,11 +491,6 @@ mutation:
     # wraps the same characters.
     - "case{value=lvar{value=first_byte}}"
 
-    # escape_regular_char's `if byte < 128` ASCII fast-path. ASCII
-    # path appends raw byte; UTF-8 path does byteslice(1) for
-    # single-byte char_len. Identical output bytes for valid UTF-8.
-    - "if{condition=send{receiver=lvar{value=byte} selector=<}}"
-
     # escape_indented_code's scan-loop and whitespace-only guard.
     # Bound mutations drop the limit; getbyte returns nil past end
     # and the inner break fires. Init value (0→1) equivalent because
@@ -519,7 +514,7 @@ mutation:
     - "while{condition=send{receiver=lvar{value=pos} selector=<}}"
 
     # byteslice length-arg mutations in remaining_content and
-    # escape_regular_char. `String#byteslice(pos, N)` clamps N to
+    # copy_multibyte_char. `String#byteslice(pos, N)` clamps N to
     # the string's bounds, so `@inline_len - pos` / `@inline_len` /
     # `@inline_len + pos` all return the same bytes for valid pos.
     - "send{selector=byteslice}"
