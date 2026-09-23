@@ -77,18 +77,36 @@ module Markbridge
 
         # Three or more newlines in a row; the gsub brings them down to two.
         NEWLINE_RUN = /\n{3,}/
+        # The shortest run the gsub replaces, as a string for include?.
+        NEWLINE_RUN_START = "\n\n\n"
         # A line with nothing but spaces and tabs on it.
         WHITESPACE_LINE = /^[ \t]+$/
-        private_constant :NEWLINE_RUN, :WHITESPACE_LINE
+        private_constant :NEWLINE_RUN, :NEWLINE_RUN_START, :WHITESPACE_LINE
 
         # The two checks in front of the gsubs save the copy that gsub makes
         # also when nothing matches. Most text has neither three newlines
         # in a row nor a whitespace-only line.
         def clean(prose)
           prose = prose.gsub(TRAILING_INVISIBLE_RE, "") if @strip_trailing_invisibles
-          prose = prose.gsub(NEWLINE_RUN, "\n\n") if prose.include?("\n\n\n")
+          prose = prose.gsub(NEWLINE_RUN, "\n\n") if prose.include?(NEWLINE_RUN_START)
           prose = prose.gsub(WHITESPACE_LINE, "") if prose.match?(WHITESPACE_LINE)
           prose
+        end
+
+        # Whether +clean+ would change anything in +document+. The segments
+        # the fence scan hands to +clean+ each start at the beginning of a
+        # line and end at the end of one, so a line of a segment is a line
+        # of the document at the same place. A document that holds nothing
+        # for +clean+ therefore holds nothing for any of its segments.
+        #
+        # An instance that strips invisibles says yes without looking at the
+        # text: that pattern costs a scan of its own and the option is off
+        # by default.
+        # @param document [String]
+        # @return [Boolean]
+        def needs_cleaning?(document)
+          @strip_trailing_invisibles || document.include?(NEWLINE_RUN_START) ||
+            document.match?(WHITESPACE_LINE)
         end
 
         # Cleans the text between fenced code blocks and copies the blocks
@@ -96,8 +114,13 @@ module Markbridge
         # text, so the lines inside a block cost nothing each. A run of
         # newlines in front of a fence is part of the text before it and
         # is collapsed there; the newline that ends a closing fence belongs
-        # to the text after the block.
+        # to the text after the block. Text with nothing to clean is handed
+        # back as it is — the scan would put the same bytes into a new
+        # string, and a document whose fences are the only reason it comes
+        # here is the common one.
         def clean_around_fences(text)
+          return text unless needs_cleaning?(text)
+
           result = +""
           prose_start = 0
           search_from = 0
@@ -168,7 +191,9 @@ module Markbridge
             # there is always a newline in front of a candidate.
             line_start = text.byterindex("\n", candidate) + 1
             line_end = text.byteindex("\n", candidate) || text.bytesize
-            return line_end if CLOSING_LINE.match?(text.byteslice(line_start...line_end))
+            if CLOSING_LINE.match?(text.byteslice(line_start, line_end - line_start))
+              return line_end
+            end
 
             from = line_end
           end
