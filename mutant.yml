@@ -326,6 +326,28 @@ mutation:
     - "if{condition=send{receiver=lvar{value=prose} selector=include?}}"
     - "if{condition=send{receiver=lvar{value=prose} selector=match?}}"
 
+    # Postprocessor#clean_around_fences' `return text unless
+    # needs_cleaning?(text)` guard. The scan copies a document that has
+    # nothing to clean byte for byte, so taking it anyway gives the same
+    # string; the guard only saves that copy. Every mutation of the guard
+    # either returns the text early (correct) or falls through to the scan
+    # (correct): `unless true`, `unless text`, the dropped guard and the
+    # dropped `return` are all alive. `needs_cleaning?` is the name of one
+    # method in the whole gem, so the pattern reaches nothing else.
+    - "if{condition=send{selector=needs_cleaning?}}"
+
+    # Postprocessor#needs_cleaning?'s two checks. A mutation that makes the
+    # method say yes more often only costs the scan — the output is the
+    # same — so `document.include?(...)` and `document.match?(...)` turning
+    # into `true`, into their receiver or into their argument all stay
+    # alive. Dropping a whole check from the `||` chain says no too often
+    # and is killed by the specs; those mutations sit on the or-node and
+    # are not covered here. `document` is the parameter's name only in this
+    # method, and nowhere else does a local of that name get include? or
+    # match? — everywhere else it holds an AST::Document.
+    - "send{receiver=lvar{value=document} selector=include?}"
+    - "send{receiver=lvar{value=document} selector=match?}"
+
     # UrlTag#markdown_destination's `if destination.match?(/[()\\]/)`
     # guard. Both branches give the same destination: gsub without a
     # match returns an equal copy. The guard only saves that copy on the
