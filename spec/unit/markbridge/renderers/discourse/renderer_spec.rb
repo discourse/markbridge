@@ -903,6 +903,178 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
     end
   end
 
+  # The renderer decides what to put between two sibling outputs from a
+  # table it packs once, while the class body runs. Mutation testing
+  # cannot reach the rules behind it — a mutant redefines a method, and
+  # by then the table is already built — so these examples take that job
+  # instead. They walk every entry of both tables and compare it with the
+  # rules written out longhand below. A change to a rule, to a byte
+  # class or to the order of the class numbers fails here.
+  describe "the join tables" do
+    let(:byte_classes) { described_class.const_get(:BYTE_CLASSES) }
+    let(:join_actions) { described_class.const_get(:JOIN_ACTIONS) }
+
+    # The number a class or an action carries is an implementation
+    # detail; the examples below talk in these names.
+    let(:class_names) do
+      {
+        described_class.const_get(:OTHER) => :other,
+        described_class.const_get(:WORD) => :word,
+        described_class.const_get(:PUNCTUATION) => :punctuation,
+        described_class.const_get(:BANG) => :bang,
+        described_class.const_get(:BRACKET) => :bracket,
+        described_class.const_get(:BACKTICK) => :backtick,
+        described_class.const_get(:STAR) => :star,
+        described_class.const_get(:UNDERSCORE) => :underscore,
+        described_class.const_get(:TILDE) => :tilde,
+      }
+    end
+
+    let(:action_names) do
+      {
+        described_class.const_get(:NOTHING) => :nothing,
+        described_class.const_get(:BOUNDARY) => :boundary,
+        described_class.const_get(:CHECK_AFTER) => :check_after,
+        described_class.const_get(:CHECK_BEFORE) => :check_before,
+        described_class.const_get(:ESCAPE_BANG) => :escape_bang,
+      }
+    end
+
+    # One byte per class. The action table has a row per class of the
+    # byte in front of the join, not a row per byte, so one byte stands
+    # for its whole class there.
+    let(:representatives) do
+      {
+        other: " ",
+        word: "a",
+        punctuation: "%",
+        bang: "!",
+        bracket: "[",
+        backtick: "`",
+        star: "*",
+        underscore: "_",
+        tilde: "~",
+      }
+    end
+
+    # What a byte is to the join rules, written out longhand: the six
+    # bytes the rules name, then CommonMark's word characters (ASCII
+    # letters and digits, and every non-ASCII byte) and its ASCII
+    # punctuation. Spaces and control bytes are neither.
+    def expected_class(byte)
+      case byte
+      when "!".ord
+        :bang
+      when "[".ord
+        :bracket
+      when "`".ord
+        :backtick
+      when "*".ord
+        :star
+      when "_".ord
+        :underscore
+      when "~".ord
+        :tilde
+      when 48..57, 65..90, 97..122, 128..255
+        :word
+      when 33..47, 58..64, 91..96, 123..126
+        :punctuation
+      else
+        :other
+      end
+    end
+
+    # A word character keeps a delimiter run next to it from opening or
+    # closing, and so does a tilde — cmark-gfm does not read `~` as
+    # punctuation next to an emphasis delimiter.
+    def blocking?(byte)
+      expected_class(byte) == :word || byte == "~".ord
+    end
+
+    # The join rules, written out longhand over the byte in front of the
+    # join and the byte after it, in the order the renderer applies
+    # them.
+    def expected_action(before, after)
+      merging = "*_~`".bytes
+      flanking = "*_~".bytes
+
+      if before == after && merging.include?(before)
+        :boundary
+      elsif before == "!".ord && after == "[".ord
+        :escape_bang
+      elsif flanking.include?(after) && blocking?(before)
+        after == "_".ord ? :boundary : :check_after
+      elsif flanking.include?(before) && blocking?(after)
+        before == "_".ord ? :boundary : :check_before
+      else
+        :nothing
+      end
+    end
+
+    it "gives every class a number of its own" do
+      expect(class_names.size).to eq(described_class.const_get(:CLASS_COUNT))
+    end
+
+    it "gives every action a number of its own" do
+      expect(action_names.size).to eq(5)
+    end
+
+    it "holds a class for every byte" do
+      expect(byte_classes.bytesize).to eq(256)
+    end
+
+    it "holds a row of 256 actions per class" do
+      expect(join_actions.bytesize).to eq(class_names.size * 256)
+    end
+
+    it "classifies every byte the way the rules define it" do
+      actual = (0..255).to_h { |byte| [byte, class_names.fetch(byte_classes.getbyte(byte))] }
+      expected = (0..255).to_h { |byte| [byte, expected_class(byte)] }
+
+      expect(actual).to eq(expected)
+    end
+
+    # The renderer asks whether a byte is punctuation with a single
+    # `>=` against the class table, so every class that CommonMark
+    # counts as punctuation has to sit at or above PUNCTUATION.
+    it "numbers every punctuation class at or above PUNCTUATION" do
+      names = %i[punctuation bang bracket backtick star underscore tilde]
+      threshold = described_class.const_get(:PUNCTUATION)
+
+      actual = (0..255).to_h { |byte| [byte, byte_classes.getbyte(byte) >= threshold] }
+      expected = (0..255).to_h { |byte| [byte, names.include?(expected_class(byte))] }
+
+      expect(actual).to eq(expected)
+    end
+
+    it "picks one byte per class to stand for it" do
+      actual =
+        representatives.transform_values do |char|
+          class_names.fetch(byte_classes.getbyte(char.ord))
+        end
+      expected = representatives.keys.to_h { |name| [name, name] }
+
+      expect(actual).to eq(expected)
+    end
+
+    it "picks the action the rules written out longhand pick" do
+      actual = {}
+      expected = {}
+
+      representatives.each do |name, char|
+        before = char.ord
+        row = byte_classes.getbyte(before) << 8
+
+        (0..255).each do |after|
+          actual[[name, after]] = action_names.fetch(join_actions.getbyte(row + after))
+          expected[[name, after]] = expected_action(before, after)
+        end
+      end
+
+      expect(actual).to eq(expected)
+    end
+  end
+
   describe "RenderingInterface helpers" do
     let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
     let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
