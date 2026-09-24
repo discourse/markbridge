@@ -20,7 +20,8 @@ many imports actually run on.
 
 ## Setup
 
-- Branch: `main`
+- Branch: `fix-roundtrip-bugs` at `b94e1205` (the round-trip fixes and
+  the performance work that follows them)
 - Bench scripts: [`bench/bench.rb`](https://github.com/discourse/markbridge/blob/main/bench/bench.rb) for the short
   reports, [`bench/sustained_bench.rb`](https://github.com/discourse/markbridge/blob/main/bench/sustained_bench.rb)
   for the long corpus run further down.
@@ -57,34 +58,45 @@ BENCH_WARMUP=10 BENCH_MEASURE=5 bin/bench-env rv run --ruby truffleruby bundle e
 
 ## Versions
 
-- `ruby 3.3.11` with YJIT
-- `ruby 3.4.9` with YJIT (+PRISM)
-- `ruby 4.0.5` with YJIT (+PRISM)
-- `jruby 10.1.0.0` (Ruby 4.0.0; OpenJDK 27-ea, default JIT, indy enabled)
-- `truffleruby 40.0.0` (Ruby 4.0.2; GraalVM CE Native — the build
-  `ruby/setup-ruby` installs for `truffleruby`)
+- `ruby 3.3.12` with YJIT
+- `ruby 3.4.10` with YJIT (+PRISM)
+- `ruby 4.0.7` with YJIT (+PRISM)
+- `jruby 10.1.1.0` (Ruby 4.0.0; OpenJDK 27-ea+35, default JIT, indy
+  enabled)
+- `truffleruby 40.0.0` (Ruby 4.0.2; Oracle GraalVM Native)
 
 ## Results
 
 Throughput (i/s, higher is better). `vs 4.0` shows the relative
-difference from Ruby 4.0.5 with YJIT.
+difference from Ruby 4.0.7 with YJIT.
 
 | Path | 3.3 | 3.4 | 4.0 | JRuby | TruffleRuby | 3.3 vs 4.0 | 3.4 vs 4.0 | JRuby vs 4.0 | TruffleRuby vs 4.0 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| simple | 61.5k | 60.6k | 81.0k | 59.6k | 314.8k | −24% | −25% | −26% | **+289%** |
-| nested | 70.1k | 64.8k | 88.8k | 62.5k | 321.4k | −21% | −27% | −30% | **+262%** |
-| list | 56.1k | 52.9k | 71.3k | 49.1k | 253.2k | −21% | −26% | −31% | **+255%** |
-| table | 18.1k | 19.1k | 26.2k | 16.4k | 84.4k | −31% | −27% | **−37%** | **+222%** |
-| quote_nested | 42.6k | 41.6k | 52.3k | 39.5k | 193.6k | −19% | −20% | −24% | **+270%** |
-| code | 125.7k | 118.1k | 162.2k | 134.1k | 585.7k | −23% | −27% | −17% | **+261%** |
-| url | 67.0k | 69.0k | 88.4k | 65.9k | 367.3k | −24% | −22% | −26% | **+315%** |
-| escaping | 86.9k | 78.1k | 93.7k | 102.9k | 318.7k | −7% | −17% | **+10%** | **+240%** |
-| escape_plain | 396.4k | 403.1k | 397.9k | 516.8k | 583.8k | −0% | +1% | **+30%** | **+47%** |
-| escape_mixed | 11.4k | 7.5k | 7.8k | 16.4k | 36.5k | **+47%** | −4% | **+111%** | **+371%** |
+| simple | 57.2k | 53.1k | 87.0k | 51.1k | 305.4k | −34% | −39% | **−41%** | **+251%** |
+| nested | 64.0k | 66.8k | 97.7k | 67.2k | 323.0k | −34% | −32% | −31% | **+231%** |
+| list | 55.4k | 48.3k | 77.3k | 49.1k | 259.3k | −28% | −38% | −37% | **+235%** |
+| table | 18.8k | 17.8k | 28.9k | 14.3k | 84.7k | −35% | −39% | **−50%** | **+193%** |
+| quote_nested | 41.0k | 38.5k | 59.4k | 37.6k | 193.8k | −31% | −35% | −37% | **+226%** |
+| code | 110.8k | 104.4k | 162.4k | 135.0k | 640.0k | −32% | −36% | −17% | **+294%** |
+| url | 60.1k | 62.4k | 88.1k | 60.6k | 335.6k | −32% | −29% | −31% | **+281%** |
+| escaping | 89.8k | 80.1k | 90.4k | 96.3k | 355.7k | −1% | −11% | +7% | **+294%** |
+| escape_plain | 387.1k | 411.5k | 368.8k | 516.5k | see below | +5% | +12% | **+40%** | — |
+| escape_mixed | 12.3k | 13.9k | 12.1k | 24.3k | 30.0k | +1% | +15% | **+100%** | **+148%** |
 
 Run-to-run noise (benchmark-ips standard deviation) stayed at or below
-3.2% on the CRuby versions. JRuby and TruffleRuby reached 8.4% and
-8.1%, so read their single-digit differences with care.
+3.1% on the CRuby versions. JRuby reached 5.0% and TruffleRuby 12.9%,
+so read their single-digit differences with care.
+
+:::note[`escape_plain` has no TruffleRuby number]
+On this build TruffleRuby reports about 6.7M i/s for `escape_plain`,
+which is 149 ns for a 4,200 character string, or roughly 28 GB/s. The
+benchmark throws the return value away and the escaper allocates
+nothing for plain text, so the compiler drops the call instead of
+running it. The same number comes out on `main`, so it is a property of
+the engine and this benchmark, not of a change in the escaper. The
+other reports keep their result alive through an allocation and are not
+affected.
+:::
 
 These measurements compare repeated conversions of small inputs. They do not predict the speed of a full application. The sustained run below uses a larger set of documents.
 
@@ -97,14 +109,13 @@ few seconds. `bench/sustained_bench.rb` measures the opposite case:
 seconds per corpus, with the throughput of every 5 second window
 printed. This is closer to a bulk migration than a micro report is.
 
-:::caution[The corpus changed on 2026-09-23]
-The posts gained emphasis that sits directly against a word, with
-content that ends in punctuation. CommonMark's flanking rules make the
-renderer inspect the bytes around such a run, and the corpus did not
-reach that code before. A post of that shape costs about 25% more than
-one where every delimiter has a space around it, so the numbers below
-were measured on an easier corpus and are not comparable with a run of
-the current one.
+:::note[The corpus gained glued emphasis]
+The posts now also carry emphasis that sits directly against a word,
+with content that ends in punctuation. CommonMark's flanking rules make
+the renderer inspect the bytes around such a run, and the corpus did not
+reach that code before. A post of that shape costs about 25% more, so
+these numbers are the first ones measured on the harder corpus and are
+lower than earlier published runs for that reason alone.
 :::
 
 ```sh
@@ -118,35 +129,35 @@ the last three windows.
 
 | Engine | ASCII | multibyte | ASCII vs 4.0 | multibyte vs 4.0 |
 |---|---:|---:|---:|---:|
-| ruby 3.3 | 19.6k | 13.7k | −9% | −4% |
-| ruby 3.4 | 16.5k | 11.9k | −23% | −17% |
-| ruby 4.0 | 21.4k | 14.3k | — | — |
-| JRuby 10.1 | 19.8k | 11.6k | −8% | −19% |
-| TruffleRuby 40 | 58.2k | 47.4k | **+171%** | **+232%** |
+| ruby 3.3 | 16.4k | 11.6k | −12% | −3% |
+| ruby 3.4 | 13.9k | 9.5k | −26% | −21% |
+| ruby 4.0 | 18.6k | 12.0k | — | — |
+| JRuby 10.1 | 15.2k | 9.7k | −19% | −19% |
+| TruffleRuby 40 | 52.5k | 40.5k | **+182%** | **+237%** |
 
-Posts per second. At steady state that is 20.0 MB/s for Ruby 4.0 and
-54.2 MB/s for TruffleRuby on the ASCII corpus.
+Posts per second. At steady state that is 18.3 MB/s for Ruby 4.0 and
+51.6 MB/s for TruffleRuby on the ASCII corpus.
 
 How long each engine needs to get there (ASCII corpus):
 
 | Engine | first 5s window | steady | gain |
 |---|---:|---:|---:|
-| ruby 3.3 | 19.5k | 19.6k | +1% |
-| ruby 3.4 | 17.0k | 16.5k | −3% |
-| ruby 4.0 | 22.4k | 21.4k | −4% |
-| JRuby 10.1 | 8.9k | 19.8k | **+122%** |
-| TruffleRuby 40 | 21.2k | 58.2k | **+175%** |
+| ruby 3.3 | 16.1k | 16.4k | +1% |
+| ruby 3.4 | 13.7k | 13.9k | +1% |
+| ruby 4.0 | 17.9k | 18.6k | +4% |
+| JRuby 10.1 | 5.4k | 15.2k | **+180%** |
+| TruffleRuby 40 | 25.2k | 52.5k | **+108%** |
 
-On the multibyte corpus the same warmup is +148% for JRuby and +266%
+On the multibyte corpus the same warmup is +145% for JRuby and +103%
 for TruffleRuby.
 
-- **The long run changes the ranking.** JRuby is 26% behind Ruby 4.0 on
-  the `simple` micro report, but only 8% behind over the ASCII corpus.
-  TruffleRuby's lead drops from 2.2x–4.2x to 2.7x (ASCII) and 3.3x
+- **The long run changes the ranking.** JRuby is 41% behind Ruby 4.0 on
+  the `simple` micro report, but only 19% behind over the ASCII corpus.
+  TruffleRuby's lead drops from 2.5x–3.9x to 2.8x (ASCII) and 3.4x
   (multibyte). The bigger and more varied the input, the smaller the
   distance — but TruffleRuby stays far ahead.
 - **The JVM engines need seconds of warmup.** On this corpus JRuby
-  reaches full speed after about 10 seconds and TruffleRuby after 15.
+  reaches full speed after about 15 seconds and TruffleRuby after 20.
   CRuby is at full speed in the first window. Warmup depends on how
   much code the workload touches, so the micro reports, which run one
   small input, get there faster than this.
@@ -154,17 +165,16 @@ for TruffleRuby.
   runs for minutes gets the steady numbers. A script that converts a
   few hundred posts and exits pays the warmup instead, and there Ruby
   4.0 is the fastest of the three.
-- **Multibyte input costs every engine**, from −19% (TruffleRuby) to
-  −41% (JRuby) against its own ASCII result. Ruby 4.0 loses 33%.
+- **Multibyte input costs every engine**, from −23% (TruffleRuby) to
+  −36% (JRuby) against its own ASCII result. Ruby 4.0 loses 35%.
 
 ### JRuby slows down when both corpora share a process
 
 A fresh JRuby process that only converts the multibyte corpus reaches
-11.6k posts/s. The same corpus in a process that converted the ASCII
-corpus first reaches either the same 11.8k or about 6.0k, and then
-stays there for the rest of the run. Across six runs of that sequence —
-pinned and unpinned, on battery and on AC — four landed near 6.0k and
-two near 11.8k.
+9.7k posts/s. The same corpus in a process that converted the ASCII
+corpus first reaches either about the same or roughly half, and then
+stays there for the rest of the run. Across three runs of that sequence
+two landed at 4.7k and one at 9.9k.
 
 CPU pinning is not the cause: a fresh multibyte process gives the same
 number with and without it. CRuby does not show the effect, and
@@ -188,6 +198,6 @@ worth a bug report if someone wants to dig into it.
   with no flag) for a quick smoke test.
 - `--yjit` is enabled on all CRuby runs and matters: without it
   numbers are 2–5× lower and don't reflect production.
-- TruffleRuby was measured with the Community native build. The
-  Oracle GraalVM build (`truffleruby+graalvm`) is usually faster
-  still, and the JVM build starts slower but can reach higher peaks.
+- TruffleRuby was measured with the Oracle GraalVM native build. The
+  Community build is usually slower, and the JVM build starts slower
+  but can reach higher peaks.
