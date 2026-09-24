@@ -15,12 +15,15 @@ setup:
   - sudo dnf update -y
   # Node + pnpm for the docs site (Astro/Starlight); both ship as Fedora packages.
   - sudo dnf install -y nodejs pnpm
-  - bundle install
+  # Every engine needs its own gems. A plain `bundle install` only serves
+  # the default one, and the others then fall back to its gems or fail.
+  # Keep this list the same as `use.ruby.versions` above.
+  - for engine in 3.3 3.4 "4.0" jruby truffleruby; do bin/with-ruby "$engine" bundle install; done
   - bundle exec lefthook install -f
   - (cd docs && CI=true pnpm install)
 
 sync:
-  - bundle install
+  - for engine in 3.3 3.4 "4.0" jruby truffleruby; do bin/with-ruby "$engine" bundle install; done
   - (cd docs && CI=true pnpm install)
 
 update:
