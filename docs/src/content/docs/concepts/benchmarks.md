@@ -68,16 +68,25 @@ sudo cpupower frequency-set -g performance
 
 Run yourself:
 
+[`bin/with-ruby`](https://github.com/discourse/markbridge/blob/main/bin/with-ruby) picks the engine and keeps it on
+its own gems. Without it a nested `ruby` can turn back into the default
+one halfway through, and the benchmark then reports the wrong engine
+under the right name. `--yjit` comes on by itself for CRuby in
+`--isolated` mode.
+
 ```sh
-# CRuby (auto-enables --yjit)
-BENCH_WARMUP=10 BENCH_MEASURE=5 bin/bench-env rv run --ruby 4.0 bundle exec ruby bench/bench.rb --isolated
+# CRuby, one version per run
+BENCH_WARMUP=10 BENCH_MEASURE=5 bin/bench-env bin/with-ruby 4.0 ruby bench/bench.rb --isolated
 
 # JRuby
-BENCH_WARMUP=10 BENCH_MEASURE=5 bin/bench-env rv run --ruby jruby bundle exec ruby bench/bench.rb --isolated
+BENCH_WARMUP=10 BENCH_MEASURE=5 bin/bench-env bin/with-ruby jruby ruby bench/bench.rb --isolated
 
 # TruffleRuby (installed by .silo.yml, or with `ruby-install truffleruby 40.0.0`)
-BENCH_WARMUP=10 BENCH_MEASURE=5 bin/bench-env rv run --ruby truffleruby bundle exec ruby bench/bench.rb --isolated
+BENCH_WARMUP=10 BENCH_MEASURE=5 bin/bench-env bin/with-ruby truffleruby ruby bench/bench.rb --isolated
 ```
+
+Check the engine line the benchmark prints before you trust a run: it
+names the engine that actually did the work.
 
 ## Versions
 
@@ -142,7 +151,7 @@ lower than earlier published runs for that reason alone.
 :::
 
 ```sh
-DURATION=60 WINDOW=5 POSTS=2000 CORPUS=ascii bin/bench-env bundle exec ruby --yjit bench/sustained_bench.rb
+DURATION=60 WINDOW=5 POSTS=2000 CORPUS=ascii bin/bench-env bin/with-ruby 4.0 ruby --yjit bench/sustained_bench.rb
 ```
 
 Each corpus ran in its own process (`CORPUS=ascii`, then
