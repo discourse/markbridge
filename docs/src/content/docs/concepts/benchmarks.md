@@ -6,6 +6,29 @@ description: Recorded throughput for CRuby, JRuby, and TruffleRuby, with the ben
 These recorded measurements show throughput (iterations per second) for `Markbridge.bbcode_to_markdown(input)`
 and `MarkdownEscaper#escape(text)` across Ruby implementations on `main`.
 
+## Picking a runtime
+
+If you can choose what the conversion runs on, this is the short
+version. The numbers behind it are further down.
+
+- **A migration that runs for minutes: TruffleRuby.** It converts 2.8x
+  to 3.4x more posts per second than Ruby 4.0 once it is warm, and it
+  needs about 20 seconds to get there.
+- **A script that converts a few hundred posts and exits: Ruby 4.0.**
+  It runs at full speed from the first window. TruffleRuby and JRuby
+  spend the first seconds warming up, and a short job never earns that
+  back.
+- **On CRuby, take 4.0.** Ruby 3.3 converts 28% to 35% slower, and 3.4
+  is slower still — it loses to 3.3 on most reports and on the corpus
+  run.
+- **JRuby only if you are on the JVM anyway.** It converts 17% to 50%
+  slower than Ruby 4.0, though it escapes text faster, and a process
+  that converts ASCII before multibyte can drop to half speed for the
+  rest of its life (see the end of this page).
+- **Multibyte content costs every runtime** between 23% and 36%
+  against its own ASCII result. Worth planning for if the forum you
+  are moving is not English.
+
 ## Machine
 
 - Laptop with a 13th Gen Intel Core i9-13900H (6 performance cores,
