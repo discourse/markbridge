@@ -14,6 +14,58 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
       expect(result).to eq("![](https://example.com/image.png)")
     end
 
+    it "renders the alt text as the image description" do
+      element = Markbridge::AST::Image.new(src: "https://example.com/image.png", alt: "a cat")
+
+      expect(tag.render(element, interface)).to eq("![a cat](https://example.com/image.png)")
+    end
+
+    it "escapes parentheses in the image destination" do
+      opening = Markbridge::AST::Image.new(src: "https://example.com/a(b.png", alt: "opening")
+      closing = Markbridge::AST::Image.new(src: "https://example.com/a)b.png", alt: "closing")
+
+      expect(tag.render(opening, interface)).to eq("![opening](https://example.com/a\\(b.png)")
+      expect(tag.render(closing, interface)).to eq("![closing](https://example.com/a\\)b.png)")
+    end
+
+    it "doubles a backslash in the image destination" do
+      trailing = Markbridge::AST::Image.new(src: "https://example.com/a\\", alt: "trailing")
+      before_paren = Markbridge::AST::Image.new(src: "https://example.com/a\\)b.png", alt: "paren")
+
+      expect(tag.render(trailing, interface)).to eq("![trailing](https://example.com/a\\\\)")
+      expect(tag.render(before_paren, interface)).to eq(
+        "![paren](https://example.com/a\\\\\\)b.png)",
+      )
+    end
+
+    it "puts the alt text in front of the dimensions" do
+      element =
+        Markbridge::AST::Image.new(
+          src: "https://example.com/image.png",
+          width: 100,
+          height: 200,
+          alt: "a cat",
+        )
+
+      expect(tag.render(element, interface)).to eq(
+        "![a cat|100x200](https://example.com/image.png)",
+      )
+    end
+
+    it "escapes the alt text like a link label" do
+      element = Markbridge::AST::Image.new(src: "https://example.com/image.png", alt: "a [cat] *")
+
+      expect(tag.render(element, interface)).to eq(
+        "![a \\[cat\\] \\*](https://example.com/image.png)",
+      )
+    end
+
+    it "renders an empty alt text like a missing one" do
+      element = Markbridge::AST::Image.new(src: "https://example.com/image.png", alt: "")
+
+      expect(tag.render(element, interface)).to eq("![](https://example.com/image.png)")
+    end
+
     it "renders image with src and width" do
       element = Markbridge::AST::Image.new(src: "https://example.com/image.png", width: 100)
 
@@ -66,6 +118,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
 
         expect(tag.render(element, interface)).to eq(
           %(<img src="https://example.com/image.png" alt="" width="100" height="200">),
+        )
+      end
+
+      it "attribute-escapes the alt text" do
+        element = Markbridge::AST::Image.new(src: "x.png", alt: %(a "cat" <b>))
+
+        expect(tag.render(element, interface)).to eq(
+          %(<img src="x.png" alt="a &quot;cat&quot; &lt;b&gt;">),
         )
       end
 

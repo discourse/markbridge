@@ -15,6 +15,40 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       expect(result).to eq("[Example](https://example.com)")
     end
 
+    it "escapes parentheses in the destination" do
+      element = Markbridge::AST::Url.new(href: "https://example.com/a(b)c)")
+      element << Markbridge::AST::Text.new("Example")
+
+      expect(tag.render(element, interface)).to eq("[Example](https://example.com/a\\(b\\)c\\))")
+    end
+
+    it "doubles a backslash in the destination" do
+      # `\)` would escape the parenthesis that closes the destination, and
+      # `\\)` right before a closing parenthesis of the href would escape
+      # only the backslash and end the destination at that parenthesis.
+      trailing = Markbridge::AST::Url.new(href: "https://example.com/a\\")
+      trailing << Markbridge::AST::Text.new("Example")
+      before_paren = Markbridge::AST::Url.new(href: "https://example.com/a\\)b")
+      before_paren << Markbridge::AST::Text.new("Example")
+
+      expect(tag.render(trailing, interface)).to eq("[Example](https://example.com/a\\\\)")
+      expect(tag.render(before_paren, interface)).to eq("[Example](https://example.com/a\\\\\\)b)")
+    end
+
+    it "escapes parentheses inside a destination that also needs angle brackets" do
+      element = Markbridge::AST::Url.new(href: "Main (Page)")
+      element << Markbridge::AST::Text.new("Example")
+
+      expect(tag.render(element, interface)).to eq("[Example](<Main \\(Page\\)>)")
+    end
+
+    it "leaves a destination without parentheses alone" do
+      element = Markbridge::AST::Url.new(href: "https://example.com/a?b=c&d=e")
+      element << Markbridge::AST::Text.new("Example")
+
+      expect(tag.render(element, interface)).to eq("[Example](https://example.com/a?b=c&d=e)")
+    end
+
     it "renders http URLs" do
       element = Markbridge::AST::Url.new(href: "http://example.com")
       element << Markbridge::AST::Text.new("Example")
@@ -216,6 +250,125 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
         expect(tag.render(element, interface)).to eq(
           "[https://example.com*really*](https://example.com)",
         )
+      end
+
+      context "when text stands right next to the URL" do
+        # Renders a bare URL with the given neighbours inside a paragraph,
+        # so the tag can see its siblings.
+        def render_between(before, after)
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new(before) if before
+          url = Markbridge::AST::Url.new(href: "https://example.com")
+          url << Markbridge::AST::Text.new("https://example.com")
+          paragraph << url
+          paragraph << after if after
+
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          tag.render(
+            url,
+            Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context),
+          )
+        end
+
+        it "writes a link with the URL as text when a word ends right in front of the URL" do
+          expect(render_between("see", nil)).to eq("[https://example.com](https://example.com)")
+        end
+
+        it "writes a link with the URL as text when text starts right after the URL" do
+          expect(render_between(nil, Markbridge::AST::Text.new("now"))).to eq(
+            "[https://example.com](https://example.com)",
+          )
+        end
+
+        it "escapes the destination of a glued bare URL like any other" do
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new("see")
+          url = Markbridge::AST::Url.new(href: "Main (Page)")
+          url << Markbridge::AST::Text.new("Main (Page)")
+          paragraph << url
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq("[Main (Page)](<Main \\(Page\\)>)")
+        end
+
+        it "links a relative href glued to text the same way" do
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new("see")
+          url = Markbridge::AST::Url.new(href: "/t/5")
+          url << Markbridge::AST::Text.new("/t/5")
+          paragraph << url
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq("[/t/5](/t/5)")
+        end
+
+        it "uses the escaped text as the label, not the raw href" do
+          # A raw `]` would end the label early, a raw `_` could start
+          # emphasis in it.
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new("see")
+          url = Markbridge::AST::Url.new(href: "https://example.com/a]b_c")
+          url << Markbridge::AST::Text.new("https://example.com/a]b_c")
+          paragraph << url
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq(
+            "[https://example.com/a\\]b\\_c](https://example.com/a]b_c)",
+          )
+        end
+
+        it "renders the href as the label when the link has no text" do
+          # The `]` is only escaped for text under the link, so the href
+          # has to be rendered as a child of the link, not on its own.
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << Markbridge::AST::Text.new("see")
+          url = Markbridge::AST::Url.new(href: "https://example.com/a]b")
+          paragraph << url
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq(
+            "[https://example.com/a\\]b](https://example.com/a]b)",
+          )
+        end
+
+        it "renders the href as the label when the label renders to nothing" do
+          paragraph = Markbridge::AST::Paragraph.new
+          url = Markbridge::AST::Url.new(href: "https://example.com/a]b")
+          url << Markbridge::AST::Bold.new
+          paragraph << url
+          paragraph << Markbridge::AST::Text.new("now")
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq(
+            "[https://example.com/a\\]b](https://example.com/a]b)",
+          )
+        end
+
+        it "keeps the plain href when whitespace stands in front of the URL" do
+          expect(render_between("see ", nil)).to eq("https://example.com")
+        end
+
+        it "keeps the plain href when whitespace follows the URL" do
+          expect(render_between(nil, Markbridge::AST::Text.new(" now"))).to eq(
+            "https://example.com",
+          )
+        end
+
+        it "keeps the plain href when the URL has no neighbours" do
+          expect(render_between(nil, nil)).to eq("https://example.com")
+        end
+
+        it "keeps the plain href when the neighbour is not a text node" do
+          bold = Markbridge::AST::Bold.new
+          bold << Markbridge::AST::Text.new("x")
+
+          expect(render_between(nil, bold)).to eq("https://example.com")
+        end
       end
 
       it "keeps the <a> form for text-less links in html_mode" do

@@ -34,7 +34,7 @@ module Markbridge
               # that render to nothing (e.g. an empty formatting child)
               # or to whitespace only, which wrap_inline would leave
               # unlinked.
-              href
+              bare_url(element, href, text, interface)
             else
               interface.wrap_inline(text, "[", "](#{markdown_destination(href)})")
             end
@@ -47,11 +47,62 @@ module Markbridge
             !text.match?(/[^[:space:]]/)
           end
 
+          # A bare URL is linked by the Markdown parser on its own only when
+          # whitespace (or the start of the line) stands in front of it and
+          # nothing sticks to its end. Glued to text it is written as a
+          # Markdown link with the URL as its text, which links everywhere,
+          # also for a relative href. The glued form is not recognized as
+          # a bare URL, so it cannot produce an inline onebox either.
+          #
+          # The label of that link is the rendered +text+, not the raw
+          # href: the renderer has already escaped it for a link label,
+          # a raw `]` in the href would end the label early. A link
+          # without text, or with a label that renders to nothing, gets
+          # the href rendered as text instead. Rendering the href every
+          # time would give the same label, reusing +text+ saves a Text
+          # node and a second escape (a quarter of the time of a glued
+          # link).
+          def bare_url(element, href, text, interface)
+            glued =
+              glued?(interface.previous_sibling(element), /\S\z/) ||
+                glued?(interface.next_sibling(element), /\A\S/)
+            return href unless glued
+
+            label = blank?(text) ? href_as_text(element, href, interface) : text
+            "[#{label}](#{markdown_destination(href)})"
+          end
+
+          def href_as_text(element, href, interface)
+            interface.render_node(AST::Text.new(href), context: interface.with_parent(element))
+          end
+
+          # Whether the neighbouring +node+ is text with something other
+          # than whitespace at the edge next to the URL.
+          def glued?(node, edge)
+            node.instance_of?(AST::Text) && node.text.match?(edge)
+          end
+
           # CommonMark link destinations cannot contain whitespace unless
           # wrapped in <> — relevant for relative targets like MediaWiki
-          # page names ("Main Page").
-          def markdown_destination(href)
-            href.match?(/\s/) ? "<#{href}>" : href
+          # page names ("Main Page"). An unbalanced parenthesis ends the
+          # destination early, so every parenthesis gets a backslash;
+          # balanced ones would be fine, but the check is not worth it. A
+          # backslash of the href is doubled, or it would escape the
+          # parenthesis after it, also the one that closes the destination.
+          # The match? in front saves the copy that gsub makes also without
+          # a match (a link is rendered often, these characters are rare).
+          # The parameter is not named href like everywhere else: the
+          # mutant ignore pattern for that guard is keyed on the name, and
+          # `href.match?` under an `if` also is the scheme check in
+          # linkable?, which must stay under mutation.
+          def markdown_destination(destination)
+            escaped =
+              if destination.match?(/[()\\]/)
+                destination.gsub(/[()\\]/) { |char| "\\#{char}" }
+              else
+                destination
+              end
+            escaped.match?(/\s/) ? "<#{escaped}>" : escaped
           end
 
           def linkable?(href)

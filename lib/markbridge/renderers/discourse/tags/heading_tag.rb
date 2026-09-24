@@ -5,6 +5,11 @@ module Markbridge
     module Discourse
       module Tags
         class HeadingTag < Tag
+          # A run of # at the end of an ATX heading, after whitespace, is
+          # the optional closing sequence and disappears when cooked.
+          CLOSING_SEQUENCE = /(?<=[ \t])#+[ \t]*\z/
+          private_constant :CLOSING_SEQUENCE
+
           def render(element, interface)
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
@@ -16,7 +21,15 @@ module Markbridge
 
             prefix = "#" * element.level
 
-            "\n\n#{prefix} #{content}\n\n"
+            "\n\n#{prefix} #{keep_trailing_hashes(content)}\n\n"
+          end
+
+          private
+
+          # A backslash in front of the run keeps it as text. The escaper
+          # does not do this, it only knows about # at the start of a line.
+          def keep_trailing_hashes(content)
+            content.sub(CLOSING_SEQUENCE) { |run| "\\#{run}" }
           end
         end
       end
