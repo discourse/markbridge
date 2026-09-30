@@ -45,6 +45,12 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::ImageHandler do
       expect(parent.children[0].height).to be_nil
     end
 
+    it "reads the alt attribute" do
+      handler.process(element: build_element('<IMG src="x.png" alt="a cat"/>'), parent:)
+
+      expect(parent.children[0].alt).to eq("a cat")
+    end
+
     it "leaves src nil when absent" do
       handler.process(element: build_element("<IMG/>"), parent:)
 

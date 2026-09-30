@@ -68,6 +68,24 @@ RSpec.describe Markbridge::Parsers::HTML::Handlers::ImageHandler do
       expect(image.height).to be_nil
     end
 
+    it "reads the alt attribute" do
+      handler.process(element: build_element('<img src="image.png" alt="a cat">'), parent:)
+
+      expect(parent.children[0].alt).to eq("a cat")
+    end
+
+    it "leaves alt nil when the attribute is missing" do
+      handler.process(element: build_element('<img src="image.png">'), parent:)
+
+      expect(parent.children[0].alt).to be_nil
+    end
+
+    it "leaves alt nil when the attribute is empty" do
+      handler.process(element: build_element('<img src="image.png" alt="">'), parent:)
+
+      expect(parent.children[0].alt).to be_nil
+    end
+
     it "leaves src nil when the attribute is missing" do
       handler.process(element: build_element("<img>"), parent:)
 

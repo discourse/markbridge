@@ -225,7 +225,19 @@ RSpec.describe "BBCode to Markdown Conversion" do
             "[list][*]outer[list][*][code]  x[/code][/list]after[/list]",
           )
 
-        expect(result.markdown).to eq("- outer\n  - ```\n      x\n    ```\n  after")
+        expect(result.markdown).to eq("- outer\n  - ```\n      x\n    ```\n\n  after")
+      end
+
+      it "keeps text after a nested list in the outer item" do
+        result = Markbridge.bbcode_to_markdown("[list][*]a[list=1][*]b[/list]c[/list]")
+
+        expect(result.markdown).to eq("- a\n  1. b\n\n  c")
+      end
+
+      it "keeps text after a list inside a quote inside an item out of the last list item" do
+        result = Markbridge.bbcode_to_markdown("[list][*]a[quote][list][*]b[/list]c[/quote][/list]")
+
+        expect(result.markdown).to eq("- a\n\n  > \n  > \n  > - b\n  > \n  > \n  > c")
       end
 
       it "preserves indentation when code is the item's only content" do
@@ -344,6 +356,16 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq(expected)
     end
 
+    it "separates two lists of the same kind" do
+      result = Markbridge.bbcode_to_markdown("[list][*]a[/list][list][*]b[/list]")
+      expect(result.markdown).to eq("- a\n\n<!---->\n\n- b")
+    end
+
+    it "does not separate an unordered list from an ordered one" do
+      result = Markbridge.bbcode_to_markdown("[list][*]a[/list][list=1][*]b[/list]")
+      expect(result.markdown).to eq("- a\n\n1. b")
+    end
+
     it "converts simple ordered list" do
       bbcode = <<~BBCODE
         [list=1]
@@ -429,6 +451,37 @@ RSpec.describe "BBCode to Markdown Conversion" do
     end
   end
 
+  describe "emphasis next to a word" do
+    it "keeps emphasis that starts with punctuation working after a word" do
+      result = Markbridge.bbcode_to_markdown("item[i]#[/i]")
+      expect(result.markdown).to eq("item<!---->*\\#*")
+    end
+
+    it "keeps emphasis that ends with punctuation working in front of a word" do
+      result = Markbridge.bbcode_to_markdown("[b]*bold*[/b]tail")
+      expect(result.markdown).to eq("**\\*bold\\***<!---->tail")
+    end
+  end
+
+  describe "text next to a link" do
+    it "keeps a ! in front of a link from turning it into an image" do
+      result = Markbridge.bbcode_to_markdown("Look![url=https://example.com]here[/url]")
+      expect(result.markdown).to eq("Look\\![here](https://example.com)")
+    end
+
+    it "keeps a ! after a literal backslash from turning the link into an image" do
+      result = Markbridge.bbcode_to_markdown("Look\\![url=https://example.com]here[/url]")
+      expect(result.markdown).to eq("Look\\\\\\![here](https://example.com)")
+    end
+  end
+
+  describe "horizontal rules" do
+    it "keeps a rule that starts a list item inside the list" do
+      result = Markbridge.bbcode_to_markdown("[list][*]Foo[*][hr][*]Bar[/list]")
+      expect(result.markdown).to eq("- Foo\n- * * *\n- Bar")
+    end
+  end
+
   describe "urls" do
     it "converts url with href option" do
       result = Markbridge.bbcode_to_markdown("[url=https://example.com]Click here[/url]")
@@ -438,6 +491,17 @@ RSpec.describe "BBCode to Markdown Conversion" do
     it "converts url with content only (no href attribute)" do
       result = Markbridge.bbcode_to_markdown("[url]https://example.com[/url]")
       expect(result.markdown).to eq("https://example.com")
+    end
+
+    it "writes a bare url glued to text as a link with the url as text" do
+      result = Markbridge.bbcode_to_markdown("a[url=https://example.com]https://example.com[/url]b")
+      expect(result.markdown).to eq("a[https://example.com](https://example.com)b")
+    end
+
+    it "keeps a bare url between spaces plain" do
+      result =
+        Markbridge.bbcode_to_markdown("see [url=https://example.com]https://example.com[/url] now")
+      expect(result.markdown).to eq("see https://example.com now")
     end
 
     it "converts url with formatted content" do
@@ -461,6 +525,14 @@ RSpec.describe "BBCode to Markdown Conversion" do
     it "converts simple image" do
       result = Markbridge.bbcode_to_markdown("[img]https://example.com/photo.jpg[/img]")
       expect(result.markdown).to eq("![](https://example.com/photo.jpg)")
+    end
+
+    it "converts image with alternative text" do
+      result =
+        Markbridge.bbcode_to_markdown(
+          "[img alt=\"a cat\" width=100]https://example.com/photo.jpg[/img]",
+        )
+      expect(result.markdown).to eq("![a cat|100](https://example.com/photo.jpg)")
     end
 
     it "converts image with dimensions" do

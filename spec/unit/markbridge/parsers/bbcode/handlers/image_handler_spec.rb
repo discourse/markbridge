@@ -154,6 +154,29 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ImageHandler do
       expect(image_element.height).to be_nil
     end
 
+    it "creates Image element with alt from the alt attribute" do
+      token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "img",
+          attrs: {
+            alt: "a cat",
+          },
+          pos: 0,
+          source: "[img alt=\"a cat\"]",
+        )
+      text_token =
+        Markbridge::Parsers::BBCode::TextToken.new(text: "https://example.com/image.png", pos: 17)
+      close_token =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "img", pos: 47, source: "[/img]")
+      scanner = MockScanner.new([text_token, close_token])
+
+      handler.on_open(token:, context:, registry:, tokens: scanner)
+
+      image_element = document.children.first
+      expect(image_element.alt).to eq("a cat")
+      expect(image_element.src).to eq("https://example.com/image.png")
+    end
+
     it "creates Image element with empty src when content is empty" do
       token =
         Markbridge::Parsers::BBCode::TagStartToken.new(

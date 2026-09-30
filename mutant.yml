@@ -117,14 +117,14 @@ matcher:
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
 
-# escape_block_* fallthrough `[content, false]` returns. The `false`
-    # → drop-second / `true` mutations on the non-match branch are
-    # equivalent because content that doesn't match the specific
-    # block pattern is handed to inline escape which produces
-    # identical bytes (or bytes that don't affect the truthiness
-    # check on skip_inline in the caller). Bucket A — covered across
+# escape_block_* fallthrough `content` returns. A method that hands
+    # the content back says "no block construct here", and the caller
+    # then inline-escapes it. Mutations on the non-match branch are
+    # equivalent because content that doesn't match the specific block
+    # pattern is handed to inline escape either way, which produces
+    # identical bytes. Bucket A — covered across
     # escape_block_ordered_list, escape_block_dash, escape_block_star,
-    # and the outermost escape_block_level `[content, false]` for
+    # and the outermost escape_block_level fallthrough for
     # non-construct content.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_ordered_list
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_block_dash
@@ -162,6 +162,15 @@ matcher:
     # collapse-if to always-regex) shift work to the regex branch
     # without changing observable output. Bucket A.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_text
+
+    # Postprocessor#clean_document's `include?(BACKTICK_FENCE) ||
+    # include?(TILDE_FENCE)` gate. Both branches produce the same text:
+    # clean_around_fences finds no fence and runs clean over the whole
+    # text once. The gate only keeps documents without a fence off the
+    # fence scan. Alive mutations (`if true`, `if text`, the dropped
+    # include?, collapse to always-scan) all take the scan without an
+    # observable change. The method holds nothing but this gate. Bucket A.
+    - Markbridge::Renderers::Discourse::Postprocessor#clean_document
 
     # Renderer#render's `@interface_cache` housekeeping (root_call
     # detection + ensure-block cache reset). The cache memoizes
@@ -308,6 +317,62 @@ mutation:
     - "index{receiver=lvar{value=cell}}"
     - "index{receiver=send{selector=first}}"
 
+    # Postprocessor#clean's two guards in front of its gsubs
+    # (`prose.include?("\n\n\n")` and `prose.match?(WHITESPACE_LINE)`).
+    # gsub without a match returns an equal copy, so dropping either
+    # guard changes nothing observable; each only saves that copy for
+    # the common text that has nothing to clean. `prose` is the local's
+    # name only in the postprocessor.
+    - "if{condition=send{receiver=lvar{value=prose} selector=include?}}"
+    - "if{condition=send{receiver=lvar{value=prose} selector=match?}}"
+
+    # Postprocessor#clean_around_fences' `return text unless
+    # needs_cleaning?(text)` guard. The scan copies a document that has
+    # nothing to clean byte for byte, so taking it anyway gives the same
+    # string; the guard only saves that copy. Every mutation of the guard
+    # either returns the text early (correct) or falls through to the scan
+    # (correct): `unless true`, `unless text`, the dropped guard and the
+    # dropped `return` are all alive. `needs_cleaning?` is the name of one
+    # method in the whole gem, so the pattern reaches nothing else.
+    - "if{condition=send{selector=needs_cleaning?}}"
+
+    # Postprocessor#needs_cleaning?'s two checks. A mutation that makes the
+    # method say yes more often only costs the scan — the output is the
+    # same — so `document.include?(...)` and `document.match?(...)` turning
+    # into `true`, into their receiver or into their argument all stay
+    # alive. Dropping a whole check from the `||` chain says no too often
+    # and is killed by the specs; those mutations sit on the or-node and
+    # are not covered here. `document` is the parameter's name only in this
+    # method, and nowhere else does a local of that name get include? or
+    # match? — everywhere else it holds an AST::Document.
+    - "send{receiver=lvar{value=document} selector=include?}"
+    - "send{receiver=lvar{value=document} selector=match?}"
+
+    # UrlTag#markdown_destination's `if destination.match?(/[()\\]/)`
+    # guard. Both branches give the same destination: gsub without a
+    # match returns an equal copy. The guard only saves that copy on the
+    # common link without these characters. `if true`, `if destination`
+    # and the collapse to always-gsub are the alive mutations. The
+    # parameter is named `destination` only there, so the pattern reaches
+    # nothing else; keyed on `href` it also covered the scheme check in
+    # UrlTag#linkable?, which is an `if href.match?(...)` too.
+    - "if{condition=send{receiver=lvar{value=destination} selector=match?}}"
+
+    # ImageTag#markdown_destination's `src&.match?(/[()\\]/) ?` guard, the
+    # same guard as above with a safe navigation call (src can be nil).
+    # `if src` and `src&.match?(//)` are the alive mutations, both still
+    # escape every source that needs it. `src&.match?` is used only there.
+    - "if{condition=csend{receiver=lvar{value=src} selector=match?}}"
+
+    # UrlTag#bare_url's `blank?(text) ? href_as_text(...) : text`. The
+    # rendered text of a bare URL is the escaped href, so rendering the
+    # href as text every time gives the same label; the branch only
+    # saves a Text node and a second escape, which is a quarter of the
+    # time of a glued link. `if true`, `if text` and the collapse to
+    # always-href_as_text are the alive mutations. `blank?` stands alone
+    # as an `if` condition only there.
+    - "if{condition=send{selector=blank?}}"
+
     # `rows_data[header_idx]` / `rows_data[0...header_idx]` / ... —
     # `.at` / `.fetch` equivalences (valid index by construction) and
     # `nil...X` == `0...X` range equivalences in render_markdown.
@@ -426,11 +491,6 @@ mutation:
     # wraps the same characters.
     - "case{value=lvar{value=first_byte}}"
 
-    # escape_regular_char's `if byte < 128` ASCII fast-path. ASCII
-    # path appends raw byte; UTF-8 path does byteslice(1) for
-    # single-byte char_len. Identical output bytes for valid UTF-8.
-    - "if{condition=send{receiver=lvar{value=byte} selector=<}}"
-
     # escape_indented_code's scan-loop and whitespace-only guard.
     # Bound mutations drop the limit; getbyte returns nil past end
     # and the inner break fires. Init value (0→1) equivalent because
@@ -454,7 +514,7 @@ mutation:
     - "while{condition=send{receiver=lvar{value=pos} selector=<}}"
 
     # byteslice length-arg mutations in remaining_content and
-    # escape_regular_char. `String#byteslice(pos, N)` clamps N to
+    # copy_multibyte_char. `String#byteslice(pos, N)` clamps N to
     # the string's bounds, so `@inline_len - pos` / `@inline_len` /
     # `@inline_len + pos` all return the same bytes for valid pos.
     - "send{selector=byteslice}"

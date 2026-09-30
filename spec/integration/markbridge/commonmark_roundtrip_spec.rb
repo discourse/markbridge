@@ -136,30 +136,6 @@ module CommonMarkRoundTrip
   BOLD_IS_STRONG = "<b> and <strong> share one AST node, the renderer always writes **"
   ASCII_LANGUAGE_ONLY = "the HTML parser takes only an ASCII token as the language of a code block"
 
-  CODE_BLOCK_TRAILING_LINE =
-    "the parser keeps the final newline of a code block and CodeTag adds another one, " \
-      "so the cooked block has a blank line too many"
-  CODE_BLOCK_BLANK_LINES =
-    "the postprocessor collapses runs of blank lines and clears whitespace-only lines " \
-      "inside a code fence"
-  INLINE_CODE_BACKTICKS =
-    "inline code containing backticks is written with a single backtick delimiter"
-  INLINE_CODE_SPACES =
-    "inline code that starts or ends with a space loses it, the delimiter is not padded"
-  IMAGE_ALT_LOST = "the alt text of an image is dropped, ImageTag writes ![](src)"
-  LINK_DESTINATION_PARENTHESES =
-    "an unbalanced parenthesis in a link destination is neither escaped nor wrapped in <>"
-  BANG_BEFORE_LINK = "a ! in front of a link is not escaped, so the link cooks as an image"
-  MERGED_LISTS = "two adjacent lists of the same kind merge into one loose list"
-  RULE_IN_LIST_ITEM =
-    "a horizontal rule inside a list item is written as ---, which cooks as a thematic " \
-      "break and ends the list"
-  HEADING_TRAILING_HASHES =
-    "a # at the end of a heading is not escaped and is eaten as the closing sequence"
-  BARE_URL_AFTER_WORD =
-    "a link whose text is its href renders as the bare URL, which is not linked again " \
-      "when a word sits directly in front of it"
-
   # Turn {reason => [ids]} into {id => reason}.
   def self.by_example(groups)
     groups.each_with_object({}) { |(reason, ids), map| ids.each { |id| map[id] = reason } }.freeze
@@ -177,113 +153,7 @@ module CommonMarkRoundTrip
     )
 
   # Examples that fail because of a defect. Fixing one must remove its entry.
-  KNOWN_BUGS =
-    by_example(
-      CODE_BLOCK_TRAILING_LINE => [
-        1,
-        2,
-        3,
-        5,
-        6,
-        7,
-        8,
-        18,
-        19,
-        24,
-        36,
-        48,
-        69,
-        85,
-        100,
-        107,
-        110,
-        114,
-        115,
-        116,
-        117,
-        118,
-        119,
-        120,
-        122,
-        123,
-        124,
-        125,
-        127,
-        128,
-        131,
-        132,
-        133,
-        134,
-        135,
-        136,
-        137,
-        139,
-        140,
-        141,
-        142,
-        143,
-        146,
-        147,
-        211,
-        212,
-        225,
-        231,
-        236,
-        252,
-        253,
-        254,
-        257,
-        263,
-        270,
-        271,
-        272,
-        273,
-        274,
-        278,
-        286,
-        287,
-        288,
-        289,
-        290,
-        309,
-        313,
-        318,
-        321,
-        324,
-      ],
-      CODE_BLOCK_BLANK_LINES => [111, 112, 129, 264],
-      INLINE_CODE_BACKTICKS => [17, 329, 330, 339],
-      INLINE_CODE_SPACES => [331],
-      IMAGE_ALT_LOST => [
-        517,
-        520,
-        531,
-        572,
-        573,
-        574,
-        575,
-        576,
-        577,
-        578,
-        579,
-        580,
-        582,
-        583,
-        584,
-        585,
-        586,
-        587,
-        588,
-        589,
-        591,
-      ],
-      LINK_DESTINATION_PARENTHESES => [492, 498, 499, 500],
-      BANG_BEFORE_LINK => [593],
-      MERGED_LISTS => [301, 302, 308],
-      RULE_IN_LIST_ITEM => [61],
-      HEADING_TRAILING_HASHES => [76],
-      BARE_URL_AFTER_WORD => [480, 481],
-    )
+  KNOWN_BUGS = by_example({})
 
   module_function
 

@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Runs a command on one of the Rubies this project is tested against.
+#
+#   bin/with-ruby truffleruby bundle install
+#   bin/with-ruby truffleruby ruby bench/bench.rb --isolated
+#   bin/with-ruby jruby bundle exec rspec
+#
+# The shell is wired for the default Ruby: rv exports GEM_HOME, GEM_PATH
+# and RUBY_ROOT for it. TruffleRuby reads GEM_HOME and then installs into,
+# and loads from, the default Ruby's gems instead of its own. `bundle exec`
+# adds to that: it puts the default Ruby's gem bin directory in front of
+# PATH, so a nested `ruby` is the default one again, whatever engine
+# started the command. Both go unnoticed, because the command runs — just
+# on the wrong Ruby.
+#
+# This drops those variables, puts the engine's own bin directory first and
+# points bundler at this project, so the engine keeps its own gems.
+set -euo pipefail
+
+if [ $# -lt 2 ]; then
+  echo "usage: bin/with-ruby <3.3|3.4|4.0|jruby|truffleruby> <command> [args...]" >&2
+  exit 1
+fi
+
+engine=$1
+shift
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+
+# MRI comes from rv, JRuby and TruffleRuby from ruby-install. Both keep
+# one directory per version, so match on the prefix and take the newest.
+find_bin() {
+  local pattern=$1 dir
+  dir=$(ls -d $pattern 2>/dev/null | sort -V | tail -1) || return 1
+  [ -n "$dir" ] && [ -x "$dir/bin/ruby" ] && printf '%s\n' "$dir/bin"
+}
+
+case $engine in
+  jruby | truffleruby)
+    bin=$(find_bin "$HOME/.rubies/$engine-*") || true
+    ;;
+  *)
+    bin=$(find_bin "$HOME/.local/share/rv/rubies/ruby-$engine*") || true
+    ;;
+esac
+
+if [ -z "${bin:-}" ]; then
+  echo "bin/with-ruby: no installation found for '$engine'." >&2
+  echo "The engines this project uses are listed in .silo.yml." >&2
+  exit 1
+fi
+
+# `bundle` and `gem` have to run before the bundle exists, so they cannot
+# be asked to load it first.
+case ${1:-} in
+  bundle | bundler | gem) rubyopt=() ;;
+  *) rubyopt=(RUBYOPT=-rbundler/setup) ;;
+esac
+
+# TruffleRuby ships `gem` and `bundle` as bash launchers. Started by
+# name they answer with the gem directory of the default Ruby, even
+# with GEM_HOME unset or pointed elsewhere; handed to the engine's own
+# `ruby` they answer with theirs. So call them that way, which the
+# other engines are fine with too.
+case ${1:-} in
+  bundle | bundler | gem)
+    launcher=$1
+    shift
+    set -- "$bin/ruby" "$bin/$launcher" "$@"
+    ;;
+esac
+
+exec env -u GEM_HOME -u GEM_PATH -u RUBY_ROOT -u RUBYOPT \
+  PATH="$bin:$PATH" \
+  BUNDLE_GEMFILE="$root/Gemfile" \
+  "${rubyopt[@]}" \
+  "$@"
