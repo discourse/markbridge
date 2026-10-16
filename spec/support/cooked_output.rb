@@ -24,4 +24,10 @@ module CookedOutput
   def cook(bbcode)
     Commonmarker.to_html(Markbridge.bbcode_to_markdown(bbcode).markdown, options: OPTIONS)
   end
+
+  # @param html [String]
+  # @return [String] the HTML that commonmarker cooks from our Markdown
+  def cook_html(html)
+    Commonmarker.to_html(Markbridge.html_to_markdown(html).markdown, options: OPTIONS)
+  end
 end

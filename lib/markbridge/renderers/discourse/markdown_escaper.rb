@@ -17,6 +17,8 @@ module Markbridge
       # - Fast path returns original string for plain text (no allocations)
       # - Pre-allocated result buffers with estimated capacity
       # - Byte-level processing for inline escaping (YJIT-friendly tight loops)
+      # - A byte table decides which bytes need the inline dispatch, so an
+      #   ordinary byte is copied without walking the dispatch arms
       # - Simplified escaping rules: [ breaks links, so ] doesn't need escaping
       #
       # @example Basic escaping
@@ -67,9 +69,10 @@ module Markbridge
         # Block-level patterns
         ATX_HEADING = /\A\#{1,6}(?=[ \t]|$)/
         BLOCK_QUOTE = /\A>/
-        # List markers followed by space, tab, or end of line
+        # List markers followed by space, tab, or end of line. A marker
+        # alone on a line is an empty list item.
         BULLET_LIST = /\A[-+*](?=[ \t]|$)/
-        ORDERED_LIST = /\A(\d+)([.)])(?=[ \t])/
+        ORDERED_LIST = /\A(\d+)([.)])(?=[ \t]|$)/
         THEMATIC_BREAK_DASH = /\A(?:-[ \t]*){3,}$/
         THEMATIC_BREAK_STAR = /\A(?:\*[ \t]*){3,}$/
         THEMATIC_BREAK_UNDERSCORE = /\A(?:_[ \t]*){3,}$/
@@ -124,6 +127,11 @@ module Markbridge
         TAB = 9
         DIGIT_0 = 48
         DIGIT_9 = 57
+
+        # `DIGIT_0..DIGIT_9` written out in the `when` arm is not a
+        # literal range, so Ruby builds a new Range for every line that
+        # reaches it. The frozen constant is looked up instead.
+        DIGITS = (DIGIT_0..DIGIT_9).freeze
 
         # Escapes markdown special characters in the given text.
         #
@@ -225,8 +233,13 @@ module Markbridge
           has_indent = indent_len > 0
           content = has_indent ? line[indent_len..] : line
 
-          escaped, skip_inline = escape_block_level(content)
-          escaped = escape_inline(escaped) unless skip_inline
+          # escape_block_level hands the content back unchanged when the
+          # line starts no block construct, and the content then only
+          # needs inline escaping. Answering with the same object instead
+          # of a [line, skip_inline] pair keeps an Array allocation off
+          # every line.
+          escaped = escape_block_level(content)
+          escaped = escape_inline(content) if escaped.equal?(content)
 
           if has_indent
             result = String.new(encoding: line.encoding)
@@ -272,6 +285,9 @@ module Markbridge
           "#{nbsp_indent}#{escape_inline(content)}"
         end
 
+        # @return [String] the escaped line, or +content+ itself when the
+        #   line starts no block construct and the caller has to
+        #   inline-escape it.
         def escape_block_level(content)
           first_byte = content.getbyte(0)
 
@@ -295,7 +311,7 @@ module Markbridge
             return escape_block_star(content)
           when UNDERSCORE
             if THEMATIC_BREAK_UNDERSCORE.match?(content)
-              return escape_all_chars(content, UNDERSCORE, "\\_"), true
+              return escape_all_chars(content, UNDERSCORE, "\\_")
             end
           when EQUALS
             # A line of only `=` is a setext heading underline when a
@@ -309,46 +325,46 @@ module Markbridge
             # Discourse renders `\=` as a literal `=`, so the result
             # looks the same.
             if SETEXT_UNDERLINE_EQUALS.match?(content)
-              return escape_all_chars(content, EQUALS, "\\="), true
+              return escape_all_chars(content, EQUALS, "\\=")
             end
           when BACKTICK
             if FENCED_CODE_BACKTICK.match?(content)
-              return escape_all_chars(content, BACKTICK, "\\`"), true
+              return escape_all_chars(content, BACKTICK, "\\`")
             end
           when TILDE
-            return "\\#{content}", true if FENCED_CODE_TILDE.match?(content)
+            return "\\#{content}" if FENCED_CODE_TILDE.match?(content)
           when BRACKET_OPEN
             return escape_first_char_inline(content, "\\[")
           when PIPE
             return escape_first_char_inline(content, "\\|")
-          when DIGIT_0..DIGIT_9
+          when DIGITS
             return escape_block_ordered_list(content)
           end
 
-          [content, false]
+          content
         end
 
         # Escape the first character and inline-escape the rest.
         def escape_first_char_inline(content, escaped_char)
-          ["#{escaped_char}#{escape_inline(content[1..])}", true]
+          "#{escaped_char}#{escape_inline(content[1..])}"
         end
 
         def escape_block_dash(content)
-          return escape_all_chars(content, DASH, "\\-"), true if THEMATIC_BREAK_DASH.match?(content)
+          return escape_all_chars(content, DASH, "\\-") if THEMATIC_BREAK_DASH.match?(content)
           if BULLET_LIST.match?(content)
             return pass_first_char_inline(content) if @allow.include?(:bullet_list)
             return escape_first_char_inline(content, "\\-")
           end
-          [content, false]
+          content
         end
 
         def escape_block_star(content)
-          return escape_all_chars(content, STAR, "\\*"), true if THEMATIC_BREAK_STAR.match?(content)
+          return escape_all_chars(content, STAR, "\\*") if THEMATIC_BREAK_STAR.match?(content)
           if BULLET_LIST.match?(content)
             return pass_first_char_inline(content) if @allow.include?(:bullet_list)
             return escape_first_char_inline(content, "\\*")
           end
-          [content, false]
+          content
         end
 
         def escape_block_ordered_list(content)
@@ -356,23 +372,23 @@ module Markbridge
             rest = content[match[0].length..]
             return pass_marker_inline(content, match[0].length) if @allow.include?(:ordered_list)
 
-            return "#{match[1]}\\#{match[2]}#{escape_inline(rest)}", true
+            return "#{match[1]}\\#{match[2]}#{escape_inline(rest)}"
           end
-          [content, false]
+          content
         end
 
         # Like {#escape_first_char_inline} but the leading character is
         # preserved verbatim (used when allow: lets a single-byte
         # marker like `-`, `+`, `*`, or `>` through).
         def pass_first_char_inline(content)
-          ["#{content[0]}#{escape_inline(content[1..])}", true]
+          "#{content[0]}#{escape_inline(content[1..])}"
         end
 
         # Preserve a multi-byte marker (e.g. `1.`, `99)`, `##`) and
         # inline-escape the rest. Used when allow: lets ordered lists
         # or ATX headings through.
         def pass_marker_inline(content, marker_length)
-          ["#{content[0, marker_length]}#{escape_inline(content[marker_length..])}", true]
+          "#{content[0, marker_length]}#{escape_inline(content[marker_length..])}"
         end
 
         def escape_all_chars(str, byte_val, escaped)
@@ -396,20 +412,55 @@ module Markbridge
           @inline_len = bytesize
           pos = 0
 
-          # No loop-progress guard: every `dispatch_inline_byte` branch
-          # returns `pos + N` for N >= 1 by construction, so the loop
-          # is provably terminating. Mutations that break this
+          # No loop-progress guard: the copy branch below advances by
+          # one and every `dispatch_inline_byte` branch returns
+          # `pos + N` for N >= 1 by construction, so the loop is
+          # provably terminating. Mutations that break this
           # (`while true`, body drops, selector swaps that short-circuit
           # the dispatch) surface as timeouts rather than alive
           # mutations, and the inline guard would otherwise cost ~15%
           # on this hot path per benchmark.
           while pos < @inline_len
             byte = @inline_content.getbyte(pos)
-            pos = dispatch_inline_byte(byte, pos)
+            if DISPATCH_BYTE[byte]
+              pos = dispatch_inline_byte(byte, pos)
+            else
+              # An ASCII byte that starts no construct. Writing it here
+              # instead of walking the whole case in dispatch_inline_byte
+              # saves eleven comparisons and two calls per byte, and most
+              # bytes of ordinary text land here.
+              @inline_result << byte
+              pos += 1
+            end
           end
 
           @inline_result
         end
+
+        # Every byte dispatch_inline_byte has an arm for, plus the lead
+        # byte of a multi-byte character (128 and up), which its `else`
+        # copies through. A new arm needs its byte in here too, or the
+        # arm never runs.
+        DISPATCH_BYTE =
+          begin
+            table = Array.new(256, false)
+            [
+              BACKSLASH,
+              DASH,
+              TILDE,
+              STAR,
+              UNDERSCORE,
+              BACKTICK,
+              BANG,
+              BRACKET_OPEN,
+              PIPE,
+              LT,
+              AMP,
+              *(128..255),
+            ].each { |byte| table[byte] = true }
+            table.freeze
+          end
+        private_constant :DISPATCH_BYTE
 
         def dispatch_inline_byte(byte, pos)
           case byte
@@ -438,7 +489,7 @@ module Markbridge
           when AMP
             escape_amp(pos)
           else
-            escape_regular_char(byte, pos)
+            copy_multibyte_char(byte, pos)
           end
         end
 
@@ -536,17 +587,15 @@ module Markbridge
           @inline_content.byteslice(pos, @inline_len - pos)
         end
 
-        # Handle regular characters including multi-byte UTF-8.
-        def escape_regular_char(byte, pos)
-          if byte < 128
-            @inline_result << byte
-            pos + 1
-          else
-            char_len = utf8_char_length(byte)
-            end_pos = [pos + char_len, @inline_len].min
-            @inline_result << @inline_content.byteslice(pos, end_pos - pos)
-            end_pos
-          end
+        # Copy one multi-byte UTF-8 character through unchanged. The loop
+        # in escape_inline sends every byte of 128 and up here. A lead
+        # byte that promises more bytes than the content holds needs no
+        # clamp: byteslice copies what is left, and the returned
+        # position is past the end, which ends the loop.
+        def copy_multibyte_char(byte, pos)
+          char_len = utf8_char_length(byte)
+          @inline_result << @inline_content.byteslice(pos, char_len)
+          pos + char_len
         end
 
         def ascii_punctuation?(byte)

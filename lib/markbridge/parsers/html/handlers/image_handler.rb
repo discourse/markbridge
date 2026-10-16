@@ -14,8 +14,11 @@ module Markbridge
             src = element["src"]
             width = sanitize_dimension(element["width"])
             height = sanitize_dimension(element["height"])
+            # An empty alt attribute means "no text", the same as a missing one.
+            alt = element["alt"]
+            alt = nil if alt&.empty?
 
-            ast_element = AST::Image.new(src:, width:, height:)
+            ast_element = AST::Image.new(src:, width:, height:, alt:)
             parent << ast_element
 
             # Return nil to signal: don't process children (void element)

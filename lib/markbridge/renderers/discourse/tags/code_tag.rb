@@ -28,8 +28,26 @@ module Markbridge
 
           private
 
+          # The delimiter is one backtick longer than the longest backtick
+          # run in the content. A space on each side keeps a backtick at
+          # the edge of the content away from the delimiter. Content that
+          # starts and ends with a space gets the same padding, because
+          # CommonMark strips one space from each end of such a span.
           def render_inline(content)
-            "`#{content}`"
+            longest_run = content.scan(/`+/).map(&:length).max || 0
+            delimiter = "`" * (longest_run + 1)
+            padding = " " if needs_padding?(content)
+
+            "#{delimiter}#{padding}#{content}#{padding}#{delimiter}"
+          end
+
+          def needs_padding?(content)
+            return true if content.start_with?("`") || content.end_with?("`")
+
+            # A span of spaces only is not stripped by CommonMark, so it
+            # needs no padding.
+            content.start_with?(" ") && content.end_with?(" ") &&
+              content.count(" ") < content.length
           end
 
           # Leading and trailing blank lines: the trailing one keeps an
@@ -38,7 +56,11 @@ module Markbridge
           # from prior raw text or inline content.
           def render_block(content, language)
             fence = calculate_fence(content)
-            "\n\n#{fence}#{language}\n#{content}\n#{fence}\n\n"
+            # The newline in front of the closing fence is part of the fence
+            # syntax, not of the code. A content that already ends with a
+            # newline (as <pre> content from HTML usually does) would
+            # otherwise cook with a blank line too many at the end.
+            "\n\n#{fence}#{language}\n#{content.chomp}\n#{fence}\n\n"
           end
 
           def render_html_block(content, language)

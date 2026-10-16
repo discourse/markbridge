@@ -15,12 +15,19 @@ RSpec.describe Markbridge::AST::Image do
     expect(element.height).to eq(200)
   end
 
+  it "stores the alternative text" do
+    element = described_class.new(src: "https://example.com/img.png", alt: "a cat")
+
+    expect(element.alt).to eq("a cat")
+  end
+
   it "defaults to nil values" do
     element = described_class.new
 
     expect(element.src).to be_nil
     expect(element.width).to be_nil
     expect(element.height).to be_nil
+    expect(element.alt).to be_nil
   end
 
   it "can have children" do
