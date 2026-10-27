@@ -32,7 +32,9 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
     doc = fragment("[list][*]outer[list][*][code]  x[/code][/list]after[/list]")
 
     expect(doc.css("ul li ul li pre").text).to eq("  x\n")
-    expect(doc.css("ul > li").first.xpath("text()").map(&:text).join).to include("after")
+    # The text after the nested list is its own paragraph in the outer item.
+    expect(doc.css("ul > li").first.xpath("text()|p/text()").map(&:text).join).to include("after")
+    expect(doc.css("ul li ul li").text).not_to include("after")
   end
 
   it "keeps a code block inside an ordered item that also has a paragraph" do
@@ -51,6 +53,27 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
 
     expect(doc.css("ul > li > table").size).to eq(1)
     expect(doc.css("ul > li > ul > li").map(&:text)).to eq(["x"])
+  end
+
+  it "keeps text after a nested list in the outer item" do
+    html = fragment("[list][*]a[list=1][*]b[/list]c[/list]")
+
+    expect(html.css("ol li").map(&:text)).to eq(["b"])
+    expect(html.at_css("ul > li").text).to include("c")
+  end
+
+  it "keeps text after a list inside a quote out of the last list item" do
+    html = fragment("[list][*]a[quote][list][*]b[/list]c[/quote][/list]")
+
+    expect(html.css("blockquote li").map(&:text)).to eq(["b"])
+    expect(html.at_css("blockquote").text).to include("c")
+  end
+
+  it "cooks two lists of the same kind into two lists" do
+    html = fragment("[list][*]a[/list][list][*]b[/list]")
+
+    expect(html.css("ul").size).to eq(2)
+    expect(html.css("p")).to be_empty
   end
 
   context "when a list item starts with < but opens no HTML block" do
