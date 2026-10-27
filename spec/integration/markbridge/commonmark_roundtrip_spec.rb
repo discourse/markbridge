@@ -131,6 +131,9 @@ module CommonMarkRoundTrip
   BARE_URL =
     "a link whose text is its href renders as the bare URL (it oneboxes in Discourse), " \
       "and the cooking engine links only http(s) and mail addresses back"
+  BARE_URL_DOTS_ONLY =
+    "a link whose text is its href renders as the bare URL, and the cooking engine does " \
+      "not link a host back that is made of dots only"
   COOKED_AUTOLINK =
     "the cooking engine links a bare URL or mail address that the spec keeps as plain text"
   BOLD_IS_STRONG = "<b> and <strong> share one AST node, the renderer always writes **"
@@ -171,6 +174,7 @@ module CommonMarkRoundTrip
       EMPTY_ELEMENT => [126, 130, 144, 218, 237, 239, 240, 280, 281, 282, 283, 284, 315],
       LINK_WITHOUT_TEXT => [21, 31, 200, 476, 477, 484, 485, 486, 487, 567, 642, 643],
       BARE_URL => [344, 596, 597, 598, 599, 601],
+      BARE_URL_DOTS_ONLY => [600],
       COOKED_AUTOLINK => [602, 606, 608, 611, 612],
       BOLD_IS_STRONG => [494],
       ASCII_LANGUAGE_ONLY => [34],
