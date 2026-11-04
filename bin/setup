@@ -5,4 +5,9 @@ set -vx
 
 bundle install
 
+# markdown-it for the cooked-output specs. Without Node they are skipped.
+if command -v npm >/dev/null; then
+  npm ci --prefix spec/support/markdown_it
+fi
+
 # Do any other automated setup that you need to do here

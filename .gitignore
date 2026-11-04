@@ -27,3 +27,4 @@
 /docs/dist/
 /docs/node_modules/
 /.pnpm-store/
+/spec/support/markdown_it/node_modules/
