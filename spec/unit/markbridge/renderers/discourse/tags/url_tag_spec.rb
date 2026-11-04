@@ -253,7 +253,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       end
 
       context "when text stands right next to the URL" do
-        # Renders a bare URL with the given neighbours inside a paragraph,
+        # Renders a bare URL with the given neighbors inside a paragraph,
         # so the tag can see its siblings.
         def render_between(before, after)
           paragraph = Markbridge::AST::Paragraph.new
@@ -473,7 +473,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
           )
         end
 
-        it "keeps the plain href when the URL has no neighbours" do
+        it "keeps the plain href when the URL has no neighbors" do
           expect(render_between(nil, nil)).to eq("https://example.com")
         end
 

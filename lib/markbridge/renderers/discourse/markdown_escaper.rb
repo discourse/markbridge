@@ -414,8 +414,8 @@ module Markbridge
 
           # No loop-progress guard: the copy branch below advances by
           # one and every `dispatch_inline_byte` branch returns
-          # `pos + N` for N >= 1 by construction, so the loop is
-          # provably terminating. Mutations that break this
+          # `pos + N` for N >= 1 by construction, so the loop always
+          # ends. Mutations that break this
           # (`while true`, body drops, selector swaps that short-circuit
           # the dispatch) surface as timeouts rather than alive
           # mutations, and the inline guard would otherwise cost ~15%

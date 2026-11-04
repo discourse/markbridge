@@ -158,7 +158,7 @@ class AstGenerator
   end
 
   # Appends one block, unless the budget is used up. Two Lists never end up
-  # as neighbours: the renderer merges them into one loose list today,
+  # as neighbors: the renderer merges them into one loose list today,
   # which is a separate bug, so a text run goes between them.
   #
   # @return [void]

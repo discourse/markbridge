@@ -71,7 +71,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
         )
       end
 
-      it "hands back a fenced document that has nothing to clean" do
+      it "returns a fenced document that has nothing to clean as it is" do
         text = "```\na\n```\n\nb"
         expect(postprocessor.call(text)).to eq(text)
       end
