@@ -10,7 +10,11 @@ require "uri"
 # the cooked HTML with the structure of the AST. The AST says "a list item
 # at depth 3 holds a code block", so the cooked DOM has to show an `li` at
 # depth 3 with a `pre` inside, and the code text has to be the code.
-RSpec.describe "renderer structure round-trip", skip: CookedOutput::SKIP_REASON do
+#
+# Every seed runs through two cookers: commonmarker (cmark-gfm) and
+# markdown-it set up like Discourse. The check is the same for both, the
+# context of each cooker lists how its HTML differs.
+RSpec.describe "renderer structure round-trip" do
   # commonmarker merges these over its defaults, so table, autolink and
   # tasklist stay on. strikethrough is named because ~~x~~ has to cook to
   # <del>; header_ids drops the id attribute from headings.
@@ -53,7 +57,8 @@ RSpec.describe "renderer structure round-trip", skip: CookedOutput::SKIP_REASON 
 
   # The renderer falls back to raw HTML when the content already carries
   # the Markdown marker, and its strikethrough fallback is <s> where
-  # CommonMark's ~~ produces <del>. Both mean the same element.
+  # cmark-gfm's ~~ produces <del> (markdown-it's ~~ produces <s>). Both
+  # mean the same element.
   ELEMENT_ALIASES = { "s" => "del" }.freeze
 
   # Markdown that must never reach the reader as text. Inside pre and code
@@ -61,10 +66,6 @@ RSpec.describe "renderer structure round-trip", skip: CookedOutput::SKIP_REASON 
   LEAKED_MARKDOWN = ["```", "~~~", "**", "](", "<!---->"].freeze
 
   SEED_COUNT = Integer(ENV.fetch("STRUCTURE_SEEDS", "300"))
-
-  def cook(markdown)
-    Commonmarker.to_html(markdown, options: COOK_OPTIONS, plugins: COOK_PLUGINS)
-  end
 
   # One skeleton node. The same shape is built from the AST and from the
   # DOM so the two can be compared with a plain ==.
@@ -132,13 +133,13 @@ RSpec.describe "renderer structure round-trip", skip: CookedOutput::SKIP_REASON 
 
       case node.name
       when "pre"
-        # commonmarker puts the code in a <code> child and ends it with a
+        # Both cookers put the code in a <code> child and end it with a
         # newline that the source does not have.
         [skeleton("pre", text: (node.at_css("code") || node).text.chomp)]
       when "code"
         [skeleton("code", text: node.text)]
       when "a"
-        # commonmarker percent-encodes `]` and `\` in a destination.
+        # Both cookers percent-encode `]` and `\` in a destination.
         [
           skeleton(
             "a",
@@ -199,30 +200,53 @@ RSpec.describe "renderer structure round-trip", skip: CookedOutput::SKIP_REASON 
     REPORT
   end
 
-  (1..SEED_COUNT).each do |seed|
-    it "renders seed #{seed} to HTML with the structure of its AST" do
-      document = AstGenerator.new(seed).document
+  shared_examples "a structure round-trip" do
+    (1..SEED_COUNT).each do |seed|
+      it "renders seed #{seed} to HTML with the structure of its AST" do
+        document = AstGenerator.new(seed).document
 
-      # The generator promises trees the default normalizer leaves alone,
-      # so the AST that gets rendered is the AST the expectation reads.
-      violations = Markbridge::Normalizer.shared_default.violations(document)
+        # The generator promises trees the default normalizer leaves alone,
+        # so the AST that gets rendered is the AST the expectation reads.
+        violations = Markbridge::Normalizer.shared_default.violations(document)
 
-      markdown = Markbridge.render(document).markdown
-      html = cook(markdown)
-      fragment = Nokogiri::HTML5.fragment(html)
-      report = failure_report(seed:, document:, markdown:, html:)
+        markdown = Markbridge.render(document).markdown
+        html = cook(markdown)
+        fragment = Nokogiri::HTML5.fragment(html)
+        report = failure_report(seed:, document:, markdown:, html:)
 
-      expect(violations).to eq([]), report
+        expect(violations).to eq([]), report
 
-      expect(actual_skeleton(fragment.children)).to eq(expected_skeleton(document)), report
+        expect(actual_skeleton(fragment.children)).to eq(expected_skeleton(document)), report
 
-      missing = missing_words(document, fragment)
-      expect(missing).to eq([]), "lost text: #{missing.inspect}\n\n#{report}"
+        missing = missing_words(document, fragment)
+        expect(missing).to eq([]), "lost text: #{missing.inspect}\n\n#{report}"
 
-      outside = text_outside_code(fragment)
-      # A marker that a Text node already carries is content, not a leak.
-      leaked = LEAKED_MARKDOWN.select { |m| outside.include?(m) && !ast_text(document).include?(m) }
-      expect(leaked).to eq([]), "leaked markdown: #{leaked.inspect}\n\n#{report}"
+        outside = text_outside_code(fragment)
+        # A marker that a Text node already carries is content, not a leak.
+        leaked =
+          LEAKED_MARKDOWN.select { |m| outside.include?(m) && !ast_text(document).include?(m) }
+        expect(leaked).to eq([]), "leaked markdown: #{leaked.inspect}\n\n#{report}"
+      end
     end
+  end
+
+  context "with commonmarker", skip: CookedOutput::SKIP_REASON do
+    def cook(markdown)
+      Commonmarker.to_html(markdown, options: COOK_OPTIONS, plugins: COOK_PLUGINS)
+    end
+
+    include_examples "a structure round-trip"
+  end
+
+  # How markdown-it's HTML differs, none of it is structure:
+  # - a single newline is <br> (breaks: true), which adds no skeleton node
+  # - ~~ is <s>, see ELEMENT_ALIASES
+  # - smartquotes turn " and ' into curly quotes, which content_words skips
+  context "with markdown-it", skip: MarkdownItCooker::SKIP_REASON do
+    def cook(markdown)
+      MarkdownItCooker.cook(markdown)
+    end
+
+    include_examples "a structure round-trip"
   end
 end

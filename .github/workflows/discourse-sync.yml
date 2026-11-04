@@ -1,0 +1,35 @@
+name: markdown-it sync with Discourse
+
+on:
+  schedule:
+    # Mondays at 05:00 UTC.
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# spec/support/markdown_it cooks the specs' Markdown with markdown-it, set up
+# like Discourse. This job fails when Discourse main has another markdown-it
+# version, other site setting defaults, or changed one of the files the
+# options come from. Run `node spec/support/markdown_it/sync.mjs` locally to
+# update, and read the compare link it prints.
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Compare with Discourse main
+        run: node spec/support/markdown_it/sync.mjs --check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

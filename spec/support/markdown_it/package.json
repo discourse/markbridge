@@ -1,0 +1,13 @@
+{
+  "name": "markbridge-markdown-it-cooker",
+  "private": true,
+  "description": "Cooks the renderer's Markdown with markdown-it, configured like Discourse. Only used by the specs.",
+  "type": "module",
+  "engines": {
+    "node": ">= 22"
+  },
+  "dependencies": {
+    "linkify-it": "6.1.0",
+    "markdown-it": "15.0.3"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "commit": "7ce00125d1ac96ea48f7cb702e9418ab38d1c964",
+  "packages": {
+    "linkify-it": "6.1.0",
+    "markdown-it": "15.0.3"
+  },
+  "site_settings": {
+    "traditional_markdown_linebreaks": false,
+    "enable_markdown_linkify": true,
+    "enable_markdown_typographer": true,
+    "markdown_typographer_quotation_marks": "“|”|‘|’",
+    "markdown_linkify_tlds": "com|net|org|io|onion|co|tv|ru|cn|us|uk|me|de|fr|fi|gov"
+  },
+  "sources": {
+    "frontend/discourse-markdown-it/src/setup.js": "3739a7817e41ddef8c6e03f6f24065de0eca03ab74e62a124a80c3364bac5810",
+    "frontend/discourse-markdown-it/src/engine.js": "b0f99477271ac3b0f8e0bd5eedc25e9c3b4d86ef1f0dcb2a6fcff85f72f57f00",
+    "frontend/discourse-markdown-it/src/features/newline.js": "395daf8b21dd7ae7bf0bb0c6022bf5df53d9a033ed79d9e486fb8af97eef4f74",
+    "frontend/discourse-markdown-it/src/features/paragraph.js": "90f25e079b7417f64cef64f1b60e54e546fa2e2c1a2e47506f5d85ae828f22c4",
+    "frontend/discourse-markdown-it/src/features/custom-typographer-replacements.js": "c4f51afab19ff27d93f42350d635b2d2682ac1ad9ea9e7223d62f6484358babb"
+  }
+}

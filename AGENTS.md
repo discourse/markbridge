@@ -231,6 +231,33 @@ commonmarker):
   the exact Markdown string. A Markdown expectation written from the
   current output also fixes the current bug in place.
 
+**Cooking with markdown-it** (needs Node 22; `bin/setup` runs `npm ci
+--prefix spec/support/markdown_it`):
+- Discourse cooks with markdown-it, not cmark-gfm, and the two read some
+  Markdown differently: markdown-it keeps a `:` after a bare URL in the
+  link, a single `~` is no strikethrough, a single newline is a `<br>`.
+  `MarkdownItCooker` (`spec/support/markdown_it_cooker.rb`) sends the
+  Markdown to one long-running `node spec/support/markdown_it/cook.mjs`,
+  which sets up markdown-it like Discourse with its default site
+  settings. The structure round-trip, the bare URL spec and the emphasis
+  join spec run every example through both cookers.
+- Without Node or `node_modules` the markdown-it examples are skipped.
+  `MARKDOWN_IT_REQUIRED=1` turns that into a failure; CI sets it. JRuby
+  skips them in any case, its Nokogiri has no HTML5 parser.
+- `spec/support/markdown_it/discourse.json` records what the setup is
+  taken from: the Discourse commit, the markdown-it and linkify-it
+  versions in its `pnpm-lock.yaml`, the site setting defaults and a hash
+  of each Discourse file `cook.mjs` copies options from. `node
+  spec/support/markdown_it/sync.mjs` updates it (and `package.json`) from
+  Discourse main; when a hash changed, read the compare link it prints and
+  update `cook.mjs` if needed. `--check` only reports, the weekly
+  `discourse-sync.yml` workflow runs it. Dependabot does not watch this
+  package on purpose: the version has to follow Discourse.
+- Plain markdown-it is not all of Discourse: BBCode, mentions, emoji,
+  `upload://`, image options and the sanitizer are missing, and
+  Discourse's own typographer replacements are not copied (GPL), so
+  markdown-it's `replacements` rule is off.
+
 ## Mutation Testing
 
 The full playbook — wrapper usage, killing/simplifying/ignoring alive
