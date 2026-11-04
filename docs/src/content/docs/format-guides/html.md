@@ -49,7 +49,7 @@ parse.ast
 | `<h1>`–`<h6>` | `#` through `######` headings | `AST::Heading` |
 | `<a href="...">` | `[text](href)` | `AST::Url` |
 | `<img src alt>` | `![](src)` | `AST::Image` |
-| `<blockquote>` | `[quote]…[/quote]` | `AST::Quote` |
+| `<blockquote>` | `[quote="name"]…[/quote]`; without attribution `> …`, or `[quote]…[/quote]` around a quote with attribution | `AST::Quote` |
 | `<ul>`, `<ol>` | `- item` / `1. item` | `AST::List` |
 | `<li>` | List item | `AST::ListItem` |
 | `<table>`, `<tr>`, `<td>`, `<th>` | GFM table | `AST::Table` |

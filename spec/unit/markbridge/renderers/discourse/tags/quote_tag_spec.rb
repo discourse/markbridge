@@ -76,6 +76,105 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
       expect(tag.render(element, interface)).to eq("\n\n[quote=\"alice\"]\nhi\n[/quote]\n\n")
     end
 
+    context "without attribution around a quote with attribution" do
+      def quote(**attrs, &block)
+        Markbridge::AST::Quote.new(**attrs).tap { |q| Array(block&.call).each { |c| q << c } }
+      end
+
+      def text(value)
+        Markbridge::AST::Text.new(value)
+      end
+
+      it "renders as [quote] when the quote with author is a direct child" do
+        element = quote { quote(author: "X") { text("in") } }
+
+        expect(tag.render(element, interface)).to eq(
+          "\n\n[quote]\n[quote=\"X\"]\nin\n[/quote]\n[/quote]\n\n",
+        )
+      end
+
+      it "renders as [quote] when the quote has a username only" do
+        element = quote { quote(username: "x") { text("in") } }
+
+        expect(tag.render(element, interface)).to eq(
+          "\n\n[quote]\n[quote=\"x\"]\nin\n[/quote]\n[/quote]\n\n",
+        )
+      end
+
+      it "renders as [quote] when the quote with author is deeper inside" do
+        list = Markbridge::AST::List.new
+        item = Markbridge::AST::ListItem.new
+        item << quote(author: "X") { text("in") }
+        list << item
+        element = quote { [text("a"), list] }
+
+        expect(tag.render(element, interface)).to start_with("\n\n[quote]\na\n")
+      end
+
+      it "renders as [quote] around a subclass of AST::Quote with author" do
+        element = quote { Class.new(Markbridge::AST::Quote).new(author: "X") << text("in") }
+
+        expect(tag.render(element, interface)).to start_with("\n\n[quote]\n")
+      end
+
+      it "renders every quote without attribution on the way as [quote]" do
+        element = quote { quote { quote(author: "X") { text("in") } } }
+
+        expect(tag.render(element, interface)).to eq(
+          "\n\n[quote]\n[quote]\n[quote=\"X\"]\nin\n[/quote]\n[/quote]\n[/quote]\n\n",
+        )
+      end
+
+      it "stays a blockquote around a quote without attribution" do
+        element = quote { [quote { text("in") }, text("out")] }
+
+        expect(tag.render(element, interface)).to eq("\n\n> > in\n> \n> out\n\n")
+      end
+
+      it "stays a blockquote around a quote attributed by ids only" do
+        element = quote { quote(post_id: 1, user_id: 2) { text("in") } }
+
+        expect(tag.render(element, interface)).to eq("\n\n> > in\n\n")
+      end
+
+      it "stays a blockquote around text and line breaks" do
+        element = quote { [text("a"), Markbridge::AST::LineBreak.new, text("b")] }
+
+        expect(tag.render(element, interface)).to eq("\n\n> a\n> b\n\n")
+      end
+    end
+
+    context "with a block at the start or the end" do
+      it "has no blank lines at the start and the end of a blockquote" do
+        element = Markbridge::AST::Quote.new
+        list = Markbridge::AST::List.new
+        list << (Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a"))
+        element << list
+
+        expect(tag.render(element, interface)).to eq("\n\n> - a\n\n")
+      end
+
+      it "has no blank lines at the start and the end of a quote with author" do
+        element = Markbridge::AST::Quote.new(author: "A")
+        element << (Markbridge::AST::Quote.new(author: "B") << Markbridge::AST::Text.new("x"))
+
+        expect(tag.render(element, interface)).to eq(
+          "\n\n[quote=\"A\"]\n[quote=\"B\"]\nx\n[/quote]\n[/quote]\n\n",
+        )
+      end
+
+      it "keeps the blank lines in the middle" do
+        element = Markbridge::AST::Quote.new(author: "A")
+        element << Markbridge::AST::Text.new("a")
+        element << (Markbridge::AST::Quote.new(author: "B") << Markbridge::AST::Text.new("x"))
+        element << Markbridge::AST::Text.new("b")
+
+        expect(tag.render(element, interface)).to eq(
+          "\n\n[quote=\"A\"]\na\n\n[quote=\"B\"]\nx\n[/quote]\n\nb\n[/quote]\n\n",
+        )
+      end
+    end
+
     let(:element_class) { Markbridge::AST::Quote }
     it_behaves_like "a tag that propagates parent context"
 

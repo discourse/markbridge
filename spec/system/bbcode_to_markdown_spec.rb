@@ -433,6 +433,21 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq("[quote=\"alice, post:123, topic:456\"]\nQuoted text\n[/quote]")
     end
 
+    it "converts a quote without author around a quote with author into [quote]" do
+      result = Markbridge.bbcode_to_markdown("[quote][quote=X]in[/quote][/quote]reply")
+      expect(result.markdown).to eq("[quote]\n[quote=\"X\"]\nin\n[/quote]\n[/quote]\n\nreply")
+    end
+
+    it "converts a quote without author around a list into a blockquote without blank lines" do
+      result = Markbridge.bbcode_to_markdown("[quote][list][*]a[*]b[/list][/quote]")
+      expect(result.markdown).to eq("> - a\n> - b")
+    end
+
+    it "converts an empty quote without author into nothing" do
+      result = Markbridge.bbcode_to_markdown("x[quote][/quote]y")
+      expect(result.markdown).to eq("xy")
+    end
+
     it "separates two consecutive named quotes with a blank line" do
       result = Markbridge.bbcode_to_markdown("[quote=A]first[/quote][quote=B]second[/quote]")
       expect(result.markdown).to eq(
