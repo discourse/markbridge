@@ -829,6 +829,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.render_children(document, context:)).to eq("Look\\![foo](/url)")
     end
 
+    it "escapes a ! after multibyte text by its byte offset" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("Sch\u00F6n\u2026!")
+      document << (Markbridge::AST::Url.new(href: "/url") << Markbridge::AST::Text.new("foo"))
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_children(document, context:)).to eq("Sch\u00F6n\u2026\\![foo](/url)")
+    end
+
+    it "leaves a ! in front of a [ alone in html_mode" do
+      # Inside an HTML block nothing is Markdown, the backslash would show.
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("wow!")
+      # A link without an href renders its text, in html_mode escaped for
+      # HTML, which leaves the [ alone.
+      document << (Markbridge::AST::Url.new(href: nil) << Markbridge::AST::Text.new("[x]"))
+      context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+
+      expect(renderer.render_children(document, context:)).to eq("wow![x]")
+    end
+
     it "escapes a ! that follows an escaped backslash" do
       # `\\!` is an escaped backslash and an active `!`.
       document = Markbridge::AST::Document.new
