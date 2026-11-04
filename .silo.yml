@@ -27,12 +27,18 @@ update:
   - sudo dnf update -y
   - rv self update
 
+# `http: true` marks a port as a web server, so `silo status --json` reports
+# a URL for it.
 daemons:
   playground:
     cmd: bin/playground
-    ports: ["4567"]
+    ports:
+      - port: "4567"
+        http: true
     autostart: true
   docs:
     cmd: bin/docs
-    ports: ["4321"]
+    ports:
+      - port: "4321"
+        http: true
     autostart: true
