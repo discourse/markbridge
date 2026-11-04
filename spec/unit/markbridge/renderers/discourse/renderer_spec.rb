@@ -411,6 +411,30 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   end
 
   describe "#render_children" do
+    it "knows the position of the child it renders, also after a nested call" do
+      positions = []
+      renderer_with_tag = nil
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new do |element, interface|
+          content = interface.render_children(element, context: interface.with_parent(element))
+          positions << renderer_with_tag.child_index
+          content
+        end,
+      )
+      renderer_with_tag = described_class.new(tag_library: library)
+      document = Markbridge::AST::Document.new
+      inner = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("a")
+      outer = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("b") << inner
+      document << Markbridge::AST::Text.new("c") << outer
+
+      renderer_with_tag.render(document)
+
+      expect(positions).to eq([1, 1])
+      expect(renderer_with_tag.child_index).to be_nil
+    end
+
     it "renders all children" do
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::Text.new("hello ")

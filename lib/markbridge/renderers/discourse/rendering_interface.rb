@@ -78,6 +78,33 @@ module Markbridge
           sibling(element, 1)
         end
 
+        # The node +offset+ positions away from +element+ among the
+        # children of its parent (negative: in front of it). nil when
+        # there is no node at that position, or when the parent is not
+        # known.
+        #
+        # The renderer knows the position of the child it renders right
+        # now, so the usual call costs no search. A search through the
+        # children is the fallback, for an element that is not the one
+        # being rendered.
+        # @param element [AST::Node]
+        # @param offset [Integer]
+        # @return [AST::Node, nil]
+        def sibling(element, offset)
+          parent = @context.element || @context.root
+          return nil if parent.nil?
+
+          siblings = parent.children
+          index = @renderer.child_index
+          unless index && siblings.at(index).equal?(element)
+            index = siblings.index { |child| child.equal?(element) }
+            return nil if index.nil?
+          end
+
+          target = index + offset
+          siblings.at(target) unless target.negative?
+        end
+
         # Check if element should be rendered in block context
         # @param node [AST::Node] container node or leaf like HorizontalRule
         # @return [Boolean]
@@ -122,18 +149,6 @@ module Markbridge
         end
 
         private
-
-        def sibling(element, offset)
-          parent = @context.element || @context.root
-          return nil if parent.nil?
-
-          siblings = parent.children
-
-          index = siblings.index { |child| child.equal?(element) }
-          return nil if index.nil? || (index + offset).negative?
-
-          siblings.at(index + offset)
-        end
 
         # Wrap content in markers, keeping leading/trailing whitespace
         # outside the markers (Unicode-aware, since CommonMark's flanking

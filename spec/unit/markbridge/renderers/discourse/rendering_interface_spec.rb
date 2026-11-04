@@ -175,6 +175,42 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
       expect(root_interface.previous_sibling(middle)).to be_nil
       expect(root_interface.next_sibling(middle)).to be_nil
     end
+
+    it "returns the node any number of positions away" do
+      expect(interface.sibling(last, -2)).to be(first)
+      expect(interface.sibling(first, 2)).to be(last)
+      expect(interface.sibling(middle, 0)).to be(middle)
+      expect(interface.sibling(first, -1)).to be_nil
+      expect(interface.sibling(last, 1)).to be_nil
+    end
+
+    it "uses the position the renderer reports for the child it renders" do
+      allow(renderer).to receive(:child_index).and_return(2)
+
+      expect(interface.previous_sibling(last)).to be(middle)
+    end
+
+    it "does not search the children when the renderer reports the position of the element" do
+      allow(renderer).to receive(:child_index).and_return(1)
+      allow(parent.children).to receive(:index).and_raise("searched the children")
+
+      expect(interface.previous_sibling(middle)).to be(first)
+      expect(interface.next_sibling(middle)).to be(last)
+    end
+
+    it "searches the children when the renderer reports another position" do
+      # The renderer reports the position of whatever it renders, the tag
+      # may ask about another node.
+      allow(renderer).to receive(:child_index).and_return(2)
+
+      expect(interface.previous_sibling(middle)).to be(first)
+    end
+
+    it "searches the children when the reported position is past the end" do
+      allow(renderer).to receive(:child_index).and_return(7)
+
+      expect(interface.next_sibling(first)).to be(middle)
+    end
   end
 
   describe "#previous_sibling and #next_sibling with a root element" do
