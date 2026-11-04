@@ -31,16 +31,19 @@ module Markbridge
         #   order (outermost first); convenience form for building a
         #   context from scratch. Ignored when +element:+ is given.
         # @param html_mode [Boolean] see {#html_mode?}
-        # @param parent [RenderContext, nil] enclosing context (chain form)
+        # @param parent [RenderContext, nil] enclosing context (chain form);
+        #   nil gives the element an empty root context as its parent
         # @param element [AST::Element, nil] nearest parent element (chain form)
         # @param root [AST::Element, nil] see {#root}
         def initialize(parents = [], html_mode: false, parent: nil, element: nil, root: nil)
           @html_mode = html_mode
           @root = root
           if element
-            @parent_context = parent
+            # Without a parent the chain still ends in a root context, the
+            # walks in Renderer#render_text rely on that.
+            @parent_context = parent || self.class.new(html_mode:, root:)
             @element = element
-            @depth = (parent ? parent.depth : 0) + 1
+            @depth = @parent_context.depth + 1
           elsif parents.empty?
             # Root context: @element and @parent_context stay unset and
             # read as nil.

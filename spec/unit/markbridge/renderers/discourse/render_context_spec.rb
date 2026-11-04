@@ -78,6 +78,20 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       expect(context.find_parent(Markbridge::AST::Italic)).to be_nil
     end
 
+    it "puts a root context under an element without an enclosing context" do
+      # Renderer#render_text walks the chain until a context without an
+      # element, it does not check for a missing context.
+      document = Markbridge::AST::Document.new
+      context =
+        described_class.new(html_mode: true, element: Markbridge::AST::Bold.new, root: document)
+      parent = context.parent_context
+
+      expect(parent.element).to be_nil
+      expect(parent.depth).to eq(0)
+      expect(parent.html_mode?).to be true
+      expect(parent.root).to be(document)
+    end
+
     it "ignores the parents array when an element is given" do
       bold = Markbridge::AST::Bold.new
       italic = Markbridge::AST::Italic.new

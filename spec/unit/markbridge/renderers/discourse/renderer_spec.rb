@@ -77,6 +77,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   end
 
   describe "#render" do
+    it "renders text in a context that has an element but no enclosing context" do
+      context =
+        Markbridge::Renderers::Discourse::RenderContext.new(element: Markbridge::AST::Bold.new)
+
+      expect(renderer.render(Markbridge::AST::Text.new("*hi*"), context:)).to eq("\\*hi\\*")
+    end
+
     it "renders a document by rendering its children" do
       document = Markbridge::AST::Document.new
       text = Markbridge::AST::Text.new("hello")
