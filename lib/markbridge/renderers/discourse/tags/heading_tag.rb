@@ -10,7 +10,11 @@ module Markbridge
           # space after the prefix counts, so a run that is the whole
           # content is one too.
           CLOSING_SEQUENCE = /(?:\A|(?<=[ \t]))#+[ \t]*\z/
-          private_constant :CLOSING_SEQUENCE
+          # A heading is one line. A newline in its content, from a text
+          # node, is a soft break and becomes a space; LineBreakTag writes
+          # a hard break in a heading as <br>.
+          LINE_BREAK = /[ \t]*\n[ \t]*/
+          private_constant :CLOSING_SEQUENCE, :LINE_BREAK
 
           def render(element, interface)
             child_context = interface.with_parent(element)
@@ -23,7 +27,7 @@ module Markbridge
 
             prefix = "#" * element.level
 
-            "\n\n#{prefix} #{keep_trailing_hashes(content)}\n\n"
+            "\n\n#{prefix} #{keep_trailing_hashes(content.gsub(LINE_BREAK, " "))}\n\n"
           end
 
           private

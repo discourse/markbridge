@@ -18,5 +18,17 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::LineBreakTag do
         expect(tag.render(Markbridge::AST::LineBreak.new, interface)).to eq("<br>")
       end
     end
+
+    context "in a heading" do
+      let(:context) do
+        Markbridge::Renderers::Discourse::RenderContext.new(
+          [Markbridge::AST::Heading.new(level: 1)],
+        )
+      end
+
+      it "renders <br>, a heading is one line" do
+        expect(tag.render(Markbridge::AST::LineBreak.new, interface)).to eq("<br>")
+      end
+    end
   end
 end

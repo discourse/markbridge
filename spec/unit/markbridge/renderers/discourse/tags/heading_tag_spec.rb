@@ -60,6 +60,22 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::HeadingTag do
       expect(tag.render(element, interface)).to eq("\n\n# C#\n\n")
     end
 
+    it "puts the lines of the content on one line" do
+      element = Markbridge::AST::Heading.new(level: 2)
+      element << Markbridge::AST::Text.new("a \n b\nc")
+
+      expect(tag.render(element, interface)).to eq("\n\n## a b c\n\n")
+    end
+
+    it "writes a line break in the heading as <br>" do
+      element = Markbridge::AST::Heading.new(level: 2)
+      element << Markbridge::AST::Text.new("a")
+      element << Markbridge::AST::LineBreak.new
+      element << Markbridge::AST::Text.new("b")
+
+      expect(tag.render(element, interface)).to eq("\n\n## a<br>b\n\n")
+    end
+
     it "leaves a # in the middle of the heading alone" do
       element = Markbridge::AST::Heading.new(level: 1)
       element << Markbridge::AST::Text.new("a # b")
