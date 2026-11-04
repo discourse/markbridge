@@ -424,9 +424,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
         end
 
         it "keeps the plain href when punctuation and whitespace follow the URL" do
-          %w[, : ! ? ... ?!].each do |punctuation|
+          %w[, ! ? ... !! ?? ). ),].each do |punctuation|
             expect(render_between(nil, Markbridge::AST::Text.new("#{punctuation} next"))).to eq(
               "https://example.com",
+            )
+          end
+        end
+
+        it "writes a link when punctuation follows that markdown-it keeps in the link" do
+          # markdown-it keeps a `:` and the first character of a mixed run.
+          %w[: .) ?! ., ,,].each do |punctuation|
+            expect(render_between(nil, Markbridge::AST::Text.new("#{punctuation} next"))).to eq(
+              "[https://example.com](https://example.com)",
             )
           end
         end

@@ -25,8 +25,8 @@ module Markbridge
           # Text after a bare URL glues to it, unless it starts with
           # whitespace or with punctuation that is followed by whitespace
           # or nothing (see #glued_after).
-          GLUED_AFTER = /\A(?![.,:!?]*(?:[[:space:]]|\z))/
-          GLUED_AFTER_PAREN_OK = /\A(?![.,:!?)]*(?:[[:space:]]|\z))/
+          GLUED_AFTER = /\A(?!(?:\.+|!+|\?+|,)?(?:[[:space:]]|\z))/
+          GLUED_AFTER_PAREN_OK = /\A(?!\)?(?:\.+|!+|\?+|,)?(?:[[:space:]]|\z))/
           # Nodes that render as a block of their own, with line breaks
           # around them. Lists, rules and code blocks are in
           # RenderingInterface#block_context?.
@@ -124,9 +124,11 @@ module Markbridge
           # The text after the URL may start with punctuation that ends a
           # sentence: markdown-it (linkify) and cmark-gfm both leave it out
           # of the link, as long as whitespace or the end of the text
-          # follows. A `)` only when the href has no parenthesis of its
-          # own: both parsers count them and keep a `)` that closes one
-          # in the link.
+          # follows. That is one `,`, or a run of `.`, `!` or `?`.
+          # markdown-it keeps a `:` in the link, and the first character of
+          # a mixed run like `.)` or `?!`. A `)` may come first, but only
+          # when the href has no parenthesis of its own: both parsers count
+          # them and keep a `)` that closes one in the link.
           def glued_after(href)
             href.match?(/[()]/) ? GLUED_AFTER : GLUED_AFTER_PAREN_OK
           end
