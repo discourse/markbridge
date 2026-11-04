@@ -77,6 +77,17 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   end
 
   describe "#render" do
+    it "is at no child outside render_children" do
+      expect(renderer.current_child?(Markbridge::AST::Text.new("x"))).to be(false)
+    end
+
+    it "is at no child when the reported position is past the end" do
+      parent = Markbridge::AST::Paragraph.new << Markbridge::AST::Text.new("x")
+      allow(renderer).to receive_messages(child_parent: parent, child_index: 3)
+
+      expect(renderer.current_child?(parent.children.first)).to be(false)
+    end
+
     it "renders text in a context that has an element but no enclosing context" do
       context =
         Markbridge::Renderers::Discourse::RenderContext.new(element: Markbridge::AST::Bold.new)
@@ -411,6 +422,44 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   end
 
   describe "#render_children" do
+    it "forgets the lists of the outer level in a nested level" do
+      outer =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        )
+      inner =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("b")
+        )
+      wrapper = Class.new(Markbridge::AST::Element).new << inner
+      document = Markbridge::AST::Document.new << outer << wrapper
+
+      expect(renderer.render(document)).not_to include("<!---->")
+    end
+
+    it "knows no previous list for a list that a tag renders on its own" do
+      # The list is not the child that render_children is at, the state
+      # of that level is not about it.
+      first =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        )
+      second =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("b")
+        )
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new do |_element, interface|
+          interface.render_node(second)
+        end,
+      )
+      document = Markbridge::AST::Document.new << first << Markbridge::AST::Bold.new
+
+      expect(described_class.new(tag_library: library).render(document)).not_to include("<!---->")
+    end
+
     it "knows the position of the child it renders, also after a nested call" do
       positions = []
       renderer_with_tag = nil

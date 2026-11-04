@@ -364,6 +364,15 @@ mutation:
     # escape every source that needs it. `src&.match?` is used only there.
     - "if{condition=csend{receiver=lvar{value=src} selector=match?}}"
 
+    # Renderer#render_children's `elsif @previous_list && part.match?(VISIBLE)`.
+    # Without a list to forget, setting @previous_list to nil changes
+    # nothing, so `elsif part.match?(VISIBLE)` is equivalent. The check
+    # in front saves a regex on every rendered child; render_only in
+    # corpus_bench.rb is 10 to 15 percent slower without it. The pattern
+    # names the right side: an instance variable name has an @, which the
+    # pattern language does not take. `part.match?` is used only there.
+    - "if{condition=and{right=send{receiver=lvar{value=part} selector=match?}}}"
+
     # UrlTag#bare_url's `blank?(text) ? href_as_text(...) : text`. The
     # rendered text of a bare URL is the escaped href, so rendering the
     # href as text every time gives the same label; the branch only

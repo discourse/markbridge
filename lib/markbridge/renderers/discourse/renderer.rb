@@ -107,7 +107,11 @@ module Markbridge
         #   end
         def render_children(node, context:)
           result = +""
+          outer_parent = @child_parent
           outer_index = @child_index
+          outer_list = @previous_list
+          @child_parent = node
+          @previous_list = nil
           index = -1
           node.children.each do |child|
             @child_index = (index += 1)
@@ -130,10 +134,28 @@ module Markbridge
             end
 
             result << part
+
+            # Remembers the last list among these children for
+            # #previous_list. Text after it with something other than
+            # whitespace in it keeps two lists apart; a child that renders
+            # to nothing never gets here.
+            if child.is_a?(AST::List)
+              @previous_list = child
+            elsif @previous_list && part.match?(VISIBLE)
+              @previous_list = nil
+            end
           end
+          @child_parent = outer_parent
           @child_index = outer_index
+          @previous_list = outer_list
           result
         end
+
+        # The element whose children #render_children is rendering right
+        # now. Unlike the parent chain of the context it also knows an
+        # element without a tag of its own, which never goes on the chain.
+        # @return [AST::Element, nil]
+        attr_reader :child_parent
 
         # The position of the child that #render_children is rendering
         # right now, among the children of its parent. A nested call
@@ -145,6 +167,25 @@ module Markbridge
         # @return [Integer, nil]
         attr_reader :child_index
 
+        # The last list among the siblings in front of +element+, when
+        # nothing but whitespace or nodes that rendered to nothing came
+        # after it. nil when there is none, or when +element+ is not the
+        # child that #render_children is rendering right now.
+        # @param element [AST::Node]
+        # @return [AST::List, nil]
+        def previous_list(element)
+          @previous_list if current_child?(element)
+        end
+
+        # Whether +element+ is the child that #render_children is
+        # rendering right now. The state above describes that child only.
+        # @param element [AST::Node]
+        # @return [Boolean]
+        def current_child?(element)
+          parent = child_parent
+          !parent.nil? && parent.children.at(child_index).equal?(element)
+        end
+
         private
 
         # Inserted between sibling outputs when their adjacent characters
@@ -153,6 +194,8 @@ module Markbridge
         # in rendered output but breaks the delimiter run during Markdown
         # parsing.
         EMPHASIS_BOUNDARY = "<!---->"
+        # Something other than whitespace.
+        VISIBLE = /[^[:space:]]/
         # A punctuation character or a symbol right at the search start,
         # which is what CommonMark's flanking rules count as punctuation
         # (ASCII and Unicode alike), as markdown-it and cmark-gfm do.
@@ -271,6 +314,7 @@ module Markbridge
             .pack("C*")
             .freeze
         private_constant :EMPHASIS_BOUNDARY,
+                         :VISIBLE,
                          :PUNCTUATION_AT,
                          :FLANKING_DELIMITERS,
                          :BACKSLASH,
