@@ -61,7 +61,8 @@ end
 | `find_parent(klass)` | Walk ancestors for a specific class |
 | `has_parent?(klass)` | Boolean ancestor check |
 | `count_parents(klass)` | How deep a specific ancestor is (nested lists, quotes) |
-| `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset)` | The neighbours of an element among the children of its parent |
+| `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset:)` | The neighbors of an element among the children of its parent |
+| `previous_list(element)` | The last list in front of the element with nothing visible between them |
 | `wrap_inline(content, markers)` | Wrap inline content with collapsing markers |
 | `block_context?(element)` | Block vs. inline position |
 | `html_mode?` | True inside a CommonMark HTML block — Tag must emit raw HTML or wrap output as a Markdown island (`\n\n…\n\n`) |
