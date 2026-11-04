@@ -27,7 +27,21 @@ module Markbridge
           # or nothing (see #glued_after).
           GLUED_AFTER = /\A(?![.,:!?]*(?:[[:space:]]|\z))/
           GLUED_AFTER_PAREN_OK = /\A(?![.,:!?)]*(?:[[:space:]]|\z))/
+          # Nodes that render as a block of their own, with line breaks
+          # around them. Lists, rules and code blocks are in
+          # RenderingInterface#block_context?.
+          BLOCKS = [
+            AST::Paragraph,
+            AST::Quote,
+            AST::Heading,
+            AST::Align,
+            AST::Details,
+            AST::Table,
+            AST::Poll,
+            AST::Event,
+          ].freeze
           private_constant :ALLOWED_SCHEMES,
+                           :BLOCKS,
                            :SCHEME_LIKE,
                            :GLUED_BEFORE,
                            :GLUED_AFTER,
@@ -48,7 +62,7 @@ module Markbridge
               # that render to nothing (e.g. an empty formatting child)
               # or to whitespace only, which wrap_inline would leave
               # unlinked.
-              bare_url(element, href, text, interface)
+              bare_url(element:, href:, text:, interface:)
             else
               interface.wrap_inline(text, "[", "](#{LinkDestination.escape(href)})")
             end
@@ -76,24 +90,35 @@ module Markbridge
           # time would give the same label, reusing +text+ saves a Text
           # node and a second escape (a quarter of the time of a glued
           # link).
-          def bare_url(element, href, text, interface)
+          def bare_url(element:, href:, text:, interface:)
             glued =
-              glued?(interface.previous_sibling(element), GLUED_BEFORE) ||
-                glued?(interface.next_sibling(element), glued_after(href))
+              glued?(interface.previous_sibling(element), edge: GLUED_BEFORE, interface:) ||
+                glued?(interface.next_sibling(element), edge: glued_after(href), interface:)
             return href unless glued
 
-            label = blank?(text) ? href_as_text(element, href, interface) : text
+            label = blank?(text) ? href_as_text(element:, href:, interface:) : text
             "[#{label}](#{LinkDestination.escape(href)})"
           end
 
-          def href_as_text(element, href, interface)
+          def href_as_text(element:, href:, interface:)
             interface.render_node(AST::Text.new(href), context: interface.with_parent(element))
           end
 
-          # Whether the neighbouring +node+ is text that would stop the
-          # Markdown parser from linking the bare URL.
-          def glued?(node, edge)
-            node.instance_of?(AST::Text) && node.text.match?(edge)
+          # Whether the neighboring +node+ would stop the Markdown parser
+          # from linking the bare URL, or would become part of the link.
+          # Text decides by the character at its +edge+. A line break or a
+          # block starts a line of its own. Any other node is written right
+          # next to the URL (inline code, emphasis, an image, ...), and the
+          # link form is the one that works next to all of them.
+          def glued?(node, edge:, interface:)
+            case node
+            when nil, AST::LineBreak
+              false
+            when AST::Text, AST::MarkdownText
+              node.text.match?(edge)
+            else
+              !BLOCKS.any? { |block| node.is_a?(block) } && !interface.block_context?(node)
+            end
           end
 
           # The text after the URL may start with punctuation that ends a
