@@ -50,7 +50,7 @@ A line break is stored as `<br/>` followed by a newline in the next text node (`
 | `<EMAIL>` | `[text](mailto:addr)` | `AST::Url` |
 | `<IMG>` | `![](src)` | `AST::Image` |
 | `<ATTACHMENT>` | Discourse upload syntax | `AST::Attachment` |
-| `<QUOTE>` | `[quote]…[/quote]` | `AST::Quote` |
+| `<QUOTE>` | `[quote="name"]…[/quote]`; without attribution `> …`, or `[quote]…[/quote]` around a quote with attribution | `AST::Quote` |
 | `<LIST>` | `- item` / `1. item` | `AST::List` |
 | `<LI>` | List item | `AST::ListItem` |
 | `<TABLE>`, `<TR>`, `<TD>` | GFM table | `AST::Table` |
