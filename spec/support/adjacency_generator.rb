@@ -9,8 +9,9 @@
 # Two families of cases:
 #
 # - Inline pairs: a left node and a right node, each with a character
-#   class at the edge that faces the other, in one of five positions
-#   (inside a paragraph, at the start of a line, in a list item, in a
+#   class at the edge that faces the other, in one of nine positions
+#   (inside a paragraph, at the start or the end of a line, right after a
+#   block, inside strong emphasis, in a heading, in a list item, in a
 #   link label, in a quote). Ids look like `paragraph/text(*)+bold(a)`.
 # - Block pairs: two blocks (two lists, a quote, a code block, a heading)
 #   with something or nothing between them, or a list followed by text,
@@ -70,6 +71,7 @@ module AdjacencyGenerator
   RELATIVE_HREF = "/relative/path"
   ADDRESS = "alice@example.com"
   IMAGE_SRC = "https://example.com/image.png"
+  UPLOAD = "image.png"
 
   # A node kind with the character at the edge that faces its neighbor.
   # +edge+ is nil for the kinds whose content is fixed.
@@ -99,8 +101,23 @@ module AdjacencyGenerator
       end
     end
 
-  EDGED_KINDS = %w[text markdown bold italic strike code link email image].freeze
-  FIXED_KINDS = %w[url relative break empty untagged].freeze
+  EDGED_KINDS = %w[
+    text
+    markdown
+    bold
+    italic
+    strike
+    underline
+    sup
+    sub
+    spoiler
+    color
+    code
+    link
+    email
+    image
+  ].freeze
+  FIXED_KINDS = %w[url relative mention upload break empty untagged].freeze
 
   VARIANTS =
     EDGED_KINDS
@@ -126,6 +143,16 @@ module AdjacencyGenerator
       AST::Italic.new << AST::Text.new(content)
     when "strike"
       AST::Strikethrough.new << AST::Text.new(content)
+    when "underline"
+      AST::Underline.new << AST::Text.new(content)
+    when "sup"
+      AST::Superscript.new << AST::Text.new(content)
+    when "sub"
+      AST::Subscript.new << AST::Text.new(content)
+    when "spoiler"
+      AST::Spoiler.new << AST::Text.new(content)
+    when "color"
+      AST::Color.new(color: "red") << AST::Text.new(content)
     when "code"
       AST::Code.new << AST::Text.new(content)
     when "link"
@@ -138,6 +165,10 @@ module AdjacencyGenerator
       AST::Url.new(href: HREF) << AST::Text.new(HREF)
     when "relative"
       AST::Url.new(href: RELATIVE_HREF) << AST::Text.new(RELATIVE_HREF)
+    when "mention"
+      AST::Mention.new(name: "alice")
+    when "upload"
+      AST::Upload.new(sha1: "abc", filename: UPLOAD, type: :image, alt: "x")
     when "break"
       AST::LineBreak.new
     when "empty"
@@ -162,6 +193,21 @@ module AdjacencyGenerator
           [AST::Text.new("x"), AST::LineBreak.new, left, right, AST::Text.new(" y")],
         )
       end,
+    "line-end" =>
+      lambda do |left, right|
+        AST::Document.new(
+          [AST::Text.new("x "), left, right, AST::LineBreak.new, AST::Text.new("y")],
+        )
+      end,
+    "after-block" =>
+      lambda do |left, right|
+        list = AST::List.new << (AST::ListItem.new << AST::Text.new("x"))
+        AST::Document.new([list, left, right, AST::Text.new(" y")])
+      end,
+    "strong" => ->(left, right) { AST::Document.new([AST::Bold.new << left << right]) },
+    "heading" => ->(left, right) do
+      AST::Document.new([AST::Heading.new(level: 2) << left << right])
+    end,
     "item" => ->(left, right) do
       AST::Document.new([AST::List.new << (AST::ListItem.new << left << right)])
     end,

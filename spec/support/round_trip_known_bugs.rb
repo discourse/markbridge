@@ -19,7 +19,7 @@ module RoundTripKnownBugs
   end
 
   # Neighbors that do not glue to a bare URL: whitespace, a line break,
-  # an element that renders to nothing, and a `(` in front of it.
+  # and a `(` in front of it.
   NOT_GLUED = %w[
     text(space)
     text(dot-space)
@@ -28,7 +28,6 @@ module RoundTripKnownBugs
     markdown(dot-space)
     markdown(nbsp)
     break
-    empty
   ].freeze
 
   RELATIVE_BARE_URL_CASES =
@@ -38,6 +37,24 @@ module RoundTripKnownBugs
           ["#{position}/#{neighbor}+relative", "#{position}/relative+#{neighbor}"]
         end << "#{position}/text(()+relative"
       end
+      .freeze
+
+  # The left emphasis may end in anything but whitespace or a star, the
+  # right one starts with punctuation or a symbol. A star at the edge
+  # takes the HTML fallback, which does not merge.
+  STRONG_WITH_TWO_EM_CASES =
+    (AdjacencyGenerator::EDGES.keys - %w[space dot-space *])
+      .product(AdjacencyGenerator::EDGES.keys - %w[a 1 space nbsp 漢 *])
+      .map { |left, right| "strong/italic(#{left})+italic(#{right})" }
+      .freeze
+
+  BREAK_IN_STRONG_CASES =
+    AdjacencyGenerator::EDGES.keys.map { |edge| "strong/break+bold(#{edge})" }.freeze
+
+  BBCODE_COLON_CASES =
+    %w[item quote]
+      .product(%w[break empty], %w[underline spoiler])
+      .map { |position, left, wrapper| "#{position}/#{left}+#{wrapper}(:)" }
       .freeze
 
   TWO_LISTS_IN_AN_ITEM_CASES =
@@ -57,6 +74,21 @@ module RoundTripKnownBugs
         "which makes the item loose",
       cases: TWO_LISTS_IN_AN_ITEM_CASES,
     ),
+    entry(
+      "strong emphasis whose content starts with emphasis and ends with emphasis that starts " \
+        "with punctuation runs the markers together, `***x*<!---->*.***` does not cook as strong",
+      cases: STRONG_WITH_TWO_EM_CASES,
+    ),
+    entry(
+      "a line break at the start of strong emphasis that falls back to <strong> leaves the tag " \
+        "alone on its line, which starts an HTML block",
+      cases: BREAK_IN_STRONG_CASES,
+    ),
+    entry(
+      "an underline or a spoiler whose content starts with `:`, at the start of a line with " \
+        "nothing after it, reads as a link reference definition and disappears",
+      cases: BBCODE_COLON_CASES,
+    ),
   ].freeze
 
   STRUCTURE = [
@@ -64,47 +96,37 @@ module RoundTripKnownBugs
       "two line breaks in a row inside a list item (the first one may end an inline wrapper) " \
         "become a blank line, which makes the list loose",
       cases: [
-        37,
-        194,
-        638,
-        734,
-        781,
-        920,
-        1009,
-        1062,
-        1128,
-        1159,
-        1300,
-        1502,
-        1508,
-        1539,
-        1651,
-        1700,
-        1730,
-        1844,
-        1876,
-        2107,
-        2189,
-        2212,
-        2241,
-        2251,
-        2347,
-        2356,
-        2460,
+        524,
+        554,
+        1104,
+        1266,
+        1423,
+        1560,
+        1594,
+        1920,
+        1921,
+        1982,
+        2087,
+        2229,
+        2263,
+        2272,
+        2280,
+        2485,
+        2494,
         2574,
-        2637,
-        2642,
-        2650,
-        2670,
-        2682,
-        2691,
-        2705,
-        2749,
-        2808,
-        2844,
-        2947,
-        2965,
+        2582,
+        2696,
       ],
+    ),
+    entry(
+      "a backslash in front of trailing whitespace inside emphasis ends up in front of the " \
+        "closing marker and escapes it",
+      cases: [1674],
+    ),
+    entry(
+      "whitespace-only text after a block is written as leading spaces of the next line, " \
+        "which pulls the paragraph after it into the block",
+      cases: [1841],
     ),
   ].freeze
 
