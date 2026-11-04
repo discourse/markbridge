@@ -5,6 +5,10 @@ module Markbridge
     module Discourse
       module Tags
         class CodeTag < Tag
+          BACKTICKS = /`+/
+          TILDES = /~+/
+          private_constant :BACKTICKS, :TILDES
+
           def render(element, interface)
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
@@ -34,8 +38,7 @@ module Markbridge
           # starts and ends with a space gets the same padding, because
           # CommonMark strips one space from each end of such a span.
           def render_inline(content)
-            longest_run = content.scan(/`+/).map(&:length).max || 0
-            delimiter = "`" * (longest_run + 1)
+            delimiter = "`" * (longest_run(content, BACKTICKS) + 1)
             padding = " " if needs_padding?(content)
 
             "#{delimiter}#{padding}#{content}#{padding}#{delimiter}"
@@ -69,17 +72,21 @@ module Markbridge
           end
 
           def calculate_fence(content)
-            max_backticks = content.scan(/`+/).map(&:length).max || 0
-            max_tildes = content.scan(/~+/).map(&:length).max || 0
-
-            required_backticks = [3, max_backticks + 1].max
-            required_tildes = [3, max_tildes + 1].max
+            required_backticks = [3, longest_run(content, BACKTICKS) + 1].max
+            required_tildes = [3, longest_run(content, TILDES) + 1].max
 
             if required_backticks <= required_tildes
               "`" * required_backticks
             else
               "~" * required_tildes
             end
+          end
+
+          # The length of the longest run that +pattern+ finds in
+          # +content+, 0 when there is none. A delimiter or a fence has to
+          # be longer than that.
+          def longest_run(content, pattern)
+            content.scan(pattern).map(&:length).max || 0
           end
         end
       end
