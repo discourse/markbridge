@@ -126,7 +126,7 @@ module Markbridge
             if last_byte
               action =
                 JOIN_ACTIONS.getbyte((BYTE_CLASSES.getbyte(last_byte) << 8) + part.getbyte(0))
-              join(result, part, last_byte, action) unless action == NOTHING
+              join(result:, part:, last_byte:, action:, context:) unless action == NOTHING
             end
 
             result << part
@@ -297,7 +297,7 @@ module Markbridge
         # Carries out the action the join table picked for the boundary
         # between +result+ and +part+. NOTHING never gets here — the
         # caller keeps it out — so the last branch is ESCAPE_BANG.
-        def join(result, part, last_byte, action)
+        def join(result:, part:, last_byte:, action:, context:)
           if action == BOUNDARY
             result << EMPHASIS_BOUNDARY
           elsif action == CHECK_AFTER
@@ -306,10 +306,12 @@ module Markbridge
           elsif action == CHECK_BEFORE
             index = result.byterindex(FLANKING_DELIMITERS.fetch(last_byte))
             result << EMPHASIS_BOUNDARY if punctuation_at?(result, index:)
-          else
+          elsif !context.html_mode? && !escaped_bang?(result)
             # A `!` right in front of a link makes it an image. The escaper
             # leaves a lone `!` alone because it cannot see the next node.
-            result.insert(-2, "\\") unless escaped_bang?(result)
+            # Inside an HTML block nothing is Markdown, a backslash would
+            # show. Byte offsets: the `!` is the last byte.
+            result.bytesplice(result.bytesize - 1, 0, "\\")
           end
         end
 
