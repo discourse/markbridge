@@ -30,15 +30,14 @@ module Markbridge
             end
 
             # A list right inside a list item starts on the line after the
-            # item text, so the list stays tight. The blank line after it
-            # keeps whatever follows in the item from becoming a
-            # continuation line of the last nested item. Everywhere else
-            # (also inside a quote or an aligned block that sits in an
-            # item) the list is a block with blank lines on both sides.
+            # item text, so the list stays tight. ListItemTag takes care of
+            # what follows it in the item. Everywhere else (also inside a
+            # quote or an aligned block that sits in an item) the list is a
+            # block with blank lines on both sides.
             parent = interface.context.element
             list =
               if parent.is_a?(AST::ListItem) || parent.is_a?(AST::List)
-                "\n#{content}\n"
+                "\n#{content}"
               else
                 "\n\n#{content}\n\n"
               end

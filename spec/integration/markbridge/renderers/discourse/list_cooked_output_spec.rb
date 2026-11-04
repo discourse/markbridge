@@ -62,6 +62,22 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
     expect(html.at_css("ul > li").text).to include("c")
   end
 
+  it "keeps the outer list tight when an item has text after its nested list" do
+    html =
+      Nokogiri::HTML5.fragment(cook_html("<ul><li>x<ul><li>a</li></ul>tail</li><li>y</li></ul>"))
+
+    expect(html.css("p")).to be_empty
+    expect(html.css("ul > li > ul > li").map(&:text)).to eq(["a"])
+    expect(html.at_css("ul > li").text).to include("tail")
+  end
+
+  it "keeps the outer list tight when a line break stands between the nested list and the text" do
+    html = fragment("[list][*]x[list][*]a[/list]\n[br]\ntail[*]y[/list]")
+
+    expect(html.css("p")).to be_empty
+    expect(html.css("ul > li > ul > li").map(&:text)).to eq(["a"])
+  end
+
   it "keeps text after a list inside a quote out of the last list item" do
     html = fragment("[list][*]a[quote][list][*]b[/list]c[/quote][/list]")
 

@@ -225,13 +225,13 @@ RSpec.describe "BBCode to Markdown Conversion" do
             "[list][*]outer[list][*][code]  x[/code][/list]after[/list]",
           )
 
-        expect(result.markdown).to eq("- outer\n  - ```\n      x\n    ```\n\n  after")
+        expect(result.markdown).to eq("- outer\n  - ```\n      x\n    ```\n  <!---->\n  after")
       end
 
       it "keeps text after a nested list in the outer item" do
         result = Markbridge.bbcode_to_markdown("[list][*]a[list=1][*]b[/list]c[/list]")
 
-        expect(result.markdown).to eq("- a\n  1. b\n\n  c")
+        expect(result.markdown).to eq("- a\n  1. b\n  <!---->\n  c")
       end
 
       it "keeps text after a list inside a quote inside an item out of the last list item" do

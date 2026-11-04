@@ -65,9 +65,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
 
       expect(result).to start_with("\n")
       expect(result).not_to start_with("\n\n")
-      # One blank line after the list, so text that follows it in the
-      # same item starts its own paragraph.
-      expect(result).to end_with("- nested item\n\n")
+      # No blank line after the list, it would make the outer list
+      # loose. ListItemTag ends the list in front of text that follows.
+      expect(result).to end_with("- nested item\n")
+      expect(result).not_to end_with("\n\n")
     end
 
     it "handles document as parent in context" do
@@ -147,7 +148,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
 
       result = tag.render(list, interface)
 
-      expect(result).to eq("\n- inner\n\n")
+      expect(result).to eq("\n- inner\n")
     end
 
     it "treats a list inside a ListItem subclass as nested" do
@@ -159,7 +160,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       item << Markbridge::AST::Text.new("inner")
       list << item
 
-      expect(tag.render(list, interface)).to eq("\n- inner\n\n")
+      expect(tag.render(list, interface)).to eq("\n- inner\n")
     end
 
     it "treats a list inside a List subclass as nested" do
@@ -171,7 +172,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       item << Markbridge::AST::Text.new("inner")
       list << item
 
-      expect(tag.render(list, interface)).to eq("\n- inner\n\n")
+      expect(tag.render(list, interface)).to eq("\n- inner\n")
     end
 
     it "treats a list inside a quote inside a list item as a block" do
@@ -205,7 +206,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
 
       # A nested item does not indent itself; the item that holds the
       # nested list indents its whole content.
-      expect(tag.render(inner_list, interface)).to eq("\n- nested\n\n")
+      expect(tag.render(inner_list, interface)).to eq("\n- nested\n")
     end
 
     context "with a list of the same kind in front of it" do

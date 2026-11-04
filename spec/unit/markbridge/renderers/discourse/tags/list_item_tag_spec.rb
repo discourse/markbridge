@@ -162,6 +162,93 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListItemTag do
       end
     end
 
+    context "with content after a nested list" do
+      it "ends the nested list with a comment line in front of the text" do
+        # A blank line would make the outer list loose, nothing at all
+        # would make the text a continuation line of the last nested item.
+        node = item(text("x"), list(items: [item(text("a"))]), text("tail"))
+
+        expect(tag.render(node, interface_for(list))).to eq("- x\n  - a\n  <!---->\n  tail\n")
+      end
+
+      it "drops whitespace and line breaks between the nested list and the text" do
+        node =
+          item(
+            text("x"),
+            list(items: [item(text("a"))]),
+            text(" \n"),
+            Markbridge::AST::LineBreak.new,
+            Markbridge::AST::Bold.new << text("tail"),
+          )
+
+        expect(tag.render(node, interface_for(list))).to eq("- x\n  - a\n  <!---->\n  **tail**\n")
+      end
+
+      it "lets text that starts with a newline bring the line break after the comment" do
+        node = item(text("x"), list(items: [item(text("a"))]), Markbridge::AST::LineBreak.new)
+        node << Markbridge::AST::MarkdownText.new("\ntail")
+
+        expect(tag.render(node, interface_for(list))).to eq("- x\n  - a\n  <!---->\n  tail\n")
+      end
+
+      it "writes no comment when only whitespace follows the nested list" do
+        node = item(text("x"), list(items: [item(text("a"))]), text(" \n "))
+
+        expect(tag.render(node, interface_for(list))).to eq("- x\n  - a\n")
+      end
+
+      it "writes the comment once for several children after the nested list" do
+        node =
+          item(
+            text("x"),
+            list(items: [item(text("a"))]),
+            text("t"),
+            Markbridge::AST::Bold.new << text("u"),
+          )
+
+        expect(tag.render(node, interface_for(list))).to eq("- x\n  - a\n  <!---->\n  t**u**\n")
+      end
+
+      it "treats subclasses of the text and line break nodes the same way" do
+        text_class = Class.new(Markbridge::AST::Text)
+        markdown_class = Class.new(Markbridge::AST::MarkdownText)
+        break_class = Class.new(Markbridge::AST::LineBreak)
+        node =
+          item(
+            text("x"),
+            list(items: [item(text("a"))]),
+            text_class.new(" "),
+            break_class.new,
+            markdown_class.new("\ntail"),
+          )
+
+        expect(tag.render(node, interface_for(list))).to eq("- x\n  - a\n  <!---->\n  tail\n")
+      end
+
+      it "writes no comment between two nested lists" do
+        node =
+          item(
+            text("x"),
+            list(items: [item(text("a"))]),
+            list(ordered: true, items: [item(text("b"))]),
+          )
+
+        expect(tag.render(node, interface_for(list))).to eq("- x\n  - a\n  1. b\n")
+      end
+
+      it "ends the second of two nested lists in front of the text" do
+        node =
+          item(
+            text("x"),
+            list(items: [item(text("a"))]),
+            list(ordered: true, items: [item(text("b"))]),
+            text("t"),
+          )
+
+        expect(tag.render(node, interface_for(list))).to eq("- x\n  - a\n  1. b\n  <!---->\n  t\n")
+      end
+    end
+
     # Iterating the children by hand would lose the boundary rule that
     # Renderer#render_children applies between siblings.
     it "keeps the boundary comment between two emphasis siblings" do
