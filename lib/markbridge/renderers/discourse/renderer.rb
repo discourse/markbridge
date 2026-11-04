@@ -153,6 +153,10 @@ module Markbridge
         # in rendered output but breaks the delimiter run during Markdown
         # parsing.
         EMPHASIS_BOUNDARY = "<!---->"
+        # A punctuation character or a symbol right at the search start,
+        # which is what CommonMark's flanking rules count as punctuation
+        # (ASCII and Unicode alike), as markdown-it and cmark-gfm do.
+        PUNCTUATION_AT = /\G[\p{P}\p{S}]/
         # Delimiters that open and close only where CommonMark's flanking
         # rules allow it: emphasis (* _) and strikethrough (~), with the
         # pattern that finds the first byte outside a run of each.
@@ -160,10 +164,12 @@ module Markbridge
         BACKSLASH = 92
 
         # What a byte is to the join rules. WORD: ASCII letters and
-        # digits, and every non-ASCII byte (a few Unicode punctuation marks
-        # are then handled like letters, which costs a comment that changes
-        # nothing). PUNCTUATION: ASCII punctuation as CommonMark defines
-        # it, the backslash included, which is what makes an escaped
+        # digits, and every non-ASCII byte. On the side of the join away
+        # from a delimiter run, Unicode punctuation then goes through the
+        # check like a letter, which at worst costs a comment that changes
+        # nothing; on the side of the run the check reads the whole
+        # character (#punctuation_at?). PUNCTUATION: ASCII punctuation as
+        # CommonMark defines it, the backslash included, which is what makes an escaped
         # character at the edge of an emphasis count as punctuation. The
         # five bytes the rules name get a class of their own, so a class
         # tells them apart without a second comparison; they stay
@@ -265,6 +271,7 @@ module Markbridge
             .pack("C*")
             .freeze
         private_constant :EMPHASIS_BOUNDARY,
+                         :PUNCTUATION_AT,
                          :FLANKING_DELIMITERS,
                          :BACKSLASH,
                          :OTHER,
@@ -294,9 +301,11 @@ module Markbridge
           if action == BOUNDARY
             result << EMPHASIS_BOUNDARY
           elsif action == CHECK_AFTER
-            result << EMPHASIS_BOUNDARY if punctuation?(byte_after_run(part, part.getbyte(0)))
+            index = part.byteindex(FLANKING_DELIMITERS.fetch(part.getbyte(0)))
+            result << EMPHASIS_BOUNDARY if punctuation_at?(part, index:)
           elsif action == CHECK_BEFORE
-            result << EMPHASIS_BOUNDARY if punctuation?(byte_before_run(result, last_byte))
+            index = result.byterindex(FLANKING_DELIMITERS.fetch(last_byte))
+            result << EMPHASIS_BOUNDARY if punctuation_at?(result, index:)
           else
             # A `!` right in front of a link makes it an image. The escaper
             # leaves a lone `!` alone because it cannot see the next node.
@@ -304,27 +313,18 @@ module Markbridge
           end
         end
 
-        # A delimiter and the two bytes the join names are punctuation
-        # too; they have a class of their own only so that the table can
-        # tell them apart.
-        def punctuation?(byte)
-          return false if byte.nil?
+        # Whether the character at byte +index+ of +string+ is punctuation
+        # for the flanking rules. +index+ is the start of a character (the
+        # searches that find it match whole characters), nil when there is
+        # no character, which is no punctuation. The match is anchored at
+        # +index+ and reads the whole character, so it needs no copy.
+        # @param string [String]
+        # @param index [Integer, nil]
+        # @return [Boolean]
+        def punctuation_at?(string, index:)
+          return false if index.nil?
 
-          BYTE_CLASSES.getbyte(byte) >= PUNCTUATION
-        end
-
-        # The first byte after the run of +byte+ that starts +part+, nil
-        # when the part is nothing but the run.
-        def byte_after_run(part, byte)
-          index = part.byteindex(FLANKING_DELIMITERS.fetch(byte))
-          index && part.getbyte(index)
-        end
-
-        # The byte in front of the run of +byte+ that ends +result+, nil
-        # when the run reaches the start of the buffer.
-        def byte_before_run(result, byte)
-          index = result.byterindex(FLANKING_DELIMITERS.fetch(byte))
-          index && result.getbyte(index)
+          !string.byteindex(PUNCTUATION_AT, index).nil?
         end
 
         # Whether the `!` at the end of +result+ is escaped. Only an odd
