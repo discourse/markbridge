@@ -249,6 +249,13 @@ matcher:
 
 mutation:
   ignore_patterns:
+    # BBCode UrlHandler#content_href peeks at the two tokens after
+    # [url]. `peek_ahead(3)` or `peek_ahead(167)` only buffer more
+    # tokens, the first two stay the same and the buffer is read in
+    # order, so the result is the same. It is the only `&.peek_ahead`
+    # call (csend), the others use a plain `.peek_ahead`.
+    - "csend{receiver=lvar{value=tokens} selector=peek_ahead}"
+
     # Bucket A bound-check equivalences. @current_pos, pos, and
     # next_pos are all position integers ≤ their *_length bound,
     # so the source `pos >= input_length` / `next_pos < @inline_len`

@@ -94,6 +94,10 @@ RSpec.describe "bare URL cooked output" do
         expect(markdown(bbcode)).to eq("see[#{BARE_URL}](#{BARE_URL}) now")
       end
 
+      it "links it when the BBCode has the URL only as text" do
+        expect_linked("see[url]#{BARE_URL}[/url] now", text: "see#{BARE_URL} now")
+      end
+
       it "links it with text after it" do
         expect_linked("see {url}now", text: "see #{BARE_URL}now")
       end
