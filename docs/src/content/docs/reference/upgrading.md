@@ -23,6 +23,11 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - `[url]https://example.com[/url]` without an option takes its href from the text. The URL had a nil href before and was written as escaped plain text, so `a_b` in it ended up as `a%5C_b` in the cooked link.
 - Strikethrough whose content starts or ends with `~` is written as `<s>…</s>`. As `~~~x~~` it did not close, and at the start of a line it opened a code fence.
 - The postprocessor clears whitespace-only lines before it collapses runs of blank lines, so the blank lines they leave are collapsed too.
+- A `[details]` block has a blank line after the opening tag and one before the closing tag. Without them a table at the end of the block took the `[/details]` line as a row, and a `---` at the start of the block made the opening tag a heading. Discourse reads the block the same with or without the blank lines.
+- The alt text of an upload and the filename of an attachment upload are escaped like a link label, as the alt text of an image already was: `![a\]b \*c\*|100x200](upload://pic.png)`.
+- What is inside an escaped HTML tag is escaped like any text. Only the `<` got a backslash before, and the tag was copied as it was: a backslash in an attribute was lost after cooking, an entity reference in it was decoded. Now `<a href="\*">` is written as `\<a href="\\\*">`.
+- Every character of a code fence at the start of a line gets a backslash, also for tildes (`\~\~\~` where it was `\~~~`), and the info string after the fence is escaped like any text. Before, `` ``` f&ouml; *x* `` kept its entity and emphasis.
+- A heading stays on one line: a newline in its text becomes a space, and a hard line break in a heading is written as `<br>`. Before, the text after the break left the heading.
 - `RenderingInterface` has `previous_sibling(element)`, `next_sibling(element)` and `sibling(element, offset:)`. For the element the renderer is rendering right now they look at the children of its parent, also when that parent has no tag of its own. For any other element they look at the children of the element on top of the parent chain, or of `RenderContext#root` when the chain is empty. `previous_list(element)` returns the last list in front of the element with nothing visible between them.
 
 ## Upgrading to 0.4.2
