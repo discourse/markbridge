@@ -121,7 +121,8 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 | `find_parent(klass)` | Walk up the ancestor chain for a specific AST class |
 | `has_parent?(klass)` | Boolean parent check |
 | `count_parents(klass)` | Depth of a specific ancestor type (useful for nested lists) |
-| `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset)` | The neighbours of an element among the children of its parent (nil at the edges) |
+| `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset:)` | The neighbors of an element among the children of its parent (nil at the edges) |
+| `previous_list(element)` | The last list in front of the element with nothing visible between them (nil when there is none) |
 | `wrap_inline(content, markers)` | Wrap inline content, collapsing adjacent markers cleanly |
 | `block_context?(element)` | True if the current position is a block context |
 | `html_mode?` | True inside a CommonMark HTML block — the Tag must emit raw HTML or wrap output as a Markdown island |
