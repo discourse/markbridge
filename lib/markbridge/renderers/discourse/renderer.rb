@@ -107,7 +107,10 @@ module Markbridge
         #   end
         def render_children(node, context:)
           result = +""
+          outer_index = @child_index
+          index = -1
           node.children.each do |child|
+            @child_index = (index += 1)
             part = render(child, context:)
             next if part.empty?
 
@@ -128,8 +131,19 @@ module Markbridge
 
             result << part
           end
+          @child_index = outer_index
           result
         end
+
+        # The position of the child that #render_children is rendering
+        # right now, among the children of its parent. A nested call
+        # sets it back when it returns, so a tag still finds its own
+        # position after it rendered its children. Only a hint for
+        # RenderingInterface#sibling, which checks it before use: a node
+        # rendered on its own, outside #render_children, sees the
+        # position of some other node.
+        # @return [Integer, nil]
+        attr_reader :child_index
 
         private
 
