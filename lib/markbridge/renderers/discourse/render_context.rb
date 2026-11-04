@@ -63,7 +63,7 @@ module Markbridge
         def parents
           result = []
           context = self
-          while context && (parent = context.element)
+          while (parent = context.element)
             result << parent
             context = context.parent_context
           end
@@ -105,13 +105,15 @@ module Markbridge
         # Find closest parent that is_a? klass (handles subclasses).
         # The chain walks are inlined in each query (instead of a shared
         # yielding helper) — these run several times per rendered text
-        # node, and a plain while loop avoids the block invocation.
+        # node, and a plain while loop avoids the block invocation. Every
+        # chain ends in a root context whose element is nil (see
+        # #initialize), so the walks stop there without a nil check.
         # @param klass [Class]
         # @return [AST::Element, nil] nil when no parent matches (implicit
         #   from the exhausted while loop)
         def find_parent(klass)
           context = self
-          while context && (parent = context.element)
+          while (parent = context.element)
             return parent if parent.is_a?(klass)
             context = context.parent_context
           end
@@ -123,7 +125,7 @@ module Markbridge
         def count_parents(klass)
           count = 0
           context = self
-          while context && (parent = context.element)
+          while (parent = context.element)
             count += 1 if parent.is_a?(klass)
             context = context.parent_context
           end
@@ -135,7 +137,7 @@ module Markbridge
         # @return [Boolean]
         def has_parent?(klass)
           context = self
-          while context && (parent = context.element)
+          while (parent = context.element)
             return true if parent.is_a?(klass)
             context = context.parent_context
           end
