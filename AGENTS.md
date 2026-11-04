@@ -227,19 +227,25 @@ expect(token).to match_tag_end("b")
   AST, the Markdown and the cooked HTML. The two specs below use it.
 - `spec/integration/markbridge/renderers/discourse/structure_roundtrip_spec.rb`
   builds nested documents with `AstGenerator` (`spec/support/`) from a
-  seed. 300 seeds by default; `STRUCTURE_SEEDS=3000 bundle exec rspec
-  <file>` runs more. A construct the generator leaves out because of an
-  open bug is marked with a comment that names the bug; the fix removes
-  the exclusion.
+  seed: every block and inline node kind the renderer has a tag for
+  (lists, quotes, tables, details, aligned blocks, headings, code,
+  emphasis, links, images, uploads, mentions, ...), with text made of
+  words, words with one of the adjacency character classes spliced in,
+  tricky tokens and lines from the CommonMark spec. 300 seeds by
+  default; `STRUCTURE_SEEDS=3000 bundle exec rspec <file>` runs more. A
+  construct the generator leaves out because of an open bug is marked
+  with a comment that names the bug; the fix removes the exclusion.
 - `spec/integration/markbridge/renderers/discourse/adjacency_roundtrip_spec.rb`
   puts two nodes next to each other on purpose (`AdjacencyGenerator`):
   every inline node kind with every character class at the edge that
-  faces its neighbor, in five positions, and block pairs (two lists with
-  whitespace, a line break or an empty element between them, a list
-  followed by text in an item, ...). CI runs a fixed sample of 2000 of
-  the 265,813 inline pairs (`ADJACENCY_SAMPLE=N` changes the size) plus
-  every block pair. A case id names the case: `paragraph/text(*)+bold(a)`
-  or `blocks/item/ul+space+ul`.
+  faces its neighbor, in nine positions (in a paragraph, at the start
+  or the end of a line, after a block, in strong emphasis, in a heading,
+  in a list item, in a link label, in a quote), and block pairs (two
+  lists with whitespace, a line break or an empty element between them,
+  a list followed by text in an item, ...). CI runs a fixed sample of
+  2000 of the 1,279,137 inline pairs (`ADJACENCY_SAMPLE=N` changes the size)
+  plus every block pair. A case id names the case:
+  `paragraph/text(*)+bold(a)` or `blocks/item/ul+space+ul`.
 - `spec/support/round_trip_known_bugs.rb` lists the cases and seeds that
   fail today, with a reason. Both specs
   run every listed case and fail when it starts to pass, so a fix
@@ -247,10 +253,12 @@ expect(token).to match_tag_end("b")
   right away gets an entry there, not an exclusion in a generator.
 - `bin/fuzz-render` runs every inline pair, every block pair and as many
   seeds as asked for outside RSpec (`--only pairs|blocks|trees`,
-  `--sample N`, `--seeds N`, `--all` to run the known bugs too) and
-  prints the shrunk reports;
-  `--output DIR` writes them to a file. The nightly `fuzz-render.yml`
-  workflow runs it and uploads the reports when a case fails.
+  `--sample N`, `--seeds N`, `--all` to run the known bugs too). Every
+  failure is shrunk, and failures whose shrunk trees have the same shape
+  are one group with one report, so a long run reads as a short list of
+  distinct bugs; `--output DIR` writes the reports to a file. The
+  nightly `fuzz-render.yml` workflow runs it and uploads the reports
+  when a case fails.
 - When a test is about structure (nesting, blank lines, indentation),
   assert on the cooked HTML (`spec/support/cooked_output.rb`), not on
   the exact Markdown string. A Markdown expectation written from the

@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "json"
+require_relative "adjacency_generator"
+
 # Builds random ASTs for the structure round-trip spec. Every choice comes
 # from +Random.new(seed)+, so the same seed always builds the same tree and
 # a failing example can be repeated from its seed alone.
@@ -22,6 +25,10 @@ class AstGenerator
 
   WORDS = %w[alice bob carol dave item note value entry].freeze
 
+  # One character per class, between or next to words. The classes are
+  # the ones the adjacency round-trip builds its cases from.
+  EDGE_CHARS = AdjacencyGenerator::EDGES.values.freeze
+
   # Tokens the escaper has to neutralize. They are placed in nested
   # positions on purpose: inside a list item or a quote they end up at the
   # start of a line, where CommonMark reads them as block markers.
@@ -42,7 +49,33 @@ class AstGenerator
     "- looks like a bullet",
     "1. looks like an ordered item",
     "# looks like a heading",
+    "    four spaces",
+    "\tone tab",
+    "a\nb",
+    "&amp;",
+    "<!-- c -->",
+    "\u200Bzero width",
   ].freeze
+
+  # The Markdown of the CommonMark spec examples, one line at a time:
+  # every construct the spec knows, as text the renderer must keep text.
+  # Lines with a URL, a mail address or an autolink stay out: Discourse
+  # links those in plain text on purpose, and the escaper keeps an
+  # autolink as it is.
+  LINKIFIED = %r{://|@|\b\w+\.(?:com|org|net|io|edu|gov|info|biz)\b|<[a-z][a-z0-9+.-]*:}i
+  COMMONMARK_LINES =
+    JSON
+      .parse(File.read(File.expand_path("../fixtures/commonmark_spec_0.31.2.json", __dir__)))
+      .flat_map { |example| example["markdown"].lines(chomp: true) }
+      .select { |line| line.match?(/[^[:space:]]/) && line.length <= 60 && !line.match?(LINKIFIED) }
+      .uniq
+      .freeze
+
+  # Texts with nothing visible in them. They stand between nodes, never
+  # first in a container. No newline among them: a newline next to a
+  # LineBreak is the known bug of two line breaks in a row (see the
+  # known bugs of the structure round-trip).
+  WHITESPACE_TEXTS = [" ", "  ", "\u00A0"].freeze
 
   # Lines for block code. Some carry leading spaces, some carry fence
   # characters, so the renderer has to widen the fence it picks.
@@ -84,7 +117,22 @@ class AstGenerator
     "/relative/path",
   ].freeze
 
-  INLINE_WRAPPERS = [AST::Bold, AST::Italic, AST::Strikethrough, AST::Url].freeze
+  INLINE_WRAPPERS = [
+    AST::Bold,
+    AST::Italic,
+    AST::Strikethrough,
+    AST::Url,
+    AST::Underline,
+    AST::Superscript,
+    AST::Subscript,
+    AST::Spoiler,
+    AST::Color,
+  ].freeze
+
+  # Leaves and links that need no edge character of their own.
+  INLINE_LEAVES = %i[image email mention upload].freeze
+
+  COLORS = %w[red #ff0000].freeze
 
   # Inline containers may nest this deep. Two levels are enough to put a
   # link inside emphasis without making the tree hard to read.
@@ -138,9 +186,9 @@ class AstGenerator
 
   # @return [Markbridge::AST::Node, nil]
   def build_block(depth:, headings:)
-    choices = %i[paragraph code_block rule]
+    choices = %i[paragraph code_block rule table]
     choices << :heading if headings
-    choices.concat(%i[list quote align]) if depth < MAX_DEPTH
+    choices.concat(%i[list quote align details]) if depth < MAX_DEPTH
 
     case choices.sample(random: @random)
     when :paragraph
@@ -149,6 +197,8 @@ class AstGenerator
       code_block
     when :rule
       spend { AST::HorizontalRule.new }
+    when :table
+      table
     when :heading
       heading
     when :list
@@ -157,7 +207,36 @@ class AstGenerator
       quote(depth:)
     when :align
       align(depth:)
+    when :details
+      details(depth:)
     end
+  end
+
+  # A table the renderer can write as a Markdown table: every row has
+  # the same number of cells, the first row is the header, no cell has
+  # a line break. The cells hold words only, a tricky token in a cell is
+  # a case for the escaper, not for the table.
+  def table
+    table = spend { AST::Table.new }
+    columns = 1 + @random.rand(3)
+    (1 + @random.rand(3)).times do |index|
+      row = spend { AST::TableRow.new }
+      columns.times do
+        cell = spend { AST::TableCell.new(header: index.zero?) }
+        cell << AST::Text.new(phrase)
+        row << cell
+      end
+      table << row
+    end
+    table
+  end
+
+  # No title: a quoted title cooks with curly quotes, which plain
+  # markdown-it shows as text.
+  def details(depth:)
+    details = spend { AST::Details.new }
+    fill_block_container(details, depth: depth + 1, headings: false)
+    details
   end
 
   def paragraph
@@ -231,20 +310,52 @@ class AstGenerator
   # @param open [Array<Class>] inline container classes already on the path
   # @return [Markbridge::AST::Node]
   def inline_node(open:, inline_depth:, line_breaks:)
-    choices = %i[text inline_code]
+    choices = %i[text text inline_code whitespace leaf]
     choices << :line_break if line_breaks
-    choices << :wrapper if inline_depth < MAX_INLINE_DEPTH && wrappers_left(open).any?
+    choices << :wrapper << :wrapper if inline_depth < MAX_INLINE_DEPTH && wrappers_left(open).any?
 
     case choices.sample(random: @random)
     when :text
       text_node
     when :inline_code
       inline_code
+    when :whitespace
+      spend { AST::Text.new(WHITESPACE_TEXTS.sample(random: @random)) }
+    when :leaf
+      inline_leaf(open:)
     when :line_break
       spend { AST::LineBreak.new }
     else
       wrapper(open:, inline_depth:, line_breaks:)
     end
+  end
+
+  # An image, a mail link, a mention or an upload. A link never holds
+  # another link, so the mail link stays out of one.
+  def inline_leaf(open:)
+    choices = INLINE_LEAVES
+    choices -= [:email] if open.include?(AST::Url)
+
+    case choices.sample(random: @random)
+    when :image
+      spend { AST::Image.new(src: pick_href, alt: (@random.rand < 0.7 ? label_text : nil)) }
+    when :email
+      email = spend { AST::Email.new(address: "alice@example.com") }
+      email << AST::Text.new(label_text)
+      email
+    when :mention
+      spend { AST::Mention.new(name: WORDS.sample(random: @random)) }
+    else
+      spend do
+        AST::Upload.new(sha1: "abc123", filename: "image.png", type: :image, alt: label_text)
+      end
+    end
+  end
+
+  # Text for an alt text or a label: a phrase, sometimes with a
+  # character class in it.
+  def label_text
+    @random.rand < 0.5 ? spliced_phrase : phrase
   end
 
   # An inline container never holds its own type again, and a link never
@@ -255,7 +366,7 @@ class AstGenerator
 
   def wrapper(open:, inline_depth:, line_breaks:)
     klass = wrappers_left(open).sample(random: @random)
-    node = spend { klass == AST::Url ? AST::Url.new(href: pick_href) : klass.new }
+    node = spend { build_wrapper(klass) }
 
     # A Url with the href as its only text renders as a bare URL, which is
     # a different construct. A plain word first keeps it a real link
@@ -272,16 +383,48 @@ class AstGenerator
     node
   end
 
+  def build_wrapper(klass)
+    if klass == AST::Url
+      AST::Url.new(href: pick_href)
+    elsif klass == AST::Color
+      AST::Color.new(color: COLORS.sample(random: @random))
+    else
+      klass.new
+    end
+  end
+
+  # A phrase, a phrase with a character class spliced in, a tricky
+  # token, or a line from the CommonMark spec.
   def text_node(tricky: true)
-    spend { AST::Text.new(tricky && @random.rand < 0.35 ? tricky_token : phrase) }
+    roll = @random.rand
+    text =
+      if tricky && roll < 0.2
+        TRICKY_TOKENS.sample(random: @random)
+      elsif tricky && roll < 0.4
+        COMMONMARK_LINES.sample(random: @random)
+      elsif roll < 0.65
+        spliced_phrase
+      else
+        phrase
+      end
+    spend { AST::Text.new(text) }
   end
 
   def phrase
     Array.new(1 + @random.rand(3)) { WORDS.sample(random: @random) }.join(" ")
   end
 
-  def tricky_token
-    TRICKY_TOKENS.sample(random: @random)
+  # A character class at the start, at the end or between the words.
+  def spliced_phrase
+    char = EDGE_CHARS.sample(random: @random)
+    case @random.rand(3)
+    when 0
+      "#{char}#{phrase}"
+    when 1
+      "#{phrase}#{char}"
+    else
+      "#{phrase}#{char}#{phrase}"
+    end
   end
 
   def inline_code

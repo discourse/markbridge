@@ -22,6 +22,9 @@ require_relative "markdown_it_cooker"
 # - lists: a list whose items hold inline content only cooks tight, with
 #   no <p> in its items
 #
+# Discourse BBCode the renderer writes ([u], [spoiler], [details]) is text
+# to plain markdown-it, and the text check expects it as text.
+#
 # A fifth, normalizer, comes first: the AST has to be one the default
 # normalizer leaves alone, so the tree that is rendered is the tree the
 # expectation reads.
@@ -30,7 +33,16 @@ class RoundTripChecker
 
   Failure = Data.define(:check, :message)
 
-  CHECKS = %i[normalizer structure text links lists].freeze
+  CHECKS = %i[normalizer shape structure text links lists].freeze
+
+  # Which parent a node of these classes needs, and which children the
+  # parent takes. The generators build nothing else, and the shrinker
+  # must not either: a table with text in it is no case.
+  SHAPES = {
+    AST::ListItem => AST::List,
+    AST::TableRow => AST::Table,
+    AST::TableCell => AST::TableRow,
+  }.freeze
 
   # HTML elements that carry structure. Everything else (p, span, br,
   # input, comments) adds no node to the skeleton and its children move up
@@ -56,6 +68,12 @@ class RoundTripChecker
     hr
     div
     s
+    sup
+    sub
+    table
+    tr
+    th
+    td
   ].freeze
 
   # Elements whose content stands apart from the text around them, so the
@@ -104,17 +122,32 @@ class RoundTripChecker
 
   # Nodes whose content is apart from the text around them, for the text
   # check. Same idea as BLOCK_ELEMENTS on the AST side.
-  BLOCK_NODES = (BLANK_LINE_NODES + [AST::List, AST::ListItem, AST::LineBreak]).freeze
+  BLOCK_NODES =
+    (
+      BLANK_LINE_NODES + [AST::List, AST::ListItem, AST::TableRow, AST::TableCell, AST::LineBreak]
+    ).freeze
+
+  # Containers the renderer writes also when nothing visible is in them:
+  # an empty div, heading, sup or sub.
+  ALWAYS_WRITTEN = [AST::Align, AST::Heading, AST::Superscript, AST::Subscript].freeze
 
   # Schemes the renderer links (see UrlTag). Anything else that looks like
   # a scheme is dropped, a scheme-less href passes.
   LINKABLE_SCHEME = /\A(?:https?|ftps?|mailto):/i
   SCHEME_LIKE = /\A[a-z][a-z0-9+.-]*:/i
 
+  # markdown-it's typographer turns straight quotes into curly ones.
+  CURLY_QUOTES = "\u201C\u201D\u2018\u2019"
+  STRAIGHT_QUOTES = "\"\"''"
+
+  # Without the normalizer: {#failures} has checked that it would change
+  # nothing, and it drops an emptied element in place, which would take
+  # the tree out from under the shrinker's undo.
+  #
   # @param document [Markbridge::AST::Document]
   # @return [String]
   def render(document)
-    Markbridge.render(document).markdown
+    Markbridge.render(document, normalize: false).markdown
   end
 
   # @param markdown [String]
@@ -132,6 +165,16 @@ class RoundTripChecker
         Failure.new(
           check: :normalizer,
           message: "the normalizer would rewrite the tree: #{violations.inspect}",
+        ),
+      ]
+    end
+
+    misplaced = misplaced_node(document)
+    if misplaced
+      return [
+        Failure.new(
+          check: :shape,
+          message: "#{AstDump.describe(misplaced)} is not where it belongs",
         ),
       ]
     end
@@ -154,18 +197,27 @@ class RoundTripChecker
   # @param label [String] what the report is about, for example a seed
   # @return [String]
   def explain(document, label:)
-    checks = failures(document).map(&:check)
     before = document.descendants.size
-    AstShrinker.shrink(document) do |candidate|
-      candidate_checks = failures(candidate).map(&:check)
-      candidate_checks.intersect?(checks)
-    rescue StandardError
-      false
-    end
+    shrink(document)
     after = document.descendants.size
 
     label = "#{label}, shrunk from #{before} to #{after} nodes" if after < before
     report(document, label:)
+  end
+
+  # Shrinks +document+ in place as long as one of the checks that fail
+  # now keeps failing. A candidate the renderer raises on does not count
+  # as failing.
+  #
+  # @param document [Markbridge::AST::Document] a document that fails
+  # @return [Markbridge::AST::Document] the same document
+  def shrink(document)
+    checks = failures(document).map(&:check)
+    AstShrinker.shrink(document) do |candidate|
+      failures(candidate).map(&:check).intersect?(checks)
+    rescue StandardError
+      false
+    end
   end
 
   # The AST, its Markdown, the cooked HTML and the failures.
@@ -245,9 +297,41 @@ class RoundTripChecker
     nil
   end
 
+  # The first node that sits under the wrong parent, or holds a child
+  # that belongs elsewhere.
+  def misplaced_node(document)
+    [document, *document.descendants(AST::Element)].each do |node|
+      misplaced = node.children.find { |child| misplaced?(child, node) }
+      return misplaced if misplaced
+    end
+    nil
+  end
+
+  def misplaced?(child, parent)
+    needed = SHAPES[child.class]
+    return !parent.is_a?(needed) if needed
+
+    SHAPES.values.any? { |container| parent.is_a?(container) }
+  end
+
   # One skeleton node. The same shape is built from the AST and from the
-  # DOM so the two can be compared with a plain ==.
+  # DOM so the two can be compared with a plain ==. strong inside em and
+  # em inside strong cook the same (`***x***` is em(strong(x)) to
+  # markdown-it), so an em with a strong as its only child is turned
+  # around and strong is outside.
   def skeleton(name, children: [], text: nil, href: nil)
+    if name == "em" && children.size == 1 && children.first[:name] == "strong"
+      inner = children.first
+      return(
+        {
+          name: "strong",
+          children: [{ name: "em", children: inner[:children], text: nil, href: nil }],
+          text:,
+          href:,
+        }
+      )
+    end
+
     { name:, children:, text:, href: }
   end
 
@@ -282,6 +366,14 @@ class RoundTripChecker
       [skeleton("h#{node.level}", children: expected_children(node))]
     when AST::Align
       [skeleton("div", children: expected_children(node))]
+    when AST::Superscript
+      [skeleton("sup", children: expected_children(node))]
+    when AST::Subscript
+      [skeleton("sub", children: expected_children(node))]
+    when AST::Table
+      [expected_table(node)]
+    when AST::Upload
+      [expected_upload(node)]
     when AST::Bold
       [skeleton("strong", children: expected_children(node))]
     when AST::Italic
@@ -304,22 +396,62 @@ class RoundTripChecker
   # Whether the node puts something on the page. Whitespace-only text
   # does not: the postprocessor clears a line of whitespace, and a
   # wrapper around whitespace loses its markers. A bare link shows its
-  # href, a link without visible text shows it too.
+  # href, a link without visible text shows it too. A table with a cell
+  # is drawn whatever the cell holds.
   def visible?(node)
     case node
     when AST::Text, AST::MarkdownText
       node.text.match?(/[^[:space:]]/)
-    when AST::Image, AST::HorizontalRule
+    when AST::Image, AST::HorizontalRule, AST::Mention, AST::Upload, *ALWAYS_WRITTEN
       true
     when AST::Code
       !code_text(node).empty?
     when AST::Url
       linkable?(node.href) || node.children.any? { |child| visible?(child) }
+    when AST::Table
+      node.descendants.any?(AST::TableCell)
     when AST::Element
       node.children.any? { |child| visible?(child) }
     else
       false
     end
+  end
+
+  # The renderer takes the first row whose cells are all header cells as
+  # the header row, or the first row, and a Markdown table always has
+  # one. A row without cells is dropped.
+  def expected_table(node)
+    rows =
+      node.children.select { |row| row.is_a?(AST::TableRow) && row.children.any?(AST::TableCell) }
+    header =
+      rows.index do |row|
+        row.children.all? { |cell| !cell.is_a?(AST::TableCell) || cell.header? }
+      end || 0
+
+    skeleton(
+      "table",
+      children:
+        rows.each_with_index.map do |row, index|
+          cells = row.children.select { |cell| cell.is_a?(AST::TableCell) }
+          skeleton(
+            "tr",
+            children:
+              cells.map do |cell|
+                skeleton(index == header ? "th" : "td", children: expected_children(cell))
+              end,
+          )
+        end,
+    )
+  end
+
+  # An upload is an image or a link to a file, see UploadTag.
+  def expected_upload(node)
+    destination = upload_destination(node)
+    node.type == :image ? skeleton("img", href: destination) : skeleton("a", href: destination)
+  end
+
+  def upload_destination(node)
+    "upload://#{node.filename || node.sha1}"
   end
 
   # A link with an href the renderer refuses keeps only its text.
@@ -398,36 +530,75 @@ class RoundTripChecker
   end
 
   # The text a reader sees, with a separator around every block so that
-  # words from two blocks never run into each other.
-  def expected_text(node, out)
+  # words from two blocks never run into each other. +in_link+ says
+  # whether a link is among the ancestors: the underline is plain text
+  # there.
+  def expected_text(node, out, in_link: false)
     case node
     when AST::Text, AST::MarkdownText
       out << node.text
     when AST::Image
       out << node.alt.to_s
-    when AST::Url
+    when AST::Mention
+      out << "@#{node.name}"
+    when AST::Upload
+      expected_upload_text(node, out)
+    when AST::Url, AST::Email
       # A link without visible text shows its href.
       if node.children.any? { |child| visible?(child) }
-        expected_children_text(node, out)
-      else
+        expected_children_text(node, out, in_link: true)
+      elsif node.is_a?(AST::Url)
         out << node.href.to_s
+      end
+    when AST::Underline
+      bbcode_text(node, out, in_link:, open: "[u]", close: "[/u]", plain: in_link)
+    when AST::Spoiler
+      open = node.title ? "[spoiler=#{node.title}]" : "[spoiler]"
+      bbcode_text(node, out, in_link:, open:, close: "[/spoiler]", plain: !visible?(node))
+    when AST::Details
+      separated(out) do
+        bbcode_text(
+          node,
+          out,
+          in_link:,
+          open: "[details]\n",
+          close: "\n[/details]",
+          plain: !visible?(node),
+        )
       end
     when AST::Code
       if block_code?(node)
-        separated(out) { expected_children_text(node, out) }
+        separated(out) { expected_children_text(node, out, in_link:) }
       else
-        expected_children_text(node, out)
+        expected_children_text(node, out, in_link:)
       end
     when *BLOCK_NODES
-      separated(out) { expected_children_text(node, out) if node.is_a?(AST::Element) }
+      separated(out) { expected_children_text(node, out, in_link:) if node.is_a?(AST::Element) }
     when AST::Element
-      expected_children_text(node, out)
+      expected_children_text(node, out, in_link:)
     end
     out
   end
 
-  def expected_children_text(element, out)
-    element.children.each { |child| expected_text(child, out) }
+  def expected_children_text(element, out, in_link: false)
+    element.children.each { |child| expected_text(child, out, in_link:) }
+  end
+
+  # BBCode around the content, or the content alone when +plain+.
+  def bbcode_text(node, out, in_link:, open:, close:, plain:)
+    out << open unless plain
+    expected_children_text(node, out, in_link:)
+    out << close unless plain
+  end
+
+  # An image shows its alt text, a file link its name and size.
+  def expected_upload_text(node, out)
+    if node.type == :image
+      out << node.alt.to_s
+    else
+      out << (node.filename || "attachment") << "|attachment"
+      out << " (#{node.size})" if node.size
+    end
   end
 
   def separated(out)
@@ -454,10 +625,11 @@ class RoundTripChecker
     out
   end
 
-  # ASCII whitespace only. A no-break space is content: the renderer and
-  # markdown-it keep it, so it has to arrive as the same character.
+  # Whitespace runs are one space, a no-break space among them: the
+  # escaper writes indentation as no-break spaces. Curly quotes are
+  # straight ones, the typographer is display.
   def normalize_text(text)
-    text.gsub(/[ \t\r\n]+/, " ").strip
+    text.gsub(/[[:space:]]+/, " ").strip.tr(CURLY_QUOTES, STRAIGHT_QUOTES)
   end
 
   def expected_links(document)
@@ -469,6 +641,8 @@ class RoundTripChecker
         "mailto:#{node.address}" if node.address
       when AST::Image
         node.src if node.src
+      when AST::Upload
+        upload_destination(node)
       end
     end
   end
