@@ -287,7 +287,7 @@ module Markbridge
         # the run. The boundary comment between the two sides is
         # punctuation, so the run can open or close again.
         #
-        # A tilde counts as a blocking neighbour like a word character:
+        # A tilde counts as a blocking neighbor like a word character:
         # CommonMark reads `~` as punctuation, but cmark-gfm
         # (commonmarker) does not treat it as one next to an emphasis
         # delimiter, so strikethrough right next to emphasis with a
@@ -448,7 +448,7 @@ module Markbridge
         # chain once and takes the first answer it can: in html_mode the
         # chain does not matter at all, and under a Code ancestor nothing
         # after it does. The checks are spelled out instead of going
-        # through a block, and the walk hands back no array — every step
+        # through a block, and the walk builds no array — every step
         # of the chain costs.
         #
         # A link label is where `]` is structural and must be escaped: a

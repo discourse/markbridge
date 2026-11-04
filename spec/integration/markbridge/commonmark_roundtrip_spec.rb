@@ -232,8 +232,8 @@ module CommonMarkRoundTrip
     end
   end
 
-  # A text node touches a block boundary when the neighbour on that side
-  # is a block element, or when there is no neighbour and the node sits
+  # A text node touches a block boundary when the neighbor on that side
+  # is a block element, or when there is no neighbor and the node sits
   # at the edge of a block element.
   def block_boundary?(sibling, parent)
     node = sibling || parent

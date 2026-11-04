@@ -117,11 +117,11 @@ matcher:
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_line
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_indented_code
 
-# escape_block_* fallthrough `content` returns. A method that hands
-    # the content back says "no block construct here", and the caller
+# escape_block_* fallthrough `content` returns. A method that returns
+    # the content unchanged says "no block construct here", and the caller
     # then inline-escapes it. Mutations on the non-match branch are
     # equivalent because content that doesn't match the specific block
-    # pattern is handed to inline escape either way, which produces
+    # pattern goes to the inline escape either way, which produces
     # identical bytes. Bucket A — covered across
     # escape_block_ordered_list, escape_block_dash, escape_block_star,
     # and the outermost escape_block_level fallthrough for
