@@ -25,12 +25,14 @@ module Markbridge
             height = element.height
             alt = flat_alt(element.alt)
 
-            return render_html(src, HtmlEscaper.escape(alt), width, height) if interface.html_mode?
+            if interface.html_mode?
+              return render_html(src:, alt: HtmlEscaper.escape(alt), width:, height:)
+            end
 
             # A height alone means nothing to Discourse.
             size = ("#{width}x#{height}" if width && height) || width
 
-            label = alt && render_alt(alt, element, interface)
+            label = alt && render_alt(alt, element:, interface:)
             "![#{label}#{"|" if ends_in_option?(alt)}#{"|#{size}" if size}](#{LinkDestination.escape(src)})"
           end
 
@@ -61,11 +63,11 @@ module Markbridge
           # it is escaped for a Markdown link label. Most images have no
           # alt text, the caller skips the Text node and the render pass
           # for them.
-          def render_alt(alt, element, interface)
+          def render_alt(alt, element:, interface:)
             interface.render_node(AST::Text.new(alt), context: interface.with_parent(element))
           end
 
-          def render_html(src, alt, width, height)
+          def render_html(src:, alt:, width:, height:)
             attrs = %(src="#{HtmlEscaper.escape(src)}" alt="#{alt}")
             attrs << %( width="#{width}") if width
             attrs << %( height="#{height}") if height

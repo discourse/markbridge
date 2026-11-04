@@ -127,7 +127,7 @@ module Markbridge
           prose_start = 0
           search_from = 0
 
-          while (candidate = fence_index(text, search_from))
+          while (candidate = fence_index(text, from: search_from))
             line_start = (text.byterindex("\n", candidate) || -1) + 1
             line_end = text.byteindex("\n", candidate) || text.bytesize
             run = opening_run(text.byteslice(line_start, line_end - line_start))
@@ -139,7 +139,7 @@ module Markbridge
               next
             end
 
-            block_end = closing_fence_end(text, line_end, run)
+            block_end = closing_fence_end(text, from: line_end, run:)
             result << clean(text.byteslice(prose_start, line_start - prose_start))
             result << text.byteslice(line_start, block_end - line_start)
             prose_start = search_from = block_end
@@ -155,7 +155,7 @@ module Markbridge
         # @param text [String]
         # @param from [Integer] byte offset to start at
         # @return [Integer, nil]
-        def fence_index(text, from)
+        def fence_index(text, from:)
           backtick = text.byteindex(BACKTICK_FENCE, from)
           tilde = text.byteindex(TILDE_FENCE, from)
           return tilde unless backtick
@@ -187,7 +187,7 @@ module Markbridge
         # @param from [Integer] byte offset to search from
         # @param run [String] the opening run
         # @return [Integer]
-        def closing_fence_end(text, from, run)
+        def closing_fence_end(text, from:, run:)
           while (candidate = text.byteindex(run, from))
             # +from+ starts at the newline that ends the opening line, so
             # there is always a newline in front of a candidate.
