@@ -64,7 +64,7 @@ All tag names are case-insensitive. Aliases in the same row use the same handler
 
 | Tags | Renders as | AST node |
 |---|---|---|
-| `[quote]` | `[quote]…[/quote]` | `AST::Quote` |
+| `[quote]` | `[quote="name"]…[/quote]`; without attribution `> …`, or `[quote]…[/quote]` around a quote with attribution | `AST::Quote` |
 | `[spoiler]`, `[hide]` | `[spoiler]…[/spoiler]` | `AST::Spoiler` |
 | `[color]` | `<span style="color: …">` | `AST::Color` |
 | `[size]` | `<span style="font-size: …">` | `AST::Size` |
