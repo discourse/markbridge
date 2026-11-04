@@ -68,9 +68,9 @@ RSpec.describe "bare URL cooked output" do
       end
     end
 
-    # Punctuation that a parser keeps in the link, so the URL is written as
-    # a Markdown link.
-    %w[;].each do |punctuation|
+    # markdown-it keeps a `:` and the first character of a mixed run in the
+    # link, so the URL is written as a Markdown link.
+    %w[: .) ?! ., ,, ;].each do |punctuation|
       it "keeps #{punctuation} after the URL out of the link" do
         bbcode = "see {url}#{punctuation} now"
 
