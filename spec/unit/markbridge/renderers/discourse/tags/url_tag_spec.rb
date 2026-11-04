@@ -366,6 +366,63 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
           )
         end
 
+        it "writes a link when inline code follows the URL" do
+          # Otherwise the autolink takes the backticks into the URL.
+          code = Markbridge::AST::Code.new << Markbridge::AST::Text.new("x")
+
+          expect(render_between("see ", code)).to eq("[https://example.com](https://example.com)")
+        end
+
+        it "writes a link when emphasis stands in front of the URL" do
+          paragraph = Markbridge::AST::Paragraph.new
+          paragraph << (Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x"))
+          url = Markbridge::AST::Url.new(href: "https://example.com")
+          url << Markbridge::AST::Text.new("https://example.com")
+          paragraph << url
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq("[https://example.com](https://example.com)")
+        end
+
+        it "decides by the edge of Markdown text next to the URL" do
+          expect(render_between(nil, Markbridge::AST::MarkdownText.new("**x**"))).to eq(
+            "[https://example.com](https://example.com)",
+          )
+          expect(render_between(nil, Markbridge::AST::MarkdownText.new(" **x**"))).to eq(
+            "https://example.com",
+          )
+        end
+
+        it "keeps the plain href next to a subclass of a block" do
+          quote_class = Class.new(Markbridge::AST::Quote)
+
+          expect(render_between(nil, quote_class.new << Markbridge::AST::Text.new("q"))).to eq(
+            "https://example.com",
+          )
+        end
+
+        it "keeps the plain href when a line break follows the URL" do
+          expect(render_between(nil, Markbridge::AST::LineBreak.new)).to eq("https://example.com")
+        end
+
+        it "keeps the plain href next to a block" do
+          [
+            Markbridge::AST::Paragraph.new << Markbridge::AST::Text.new("p"),
+            Markbridge::AST::Quote.new << Markbridge::AST::Text.new("q"),
+            Markbridge::AST::Heading.new(level: 2) << Markbridge::AST::Text.new("h"),
+            Markbridge::AST::Align.new(alignment: "center") << Markbridge::AST::Text.new("a"),
+            Markbridge::AST::Details.new << Markbridge::AST::Text.new("d"),
+            Markbridge::AST::Table.new,
+            Markbridge::AST::Poll.new,
+            Markbridge::AST::Event.new(name: "e", starts_at: "2026-01-01"),
+            Markbridge::AST::List.new,
+            Markbridge::AST::HorizontalRule.new,
+          ].each do |block|
+            expect(render_between(nil, block)).to eq("https://example.com"), block.class.name
+          end
+        end
+
         it "keeps the plain href when punctuation and whitespace follow the URL" do
           %w[, : ! ? ... ?!].each do |punctuation|
             expect(render_between(nil, Markbridge::AST::Text.new("#{punctuation} next"))).to eq(
@@ -420,11 +477,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
           expect(render_between(nil, nil)).to eq("https://example.com")
         end
 
-        it "keeps the plain href when the neighbour is not a text node" do
+        it "writes a link when emphasis follows the URL" do
+          # cmark-gfm takes `**x` into a bare URL; markdown-it does not.
           bold = Markbridge::AST::Bold.new
           bold << Markbridge::AST::Text.new("x")
 
-          expect(render_between(nil, bold)).to eq("https://example.com")
+          expect(render_between(nil, bold)).to eq("[https://example.com](https://example.com)")
         end
       end
 

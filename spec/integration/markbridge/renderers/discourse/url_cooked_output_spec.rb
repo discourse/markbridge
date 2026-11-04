@@ -17,6 +17,15 @@ RSpec.describe "link cooked output", skip: CookedOutput::SKIP_REASON do
     expect(link.text).to eq("https://example.com/t/5")
   end
 
+  it "cooks a bare URL followed by inline code into a link and a code span" do
+    html =
+      cook_html(%(<p>see <a href="https://example.com">https://example.com</a><code>x</code></p>))
+    link = anchor(html)
+
+    expect(link["href"]).to eq("https://example.com")
+    expect(Nokogiri::HTML.fragment(html).at_css("code").text).to eq("x")
+  end
+
   it "cooks a glued bare URL with Markdown characters into a link with the URL as text" do
     # The BBCode option syntax cannot carry a `]`, the HTML parser can.
     html =
