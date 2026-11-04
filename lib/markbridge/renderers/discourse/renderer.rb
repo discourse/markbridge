@@ -452,10 +452,9 @@ module Markbridge
         # of the chain costs.
         #
         # A link label is where `]` is structural and must be escaped: a
-        # link, a mail link, and the alt text of an image (ImageTag renders
-        # it as a Text node under the Image). Tags that emit their own
-        # bracketed markup (ImageTag, UploadTag, etc.) skip the text path
-        # entirely, so their structural brackets are preserved.
+        # link, a mail link, and the alt text of an image or an upload
+        # (ImageTag and UploadTag render it as a Text node under their
+        # element). The tags write their own brackets around it.
         def render_text(node, context)
           # In html_mode even inside a code block we must HTML-escape, otherwise a
           # stray `<` in a code cell would break the surrounding <td>.
@@ -468,7 +467,7 @@ module Markbridge
             return node.text if parent.is_a?(AST::Code)
 
             in_link_label = true if parent.is_a?(AST::Url) || parent.is_a?(AST::Email) ||
-              parent.is_a?(AST::Image)
+              parent.is_a?(AST::Image) || parent.is_a?(AST::Upload)
             context = context.parent_context
           end
 

@@ -262,6 +262,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.render(Markbridge::AST::Text.new("[A]"), context:)).to eq("\\[A\\]")
     end
 
+    it "escapes ] in Text content under an Upload and under an Upload subclass" do
+      upload = Markbridge::AST::Upload.new(sha1: "abc", type: :image)
+      upload_class = Class.new(Markbridge::AST::Upload)
+      [upload, upload_class.new(sha1: "abc", type: :image)].each do |parent|
+        context = Markbridge::Renderers::Discourse::RenderContext.new([parent])
+
+        expect(renderer.render(Markbridge::AST::Text.new("[A]"), context:)).to eq("\\[A\\]")
+      end
+    end
+
     it "does not escape ] in Text content under a parent that is no link" do
       bold = Markbridge::AST::Bold.new
       bold << Markbridge::AST::Text.new("a]b")

@@ -35,40 +35,48 @@ module Markbridge
             # Return raw Markdown if available, otherwise reconstruct
             return element.raw if element.raw
 
-            build_upload_markdown(element)
+            build_upload_markdown(element, interface)
           end
 
           private
 
-          def build_upload_markdown(element)
+          def build_upload_markdown(element, interface)
             if element.type == :image
-              build_image_markdown(element)
+              build_image_markdown(element, interface)
             else
-              build_attachment_markdown(element)
+              build_attachment_markdown(element, interface)
             end
           end
 
-          def build_image_markdown(element)
-            alt = build_alt(element)
+          def build_image_markdown(element, interface)
+            alt = build_alt(element, interface)
             url = build_upload_url(element)
 
             "![#{alt}](#{url})"
           end
 
-          def build_attachment_markdown(element)
-            filename = element.filename || "attachment"
+          def build_attachment_markdown(element, interface)
+            filename = label(element.filename || "attachment", element, interface)
             url = build_upload_url(element)
             size_part = " (#{element.size})" if element.size
 
             "[#{filename}|attachment](#{url})#{size_part}"
           end
 
-          def build_alt(element)
+          # The alt text is escaped for a link label, the dimensions are
+          # ours and stay as they are.
+          def build_alt(element, interface)
             parts = []
-            parts << element.alt if element.alt
+            parts << label(element.alt, element, interface) if element.alt
             parts << element.dimensions if element.dimensions
 
             parts.join("|")
+          end
+
+          # Text inside the brackets goes through the renderer like any
+          # text, so a `]` or Markdown in it is escaped.
+          def label(text, element, interface)
+            interface.render_node(AST::Text.new(text), context: interface.with_parent(element))
           end
 
           def build_upload_url(element)
