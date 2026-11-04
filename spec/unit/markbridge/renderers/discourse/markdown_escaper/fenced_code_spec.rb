@@ -24,6 +24,10 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(escaper.escape("   ```")).to eq("   \\`\\`\\`")
       end
 
+      it "escapes the info string after the fence like text" do
+        expect(escaper.escape("``` f&ouml; *x*")).to eq("\\`\\`\\` f\\&ouml; \\*x\\*")
+      end
+
       it "escapes nested fence patterns correctly" do
         # This was a known failure case - nested fences with different lengths
         input = "````\naaa\n```\n``````"
@@ -36,12 +40,14 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
     end
 
     context "when 3+ tildes at line start (MUST escape)" do
-      it "escapes ~~~ at line start" do
-        expect(escaper.escape("~~~")).to eq("\\~~~")
+      it "escapes every tilde of a ~~~ at line start" do
+        expect(escaper.escape("~~~")).to eq("\\~\\~\\~")
+        expect(escaper.escape("~~~~")).to eq("\\~\\~\\~\\~")
       end
 
-      it "escapes ~~~ with info string" do
-        expect(escaper.escape("~~~python")).to eq("\\~~~python")
+      it "escapes ~~~ with info string, and the info string like text" do
+        expect(escaper.escape("~~~python")).to eq("\\~\\~\\~python")
+        expect(escaper.escape("~~~ *x* ~~y~~")).to eq("\\~\\~\\~ \\*x\\* \\~\\~y\\~\\~")
       end
     end
 

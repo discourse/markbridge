@@ -49,6 +49,13 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         result = escaper.escape('<img src="img.png">')
         expect(result).to eq('\\<img src="img.png">')
       end
+
+      it "escapes what is inside the tag like text" do
+        expect(escaper.escape('<a href="\\*">')).to eq('\\<a href="\\\\\\*">')
+        expect(escaper.escape('<a href="&ouml;">')).to eq('\\<a href="\\&ouml;">')
+        expect(escaper.escape("<b>`x`</b>")).to eq("\\<b>\\`x\\`\\</b>")
+        expect(escaper.escape("<b class=*x*>")).to eq("\\<b class=\\*x\\*>")
+      end
     end
 
     context "when < and > appear in other contexts" do
