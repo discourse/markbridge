@@ -26,6 +26,25 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
       expect(tag.render(element, interface)).to eq("![A picture|100x200](upload://pic.png)")
     end
 
+    it "escapes the alt text like a link label and keeps the dimensions" do
+      element =
+        Markbridge::AST::Upload.new(
+          sha1: "abc",
+          filename: "pic.png",
+          type: :image,
+          alt: "a]b *c*",
+          dimensions: "100x200",
+        )
+
+      expect(tag.render(element, interface)).to eq("![a\\]b \\*c\\*|100x200](upload://pic.png)")
+    end
+
+    it "escapes the filename of an attachment like a link label" do
+      element = Markbridge::AST::Upload.new(sha1: "abc", filename: "a]b_c.txt", type: :attachment)
+
+      expect(tag.render(element, interface)).to eq("[a\\]b\\_c.txt|attachment](upload://a]b_c.txt)")
+    end
+
     it "uses sha1 as URL filename when filename is missing" do
       element = Markbridge::AST::Upload.new(sha1: "abc123", type: :image)
 
