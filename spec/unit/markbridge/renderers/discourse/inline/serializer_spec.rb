@@ -518,8 +518,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
   end
 
   describe "#write_groups" do
-    def write_groups(groups, html_mode: false, &block)
-      serializer.write_groups(groups.map(&:first), groups.map(&:last), html_mode:, &block)
+    def write_groups(groups, html_mode: false, &before)
+      outputs = groups.to_h
+      serializer.write_groups(groups.map(&:first), html_mode:, before:) do |child|
+        outputs.fetch(child)
+      end
     end
 
     it "writes finished Markdown and tokens one after the other" do
@@ -533,8 +536,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       expect(write_groups([[:a, "**a**"], [:b, "**b**"]])).to eq("**a**<!---->**b**")
     end
 
-    it "writes Markdown when html_mode is not given" do
-      expect(serializer.write_groups(%i[a b], %w[`a` `b`])).to eq("`a`<!---->`b`")
+    it "writes Markdown when html_mode is not given, and needs no before" do
+      outputs = { a: "`a`", b: "`b`" }
+
+      expect(serializer.write_groups(%i[a b]) { |child| outputs.fetch(child) }).to eq(
+        "`a`<!---->`b`",
+      )
     end
 
     it "yields the buffer and the child in front of the child's first piece" do
