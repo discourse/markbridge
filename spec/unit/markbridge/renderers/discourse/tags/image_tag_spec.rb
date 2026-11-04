@@ -7,6 +7,77 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
   let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
   describe "#render" do
+    it "renders no text node for an image without alt text" do
+      allow(interface).to receive(:render_node).and_call_original
+      tag.render(Markbridge::AST::Image.new(src: "a.png"), interface)
+
+      expect(interface).not_to have_received(:render_node)
+    end
+
+    it "wraps a destination with a space in angle brackets" do
+      element = Markbridge::AST::Image.new(src: "my image.png")
+
+      expect(tag.render(element, interface)).to eq("![](<my image.png>)")
+    end
+
+    it "puts the words of an alt text with line breaks on one line" do
+      element = Markbridge::AST::Image.new(src: "a.png", alt: "first\n\n  second\nthird")
+
+      expect(tag.render(element, interface)).to eq("![first second third](a.png)")
+    end
+
+    context "when the alt text ends in a part that Discourse reads as an option" do
+      def render_alt(alt, **size)
+        tag.render(Markbridge::AST::Image.new(src: "a.png", alt:, **size), interface)
+      end
+
+      it "puts an empty part after the alt text" do
+        # Discourse would take `|800x600` for a size; the empty part stops it.
+        expect(render_alt("screenshot|800x600")).to eq("![screenshot\\|800x600|](a.png)")
+      end
+
+      it "keeps the size it writes itself after the empty part" do
+        expect(render_alt("screenshot|800x600", width: 100, height: 50)).to eq(
+          "![screenshot\\|800x600||100x50](a.png)",
+        )
+      end
+
+      it "recognizes every kind of option" do
+        [
+          "10x20",
+          "10x20, 50%",
+          "10x20,x30",
+          "10x20,50",
+          "10x20 , 7x",
+          "video",
+          "audio",
+          "thumbnail",
+          "key=value",
+          "data-x.y:z_1=a b",
+          "=",
+        ].each { |option| expect(render_alt("a|#{option}")).to end_with("|](a.png)"), option }
+      end
+
+      it "looks only at the last part" do
+        expect(render_alt("10x20|a")).to eq("![10x20\\|a](a.png)")
+      end
+    end
+
+    it "adds no empty part when the last part of the alt text is no option" do
+      %w[a|b a|0x10 a|10x a|10x20,5000 a|10x20,0 a|Video a|x\ y=1 a|10x20x a| a].each do |alt|
+        element = Markbridge::AST::Image.new(src: "a.png", alt:)
+
+        expect(tag.render(element, interface)).to eq("![#{alt.gsub("|", "\\|")}](a.png)"), alt
+      end
+    end
+
+    it "keeps an alt text that is nothing but an option" do
+      # Discourse never takes the first part for an option.
+      element = Markbridge::AST::Image.new(src: "a.png", alt: "800x600", width: 5)
+
+      expect(tag.render(element, interface)).to eq("![800x600|5](a.png)")
+    end
+
     it "renders image with src only" do
       element = Markbridge::AST::Image.new(src: "https://example.com/image.png")
 
