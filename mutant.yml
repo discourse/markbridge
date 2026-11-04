@@ -100,6 +100,12 @@ matcher:
     # multi-line and one-sided-whitespace content. Bucket A.
     - Markbridge::Renderers::Discourse::RenderingInterface#apply_markers
 
+    # Inline::Serializer#place_markers has the same EDGE_WHITESPACE fast
+    # path as apply_markers above, with the same equivalence: the sub
+    # gives the same string for content without edge whitespace and
+    # only costs the MatchData. Bucket A.
+    - Markbridge::Renderers::Discourse::Inline::Serializer#place_markers
+
     # parse_external_link mutations are all Bucket A: `split(" ", 2)`
     # vs `split(nil, 2)` (Ruby's awk-style behaviour on " " is
     # identical to default whitespace for realistic URLs);

@@ -9,6 +9,9 @@ require_relative "discourse/identity_escaper"
 require_relative "discourse/html_escaper"
 require_relative "discourse/html_block"
 require_relative "discourse/link_destination"
+require_relative "discourse/inline/tokens"
+require_relative "discourse/inline/joins"
+require_relative "discourse/inline/serializer"
 require_relative "discourse/postprocessor"
 
 # Builders
