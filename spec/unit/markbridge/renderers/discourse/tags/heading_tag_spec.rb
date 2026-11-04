@@ -43,6 +43,15 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::HeadingTag do
       expect(tag.render(element, interface)).to eq("\n\n## foo \\# \n\n")
     end
 
+    it "keeps a heading that is nothing but a run of # as text" do
+      # Seven or more are not a heading marker, so the escaper leaves
+      # them alone; after the prefix they would be the closing sequence.
+      element = Markbridge::AST::Heading.new(level: 1)
+      element << Markbridge::AST::Text.new("#######")
+
+      expect(tag.render(element, interface)).to eq("\n\n# \\#######\n\n")
+    end
+
     it "leaves a # that is not preceded by whitespace alone" do
       # Without the space in front it is not a closing sequence.
       element = Markbridge::AST::Heading.new(level: 1)
