@@ -97,6 +97,7 @@ GEM
     lefthook (2.2.2)
     lint_roller (1.1.0)
     logger (1.7.0)
+    mini_portile2 (2.8.9)
     mustermann (3.1.1)
     mutant (0.17.1)
       diff-lcs (>= 1.6, < 3)
@@ -111,6 +112,9 @@ GEM
       rspec-core (>= 3.8.0, < 5.0.0)
     nio4r (2.7.5)
     nio4r (2.7.5-java)
+    nokogiri (1.19.4)
+      mini_portile2 (~> 2.8.2)
+      racc (~> 1.4)
     nokogiri (1.19.4-aarch64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.19.4-aarch64-linux-musl)
@@ -274,6 +278,7 @@ PLATFORMS
   arm-linux-gnu
   arm-linux-musl
   arm64-darwin
+  ruby
   universal-java
   x86_64-darwin
   x86_64-linux-gnu
@@ -350,11 +355,13 @@ CHECKSUMS
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
   logger (1.7.0) sha256=196edec7cc44b66cfb40f9755ce11b392f21f7967696af15d274dde7edff0203
   markbridge (0.4.3)
+  mini_portile2 (2.8.9) sha256=0cd7c7f824e010c072e33f68bc02d85a00aeb6fce05bb4819c03dfd3c140c289
   mustermann (3.1.1) sha256=4c6170c7234d5499c345562ba7c7dfe73e1754286dcc1abb053064d66a127198
   mutant (0.17.1) sha256=24c7ceecae0b4efe550ab88ff06017a93828c73cd9569bda1b2689575b120e6c
   mutant-rspec (0.17.1) sha256=1be683271e0d7c0847b3340a3a49266bbb72d58a60991ce5725752706f086da5
   nio4r (2.7.5) sha256=6c90168e48fb5f8e768419c93abb94ba2b892a1d0602cb06eef16d8b7df1dca1
   nio4r (2.7.5-java) sha256=d14779d2a9b012ec0148a53344fbb2ed2a3c4d90c5dd923bf281135ab983b2c9
+  nokogiri (1.19.4) sha256=50c951611c92bca05c51411aef45f1cbc50f2821c4802758c5c6d34696533ab5
   nokogiri (1.19.4-aarch64-linux-gnu) sha256=1269fb644a6de405057a53dd5c762b1209b43ca7424f839454d3dbc677c31a8f
   nokogiri (1.19.4-aarch64-linux-musl) sha256=35c65b9ce72b3bb03207bdbe7067915019dc18c1b9b59139684bd6690fdd01af
   nokogiri (1.19.4-arm-linux-gnu) sha256=a301313e38bb065d68239e79734bcd6f56fb6efaacebde29e9abf2a4735340ca
