@@ -738,6 +738,40 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(boundary_between?("a", "**")).to be(false)
     end
 
+    # Characters outside ASCII next to the run: Unicode punctuation and
+    # symbols count as punctuation (both markdown-it and cmark-gfm do so),
+    # letters do not. One per UTF-8 length.
+    {
+      "\u00E4" => false,
+      "\u00A7" => true,
+      "\u201C" => true,
+      "\u300C" => true,
+      "\u20AC" => true,
+      "\u4E2D" => false,
+      "\u{1F600}" => true,
+      "\u{20000}" => false,
+    }.each do |char, punctuation|
+      it "treats #{char.inspect} after the run as #{punctuation ? "punctuation" : "no punctuation"}" do
+        expect(boundary_between?("a", "**#{char}x**")).to be(punctuation)
+      end
+
+      it "treats #{char.inspect} in front of the run as #{punctuation ? "punctuation" : "no punctuation"}" do
+        expect(boundary_between?("**x#{char}**", "b")).to be(punctuation)
+      end
+    end
+
+    it "puts boundaries on both sides of emphasis with Unicode punctuation at its edges" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("foo")
+      document << (Markbridge::AST::Bold.new << Markbridge::AST::Text.new("\u201Cbar\u201D"))
+      document << Markbridge::AST::Text.new("\u4E2D\u6587")
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+
+      expect(renderer.render_children(document, context:)).to eq(
+        "foo<!---->**\u201Cbar\u201D**<!---->\u4E2D\u6587",
+      )
+    end
+
     it "puts no boundary when the run reaches the start of the buffer" do
       expect(boundary_between?("**", "b")).to be(false)
     end
