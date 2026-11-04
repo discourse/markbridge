@@ -6,8 +6,10 @@ module Markbridge
       module Tags
         class HeadingTag < Tag
           # A run of # at the end of an ATX heading, after whitespace, is
-          # the optional closing sequence and disappears when cooked.
-          CLOSING_SEQUENCE = /(?<=[ \t])#+[ \t]*\z/
+          # the optional closing sequence and disappears when cooked. The
+          # space after the prefix counts, so a run that is the whole
+          # content is one too.
+          CLOSING_SEQUENCE = /(?:\A|(?<=[ \t]))#+[ \t]*\z/
           private_constant :CLOSING_SEQUENCE
 
           def render(element, interface)
