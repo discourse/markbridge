@@ -141,7 +141,7 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
     let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([parent]) }
 
-    it "returns the neighbours among the children of the parent on the chain" do
+    it "returns the neighbors among the children of the parent on the chain" do
       expect(interface.previous_sibling(middle)).to be(first)
       expect(interface.next_sibling(middle)).to be(last)
     end
@@ -177,21 +177,21 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
 
     it "returns the node any number of positions away" do
-      expect(interface.sibling(last, -2)).to be(first)
-      expect(interface.sibling(first, 2)).to be(last)
-      expect(interface.sibling(middle, 0)).to be(middle)
-      expect(interface.sibling(first, -1)).to be_nil
-      expect(interface.sibling(last, 1)).to be_nil
+      expect(interface.sibling(last, offset: -2)).to be(first)
+      expect(interface.sibling(first, offset: 2)).to be(last)
+      expect(interface.sibling(middle, offset: 0)).to be(middle)
+      expect(interface.sibling(first, offset: -1)).to be_nil
+      expect(interface.sibling(last, offset: 1)).to be_nil
     end
 
     it "uses the position the renderer reports for the child it renders" do
-      allow(renderer).to receive(:child_index).and_return(2)
+      allow(renderer).to receive_messages(child_parent: parent, child_index: 2)
 
       expect(interface.previous_sibling(last)).to be(middle)
     end
 
     it "does not search the children when the renderer reports the position of the element" do
-      allow(renderer).to receive(:child_index).and_return(1)
+      allow(renderer).to receive_messages(child_parent: parent, child_index: 1)
       allow(parent.children).to receive(:index).and_raise("searched the children")
 
       expect(interface.previous_sibling(middle)).to be(first)
@@ -201,15 +201,44 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     it "searches the children when the renderer reports another position" do
       # The renderer reports the position of whatever it renders, the tag
       # may ask about another node.
-      allow(renderer).to receive(:child_index).and_return(2)
+      allow(renderer).to receive_messages(child_parent: parent, child_index: 2)
+
+      expect(interface.previous_sibling(middle)).to be(first)
+    end
+
+    it "takes the parent from the renderer, also one that is not on the chain" do
+      # An element without a tag never goes on the parent chain.
+      wrapper = Markbridge::AST::Paragraph.new
+      left = Markbridge::AST::Text.new("l")
+      right = Markbridge::AST::Bold.new
+      wrapper << left << right
+      allow(renderer).to receive_messages(child_parent: wrapper, child_index: 1)
+
+      expect(interface.previous_sibling(right)).to be(left)
+      expect(interface.next_sibling(right)).to be_nil
+    end
+
+    it "searches the parent on the chain when the renderer renders another parent" do
+      other = Markbridge::AST::Paragraph.new << Markbridge::AST::Text.new("x")
+      allow(renderer).to receive_messages(child_parent: other, child_index: 0)
 
       expect(interface.previous_sibling(middle)).to be(first)
     end
 
     it "searches the children when the reported position is past the end" do
-      allow(renderer).to receive(:child_index).and_return(7)
+      allow(renderer).to receive_messages(child_parent: parent, child_index: 7)
 
       expect(interface.next_sibling(first)).to be(middle)
+    end
+  end
+
+  describe "#previous_list" do
+    it "asks the renderer" do
+      list = Markbridge::AST::List.new
+      element = Markbridge::AST::List.new
+      allow(renderer).to receive(:previous_list).with(element).and_return(list)
+
+      expect(interface.previous_list(element)).to be(list)
     end
   end
 

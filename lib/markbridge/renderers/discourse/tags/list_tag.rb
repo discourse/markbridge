@@ -46,36 +46,13 @@ module Markbridge
             # Two lists of the same kind in a row need something between
             # them, or CommonMark reads the second as more items of the
             # first and the blank line makes the whole list loose. A change
-            # of kind starts a new list on its own.
-            previous = previous_visible_sibling(element, interface)
-            return list unless previous.is_a?(AST::List) && previous.ordered? == element.ordered?
+            # of kind starts a new list on its own. Whitespace between
+            # them, and nodes that render to nothing, do not keep them
+            # apart; the renderer knows which list came last.
+            previous = interface.previous_list(element)
+            return list unless previous && previous.ordered? == element.ordered?
 
             "#{LIST_SEPARATOR}#{list}"
-          end
-
-          private
-
-          # The sibling in front of +element+, skipping the nodes that
-          # render to whitespace or to nothing: whitespace between the
-          # lists (a newline in BBCode, as a rule), a line break, and a
-          # list without items. These do not keep two lists apart.
-          def previous_visible_sibling(element, interface)
-            offset = -1
-            while (node = interface.sibling(element, offset)) && invisible?(node)
-              offset -= 1
-            end
-            node
-          end
-
-          def invisible?(node)
-            case node
-            when AST::Text
-              !node.text.match?(/[^[:space:]]/)
-            when AST::LineBreak
-              true
-            when AST::List
-              node.children.empty?
-            end
           end
         end
       end

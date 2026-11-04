@@ -61,21 +61,20 @@ module Markbridge
           @context.root?
         end
 
-        # The node in front of +element+ among the children of its parent:
-        # the element on top of the parent chain, or the root element when
-        # the chain is empty. nil when +element+ is the first child, or when
-        # the parent is not known.
+        # The node in front of +element+ among the children of its parent.
+        # nil when +element+ is the first child, or when the parent is not
+        # known.
         # @param element [AST::Node]
         # @return [AST::Node, nil]
         def previous_sibling(element)
-          sibling(element, -1)
+          sibling(element, offset: -1)
         end
 
         # The node after +element+ among the children of its parent.
         # @param element [AST::Node]
         # @return [AST::Node, nil]
         def next_sibling(element)
-          sibling(element, 1)
+          sibling(element, offset: 1)
         end
 
         # The node +offset+ positions away from +element+ among the
@@ -83,26 +82,39 @@ module Markbridge
         # there is no node at that position, or when the parent is not
         # known.
         #
-        # The renderer knows the position of the child it renders right
-        # now, so the usual call costs no search. A search through the
-        # children is the fallback, for an element that is not the one
-        # being rendered.
+        # The renderer knows the element whose children it renders and
+        # the position of the child it renders right now, so the usual
+        # call costs no search, and an element without a tag (which is
+        # not on the parent chain) is found as the parent too. For any
+        # other element the parent is the element on top of the parent
+        # chain, or the root element when the chain is empty, and its
+        # children are searched.
         # @param element [AST::Node]
         # @param offset [Integer]
         # @return [AST::Node, nil]
-        def sibling(element, offset)
-          parent = @context.element || @context.root
-          return nil if parent.nil?
+        def sibling(element, offset:)
+          if @renderer.current_child?(element)
+            parent = @renderer.child_parent
+            index = @renderer.child_index
+          else
+            parent = @context.element || @context.root
+            return nil if parent.nil?
 
-          siblings = parent.children
-          index = @renderer.child_index
-          unless index && siblings.at(index).equal?(element)
-            index = siblings.index { |child| child.equal?(element) }
+            index = parent.children.index { |child| child.equal?(element) }
             return nil if index.nil?
           end
 
           target = index + offset
-          siblings.at(target) unless target.negative?
+          parent.children.at(target) unless target.negative?
+        end
+
+        # The last list among the siblings in front of +element+ with
+        # nothing but whitespace, or nodes that rendered to nothing,
+        # after it. See Renderer#previous_list.
+        # @param element [AST::Node]
+        # @return [AST::List, nil]
+        def previous_list(element)
+          @renderer.previous_list(element)
         end
 
         # Check if element should be rendered in block context
