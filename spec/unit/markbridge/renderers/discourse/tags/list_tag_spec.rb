@@ -242,6 +242,55 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         expect(render_in_document(second, first, second)).to start_with("\n\n<!---->")
       end
 
+      it "separates two lists with whitespace between them" do
+        # A newline between two BBCode lists is a Text node of its own.
+        first = list_with_item(ordered: false, text: "a")
+        second = list_with_item(ordered: false, text: "b")
+        space = Markbridge::AST::Text.new(" \n\t")
+
+        expect(render_in_document(second, first, space, second)).to start_with("\n\n<!---->")
+      end
+
+      it "separates two lists with a line break between them" do
+        first = list_with_item(ordered: false, text: "a")
+        second = list_with_item(ordered: false, text: "b")
+        line_break = Markbridge::AST::LineBreak.new
+
+        expect(render_in_document(second, first, line_break, second)).to start_with("\n\n<!---->")
+      end
+
+      it "separates two lists with an empty list between them" do
+        first = list_with_item(ordered: false, text: "a")
+        empty = Markbridge::AST::List.new(ordered: false)
+        second = list_with_item(ordered: false, text: "b")
+
+        expect(render_in_document(second, first, empty, second)).to start_with("\n\n<!---->")
+      end
+
+      it "does not separate a list from an empty list in front of it" do
+        # The empty list renders to nothing, a comment would stand alone.
+        empty = Markbridge::AST::List.new(ordered: false)
+        list = list_with_item(ordered: false, text: "b")
+
+        expect(render_in_document(list, empty, list)).to eq("\n\n- b\n\n\n")
+      end
+
+      it "does not separate a list from a list with text between them" do
+        first = list_with_item(ordered: false, text: "a")
+        second = list_with_item(ordered: false, text: "b")
+        text = Markbridge::AST::Text.new("\nx\n")
+
+        expect(render_in_document(second, first, text, second)).to eq("\n\n- b\n\n\n")
+      end
+
+      it "does not look past an element that is not a list" do
+        first = list_with_item(ordered: false, text: "a")
+        second = list_with_item(ordered: false, text: "b")
+        quote = Markbridge::AST::Quote.new
+
+        expect(render_in_document(second, first, quote, second)).to eq("\n\n- b\n\n\n")
+      end
+
       it "separates two lists whose classes are subclasses of List" do
         list_class = Class.new(Markbridge::AST::List)
         first = list_class.new(ordered: false)
