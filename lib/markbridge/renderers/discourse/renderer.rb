@@ -288,11 +288,11 @@ module Markbridge
         # punctuation, so the run can open or close again.
         #
         # A tilde counts as a blocking neighbor like a word character:
-        # CommonMark reads `~` as punctuation, but cmark-gfm
-        # (commonmarker) does not treat it as one next to an emphasis
-        # delimiter, so strikethrough right next to emphasis with a
-        # punctuation edge needs the boundary as well. markdown-it would
-        # not need it; the comment changes nothing there.
+        # CommonMark reads `~` as punctuation, but cmark-gfm does not
+        # treat it as one next to an emphasis delimiter, so strikethrough
+        # right next to emphasis with a punctuation edge needs the
+        # boundary as well. markdown-it would not need it; the comment
+        # changes nothing there.
         JOIN_ACTIONS =
           Array
             .new(CLASS_COUNT * 256) do |index|

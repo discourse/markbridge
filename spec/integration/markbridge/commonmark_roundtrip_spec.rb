@@ -2,17 +2,14 @@
 
 require "json"
 
-# commonmarker's Rust/Magnus native extension only builds on MRI.
-require "commonmarker" if RUBY_ENGINE == "ruby"
-
 # Round-trips the CommonMark Spec 0.31.2 examples through the HTML parser
 # and the Discourse renderer.
 #
 # The examples are Markdown -> HTML pairs and the renderer starts from an
 # AST, so this spec runs them backwards: it takes the HTML a CommonMark
 # parser produces, converts it to Markdown with Markbridge, cooks that
-# Markdown with commonmarker and compares the result with the HTML it
-# started from. Same HTML in, same HTML out.
+# Markdown with markdown-it set up like Discourse and compares the result
+# with the HTML it started from. Same HTML in, same HTML out.
 #
 # Asserting on the Markdown string instead would not find much: a wrong
 # indentation or a missing blank line still looks plausible in the string
@@ -95,33 +92,8 @@ module CommonMarkRoundTrip
     ul
   ].to_set.freeze
 
-  # * unsafe: the spec's HTML keeps every link and image destination,
-  #   commonmarker would otherwise drop some of them.
-  # * escaped_char_spans: off, we do not want a <span> around every
-  #   backslash escape the renderer writes.
-  # * github_pre_lang: off, so a fenced code block cooks to the
-  #   <pre><code class="language-x"> shape the spec expects.
-  # * header_ids: off, the spec's headings carry no anchor.
-  # * strikethrough: on, the renderer writes ~~ for <del> and <s>.
-  #
-  # The autolink extension stays on (it is a commonmarker default, and
-  # Discourse links bare URLs too). That is what makes the renderer's
-  # bare-URL form round-trip at all, and the few examples where the spec
-  # keeps a URL as plain text are listed as intended differences.
-  COMMONMARK_OPTIONS = {
-    render: {
-      unsafe: true,
-      escaped_char_spans: false,
-      github_pre_lang: false,
-    },
-    extension: {
-      header_ids: nil,
-      strikethrough: true,
-    },
-  }.freeze
-
-  # The syntax highlighter would wrap every code block in <span> markup.
-  COMMONMARK_PLUGINS = { syntax_highlighter: nil }.freeze
+  CURLY_QUOTES = "\u201C\u201D\u2018\u2019"
+  STRAIGHT_QUOTES = "\"\"''"
 
   # Reasons, so that the id lists below stay readable.
   EMPTY_ELEMENT = "an element without content renders to nothing"
@@ -149,7 +121,7 @@ module CommonMarkRoundTrip
     by_example(
       EMPTY_ELEMENT => [126, 130, 144, 218, 237, 239, 240, 280, 281, 282, 283, 284, 315],
       LINK_WITHOUT_TEXT => [21, 31, 200, 476, 477, 484, 485, 486, 487, 567, 642, 643],
-      BARE_URL => [344, 596, 597, 598, 599, 601],
+      BARE_URL => [344, 596, 598, 599, 601],
       BARE_URL_DOTS_ONLY => [600],
       COOKED_AUTOLINK => [602, 606, 608, 611, 612],
       BOLD_IS_STRONG => [494],
@@ -179,7 +151,7 @@ module CommonMarkRoundTrip
   end
 
   def cook(markdown)
-    Commonmarker.to_html(markdown, options: COMMONMARK_OPTIONS, plugins: COMMONMARK_PLUGINS)
+    MarkdownItCooker.cook(markdown)
   end
 
   # Brings both sides into a shape where only differences Markbridge is
@@ -207,7 +179,7 @@ module CommonMarkRoundTrip
     fragment.css("a[title], img[title]").each { |node| node.remove_attribute("title") }
     fragment.css("ol[start]").each { |node| node.remove_attribute("start") }
 
-    # commonmarker always writes the alt attribute, the spec leaves it out
+    # markdown-it always writes the alt attribute, the spec leaves it out
     # when it is empty. An alt text that got lost still shows up, because
     # then only one of the two sides is empty.
     fragment.css("img[alt='']").each { |node| node.remove_attribute("alt") }
@@ -220,12 +192,16 @@ module CommonMarkRoundTrip
   # writer is free to place differently. Whitespace between two inline
   # elements is kept, so a lost space between two words or two links is
   # still a difference.
+  #
+  # markdown-it's typographer turns straight quotes into curly ones
+  # (Discourse has it on). That is display, so both sides get straight
+  # quotes.
   def normalize_whitespace(fragment)
     fragment.traverse do |node|
       next unless node.text?
       next if node.ancestors.any? { |ancestor| ancestor.name == "pre" }
 
-      text = node.text.gsub(/\s+/, " ")
+      text = node.text.gsub(/\s+/, " ").tr(CURLY_QUOTES, STRAIGHT_QUOTES)
       text = text.lstrip if block_boundary?(node.previous_sibling, node.parent)
       text = text.rstrip if block_boundary?(node.next_sibling, node.parent)
       text.empty? ? node.remove : node.content = text
@@ -247,9 +223,7 @@ module CommonMarkRoundTrip
   end
 end
 
-skip_reason = "commonmarker not available on #{RUBY_ENGINE}" unless RUBY_ENGINE == "ruby"
-
-RSpec.describe "CommonMark spec round-trip", skip: skip_reason do
+RSpec.describe "CommonMark spec round-trip", skip: MarkdownItCooker::SKIP_REASON do
   # Converts one example and returns what to compare, plus the message
   # that tells the whole story when the comparison is not what the list
   # above says it should be.

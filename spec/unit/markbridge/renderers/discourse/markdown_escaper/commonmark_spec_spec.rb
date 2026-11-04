@@ -2,9 +2,6 @@
 
 require "json"
 
-# commonmarker's Rust/Magnus native extension only builds on MRI.
-require "commonmarker" if RUBY_ENGINE == "ruby"
-
 # Validates the MarkdownEscaper against all CommonMark Spec 0.31.2 examples.
 #
 # Two properties are checked for every example:
@@ -17,10 +14,8 @@ require "commonmarker" if RUBY_ENGINE == "ruby"
 # 2. **Content preservation** — every word that appears in the spec's expected
 #    HTML output must still appear after escaping and re-rendering. This catches
 #    bugs where the escaper silently drops or corrupts text.
-skip_reason = "commonmarker not available on #{RUBY_ENGINE}" unless RUBY_ENGINE == "ruby"
-
 RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
-  context "with CommonMark Spec 0.31.2 examples", skip: skip_reason do
+  context "with CommonMark Spec 0.31.2 examples", skip: MarkdownItCooker::SKIP_REASON do
     let(:escaper) { described_class.new(escape_hard_line_breaks: true) }
 
     SPEC_EXAMPLES = JSON.parse(SPEC_ROOT.join("fixtures/commonmark_spec_0.31.2.json").read)
@@ -28,10 +23,8 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
     # Block-level tags that indicate the escaper failed to neutralize a construct
     BLOCK_TAG = %r{<(?:h[1-6]|pre|blockquote|[uo]l|li|hr|table|div)[\s/>]}
 
-    COMMONMARK_OPTIONS = { render: { escaped_char_spans: false }, extension: {} }.freeze
-
-    def render_commonmark(text)
-      Commonmarker.to_html(text.encode("UTF-8"), options: COMMONMARK_OPTIONS)
+    def render_markdown(text)
+      MarkdownItCooker.cook(text.encode("UTF-8"))
     end
 
     def paragraph_only?(html)
@@ -87,7 +80,7 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       MARKUP_EXAMPLES.each do |ex|
         it "renders #{preview(ex["markdown"])} as plain text (#{ex["section"]}, example #{ex["example"]})" do
           escaped = escaper.escape(ex["markdown"])
-          result_html = render_commonmark(escaped)
+          result_html = render_markdown(escaped)
 
           expect(result_html).to(
             satisfy("contain no block-level HTML tags") { |html| paragraph_only?(html) },
@@ -103,7 +96,7 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       PLAIN_EXAMPLES.each do |ex|
         it "preserves #{preview(ex["markdown"])} as paragraph (#{ex["section"]}, example #{ex["example"]})" do
           escaped = escaper.escape(ex["markdown"])
-          result_html = render_commonmark(escaped)
+          result_html = render_markdown(escaped)
 
           expect(result_html).to(
             satisfy("contain no block-level HTML tags") { |html| paragraph_only?(html) },
@@ -119,7 +112,7 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       AUTOLINK_EXAMPLES.each do |ex|
         it "preserves #{preview(ex["markdown"])} (#{ex["section"]}, example #{ex["example"]})" do
           escaped = escaper.escape(ex["markdown"])
-          result_html = render_commonmark(escaped)
+          result_html = render_markdown(escaped)
 
           expect(result_html).to(
             satisfy("preserve autolinks or render as paragraph") do |html|

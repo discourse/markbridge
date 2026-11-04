@@ -175,7 +175,7 @@ class AstGenerator
 
   def quote(depth:)
     # No author: an attributed quote renders Discourse BBCode, which
-    # commonmarker does not know.
+    # plain markdown-it does not know.
     quote = spend { AST::Quote.new }
     fill_block_container(quote, depth: depth + 1, headings: true)
     quote
