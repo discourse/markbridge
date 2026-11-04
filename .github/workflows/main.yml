@@ -56,7 +56,7 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-      # The specs cook the Markdown with markdown-it as well. JRuby skips
+      # The specs cook the Markdown with markdown-it. JRuby skips
       # those specs, its Nokogiri has no HTML5 parser.
       - name: Set up Node
         if: ${{ !startsWith(matrix.ruby, 'jruby') }}

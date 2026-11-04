@@ -58,12 +58,6 @@ class RoundTripChecker
     s
   ].freeze
 
-  # The renderer falls back to raw HTML when the content already carries
-  # the Markdown marker, and its strikethrough fallback is <s> where
-  # cmark-gfm's ~~ produces <del> (markdown-it's ~~ produces <s>). Both
-  # mean the same element.
-  ELEMENT_ALIASES = { "s" => "del" }.freeze
-
   # Elements whose content stands apart from the text around them, so the
   # text check puts a separator on both sides.
   BLOCK_ELEMENTS = %w[
@@ -293,7 +287,7 @@ class RoundTripChecker
     when AST::Italic
       [skeleton("em", children: expected_children(node))]
     when AST::Strikethrough
-      [skeleton("del", children: expected_children(node))]
+      [skeleton("s", children: expected_children(node))]
     when AST::HorizontalRule
       [skeleton("hr")]
     when AST::Element
@@ -378,12 +372,7 @@ class RoundTripChecker
       when "img"
         [skeleton("img", href: decode(node["src"]))]
       when *STRUCTURAL_ELEMENTS
-        [
-          skeleton(
-            ELEMENT_ALIASES.fetch(node.name, node.name),
-            children: actual_skeleton(node.children),
-          ),
-        ]
+        [skeleton(node.name, children: actual_skeleton(node.children))]
       else
         actual_skeleton(node.children)
       end

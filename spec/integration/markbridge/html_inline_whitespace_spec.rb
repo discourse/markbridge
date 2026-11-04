@@ -4,8 +4,7 @@ require "spec_helper"
 
 RSpec.describe "HTML inline whitespace", skip: CookedOutput::SKIP_REASON do
   def converted_dom(html)
-    markdown = Markbridge.html_to_markdown(html).markdown
-    Nokogiri::HTML.fragment(Commonmarker.to_html(markdown, options: CookedOutput::OPTIONS))
+    Nokogiri::HTML.fragment(MarkdownItCooker.cook(Markbridge.html_to_markdown(html).markdown))
   end
 
   it "renders a punctuation-ending label identically with whitespace inside or outside strong" do

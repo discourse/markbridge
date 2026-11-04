@@ -5,9 +5,7 @@ require "nokogiri"
 require "open3"
 
 # Cooks Markdown with markdown-it, set up like Discourse (see
-# spec/support/markdown_it/cook.mjs). commonmarker reads some Markdown
-# differently: it does not link bare URLs, it reads a single `~` as
-# strikethrough and it keeps a single newline a soft break.
+# spec/support/markdown_it/cook.mjs).
 #
 # One Node process cooks everything for a whole spec run. It starts with the
 # first cook and ends when Ruby exits. Node is a subprocess and not a gem, so

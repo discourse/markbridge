@@ -7,7 +7,6 @@ gemspec
 gem "benchmark"
 gem "benchmark-ips"
 gem "csv"
-gem "commonmarker", install_if: -> { RUBY_ENGINE == "ruby" }
 gem "lefthook"
 gem "nokogiri"
 gem "puma"
@@ -22,7 +21,6 @@ gem "sinatra"
 gem "syntax_tree"
 
 # mutant only runs in the dedicated MRI `mutation` CI job. Keep it (and its
-# rdoc → rbs chain, which has a native extension) off JRuby/TruffleRuby, the
-# same way commonmarker is guarded above.
+# rdoc → rbs chain, which has a native extension) off JRuby/TruffleRuby.
 gem "mutant", install_if: -> { RUBY_ENGINE == "ruby" }
 gem "mutant-rspec", install_if: -> { RUBY_ENGINE == "ruby" }
