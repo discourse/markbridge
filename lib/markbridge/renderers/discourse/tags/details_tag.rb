@@ -33,8 +33,14 @@ module Markbridge
 
             return render_html(element.title, content) if interface.html_mode?
 
+            # Blank lines keep the content apart from the two tag lines:
+            # a table right in front of the closing tag would take the
+            # tag line as a row, and a `---` right after the opening tag
+            # would make it a heading. Discourse finds the closing tag
+            # line first and reads the lines between as blocks, so the
+            # blank lines change nothing there.
             opener = element.title ? %([details="#{element.title}"]) : "[details]"
-            "\n\n#{opener}\n#{content}\n[/details]\n\n"
+            "\n\n#{opener}\n\n#{content}\n\n[/details]\n\n"
           end
 
           private
