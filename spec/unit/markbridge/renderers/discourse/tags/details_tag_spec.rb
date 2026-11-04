@@ -7,12 +7,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
   let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
   describe "#render" do
-    it "renders [details=\"title\"]…[/details] bracketed by blank lines" do
+    it "renders [details=\"title\"]…[/details] with blank lines around the tags and the body" do
       element = Markbridge::AST::Details.new(title: "Show more")
       element << Markbridge::AST::Text.new("hidden body")
 
       expect(tag.render(element, interface)).to eq(
-        %(\n\n[details="Show more"]\nhidden body\n[/details]\n\n),
+        %(\n\n[details="Show more"]\n\nhidden body\n\n[/details]\n\n),
       )
     end
 
@@ -21,7 +21,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
       element << Markbridge::AST::Text.new(" \nhidden body\n ")
 
       expect(tag.render(element, interface)).to eq(
-        %(\n\n[details="Show more"]\nhidden body\n[/details]\n\n),
+        %(\n\n[details="Show more"]\n\nhidden body\n\n[/details]\n\n),
       )
     end
 
@@ -42,19 +42,17 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
       element = Markbridge::AST::Details.new
       element << Markbridge::AST::Text.new("body")
 
-      expect(tag.render(element, interface)).to eq("\n\n[details]\nbody\n[/details]\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n[details]\n\nbody\n\n[/details]\n\n")
     end
 
     it "strips leading/trailing whitespace inside the block" do
-      # Block-level children frequently emit their own \n\n bracketing
-      # (Quote, Table, …). Without stripping, the [details] opener
-      # would be followed by a stray blank line and the BBCode parser
-      # would treat the body as a separate paragraph.
+      # Block-level children emit their own \n\n bracketing (Quote,
+      # Table, …), and the tag puts exactly one blank line on each side.
       element = Markbridge::AST::Details.new(title: "X")
       element << Markbridge::AST::Text.new("\n\nbody with leading\n\n")
 
       expect(tag.render(element, interface)).to eq(
-        %(\n\n[details="X"]\nbody with leading\n[/details]\n\n),
+        %(\n\n[details="X"]\n\nbody with leading\n\n[/details]\n\n),
       )
     end
 
@@ -64,7 +62,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
       bold << Markbridge::AST::Text.new("inner")
       element << bold
 
-      expect(tag.render(element, interface)).to eq(%(\n\n[details="T"]\n**inner**\n[/details]\n\n))
+      expect(tag.render(element, interface)).to eq(
+        %(\n\n[details="T"]\n\n**inner**\n\n[/details]\n\n),
+      )
     end
 
     let(:element_class) { Markbridge::AST::Details }
