@@ -12,10 +12,12 @@
 #   bin/fuzz-render --sample 5000             # a random subset of the pairs
 #   bin/fuzz-render --all                     # run the known bugs too
 #
-# Every failure is shrunk and printed as a report: the AST, its Markdown
-# and the cooked HTML. With --output the reports go to <dir>/failures.txt
-# and the summary to <dir>/summary.txt. The exit status is 1 when a case
-# fails that is not a known bug, or when a known bug passes.
+# Every failure is shrunk, and the failures whose shrunk trees have the
+# same shape (see AstDump.signature) are one group: one report, the AST,
+# its Markdown and the cooked HTML, and the cases it stands for. With
+# --output the reports go to <dir>/failures.txt and the summary to
+# <dir>/summary.txt. The exit status is 1 when a case fails that is not
+# a known bug, or when a known bug passes.
 
 ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../Gemfile", __dir__)
 
@@ -46,7 +48,8 @@ class FuzzRender
     @failed = []
     @stale = []
     @known = []
-    @reports = []
+    # signature => [report, ids]
+    @groups = {}
     @counts = Hash.new(0)
   end
 
@@ -125,8 +128,22 @@ class FuzzRender
       @known << Result.new(family: family.name, id:, checks:, reason:)
     else
       @failed << Result.new(family: family.name, id:, checks:, reason: nil)
-      label = kase.is_a?(Integer) ? "seed #{kase}" : kase.id
-      @reports << @checker.explain(build.call, label:)
+      group(family, id, build.call)
+    end
+  end
+
+  # Shrinks the document and files it under the shape of what is left.
+  # The first case of a shape gets the report.
+  def group(family, id, document)
+    before = document.descendants.size
+    @checker.shrink(document)
+    signature = AstDump.signature(document)
+    group = @groups[signature]
+    if group
+      group[1] << "#{family.name} #{id}"
+    else
+      label = "#{family.name} #{id}, shrunk from #{before} to #{document.descendants.size} nodes"
+      @groups[signature] = [@checker.report(document, label:), ["#{family.name} #{id}"]]
     end
   end
 
@@ -136,7 +153,14 @@ class FuzzRender
   end
 
   def finish
-    reports = @reports.join("\n\n#{"=" * 72}\n\n")
+    reports =
+      @groups
+        .values
+        .sort_by { |_, ids| -ids.size }
+        .map do |report, ids|
+          "#{ids.size} cases: #{ids.first(10).join(", ")}#{", ..." if ids.size > 10}\n\n#{report}"
+        end
+        .join("\n\n#{"=" * 72}\n\n")
     summary = summary_text
 
     if @output
@@ -166,6 +190,14 @@ class FuzzRender
         .tally
         .sort_by { |check, count| [-count, check] }
         .each { |check, count| lines << format("  %-10s %6d", check, count) }
+      lines << "" << "distinct failures: #{@groups.size}"
+      @groups
+        .values
+        .sort_by { |_, ids| -ids.size }
+        .each do |report, ids|
+          checks = report.lines.grep(/\A(structure|text|links|lists|shape):/).map(&:strip)
+          lines << "  #{ids.size} cases, e.g. #{ids.first}: #{checks.join("; ")}"
+        end
       lines << "" << "failed cases:"
       @failed.each do |result|
         lines << "  #{result.family} #{result.id} [#{result.checks.join(", ")}]"

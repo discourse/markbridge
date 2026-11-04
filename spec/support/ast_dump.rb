@@ -17,6 +17,25 @@ module AstDump
     lines.join("\n")
   end
 
+  # The dump with every text reduced to its character classes, so two
+  # trees that fail for the same reason get the same signature: a letter
+  # is "a", a digit "1", whitespace a space, every other character
+  # itself, and a run of one class is one character.
+  #
+  # @param node [Markbridge::AST::Node]
+  # @return [String]
+  def self.signature(node)
+    dump(node).gsub(/"((?:[^"\\]|\\.)*)"/) do
+      classes =
+        Regexp
+          .last_match(1)
+          .gsub(/[[:alpha:]]+/, "a")
+          .gsub(/[[:digit:]]+/, "1")
+          .gsub(/[[:space:]]+/, " ")
+      classes.inspect
+    end
+  end
+
   # @param node [Markbridge::AST::Node]
   # @return [String] one line with the node's class and its own attributes
   def self.describe(node)
