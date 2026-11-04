@@ -1,0 +1,620 @@
+# frozen_string_literal: true
+
+RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
+  subject(:serializer) do
+    described_class.new(escaper: Markbridge::Renderers::Discourse::MarkdownEscaper.new)
+  end
+
+  let(:tokens) { Markbridge::Renderers::Discourse::Inline::Tokens }
+
+  def write(*tokens, html_mode: false)
+    serializer.write(tokens, html_mode:)
+  end
+
+  def em(*content)
+    [tokens.open(:em), *content, tokens.close(:em)]
+  end
+
+  describe "#write" do
+    it "writes nothing for no tokens" do
+      expect(write).to eq("")
+    end
+
+    it "writes Markdown when html_mode is not given" do
+      expect(serializer.write([tokens.open(:em), tokens.text("a"), tokens.close(:em)])).to eq("*a*")
+    end
+
+    it "escapes text" do
+      expect(write(tokens.text("# a *b*"))).to eq("\\# a \\*b\\*")
+    end
+
+    it "escapes text in a link label with the closing bracket" do
+      expect(write(tokens.text("a]b", tokens::LABEL))).to eq("a]b".sub("]", "\\]"))
+    end
+
+    it "writes verbatim text as it is" do
+      expect(write(tokens.text("*a*", tokens::VERBATIM))).to eq("*a*")
+    end
+
+    it "writes raw Markdown and HTML as they are" do
+      expect(write(tokens.raw("**a**"), tokens.html("<sup>2</sup>"))).to eq("**a**<sup>2</sup>")
+    end
+
+    it "joins the pieces with the join rules" do
+      expect(write(tokens.raw("**a**"), tokens.raw("**b**"))).to eq("**a**<!---->**b**")
+    end
+
+    it "writes a hard break as a newline" do
+      expect(write(tokens.text("a"), tokens.hard_break, tokens.text("b"))).to eq("a\nb")
+    end
+
+    describe "delimiters" do
+      it "wraps the content in the markers" do
+        expect(write(tokens.open(:strong), tokens.text("a"), tokens.close(:strong))).to eq("**a**")
+        expect(write(*em(tokens.text("a")))).to eq("*a*")
+        expect(write(tokens.open(:s), tokens.text("a"), tokens.close(:s))).to eq("~~a~~")
+        expect(write(tokens.open(:u), tokens.text("a"), tokens.close(:u))).to eq("[u]a[/u]")
+      end
+
+      it "keeps whitespace at the edges outside the markers" do
+        expect(write(*em(tokens.text("  a\t")))).to eq("  *a*\t")
+        expect(write(*em(tokens.text(" a ")))).to eq(" *a* ")
+        expect(write(*em(tokens.text(" a\nb ")))).to eq(" *a\nb* ")
+      end
+
+      it "keeps whitespace on one edge outside the markers" do
+        expect(write(*em(tokens.text("  a")))).to eq("  *a*")
+        expect(write(*em(tokens.text("a  ")))).to eq("*a*  ")
+      end
+
+      it "writes content with nothing visible without markers" do
+        expect(write(*em(tokens.text("  ")))).to eq("  ")
+        expect(write(*em(tokens.text(" ")))).to eq(" ")
+        expect(write(*em)).to eq("")
+      end
+
+      it "joins the pieces of the content among themselves" do
+        expect(write(*em(tokens.raw("`a`"), tokens.raw("`b`")))).to eq("*`a`<!---->`b`*")
+      end
+
+      it "joins the wrapped content with its neighbors" do
+        expect(write(tokens.text("item"), *em(tokens.text("#")))).to eq("item<!---->*\\#*")
+        expect(write(*em(tokens.text("#")), tokens.text("item"))).to eq("*\\#*<!---->item")
+      end
+
+      it "nests a delimiter in another and falls back to HTML when the markers share a character" do
+        strong = tokens.open(:strong), tokens.text("b"), tokens.close(:strong)
+        strike = tokens.open(:s), tokens.text("b"), tokens.close(:s)
+
+        expect(write(*em(tokens.text("a"), *strike, tokens.text("c")))).to eq("*a~~b~~c*")
+        expect(write(*em(tokens.text("a"), *strong, tokens.text("c")))).to eq("<em>a**b**c</em>")
+      end
+
+      it "nests a delimiter in itself" do
+        expect(write(*em(tokens.text("a "), *em(tokens.text("b"))))).to eq("<em>a *b*</em>")
+      end
+
+      it "falls back to HTML when the content holds the marker" do
+        expect(write(tokens.open(:strong), tokens.raw("a**b"), tokens.close(:strong))).to eq(
+          "<strong>a**b</strong>",
+        )
+        expect(write(*em(tokens.raw("a*b")))).to eq("<em>a*b</em>")
+        expect(write(tokens.open(:s), tokens.raw("a~~b"), tokens.close(:s))).to eq("<s>a~~b</s>")
+      end
+
+      it "falls back to HTML when the marker's character stands at an edge of the content" do
+        expect(write(tokens.open(:strong), tokens.raw("*a"), tokens.close(:strong))).to eq(
+          "<strong>*a</strong>",
+        )
+        expect(write(tokens.open(:s), tokens.raw("a~"), tokens.close(:s))).to eq("<s>a~</s>")
+        expect(write(tokens.open(:s), tokens.raw(" ~a "), tokens.close(:s))).to eq("<s> ~a </s>")
+      end
+
+      it "wraps content whose last character is escaped" do
+        expect(write(tokens.open(:strong), tokens.text("*bold*"), tokens.close(:strong))).to eq(
+          "**\\*bold\\***",
+        )
+        expect(write(tokens.open(:s), tokens.raw("a\\\\~"), tokens.close(:s))).to eq(
+          "<s>a\\\\~</s>",
+        )
+        expect(write(tokens.open(:s), tokens.raw("\\~"), tokens.close(:s))).to eq("~~\\~~~")
+      end
+
+      it "has no HTML fallback for the underline" do
+        expect(write(tokens.open(:u), tokens.raw("[u]a[/u]"), tokens.close(:u))).to eq(
+          "[u][u]a[/u][/u]",
+        )
+      end
+    end
+
+    describe "code spans" do
+      it "writes nothing for empty code" do
+        expect(write(tokens.code(""))).to eq("")
+      end
+
+      it "wraps the code in one backtick more than its longest run" do
+        expect(write(tokens.code("a"))).to eq("`a`")
+        expect(write(tokens.code("a`b"))).to eq("``a`b``")
+        expect(write(tokens.code("a``b`c"))).to eq("```a``b`c```")
+        expect(write(tokens.code("a`b``c"))).to eq("```a`b``c```")
+      end
+
+      it "pads code with a backtick at an edge" do
+        expect(write(tokens.code("`a"))).to eq("`` `a ``")
+        expect(write(tokens.code("a`"))).to eq("`` a` ``")
+      end
+
+      it "pads code with a space at both edges" do
+        expect(write(tokens.code(" a "))).to eq("`  a  `")
+      end
+
+      it "does not pad code with a space at one edge, or spaces only" do
+        expect(write(tokens.code(" a"))).to eq("` a`")
+        expect(write(tokens.code("a "))).to eq("`a `")
+        expect(write(tokens.code("  "))).to eq("`  `")
+      end
+
+      it "does not escape the code" do
+        expect(write(tokens.code("*a*"))).to eq("`*a*`")
+      end
+
+      it "keeps two code spans apart" do
+        expect(write(tokens.code("a"), tokens.code("b"))).to eq("`a`<!---->`b`")
+      end
+    end
+
+    describe "links" do
+      def link(destination, *content)
+        [tokens.link_open(destination), *content, tokens.link_close]
+      end
+
+      it "writes the label and the destination" do
+        expect(write(*link("https://e.com", tokens.text("a")))).to eq("[a](https://e.com)")
+      end
+
+      it "escapes the destination" do
+        expect(write(*link("https://e.com/a(b)\\c d", tokens.text("a")))).to eq(
+          "[a](<https://e.com/a\\(b\\)\\\\c d>)",
+        )
+      end
+
+      it "keeps whitespace at the edges of the label outside the brackets" do
+        expect(write(*link("/a", tokens.text(" a ")))).to eq(" [a](/a) ")
+      end
+
+      it "writes a label with nothing visible without the link" do
+        expect(write(*link("/a", tokens.text(" ")))).to eq(" ")
+        expect(write(*link("/a"))).to eq("")
+      end
+
+      it "nests delimiters in the label" do
+        expect(write(*link("/a", *em(tokens.text("a"))))).to eq("[*a*](/a)")
+      end
+
+      it "nests a link in a delimiter" do
+        expect(write(*em(tokens.text("a"), *link("/a", tokens.text("b"))))).to eq("*a[b](/a)*")
+      end
+
+      it "pairs a link in a link by depth" do
+        expect(write(*link("/a", *link("/b", tokens.text("x"))))).to eq("[[x](/b)](/a)")
+      end
+
+      it "escapes a ! in front of the link" do
+        expect(write(tokens.text("a!"), *link("/a", tokens.text("b")))).to eq("a\\![b](/a)")
+      end
+    end
+
+    describe "bare URLs" do
+      let(:href) { "https://e.com/p" }
+      let(:link) { "[#{href}](#{href})" }
+
+      it "stays bare with whitespace on both sides" do
+        expect(write(tokens.text("a "), tokens.bare_url(href), tokens.text(" b"))).to eq(
+          "a #{href} b",
+        )
+      end
+
+      it "stays bare on its own" do
+        expect(write(tokens.bare_url(href))).to eq(href)
+      end
+
+      it "stays bare at the start and at the end of the run" do
+        expect(write(tokens.bare_url(href), tokens.text(" b"))).to eq("#{href} b")
+        expect(write(tokens.text("a "), tokens.bare_url(href))).to eq("a #{href}")
+      end
+
+      it "stays bare after a no-break space" do
+        expect(write(tokens.text("a "), tokens.bare_url(href))).to eq("a #{href}")
+      end
+
+      it "stays bare after an opening parenthesis and before a closing one" do
+        expect(write(tokens.text("("), tokens.bare_url(href), tokens.text(")"))).to eq("(#{href})")
+      end
+
+      it "stays bare before sentence punctuation that whitespace or the end follows" do
+        %w[. , ! ? ) .. ... !! ?? ). ),].each do |punctuation|
+          expect(write(tokens.bare_url(href), tokens.text("#{punctuation} b"))).to eq(
+            "#{href}#{punctuation} b",
+          )
+          expect(write(tokens.bare_url(href), tokens.text(punctuation))).to eq(
+            "#{href}#{punctuation}",
+          )
+        end
+      end
+
+      it "becomes a link before punctuation that linkify keeps in the link" do
+        %w[: .) ?! ., ,, ;].each do |punctuation|
+          expect(write(tokens.bare_url(href), tokens.text("#{punctuation} b"))).to eq(
+            "#{link}#{punctuation} b",
+          )
+        end
+      end
+
+      it "becomes a link before a closing parenthesis when the href has parentheses" do
+        href = "https://e.com/a_(b)"
+
+        link = "[https://e.com/a\\_(b)](https://e.com/a_\\(b\\))"
+
+        expect(write(tokens.bare_url(href), tokens.text(") b"))).to eq("#{link}) b")
+        expect(write(tokens.text("("), tokens.bare_url(href), tokens.text(")"))).to eq("(#{link})")
+      end
+
+      it "becomes a link with text glued to it" do
+        expect(write(tokens.text("a"), tokens.bare_url(href))).to eq("a#{link}")
+        expect(write(tokens.bare_url(href), tokens.text("b"))).to eq("#{link}b")
+        expect(write(tokens.bare_url(href), tokens.text(".b"))).to eq("#{link}.b")
+      end
+
+      it "becomes a link after a multi-byte character" do
+        expect(write(tokens.text("漢"), tokens.bare_url(href))).to eq("漢#{link}")
+      end
+
+      it "becomes a link next to a delimiter or a code span" do
+        expect(write(*em(tokens.text("a")), tokens.bare_url(href))).to eq("*a*#{link}")
+        expect(write(tokens.bare_url(href), tokens.code("x"))).to eq("#{link}`x`")
+      end
+
+      it "becomes a link in front of another bare URL" do
+        expect(write(tokens.bare_url(href), tokens.bare_url(href))).to eq("#{link}#{link}")
+      end
+
+      it "escapes the label like a link label and the destination like a destination" do
+        href = "https://e.com/a]b_c"
+
+        expect(write(tokens.text("a"), tokens.bare_url(href))).to eq(
+          "a[https://e.com/a\\]b\\_c](https://e.com/a]b_c)",
+        )
+      end
+
+      it "stays bare after a hard break" do
+        expect(write(tokens.text("a"), tokens.hard_break, tokens.bare_url(href))).to eq(
+          "a\n#{href}",
+        )
+      end
+    end
+
+    describe "images" do
+      it "writes the source and the alt text" do
+        expect(write(tokens.image(src: "a.png", alt: "x"))).to eq("![x](a.png)")
+      end
+
+      it "writes no alt text when there is none" do
+        expect(write(tokens.image(src: "a.png"))).to eq("![](a.png)")
+      end
+
+      it "escapes the alt text like a link label and the source like a destination" do
+        expect(write(tokens.image(src: "a (b).png", alt: "x]*y*"))).to eq(
+          "![x\\]\\*y\\*](<a \\(b\\).png>)",
+        )
+      end
+
+      it "writes the size as Discourse reads it" do
+        expect(write(tokens.image(src: "a.png", alt: "x", width: 10, height: 5))).to eq(
+          "![x|10x5](a.png)",
+        )
+        expect(write(tokens.image(src: "a.png", alt: "x", width: 10))).to eq("![x|10](a.png)")
+        expect(write(tokens.image(src: "a.png", alt: "x", height: 5))).to eq("![x](a.png)")
+        expect(write(tokens.image(src: "a.png", width: 10))).to eq("![|10](a.png)")
+      end
+
+      it "keeps a part of the alt text that looks like an option apart from the options" do
+        expect(write(tokens.image(src: "a.png", alt: "x|100x100", width: 10))).to eq(
+          "![x\\|100x100||10](a.png)",
+        )
+        expect(write(tokens.image(src: "a.png", alt: "x|thumbnail"))).to eq(
+          "![x\\|thumbnail|](a.png)",
+        )
+        expect(write(tokens.image(src: "a.png", alt: "x|k=v"))).to eq("![x\\|k=v|](a.png)")
+        expect(write(tokens.image(src: "a.png", alt: "x|y"))).to eq("![x\\|y](a.png)")
+      end
+
+      it "puts the alt text on one line" do
+        expect(write(tokens.image(src: "a.png", alt: "x \n\n y \nz"))).to eq("![x y z](a.png)")
+      end
+    end
+
+    describe "errors" do
+      it "refuses a close token without its open token" do
+        expect { write(tokens.close(:em)) }.to raise_error(
+          ArgumentError,
+          "close token without an open token in front of it",
+        )
+        expect { write(tokens.link_close) }.to raise_error(
+          ArgumentError,
+          "link_close token without an open token in front of it",
+        )
+      end
+
+      it "refuses an open token without its close token" do
+        message = "open token without a close token after it"
+
+        expect { write(tokens.open(:em), tokens.text("a")) }.to raise_error(ArgumentError, message)
+        expect { write(*em(tokens.open(:em))) }.to raise_error(ArgumentError, message)
+        expect { write(tokens.link_open("/a")) }.to raise_error(
+          ArgumentError,
+          "link_open token without a link_close token after it",
+        )
+      end
+
+      it "does not close a delimiter with the close token of another" do
+        expect { write(tokens.open(:em), tokens.close(:strong)) }.to raise_error(
+          ArgumentError,
+          "open token without a close token after it",
+        )
+      end
+
+      it "refuses an unknown token" do
+        expect { write([:bold, "a"]) }.to raise_error(
+          ArgumentError,
+          'unknown inline token [:bold, "a"]',
+        )
+        expect { write("a") }.to raise_error(ArgumentError, 'unknown inline token "a"')
+      end
+    end
+
+    # One character class at the inner edge of a text and an emphasis,
+    # and around a bare URL. The classes are the ones the adjacency
+    # round-trip builds its cases from, so a rule that changes shows
+    # here first.
+    describe "character classes at the edges" do
+      EDGE_OUTPUTS = {
+        "a" => ["xa*ay*", "*xa*ay", "xa[https://e.com/p](https://e.com/p)ay"],
+        "1" => ["x1*1y*", "*x1*1y", "x1[https://e.com/p](https://e.com/p)1y"],
+        "space" => ["x  *y*", "*x*  y", "x https://e.com/p y"],
+        "*" => [
+          "x\\*<em>\\*y</em>",
+          "<em>x\\*</em>\\*y",
+          "x\\*[https://e.com/p](https://e.com/p)\\*y",
+        ],
+        "_" => ["x\\_*\\_y*", "*x\\_*\\_y", "x\\_[https://e.com/p](https://e.com/p)\\_y"],
+        "~" => ["x~<!---->*~y*", "*x~*<!---->~y", "x~[https://e.com/p](https://e.com/p)~y"],
+        "`" => ["x\\`*\\`y*", "*x\\`*\\`y", "x\\`[https://e.com/p](https://e.com/p)\\`y"],
+        "!" => ["x!*!y*", "*x!*!y", "x\\![https://e.com/p](https://e.com/p)!y"],
+        "[" => ["x\\[*\\[y*", "*x\\[*\\[y", "x\\[[https://e.com/p](https://e.com/p)\\[y"],
+        "]" => ["x]*]y*", "*x]*]y", "x][https://e.com/p](https://e.com/p)]y"],
+        "(" => ["x(*(y*", "*x(*(y", "x([https://e.com/p](https://e.com/p)(y"],
+        ")" => ["x)*)y*", "*x)*)y", "x)[https://e.com/p](https://e.com/p))y"],
+        "<" => ["x<*\\<y*", "*x<*\\<y", "x<[https://e.com/p](https://e.com/p)\\<y"],
+        ">" => ["x>*\\>y*", "*x>*\\>y", "x>[https://e.com/p](https://e.com/p)\\>y"],
+        "&" => ["x&*&y*", "*x&*&y", "x&[https://e.com/p](https://e.com/p)&y"],
+        "\\" => ["x\\\\*\\y*", "*x\\\\*\\y", "x\\\\[https://e.com/p](https://e.com/p)\\y"],
+        "#" => ["x#*#y*", "*x#*#y", "x#[https://e.com/p](https://e.com/p)#y"],
+        "|" => ["x\\|*\\|y*", "*x\\|*\\|y", "x\\|[https://e.com/p](https://e.com/p)\\|y"],
+        "." => ["x.*.y*", "*x.*.y", "x.[https://e.com/p](https://e.com/p).y"],
+        "-" => ["x-*-y*", "*x-*-y", "x-[https://e.com/p](https://e.com/p)-y"],
+        ":" => ["x:*:y*", "*x:*:y", "x:[https://e.com/p](https://e.com/p):y"],
+        "dot-space" => ["x. *. y*", "*x.* . y", "x. https://e.com/p. y"],
+        "nbsp" => %w[x  *y* *x*  y x https://e.com/p y],
+        "“" => ["x“<!---->*“y*", "*x“*<!---->“y", "x“[https://e.com/p](https://e.com/p)“y"],
+        "「" => ["x「<!---->*「y*", "*x「*<!---->「y", "x「[https://e.com/p](https://e.com/p)「y"],
+        "€" => ["x€<!---->*€y*", "*x€*<!---->€y", "x€[https://e.com/p](https://e.com/p)€y"],
+        "漢" => ["x漢*漢y*", "*x漢*漢y", "x漢[https://e.com/p](https://e.com/p)漢y"],
+        "😀" => ["x😀<!---->*😀y*", "*x😀*<!---->😀y", "x😀[https://e.com/p](https://e.com/p)😀y"],
+      }.freeze
+
+      AdjacencyGenerator::EDGES.each do |name, char|
+        text_then_em, em_then_text, around_url = EDGE_OUTPUTS.fetch(name)
+
+        it "writes text ending in #{name} in front of emphasis starting with it" do
+          expect(write(tokens.text("x#{char}"), *em(tokens.text("#{char}y")))).to eq(text_then_em)
+        end
+
+        it "writes emphasis ending in #{name} in front of text starting with it" do
+          expect(write(*em(tokens.text("x#{char}")), tokens.text("#{char}y"))).to eq(em_then_text)
+        end
+
+        it "writes a bare URL between #{name} on both sides" do
+          url = tokens.bare_url("https://e.com/p")
+
+          expect(write(tokens.text("x#{char}"), url, tokens.text("#{char}y"))).to eq(around_url)
+        end
+      end
+    end
+  end
+
+  describe "#write with html_mode" do
+    def html(*tokens)
+      write(*tokens, html_mode: true)
+    end
+
+    it "escapes text for HTML whatever its mode" do
+      expect(
+        html(
+          tokens.text("<a>"),
+          tokens.text("<b>", tokens::LABEL),
+          tokens.text("<c>", tokens::VERBATIM),
+        ),
+      ).to eq("&lt;a&gt;&lt;b&gt;&lt;c&gt;")
+    end
+
+    it "writes raw Markdown and HTML as they are" do
+      expect(html(tokens.raw("\n\n**a**\n\n"), tokens.html("<sup>2</sup>"))).to eq(
+        "\n\n**a**\n\n<sup>2</sup>",
+      )
+    end
+
+    it "writes the HTML tags of a delimiter, also around nothing visible" do
+      expect(html(tokens.open(:strong), tokens.text("a"), tokens.close(:strong))).to eq(
+        "<strong>a</strong>",
+      )
+      expect(html(*em(tokens.text("a")))).to eq("<em>a</em>")
+      expect(html(tokens.open(:s), tokens.text("a"), tokens.close(:s))).to eq("<s>a</s>")
+      expect(html(tokens.open(:u), tokens.text("a"), tokens.close(:u))).to eq(
+        %(<span class="bbcode-u">a</span>),
+      )
+      expect(html(*em(tokens.text(" ")))).to eq("<em> </em>")
+    end
+
+    it "writes a code span as a code element" do
+      expect(html(tokens.code("a<b"))).to eq("<code>a&lt;b</code>")
+      expect(html(tokens.code(""))).to eq("")
+    end
+
+    it "writes a link as an anchor" do
+      expect(html(tokens.link_open("/a?b&c"), tokens.text("x"), tokens.link_close)).to eq(
+        %(<a href="/a?b&amp;c">x</a>),
+      )
+    end
+
+    it "writes nested pairs as HTML throughout" do
+      strong = tokens.open(:strong), *em(tokens.text("a")), tokens.close(:strong)
+      link = tokens.link_open("/a"), *em(tokens.text("b")), tokens.link_close
+
+      expect(html(*strong, *link)).to eq(%(<strong><em>a</em></strong><a href="/a"><em>b</em></a>))
+    end
+
+    it "writes a bare URL as an anchor" do
+      expect(html(tokens.bare_url("https://e.com/?a&b"))).to eq(
+        %(<a href="https://e.com/?a&amp;b">https://e.com/?a&amp;b</a>),
+      )
+    end
+
+    it "writes an image as an img element" do
+      expect(html(tokens.image(src: "a&b.png", alt: "<x>", width: 10, height: 5))).to eq(
+        %(<img src="a&amp;b.png" alt="&lt;x&gt;" width="10" height="5">),
+      )
+      expect(html(tokens.image(src: "a.png"))).to eq(%(<img src="a.png" alt="">))
+      expect(html(tokens.image(src: "a.png", width: 10))).to eq(
+        %(<img src="a.png" alt="" width="10">),
+      )
+    end
+
+    it "writes a hard break as a br element" do
+      expect(html(tokens.hard_break)).to eq("<br>")
+    end
+
+    it "joins nothing inside a pair either" do
+      expect(
+        html(tokens.open(:strong), tokens.raw("`a`"), tokens.raw("`b`"), tokens.close(:strong)),
+      ).to eq("<strong>`a``b`</strong>")
+    end
+
+    it "joins nothing: a ! in front of a link stays a !" do
+      expect(
+        html(tokens.text("a!"), tokens.link_open("/a"), tokens.text("b"), tokens.link_close),
+      ).to eq(%(a!<a href="/a">b</a>))
+      expect(html(tokens.raw("`a`"), tokens.raw("`b`"))).to eq("`a``b`")
+    end
+  end
+
+  describe "#write_groups" do
+    def write_groups(groups, html_mode: false, &block)
+      serializer.write_groups(groups.map(&:first), groups.map(&:last), html_mode:, &block)
+    end
+
+    it "writes finished Markdown and tokens one after the other" do
+      groups = [[:a, "a*"], [:b, em(tokens.text("b"))], [:c, [tokens.text("c")]]]
+
+      expect(write_groups(groups)).to eq("a*<!---->*b*c")
+    end
+
+    it "joins across the groups" do
+      expect(write_groups([[:a, "**a**"], [:b, [tokens.raw("**b**")]]])).to eq("**a**<!---->**b**")
+      expect(write_groups([[:a, "**a**"], [:b, "**b**"]])).to eq("**a**<!---->**b**")
+    end
+
+    it "writes Markdown when html_mode is not given" do
+      expect(serializer.write_groups(%i[a b], %w[`a` `b`])).to eq("`a`<!---->`b`")
+    end
+
+    it "yields the buffer and the child in front of the child's first piece" do
+      seen = []
+      groups = [[:a, "a"], [:b, [tokens.text("b"), tokens.text("c")]]]
+
+      result = write_groups(groups) { |buffer, child| seen << [buffer.dup, child] }
+
+      expect(result).to eq("abc")
+      expect(seen).to eq([["", :a], ["a", :b]])
+    end
+
+    it "keeps what the block wrote to the buffer" do
+      groups = [[:a, "a"], [:b, "b"], [:c, [tokens.text("c")]]]
+
+      expect(write_groups(groups) { |buffer, child| buffer << "|" if child != :a }).to eq("a|b|c")
+    end
+
+    it "does not yield for a child without output" do
+      seen = []
+      groups = [[:a, ""], [:b, []], [:c, [tokens.code("")]], [:d, "d"]]
+
+      write_groups(groups) { |_, child| seen << child }
+
+      expect(seen).to eq([:d])
+    end
+
+    it "decides a bare URL at the end of a group by the next group" do
+      href = "https://e.com/p"
+
+      expect(write_groups([[:a, [tokens.bare_url(href)]], [:b, "b"]])).to eq("[#{href}](#{href})b")
+      expect(write_groups([[:a, [tokens.bare_url(href)]], [:b, [tokens.text("b")]]])).to eq(
+        "[#{href}](#{href})b",
+      )
+      expect(write_groups([[:a, [tokens.bare_url(href)]], [:b, [tokens.text(" b")]]])).to eq(
+        "#{href} b",
+      )
+      expect(write_groups([[:a, [tokens.text("a "), tokens.bare_url(href)]], [:b, "b"]])).to eq(
+        "a [#{href}](#{href})b",
+      )
+      expect(write_groups([[:a, [tokens.bare_url(href)]], [:b, [tokens.bare_url(href)]]])).to eq(
+        "[#{href}](#{href})[#{href}](#{href})",
+      )
+    end
+
+    it "takes the next group for the look-ahead, wherever the group is" do
+      href = "https://e.com/p"
+      groups = [[:a, " a "], [:x, "x "], [:b, [tokens.bare_url(href)]], [:c, " c"]]
+
+      expect(write_groups(groups)).to eq(" a x #{href} c")
+    end
+
+    it "keeps a bare URL bare when the next group has no output, or there is none" do
+      href = "https://e.com/p"
+
+      expect(write_groups([[:a, [tokens.bare_url(href)]], [:b, ""]])).to eq(href)
+      expect(write_groups([[:a, [tokens.bare_url(href)]], [:b, []]])).to eq(href)
+      expect(write_groups([[:a, [tokens.bare_url(href)]]])).to eq(href)
+    end
+
+    it "writes HTML in html_mode and joins nothing" do
+      groups = [
+        [:a, "<b>a</b>"],
+        [:b, em(tokens.text("b"))],
+        [:c, "`a`"],
+        [:d, "`b`"],
+        [:e, [tokens.raw("`c`")]],
+      ]
+
+      expect(write_groups(groups, html_mode: true)).to eq("<b>a</b><em>b</em>`a``b``c`")
+    end
+
+    it "yields before the pieces of a child, after the bare URL of the child in front" do
+      href = "https://e.com/p"
+      seen = []
+      groups = [[:a, [tokens.bare_url(href)]], [:b, "b"]]
+
+      write_groups(groups) { |buffer, child| seen << [buffer.dup, child] }
+
+      expect(seen).to eq([["", :a], ["[#{href}](#{href})", :b]])
+    end
+  end
+end
