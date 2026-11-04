@@ -209,8 +209,7 @@ expect(token).to match_tag_end("b")
 - Keep tests independent (random order execution)
 - Use `expect`, never `should`
 
-**Round-trip checks against a CommonMark parser** (MRI only, they need
-commonmarker):
+**Round-trip checks against a Markdown parser**:
 - `spec/integration/markbridge/commonmark_roundtrip_spec.rb` takes the
   expected HTML of every CommonMark spec example, converts it with the
   HTML parser and the renderer, cooks the Markdown with commonmarker and
@@ -218,14 +217,40 @@ commonmarker):
   does not round-trip is listed in `INTENDED_DIFFERENCES` or
   `KNOWN_BUGS` with a reason. The spec fails when a listed example
   starts to pass, so a bug fix removes its entry in the same commit.
+- `RoundTripChecker` (`spec/support/round_trip_checker.rb`) renders an
+  AST, cooks it and compares the cooked HTML with the AST in four ways:
+  the structure (lists, items, quotes, code, links, emphasis, headings),
+  the visible text, the link and image destinations, and tight lists
+  (an item with inline content only must not cook with a `<p>`). It
+  cooks with markdown-it (see below). On a failure `explain` shrinks the
+  AST with `AstShrinker` as long as the same check fails and prints the
+  AST, the Markdown and the cooked HTML. The two specs below use it.
 - `spec/integration/markbridge/renderers/discourse/structure_roundtrip_spec.rb`
   builds nested documents with `AstGenerator` (`spec/support/`) from a
-  seed, renders and cooks them, and compares the structure of the cooked
-  DOM with the AST. 300 seeds by default; `STRUCTURE_SEEDS=3000
-  bundle exec rspec <file>` runs more. A failure prints the seed, the
-  AST, the Markdown and the HTML. A construct the generator leaves out
-  because of an open bug is marked with a comment that names the bug;
-  the fix removes the exclusion.
+  seed. 300 seeds by default; `STRUCTURE_SEEDS=3000 bundle exec rspec
+  <file>` runs more. A construct the generator leaves out because of an
+  open bug is marked with a comment that names the bug; the fix removes
+  the exclusion.
+- `spec/integration/markbridge/renderers/discourse/adjacency_roundtrip_spec.rb`
+  puts two nodes next to each other on purpose (`AdjacencyGenerator`):
+  every inline node kind with every character class at the edge that
+  faces its neighbor, in five positions, and block pairs (two lists with
+  whitespace, a line break or an empty element between them, a list
+  followed by text in an item, ...). CI runs a fixed sample of 2000 of
+  the 265,813 inline pairs (`ADJACENCY_SAMPLE=N` changes the size) plus
+  every block pair. A case id names the case: `paragraph/text(*)+bold(a)`
+  or `blocks/item/ul+space+ul`.
+- `spec/support/round_trip_known_bugs.rb` lists the cases and seeds that
+  fail today, with a reason. Both specs
+  run every listed case and fail when it starts to pass, so a fix
+  removes the entry in the same commit. A new failure that is not fixed
+  right away gets an entry there, not an exclusion in a generator.
+- `bin/fuzz-render` runs every inline pair, every block pair and as many
+  seeds as asked for outside RSpec (`--only pairs|blocks|trees`,
+  `--sample N`, `--seeds N`, `--all` to run the known bugs too) and
+  prints the shrunk reports;
+  `--output DIR` writes them to a file. The nightly `fuzz-render.yml`
+  workflow runs it and uploads the reports when a case fails.
 - When a test is about structure (nesting, blank lines, indentation),
   assert on the cooked HTML (`spec/support/cooked_output.rb`), not on
   the exact Markdown string. A Markdown expectation written from the
