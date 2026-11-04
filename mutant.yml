@@ -157,6 +157,11 @@ matcher:
     # non-terminating mutants surface as accepted timeouts.
     - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_char_run
 
+    # MarkdownEscaper#escape_fence counts the fence run from 1: the
+    # caller matched three or more fence characters, so a count that
+    # starts at 0 or 2 lands on the same length. Bucket A.
+    - Markbridge::Renderers::Discourse::MarkdownEscaper#escape_fence
+
     # MarkdownEscaper#escape_text's `text.include?("\r") ?` fast-path
     # ternary. Both branches produce byte-identical lines for any
     # input: `text.split(/\r?\n/, -1)` consumes any CRLF terminator,

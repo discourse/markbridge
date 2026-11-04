@@ -328,11 +328,9 @@ module Markbridge
               return escape_all_chars(content, EQUALS, "\\=")
             end
           when BACKTICK
-            if FENCED_CODE_BACKTICK.match?(content)
-              return escape_all_chars(content, BACKTICK, "\\`")
-            end
+            return escape_fence(content, BACKTICK, "\\`") if FENCED_CODE_BACKTICK.match?(content)
           when TILDE
-            return "\\#{content}" if FENCED_CODE_TILDE.match?(content)
+            return escape_fence(content, TILDE, "\\~") if FENCED_CODE_TILDE.match?(content)
           when BRACKET_OPEN
             return escape_first_char_inline(content, "\\[")
           when PIPE
@@ -342,6 +340,16 @@ module Markbridge
           end
 
           content
+        end
+
+        # Every character of the fence run gets a backslash, so no part of
+        # the run can open a code span or strikethrough either, and the
+        # info string after the run is inline-escaped like any text.
+        def escape_fence(content, byte_val, escaped)
+          # The caller matched the fence, so the first byte is one.
+          length = 1
+          length += 1 while content.getbyte(length) == byte_val
+          "#{escaped * length}#{escape_inline(content[length..])}"
         end
 
         # Escape the first character and inline-escape the rest.
@@ -556,11 +564,10 @@ module Markbridge
             matched = match[0]
             @inline_result << matched
             pos + matched.bytesize
-          elsif (match = HTML_TAG.match(remaining))
-            matched = match[0]
-            @inline_result << "\\" << matched.gsub("`") { "\\`" }
-            pos + matched.bytesize
-          elsif HTML_TAG_START.match?(remaining)
+          elsif HTML_TAG.match?(remaining) || HTML_TAG_START.match?(remaining)
+            # The backslash keeps the tag text. What is inside the tag
+            # goes on through the loop like any text: a backslash, a
+            # backtick or an entity in an attribute needs its escape too.
             @inline_result << "\\<"
             pos + 1
           else
