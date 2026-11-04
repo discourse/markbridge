@@ -17,7 +17,21 @@ module Markbridge
           # URLs) pass through — common in forum exports and harmless.
           ALLOWED_SCHEMES = /\A(?:https?|ftps?|mailto):/i
           SCHEME_LIKE = /\A[a-z][a-z0-9+.-]*:/i
-          private_constant :ALLOWED_SCHEMES, :SCHEME_LIKE
+          # The text in front of a bare URL keeps it from being linked
+          # unless it ends in whitespace or an opening parenthesis. These
+          # are the characters that cmark-gfm accepts there, markdown-it
+          # accepts more.
+          GLUED_BEFORE = /[^[:space:](]\z/
+          # Text after a bare URL glues to it, unless it starts with
+          # whitespace or with punctuation that is followed by whitespace
+          # or nothing (see #glued_after).
+          GLUED_AFTER = /\A(?![.,:!?]*(?:[[:space:]]|\z))/
+          GLUED_AFTER_PAREN_OK = /\A(?![.,:!?)]*(?:[[:space:]]|\z))/
+          private_constant :ALLOWED_SCHEMES,
+                           :SCHEME_LIKE,
+                           :GLUED_BEFORE,
+                           :GLUED_AFTER,
+                           :GLUED_AFTER_PAREN_OK
 
           def render(element, interface)
             child_context = interface.with_parent(element)
@@ -64,8 +78,8 @@ module Markbridge
           # link).
           def bare_url(element, href, text, interface)
             glued =
-              glued?(interface.previous_sibling(element), /\S\z/) ||
-                glued?(interface.next_sibling(element), /\A\S/)
+              glued?(interface.previous_sibling(element), GLUED_BEFORE) ||
+                glued?(interface.next_sibling(element), glued_after(href))
             return href unless glued
 
             label = blank?(text) ? href_as_text(element, href, interface) : text
@@ -76,10 +90,20 @@ module Markbridge
             interface.render_node(AST::Text.new(href), context: interface.with_parent(element))
           end
 
-          # Whether the neighbouring +node+ is text with something other
-          # than whitespace at the edge next to the URL.
+          # Whether the neighbouring +node+ is text that would stop the
+          # Markdown parser from linking the bare URL.
           def glued?(node, edge)
             node.instance_of?(AST::Text) && node.text.match?(edge)
+          end
+
+          # The text after the URL may start with punctuation that ends a
+          # sentence: markdown-it (linkify) and cmark-gfm both leave it out
+          # of the link, as long as whitespace or the end of the text
+          # follows. A `)` only when the href has no parenthesis of its
+          # own: both parsers count them and keep a `)` that closes one
+          # in the link.
+          def glued_after(href)
+            href.match?(/[()]/) ? GLUED_AFTER : GLUED_AFTER_PAREN_OK
           end
 
           # CommonMark link destinations cannot contain whitespace unless
