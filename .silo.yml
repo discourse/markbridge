@@ -14,7 +14,10 @@ use:
 setup:
   - sudo dnf update -y
   # Node + pnpm for the docs site (Astro/Starlight); both ship as Fedora packages.
-  - sudo dnf install -y nodejs pnpm
+  # Node 24, because Astro needs a newer Node 22 than Fedora has. The -bin
+  # packages make it `node` and `npm`, --allowerasing replaces the ones of
+  # Node 22 when a silo already has them.
+  - sudo dnf install -y --allowerasing nodejs24 nodejs24-bin nodejs24-npm-bin pnpm
   # Every engine needs its own gems. A plain `bundle install` only serves
   # the default one, and the others then fall back to its gems or fail.
   # Keep this list the same as `use.ruby.versions` above.
