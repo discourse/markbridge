@@ -21,10 +21,13 @@ setup:
   - for engine in 3.3 3.4 "4.0" jruby truffleruby; do bin/with-ruby "$engine" bundle install; done
   - bundle exec lefthook install -f
   - (cd docs && CI=true pnpm install)
+  # markdown-it for the cooked-output specs, without it they are skipped.
+  - npm ci --prefix spec/support/markdown_it
 
 sync:
   - for engine in 3.3 3.4 "4.0" jruby truffleruby; do bin/with-ruby "$engine" bundle install; done
   - (cd docs && CI=true pnpm install)
+  - npm ci --prefix spec/support/markdown_it
 
 update:
   - sudo dnf update -y
