@@ -359,6 +359,63 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
           )
         end
 
+        it "keeps the plain href when a sentence ends after the URL" do
+          # Linkify leaves the punctuation out of the link.
+          expect(render_between("See ", Markbridge::AST::Text.new("."))).to eq(
+            "https://example.com",
+          )
+        end
+
+        it "keeps the plain href when punctuation and whitespace follow the URL" do
+          %w[, : ! ? ... ?!].each do |punctuation|
+            expect(render_between(nil, Markbridge::AST::Text.new("#{punctuation} next"))).to eq(
+              "https://example.com",
+            )
+          end
+        end
+
+        it "keeps the plain href inside parentheses" do
+          expect(render_between("(see ", Markbridge::AST::Text.new(")."))).to eq(
+            "https://example.com",
+          )
+        end
+
+        it "keeps the plain href when an opening parenthesis stands in front of the URL" do
+          expect(render_between("(", nil)).to eq("https://example.com")
+        end
+
+        it "writes a link when text follows the punctuation after the URL" do
+          expect(render_between(nil, Markbridge::AST::Text.new(".com"))).to eq(
+            "[https://example.com](https://example.com)",
+          )
+        end
+
+        it "writes a link when a semicolon follows the URL" do
+          # cmark-gfm keeps a semicolon in the link.
+          expect(render_between(nil, Markbridge::AST::Text.new(";"))).to eq(
+            "[https://example.com](https://example.com)",
+          )
+        end
+
+        it "writes a link when a quote stands in front of the URL" do
+          expect(render_between("\"", nil)).to eq("[https://example.com](https://example.com)")
+        end
+
+        it "writes a link when a ) follows a URL that has parentheses of its own" do
+          # Both parsers keep the ) in the link, it closes the one in the href.
+          paragraph = Markbridge::AST::Paragraph.new
+          url = Markbridge::AST::Url.new(href: "https://example.com/a(b")
+          url << Markbridge::AST::Text.new("https://example.com/a(b")
+          paragraph << url
+          paragraph << Markbridge::AST::Text.new(")")
+          context = Markbridge::Renderers::Discourse::RenderContext.new([paragraph])
+          interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+
+          expect(tag.render(url, interface)).to eq(
+            "[https://example.com/a(b](https://example.com/a\\(b)",
+          )
+        end
+
         it "keeps the plain href when the URL has no neighbours" do
           expect(render_between(nil, nil)).to eq("https://example.com")
         end
