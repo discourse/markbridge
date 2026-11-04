@@ -10,8 +10,8 @@ module Markbridge
       #    ZWNBSP/BOM). Deliberately excludes ASCII space and tab so
       #    Markdown's "two trailing spaces = hard line break" rule
       #    still works. Off by default.
-      # 2. collapses runs of 3+ newlines down to two,
-      # 3. clears whitespace-only lines,
+      # 2. clears whitespace-only lines,
+      # 3. collapses runs of 3+ newlines down to two,
       # 4. trims leading/trailing whitespace from the whole document.
       #
       # Steps 1 to 3 leave fenced code blocks alone: inside a fence every
@@ -88,8 +88,10 @@ module Markbridge
         # in a row nor a whitespace-only line.
         def clean(prose)
           prose = prose.gsub(TRAILING_INVISIBLE_RE, "") if @strip_trailing_invisibles
-          prose = prose.gsub(NEWLINE_RUN, "\n\n") if prose.include?(NEWLINE_RUN_START)
+          # Whitespace-only lines are cleared first, so the blank lines
+          # they leave are part of the newline run that is collapsed next.
           prose = prose.gsub(WHITESPACE_LINE, "") if prose.match?(WHITESPACE_LINE)
+          prose = prose.gsub(NEWLINE_RUN, "\n\n") if prose.include?(NEWLINE_RUN_START)
           prose
         end
 
