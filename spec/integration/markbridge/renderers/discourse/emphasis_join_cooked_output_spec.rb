@@ -2,9 +2,9 @@
 
 require "nokogiri"
 
-# Where two siblings meet, the renderer puts an empty HTML comment between
-# their delimiters when the Markdown parser would read them wrong (the
-# JOIN_ACTIONS rules in Renderer). Some of these comments are only needed
+# Where two siblings meet, the serializer puts an empty HTML comment
+# between their delimiters when the Markdown parser would read them wrong
+# (see Inline::Joins). Some of these comments are only needed
 # for cmark-gfm, which does not count a `~` as punctuation next to an
 # emphasis delimiter. markdown-it does, so here the comment has to change
 # nothing. Every case is checked on the cooked HTML.

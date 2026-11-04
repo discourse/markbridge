@@ -93,25 +93,26 @@ module Markbridge
             buffer
           end
 
-          # Writes the output of several children one after the other.
-          # With a block, the block runs right before the first piece of a
-          # child's output is appended, with the buffer so far and the
-          # child; it may change the buffer in place. A child whose output
-          # is empty is skipped.
+          # Writes the output of several children one after the other. The
+          # block gives the output of each child, finished Markdown or
+          # tokens, as it is reached. +before+ runs right before the first
+          # piece of a child's output is appended, with the buffer so far
+          # and the child; it may change the buffer in place. A child
+          # whose output is empty is skipped.
           #
-          # @param children [Array] the children, one per output
-          # @param outputs [Array<String, Array<Array>>] per child its
-          #   output: finished Markdown or tokens
+          # @param children [Array] the children
           # @param html_mode [Boolean]
-          # @yieldparam buffer [String]
+          # @param before [Proc, nil] called with the buffer and the child
           # @yieldparam child [Object]
+          # @yieldreturn [String, Array<Array>] the child's output
           # @return [String]
-          def write_groups(children, outputs, html_mode: false)
+          def write_groups(children, html_mode: false, before: nil)
             buffer = +""
             # A bare URL at the end of an output waits for the first piece
             # of the next output that has one.
             pending = nil
-            outputs.each_with_index do |output, index|
+            children.each do |child|
+              output = yield(child)
               if output.instance_of?(String)
                 next if output.empty?
 
@@ -128,7 +129,7 @@ module Markbridge
                 Joins.append(buffer, bare_url_piece(pending, buffer, first))
                 pending = nil
               end
-              yield(buffer, children.fetch(index)) if block_given?
+              before&.call(buffer, child)
 
               if pieces.nil?
                 html_mode ? buffer << output : Joins.append(buffer, output)
