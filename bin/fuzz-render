@@ -1,0 +1,184 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Runs the renderer round-trip checks over more cases than the specs do:
+# every adjacency pair instead of a sample, and as many structure seeds
+# as asked for. Known bugs (spec/support/round_trip_known_bugs.rb) are
+# skipped, and a known bug that passes is reported, as in the specs.
+#
+#   bin/fuzz-render                           # every pair and 300 seeds
+#   bin/fuzz-render --only pairs
+#   bin/fuzz-render --seeds 3000 --only trees --output tmp/fuzz-render
+#   bin/fuzz-render --sample 5000             # a random subset of the pairs
+#   bin/fuzz-render --all                     # run the known bugs too
+#
+# Every failure is shrunk and printed as a report: the AST, its Markdown
+# and the cooked HTML. With --output the reports go to <dir>/failures.txt
+# and the summary to <dir>/summary.txt. The exit status is 1 when a case
+# fails that is not a known bug, or when a known bug passes.
+
+ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../Gemfile", __dir__)
+
+require "bundler/setup"
+require "fileutils"
+require "optparse"
+require "markbridge/all"
+require_relative "../spec/support/ast_generator"
+require_relative "../spec/support/adjacency_generator"
+require_relative "../spec/support/round_trip_checker"
+require_relative "../spec/support/round_trip_known_bugs"
+
+class FuzzRender
+  Family = Data.define(:name, :list, :cases, :size)
+  Result = Data.define(:family, :id, :checks, :reason)
+
+  FAMILIES = %w[pairs blocks trees].freeze
+
+  def initialize(argv)
+    @seeds = 300
+    @only = FAMILIES
+    @sample = nil
+    @sample_seed = 1
+    @output = nil
+    @all = false
+    parse(argv)
+    @checker = RoundTripChecker.new
+    @failed = []
+    @stale = []
+    @known = []
+    @reports = []
+    @counts = Hash.new(0)
+  end
+
+  def run
+    reason = MarkdownItCooker::SKIP_REASON || MarkdownItCooker.missing
+    abort "bin/fuzz-render: #{reason}" if reason
+
+    families.each { |family| run_family(family) }
+    finish
+  end
+
+  private
+
+  def parse(argv)
+    OptionParser
+      .new do |opts|
+        opts.banner = "usage: bin/fuzz-render [options]"
+        opts.on("--seeds N", Integer, "structure seeds to run (default: 300)") { |n| @seeds = n }
+        opts.on("--only FAMILY", FAMILIES, "run only pairs, blocks or trees") do |family|
+          @only = [family]
+        end
+        opts.on("--sample N", Integer, "run N random pairs instead of all of them") do |n|
+          @sample = n
+        end
+        opts.on("--sample-seed N", Integer, "the seed that picks the sample (default: 1)") do |n|
+          @sample_seed = n
+        end
+        opts.on("--output DIR", "write failures.txt and summary.txt to DIR") { |dir| @output = dir }
+        opts.on("--all", "run the known bugs like every other case") { @all = true }
+      end
+      .parse!(argv)
+  end
+
+  def families
+    list = []
+    if @only.include?("pairs")
+      cases =
+        if @sample
+          AdjacencyGenerator.inline_sample(@sample, seed: @sample_seed)
+        else
+          AdjacencyGenerator.inline_cases
+        end
+      size = @sample || AdjacencyGenerator.inline_size
+      list << Family.new(name: "pairs", list: :adjacency, cases:, size:)
+    end
+    if @only.include?("blocks")
+      cases = AdjacencyGenerator.block_cases
+      list << Family.new(name: "blocks", list: :adjacency, cases:, size: cases.size)
+    end
+    if @only.include?("trees") && @seeds.positive?
+      list << Family.new(name: "trees", list: :structure, cases: (1..@seeds), size: @seeds)
+    end
+    list
+  end
+
+  def run_family(family)
+    started = Time.now
+    family.cases.each_with_index do |kase, index|
+      run_case(family, kase)
+      progress(family, index + 1, started) if ((index + 1) % 5000).zero?
+    end
+    progress(family, family.size, started)
+  end
+
+  # @param kase [AdjacencyGenerator::InlineCase, AdjacencyGenerator::BlockCase, Integer]
+  def run_case(family, kase)
+    id = kase.is_a?(Integer) ? kase : kase.id
+    build = kase.is_a?(Integer) ? -> { AstGenerator.new(kase).document } : -> { kase.document }
+    reason = @all ? nil : RoundTripKnownBugs.reason(family.list, id)
+    checks = @checker.failures(build.call).map(&:check)
+    @counts[family.name] += 1
+
+    if checks.empty?
+      @stale << Result.new(family: family.name, id:, checks:, reason:) if reason
+    elsif reason
+      @known << Result.new(family: family.name, id:, checks:, reason:)
+    else
+      @failed << Result.new(family: family.name, id:, checks:, reason: nil)
+      label = kase.is_a?(Integer) ? "seed #{kase}" : kase.id
+      @reports << @checker.explain(build.call, label:)
+    end
+  end
+
+  def progress(family, done, started)
+    elapsed = (Time.now - started).round
+    warn "#{family.name}: #{done}/#{family.size} in #{elapsed}s, #{@failed.size} failed"
+  end
+
+  def finish
+    reports = @reports.join("\n\n#{"=" * 72}\n\n")
+    summary = summary_text
+
+    if @output
+      FileUtils.mkdir_p(@output)
+      File.write(File.join(@output, "failures.txt"), reports)
+      File.write(File.join(@output, "summary.txt"), summary)
+    else
+      puts reports unless reports.empty?
+    end
+    puts summary
+
+    exit(@failed.empty? && @stale.empty? ? 0 : 1)
+  end
+
+  def summary_text
+    lines = ["family         cases   failed    known"]
+    @counts.each do |family, count|
+      failed = @failed.count { |result| result.family == family }
+      known = @known.count { |result| result.family == family }
+      lines << format("%-12s %8d %8d %8d", family, count, failed, known)
+    end
+
+    unless @failed.empty?
+      lines << "" << "failed checks:"
+      @failed
+        .flat_map(&:checks)
+        .tally
+        .sort_by { |check, count| [-count, check] }
+        .each { |check, count| lines << format("  %-10s %6d", check, count) }
+      lines << "" << "failed cases:"
+      @failed.each do |result|
+        lines << "  #{result.family} #{result.id} [#{result.checks.join(", ")}]"
+      end
+    end
+
+    unless @stale.empty?
+      lines << "" << "known bugs that pass now, remove their entries:"
+      @stale.each { |result| lines << "  #{result.family} #{result.id}: #{result.reason}" }
+    end
+
+    lines.join("\n")
+  end
+end
+
+FuzzRender.new(ARGV).run

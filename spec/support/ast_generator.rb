@@ -90,43 +90,6 @@ class AstGenerator
   # link inside emphasis without making the tree hard to read.
   MAX_INLINE_DEPTH = 2
 
-  # Renders an AST as indented lines. +Node#inspect+ prints instance
-  # variables and is hard to read once a tree has a few levels.
-  #
-  # @param node [Markbridge::AST::Node]
-  # @param level [Integer] indentation level of +node+
-  # @return [String]
-  def self.dump(node, level: 0)
-    lines = ["#{"  " * level}#{describe(node)}"]
-    if node.is_a?(AST::Element)
-      node.children.each { |child| lines << dump(child, level: level + 1) }
-    end
-    lines.join("\n")
-  end
-
-  # @param node [Markbridge::AST::Node]
-  # @return [String] one line describing the node and its own attributes
-  def self.describe(node)
-    name = node.class.name.split("::").last
-
-    case node
-    when AST::Text
-      "#{name} #{node.text.inspect}"
-    when AST::List
-      "#{name} ordered=#{node.ordered?}"
-    when AST::Code
-      "#{name} block=#{node.block.inspect} language=#{node.language.inspect}"
-    when AST::Url
-      "#{name} href=#{node.href.inspect}"
-    when AST::Heading
-      "#{name} level=#{node.level}"
-    when AST::Align
-      "#{name} alignment=#{node.alignment.inspect}"
-    else
-      name
-    end
-  end
-
   # @param seed [Integer]
   def initialize(seed)
     @random = Random.new(seed)
@@ -158,8 +121,9 @@ class AstGenerator
   end
 
   # Appends one block, unless the budget is used up. Two Lists never end up
-  # as neighbors: the renderer merges them into one loose list today,
-  # which is a separate bug, so a text run goes between them.
+  # as neighbors: two lists of the same kind inside a list item make the
+  # item loose today (see the known bugs of the adjacency round-trip), so
+  # a text run goes between them.
   #
   # @return [void]
   def add_block(container, depth:, headings:)
