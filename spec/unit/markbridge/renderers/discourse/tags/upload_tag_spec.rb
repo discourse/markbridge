@@ -86,6 +86,48 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
       expect(tag.render(element, interface)).to eq("[attachment|attachment](upload://abc123)")
     end
 
+    context "in a table cell" do
+      let(:context) do
+        Markbridge::Renderers::Discourse::RenderContext.new([Markbridge::AST::TableCell.new])
+      end
+
+      it "escapes the pipe in front of the dimensions, which would end the cell" do
+        element =
+          Markbridge::AST::Upload.new(
+            sha1: "abc",
+            filename: "pic.png",
+            alt: "A",
+            dimensions: "10x20",
+          )
+
+        expect(tag.render(element, interface)).to eq("![A\\|10x20](upload://pic.png)")
+      end
+
+      it "escapes the pipe in front of the attachment marker" do
+        element =
+          Markbridge::AST::Upload.new(
+            sha1: "abc",
+            filename: "a.pdf",
+            type: :attachment,
+            size: "1 KB",
+          )
+
+        expect(tag.render(element, interface)).to eq("[a.pdf\\|attachment](upload://a.pdf) (1 KB)")
+      end
+
+      it "escapes the pipes of the raw Markdown" do
+        element = Markbridge::AST::Upload.new(sha1: "abc", raw: "![a|10x20](upload://a.png)")
+
+        expect(tag.render(element, interface)).to eq("![a\\|10x20](upload://a.png)")
+      end
+
+      it "leaves a pipe of the raw Markdown alone that is escaped already" do
+        element = Markbridge::AST::Upload.new(sha1: "abc", raw: "![a\\|b|10x20](upload://a.png)")
+
+        expect(tag.render(element, interface)).to eq("![a\\|b\\|10x20](upload://a.png)")
+      end
+    end
+
     context "in html_mode" do
       let(:context) { html_context }
 
