@@ -465,6 +465,18 @@ RSpec.describe "BBCode to Markdown Conversion" do
     end
   end
 
+  describe "emphasis across a blank line" do
+    it "closes and reopens bold around the blank line" do
+      result = Markbridge.bbcode_to_markdown("[b]a\n\nb[/b] c")
+      expect(result.markdown).to eq("**a**\n\n**b** c")
+    end
+
+    it "closes and reopens underline around the blank line" do
+      result = Markbridge.bbcode_to_markdown("[u]a\n\nb[/u] c")
+      expect(result.markdown).to eq("[u]a[/u]\n\n[u]b[/u] c")
+    end
+  end
+
   describe "superscript and subscript" do
     it "converts superscript to HTML" do
       result = Markbridge.bbcode_to_markdown("[sup]2[/sup]")
