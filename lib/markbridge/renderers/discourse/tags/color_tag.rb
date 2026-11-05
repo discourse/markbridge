@@ -4,21 +4,19 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Tag for rendering colored text
-        # Note: Discourse doesn't support inline color by default
-        # Renders as plain text with HTML comment noting the color was lost
+        # Tag for rendering colored text as a span with a style, which
+        # needs HTML to be enabled; Discourse has no Markdown for it. The
+        # tags are inline tokens, see SuperscriptTag. Without a color the
+        # content stands alone.
         class ColorTag < Tag
-          def render(element, interface)
-            child_context = interface.with_parent(element)
-            content = interface.render_children(element, context: child_context)
+          CLOSE = Inline::Tokens.html("</span>")
+          private_constant :CLOSE
 
-            if element.color
-              # Render as HTML span with style - requires HTML to be enabled
-              # Alternative: just output the text without color
-              "<span style=\"color: #{element.color}\">#{content}</span>"
-            else
-              content
-            end
+          def render(element, interface)
+            tokens = interface.render_tokens(element, context: interface.with_parent(element))
+            return tokens unless element.color
+
+            tokens.unshift(Inline::Tokens.html(%(<span style="color: #{element.color}">))) << CLOSE
           end
         end
       end

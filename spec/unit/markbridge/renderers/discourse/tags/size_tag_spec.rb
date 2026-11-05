@@ -8,14 +8,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SizeTag do
       element = Markbridge::AST::Size.new(size: "20")
       element << Markbridge::AST::Text.new("big")
 
-      expect(tag.render(element, interface)).to eq('<span style="font-size: 20px">big</span>')
+      expect(rendered(element)).to eq('<span style="font-size: 20px">big</span>')
+    end
+
+    it "writes a line break at the start as <br>, so the tag is not alone on its line" do
+      element = Markbridge::AST::Size.new(size: "20")
+      element << Markbridge::AST::LineBreak.new << Markbridge::AST::Text.new("big")
+
+      expect(rendered(element)).to eq('<span style="font-size: 20px"><br>big</span>')
     end
 
     it "returns just the content when no size is set" do
       element = Markbridge::AST::Size.new
       element << Markbridge::AST::Text.new("plain")
 
-      expect(tag.render(element, interface)).to eq("plain")
+      expect(rendered(element)).to eq("plain")
     end
 
     let(:element_class) { Markbridge::AST::Size }
