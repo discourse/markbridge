@@ -21,8 +21,9 @@ module Markbridge
               )
             parent << node
 
-            # Return node to signal: process children into this node
-            node
+            # The content is only fallback text (the URL), so there are
+            # no children to process.
+            nil
           end
 
           attr_reader :element_class

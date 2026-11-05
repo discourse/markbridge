@@ -328,6 +328,13 @@ mutation:
     # call (csend), the others use a plain `.peek_ahead`.
     - "csend{receiver=lvar{value=tokens} selector=peek_ahead}"
 
+    # TextFormatter::Parser#initialize memoizes "is this AST class a
+    # block?" in a Hash default block. Dropping the store
+    # (`block_class_cache[klass] = …` → `…`, or the key → `nil`) only
+    # makes every lookup compute the answer again. The result is the
+    # same, it is only slower. `block_class_cache` is used only there.
+    - "indexasgn{receiver=lvar{value=block_class_cache}}"
+
     # Bucket A bound-check equivalences. @current_pos, pos, and
     # next_pos are all position integers ≤ their *_length bound,
     # so the source `pos >= input_length` / `next_pos < @inline_len`

@@ -10,18 +10,22 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::ImageHandler do
 
   describe "#process" do
     it "creates an Image with src, width, and height from attributes" do
-      result =
-        handler.process(
-          element: build_element('<IMG src="x.png" width="100" height="200"/>'),
-          parent:,
-        )
+      handler.process(
+        element: build_element('<IMG src="x.png" width="100" height="200"/>'),
+        parent:,
+      )
 
       image = parent.children[0]
       expect(image).to be_a(Markbridge::AST::Image)
       expect(image.src).to eq("x.png")
       expect(image.width).to eq(100)
       expect(image.height).to eq(200)
-      expect(result).to eq(image)
+    end
+
+    it "returns nil so that the fallback URL in the content is skipped" do
+      xml = '<IMG src="x.png"><s>[img]</s>x.png<e>[/img]</e></IMG>'
+
+      expect(handler.process(element: build_element(xml), parent:)).to be_nil
     end
 
     it "converts the width attribute to an integer" do

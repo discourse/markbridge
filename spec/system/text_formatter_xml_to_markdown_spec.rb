@@ -127,6 +127,98 @@ RSpec.describe "phpBB3 XML to Markdown" do
     end
   end
 
+  describe "phpBB 3.x posts" do
+    def convert(xml)
+      Markbridge.text_formatter_xml_to_markdown(xml).markdown
+    end
+
+    it "keeps the space between two inline elements" do
+      xml = "<r><B><s>[b]</s>a<e>[/b]</e></B> <I><s>[i]</s>b<e>[/i]</e></I></r>"
+
+      expect(convert(xml)).to eq("**a** *b*")
+    end
+
+    it "converts an attachment with its fallback filename" do
+      xml =
+        '<r><ATTACHMENT filename="a.png" index="0"><s>[attachment=0]</s>a.png<e>[/attachment]</e></ATTACHMENT></r>'
+
+      expect(convert(xml)).to eq("<!-- ATTACHMENT: index=0 filename=a.png -->")
+    end
+
+    it "converts an image with its fallback URL" do
+      xml =
+        '<r><IMG src="https://example.com/a.png"><s>[img]</s>https://example.com/a.png<e>[/img]</e></IMG></r>'
+
+      expect(convert(xml)).to eq("![](https://example.com/a.png)")
+    end
+
+    # [u] is the only output that puts a BBCode tag right inside the
+    # emphasis markers. "[" is punctuation, so ** between a letter and "["
+    # can't open without the boundary comment.
+    it "keeps bold that starts with underline after a letter working" do
+      xml = "<r>a<B><s>[b]</s><U><s>[u]</s>b<e>[/u]</e></U> c<e>[/b]</e></B>d</r>"
+
+      expect(convert(xml)).to eq("a<!---->**[u]b[/u] c**d")
+    end
+
+    it "keeps bold that only holds underline between two letters working" do
+      xml = "<r>x<B><s>[b]</s><U><s>[u]</s>b<e>[/u]</e></U><e>[/b]</e></B>y</r>"
+
+      expect(convert(xml)).to eq("x<!---->**[u]b[/u]**<!---->y")
+    end
+
+    it "converts bold and underline that overlap in the source" do
+      xml = "<r>a <B><s>[b]</s>b <U><s>[u]</s>c<e>[/b]</e></U></B><U> d<e>[/u]</e></U> e</r>"
+
+      expect(convert(xml)).to eq("a **b [u]c[/u]**[u] d[/u] e")
+    end
+
+    it "skips text that s9e ignored" do
+      expect(convert("<r>x<i>[/b]</i> y</r>")).to eq("x y")
+    end
+
+    it "converts a line break into a single newline" do
+      expect(convert("<t>a<br/>\nb</t>")).to eq("a\nb")
+    end
+
+    it "converts two line breaks into a blank line" do
+      expect(convert("<t>a<br/>\n<br/>\nb</t>")).to eq("a\n\nb")
+    end
+
+    it "keeps bold across a line break" do
+      expect(convert("<r><B><s>[b]</s>a<br/>\nb<e>[/b]</e></B></r>")).to eq("**a\nb**")
+    end
+
+    it "keeps the lines of a quote together" do
+      xml =
+        "<r><QUOTE><s>[quote]</s>a <B><s>[b]</s>b<e>[/b]</e></B> c<br/>\nd<e>[/quote]</e></QUOTE></r>"
+
+      expect(convert(xml)).to eq("> a **b** c\n> d")
+    end
+
+    it "escapes lines that look like Markdown without blank lines between them" do
+      xml = "<t>1. first<br/>\n* star<br/>\n___<br/>\n~~~~</t>"
+
+      expect(convert(xml)).to eq("1\\. first\n\\* star\n\\_\\_\\_\n\\~\\~\\~\\~")
+    end
+
+    it "keeps newlines and indentation in code" do
+      xml = "<r><CODE><s>[code]</s>line1\n    line2<e>[/code]</e></CODE></r>"
+
+      expect(convert(xml)).to eq("```\nline1\n    line2\n```")
+    end
+
+    it "removes the indentation at the start of a line" do
+      expect(convert("<t>a<br/>\n          b</t>")).to eq("a\nb")
+    end
+
+    it "removes the indentation inside an inline element at the start of a line" do
+      xml = "<r>a<br/>\n<B><s>[b]</s>          b<e>[/b]</e></B></r>"
+
+      expect(convert(xml)).to eq("a\n**b**")
+    end
+  end
+
   describe "tables" do
     it "renders a table as Markdown" do
       xml =
