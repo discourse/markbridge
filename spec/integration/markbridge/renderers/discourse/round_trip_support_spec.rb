@@ -86,6 +86,17 @@ RSpec.describe "the round-trip support" do
         expect(cooked(document, "<p>t</p>")).to eq(%i[structure links])
       end
 
+      it "expects the html_mode forms inside a table the renderer writes as HTML" do
+        header = AST::TableRow.new << (AST::TableCell.new(header: true) << text("x"))
+        header << (AST::TableCell.new(header: true) << text("y"))
+        cell = AST::TableCell.new << (AST::Underline.new << text("a"))
+        document = AST::Document.new << (AST::Table.new << header << (AST::TableRow.new << cell))
+        html = "<table><tr><th>x</th><th>y</th></tr><tr><td>%s</td></tr></table>"
+
+        expect(cooked(document, format(html, %(<span class="bbcode-u">a</span>)))).to eq([])
+        expect(cooked(document, format(html, "[u]a[/u]"))).to eq([:text])
+      end
+
       it "reports a list that cooks loose" do
         document = AST::Document.new << (AST::List.new << (AST::ListItem.new << text("a")))
 

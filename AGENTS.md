@@ -236,7 +236,9 @@ expect(token).to match_tag_end("b")
   AST, cooks it and compares the cooked HTML with the AST in four ways:
   the structure (lists, items, quotes, code, links, emphasis, headings),
   the visible text, the link and image destinations, and tight lists
-  (an item with inline content only must not cook with a `<p>`). It
+  (an item with inline content only must not cook with a `<p>`). For a
+  table the renderer writes as HTML it expects the html_mode forms
+  inside, reading the renderer's decision off the table tag. It
   cooks with markdown-it (see below). On a failure `explain` shrinks the
   AST with `AstShrinker` as long as the same check fails and prints the
   AST, the Markdown and the cooked HTML. The two specs below use it.
@@ -244,7 +246,10 @@ expect(token).to match_tag_end("b")
   builds nested documents with `AstGenerator` (`spec/support/`) from a
   seed: every block and inline node kind the renderer has a tag for
   (lists, quotes, tables, details, aligned blocks, headings, code,
-  emphasis, links, images, uploads, mentions, ...), with text made of
+  emphasis, links, images, uploads, mentions, ...; also tables the
+  renderer has to write as HTML, with a line break, a block or another
+  table in a cell, so everything in them is written in html_mode), with
+  text made of
   words, words with one of the adjacency character classes spliced in,
   tricky tokens and lines from the CommonMark spec. 300 seeds by
   default; `STRUCTURE_SEEDS=3000 bundle exec rspec <file>` runs more. A
@@ -253,14 +258,17 @@ expect(token).to match_tag_end("b")
 - `spec/integration/markbridge/renderers/discourse/adjacency_roundtrip_spec.rb`
   puts two nodes next to each other on purpose (`AdjacencyGenerator`):
   every inline node kind with every character class at the edge that
-  faces its neighbor, in nine positions (in a paragraph, at the start
+  faces its neighbor, in twelve positions (in a paragraph, at the start
   or the end of a line, after a block, in strong emphasis, in a heading,
-  in a list item, in a link label, in a quote), and block pairs (two
+  in a list item, in a link label, in a quote, in superscript, in the
+  cell of a Markdown table, in the cell of a table the renderer writes
+  as HTML, where the pair is written in html_mode), and block pairs (two
   lists with whitespace, a line break or an empty element between them,
-  a list followed by text in an item, ...). CI runs a fixed sample of
-  2000 of the 1,279,137 inline pairs (`ADJACENCY_SAMPLE=N` changes the size)
-  plus every block pair. A case id names the case:
-  `paragraph/text(*)+bold(a)` or `blocks/item/ul+space+ul`.
+  a list followed by text in an item, two blocks in a table cell, ...).
+  CI runs a fixed sample of 2000 of the 1,710,156 inline pairs
+  (`ADJACENCY_SAMPLE=N` changes the size) plus every block pair. A case
+  id names the case: `paragraph/text(*)+bold(a)` or
+  `blocks/item/ul+space+ul`.
 - `spec/support/round_trip_known_bugs.rb` lists the cases and seeds that
   fail today, with a reason. Both specs
   run every listed case and fail when it starts to pass, so a fix
