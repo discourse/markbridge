@@ -1,12 +1,10 @@
 # frozen_string_literal: true
 
-require "nokogiri"
-
 RSpec.describe "image cooked output", skip: CookedOutput::SKIP_REASON do
-  def round_trip_src(src)
-    markdown = Markbridge.html_to_markdown(%(<img src="#{src}" alt="x">)).markdown
+  include CookedOutput
 
-    Nokogiri::HTML5.fragment(MarkdownItCooker.cook(markdown)).at_css("img")&.[]("src")
+  def round_trip_src(src)
+    fragment(cook_html(%(<img src="#{src}" alt="x">))).at_css("img")&.[]("src")
   end
 
   it "preserves image sources with unbalanced parentheses" do

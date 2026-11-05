@@ -1,15 +1,11 @@
 # frozen_string_literal: true
 
-require "nokogiri"
-
 # A bare URL in the Markdown is linked by the Markdown parser, not by the
-# renderer: markdown-it's linkify in Discourse. UrlTag writes the URL bare
-# only where linkify links it and writes `[url](url)` everywhere else.
-# Each case is checked on the cooked anchor.
-RSpec.describe "bare URL cooked output", skip: MarkdownItCooker::SKIP_REASON do
-  def cook(markdown)
-    MarkdownItCooker.cook(markdown)
-  end
+# renderer: markdown-it's linkify in Discourse. The serializer writes the
+# URL bare only where linkify links it and writes `[url](url)` everywhere
+# else. Each case is checked on the cooked anchor.
+RSpec.describe "bare URL cooked output", skip: CookedOutput::SKIP_REASON do
+  include CookedOutput
 
   BARE_URL = "https://example.com/t/5"
   BARE_PAREN_URL = "https://example.com/a_(b)"
@@ -21,7 +17,7 @@ RSpec.describe "bare URL cooked output", skip: MarkdownItCooker::SKIP_REASON do
   end
 
   def paragraph(bbcode, href: BARE_URL)
-    Nokogiri::HTML5.fragment(cook(markdown(bbcode, href:))).at_css("p")
+    fragment(cook_markdown(markdown(bbcode, href:))).at_css("p")
   end
 
   def links(cooked)
@@ -139,5 +135,36 @@ RSpec.describe "bare URL cooked output", skip: MarkdownItCooker::SKIP_REASON do
 
     expect(links(cooked)).to eq([[BARE_URL, BARE_URL]]), cooked.to_html
     expect(cooked.at_css("strong").text).to eq("x")
+  end
+
+  it "links a URL with inline code after it" do
+    cooked =
+      fragment(
+        cook_html(
+          %(<p>see <a href="https://example.com">https://example.com</a><code>x</code></p>),
+        ),
+      )
+
+    expect(links(cooked)).to eq([%w[https://example.com https://example.com]])
+    expect(cooked.at_css("code").text).to eq("x")
+  end
+
+  it "links a glued URL with Markdown characters in it, with the URL as its text" do
+    # The BBCode option syntax cannot carry a `]`, the HTML parser can.
+    cooked =
+      fragment(
+        cook_html(
+          %(<p>see<a href="https://example.com/a]b_c">https://example.com/a]b_c</a>now</p>),
+        ),
+      )
+
+    expect(links(cooked)).to eq([["https://example.com/a%5Db_c", "https://example.com/a]b_c"]])
+    expect(cooked.at_css("p").text).to eq("seehttps://example.com/a]b_cnow")
+  end
+
+  it "links a glued link without text with the URL as its text" do
+    cooked = fragment(cook_html(%(<p>see<a href="https://example.com/a_b"></a>now</p>)))
+
+    expect(links(cooked)).to eq([%w[https://example.com/a_b https://example.com/a_b]])
   end
 end

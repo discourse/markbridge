@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require "spec_helper"
-
 RSpec.describe "HTML inline whitespace", skip: CookedOutput::SKIP_REASON do
+  include CookedOutput
+
   def converted_dom(html)
-    Nokogiri::HTML.fragment(MarkdownItCooker.cook(Markbridge.html_to_markdown(html).markdown))
+    fragment(cook_html(html))
   end
 
   it "renders a punctuation-ending label identically with whitespace inside or outside strong" do

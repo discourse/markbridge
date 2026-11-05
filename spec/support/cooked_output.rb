@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
+require "nokogiri"
 require_relative "markdown_it_cooker"
 
-# Helper for specs that check the HTML markdown-it cooks from our
+# Helpers for specs that check the HTML markdown-it cooks from our
 # Markdown. Asserting on the Markdown alone lets a collapsed blank line
 # pass unnoticed: the string still looks plausible while the content
 # cooks to literal text.
@@ -19,12 +20,30 @@ module CookedOutput
   # @param bbcode [String]
   # @return [String] the HTML that markdown-it cooks from our Markdown
   def cook(bbcode)
-    MarkdownItCooker.cook(Markbridge.bbcode_to_markdown(bbcode).markdown)
+    cook_markdown(Markbridge.bbcode_to_markdown(bbcode).markdown)
   end
 
   # @param html [String]
   # @return [String] the HTML that markdown-it cooks from our Markdown
   def cook_html(html)
-    MarkdownItCooker.cook(Markbridge.html_to_markdown(html).markdown)
+    cook_markdown(Markbridge.html_to_markdown(html).markdown)
+  end
+
+  # @param document [Markbridge::AST::Node]
+  # @return [String] the HTML that markdown-it cooks from our Markdown
+  def cook_ast(document)
+    cook_markdown(Markbridge.render(document).markdown)
+  end
+
+  # @param markdown [String]
+  # @return [String] the HTML markdown-it cooks from it
+  def cook_markdown(markdown)
+    MarkdownItCooker.cook(markdown)
+  end
+
+  # @param html [String] cooked HTML
+  # @return [Nokogiri::HTML5::DocumentFragment]
+  def fragment(html)
+    Nokogiri::HTML5.fragment(html)
   end
 end
