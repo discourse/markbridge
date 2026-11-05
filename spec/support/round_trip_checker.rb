@@ -160,18 +160,20 @@ class RoundTripChecker
   end
 
   # The plugin features the checker renders with when none are given.
-  DEFAULT_FEATURES = { details: true, spoiler: true }.freeze
+  DEFAULT_FEATURES = { details: true, spoiler: true, bbcode: false }.freeze
 
   # @param features [Hash{Symbol => Boolean}, nil] the plugin features of
   #   the target site, see +Markbridge.discourse_renderer+. The expected
   #   text follows them: the BBCode of a plugin is text to plain
-  #   markdown-it, the plain form without the plugin cooks.
+  #   markdown-it, the plain form without the plugin cooks. With bbcode
+  #   on, the sizes of the generator are written as they are.
   def initialize(features: nil)
     @features = DEFAULT_FEATURES.merge(features || {})
     @table_tag = RecordingTableTag.new
     library = Markbridge::Renderers::Discourse::TagLibrary.default
     library.register(AST::Table, @table_tag)
-    @renderer = Markbridge.discourse_renderer(tag_library: library, features:)
+    sizes = ->(size) { size } if @features[:bbcode]
+    @renderer = Markbridge.discourse_renderer(tag_library: library, features: @features, sizes:)
   end
 
   # @param document [Markbridge::AST::Document]
@@ -606,6 +608,14 @@ class RoundTripChecker
     when AST::Underline
       plain = in_link || html || !visible?(node)
       bbcode_text(node, out, in_link:, html:, open: "[u]", close: "[/u]", plain:)
+    when AST::Color, AST::Size
+      # The BBCode of discourse-bbcode is text to plain markdown-it; in
+      # html_mode and in a link the tag writes no BBCode.
+      value = node.is_a?(AST::Color) ? node.color : node.size
+      open = node.is_a?(AST::Color) ? "[color=#{value}]" : "[size=#{value}]"
+      close = node.is_a?(AST::Color) ? "[/color]" : "[/size]"
+      plain = !@features[:bbcode] || html || in_link || !visible?(node)
+      bbcode_text(node, out, in_link:, html:, open:, close:, plain:)
     when AST::Spoiler
       out << "#{node.title.strip}: " if node.title.to_s.match?(/[^[:space:]]/) && visible?(node)
       plain = html || !visible?(node) || !@features[:spoiler]

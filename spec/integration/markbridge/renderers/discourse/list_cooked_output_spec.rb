@@ -119,7 +119,7 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
     end
 
     it "leaves a list under inline HTML tight" do
-      html = cook("[list][*][color=red]red[/color]\n[list][*]child[/list][*]sibling[/list]")
+      html = cook("[list][*][sup]red[/sup]\n[list][*]child[/list][*]sibling[/list]")
 
       expect(html).to include("<li>child</li>").and include("<li>sibling</li>")
       expect(html).not_to include("<p>")

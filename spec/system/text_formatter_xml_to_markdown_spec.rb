@@ -110,26 +110,37 @@ RSpec.describe "phpBB3 XML to Markdown" do
       expect(result.markdown).to eq("Reveal: [spoiler]hidden content[/spoiler]")
     end
 
-    it "converts color tags into their text" do
+    it "converts color tags into their text without the bbcode plugin" do
       xml = '<r><COLOR color="red">red text</COLOR></r>'
+      renderer = Markbridge.discourse_renderer(features: { bbcode: false })
 
-      result = Markbridge.text_formatter_xml_to_markdown(xml)
+      result = Markbridge.text_formatter_xml_to_markdown(xml, renderer:)
 
       expect(result.markdown).to eq("red text")
     end
 
-    it "converts size tags into their text" do
+    it "converts size tags into their text without the bbcode plugin" do
       xml = '<r><SIZE size="20">big text</SIZE></r>'
+      renderer = Markbridge.discourse_renderer(features: { bbcode: false })
 
-      result = Markbridge.text_formatter_xml_to_markdown(xml)
+      result = Markbridge.text_formatter_xml_to_markdown(xml, renderer:)
 
       expect(result.markdown).to eq("big text")
+    end
+
+    it "raises for a color until the bbcode feature is decided" do
+      xml = '<r><COLOR color="red">red text</COLOR></r>'
+
+      expect { Markbridge.text_formatter_xml_to_markdown(xml) }.to raise_error(
+        Markbridge::UndecidedFeatureError,
+      )
     end
 
     it "converts color and size tags into BBCode with the bbcode feature" do
       xml =
         '<r><COLOR color="#FF0000">red</COLOR> <SIZE size="85"><s>[size=85]</s>small<e>[/size]</e></SIZE></r>'
-      renderer = Markbridge.discourse_renderer(features: { bbcode: true })
+      # phpBB 3.x stores the size as a percentage, the value is the percent.
+      renderer = Markbridge.discourse_renderer(features: { bbcode: true }, sizes: ->(size) { size })
 
       result = Markbridge.text_formatter_xml_to_markdown(xml, renderer:)
 
@@ -138,7 +149,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
     it "closes and reopens color around a blank line with the bbcode feature" do
       xml = "<r><COLOR color=\"red\">a<br/>\n<br/>\nb</COLOR></r>"
-      renderer = Markbridge.discourse_renderer(features: { bbcode: true })
+      renderer = Markbridge.discourse_renderer(features: { bbcode: true }, sizes: {})
 
       result = Markbridge.text_formatter_xml_to_markdown(xml, renderer:)
 
