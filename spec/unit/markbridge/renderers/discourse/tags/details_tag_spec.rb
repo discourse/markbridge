@@ -154,6 +154,47 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
     end
   end
 
+  describe "#leading_list and #trailing_list" do
+    let(:first) { Markbridge::AST::List.new }
+    let(:last) { Markbridge::AST::List.new }
+
+    def details(title: nil)
+      element = Markbridge::AST::Details.new(title:)
+      element << Markbridge::AST::Text.new(" ") << first << Markbridge::AST::Text.new("x") << last
+      element << Markbridge::AST::Text.new("\n")
+    end
+
+    it "are nil with the plugin, the BBCode lines are the edges" do
+      expect(tag.leading_list(details, interface)).to be_nil
+      expect(tag.trailing_list(details, interface)).to be_nil
+    end
+
+    context "with bbcode: false" do
+      let(:tag) { described_class.new(bbcode: false) }
+
+      it "are the lists at the edges of the content when there is no title" do
+        expect(tag.leading_list(details, interface)).to be(first)
+        expect(tag.trailing_list(details, interface)).to be(last)
+      end
+
+      it "start with the title paragraph when there is one" do
+        expect(tag.leading_list(details(title: "T"), interface)).to be_nil
+        expect(tag.trailing_list(details(title: "T"), interface)).to be(last)
+      end
+
+      it "treat a title of whitespace as none" do
+        expect(tag.leading_list(details(title: " \t"), interface)).to be(first)
+      end
+
+      it "are nil when the content does not start or end with a list" do
+        element = Markbridge::AST::Details.new << Markbridge::AST::Text.new("a")
+
+        expect(tag.leading_list(element, interface)).to be_nil
+        expect(tag.trailing_list(element, interface)).to be_nil
+      end
+    end
+  end
+
   describe "auto-registration" do
     it "is registered against AST::Details in the default TagLibrary" do
       library = Markbridge::Renderers::Discourse::TagLibrary.default

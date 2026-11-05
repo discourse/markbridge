@@ -34,14 +34,35 @@ module Markbridge
             "\n\n#{body}\n\n"
           end
 
+          # The plain form is a bullet list, so a bullet list next to the
+          # poll would continue it (see Tag#leading_list).
+          def leading_list(element, _interface)
+            plain_list(element)
+          end
+
+          def trailing_list(element, _interface)
+            plain_list(element)
+          end
+
           private
 
           # A list without items renders to nothing, so a poll without
-          # options does too.
+          # options does too. The list is no child of the poll's parent,
+          # so its tag cannot ask for the list in front; the separator
+          # that keeps the two apart is put here.
           def without_plugin(element, interface)
-            list = AST::List.new
+            list = plain_list(element)
             element.options.each { |option| list << (AST::ListItem.new << AST::Text.new(option)) }
-            interface.render_node(list)
+            output = interface.render_node(list)
+            return output if output.empty?
+
+            previous = interface.previous_list(element)
+            previous && !previous.ordered? ? "#{ListTag::LIST_SEPARATOR}#{output}" : output
+          end
+
+          # The bullet list of the plain form, empty; nil with the plugin.
+          def plain_list(_element)
+            AST::List.new unless @bbcode
           end
 
           def build_poll_bbcode(element)

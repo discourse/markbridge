@@ -123,6 +123,25 @@ module Markbridge
           @renderer.previous_list(element)
         end
 
+        # The list the output of +node+ starts with, as its tag says, or
+        # nil. With +children: true+ the answer of the first child with
+        # something in it, for a tag whose output starts with the
+        # children's; see Tag#leading_list and Renderer#leading_list.
+        # @param node [AST::Node]
+        # @param children [Boolean]
+        # @return [AST::List, nil]
+        def leading_list(node, children: false)
+          @renderer.leading_list(node, @context, children:)
+        end
+
+        # The list the output of +node+ ends with, see #leading_list.
+        # @param node [AST::Node]
+        # @param children [Boolean]
+        # @return [AST::List, nil]
+        def trailing_list(node, children: false)
+          @renderer.trailing_list(node, @context, children:)
+        end
+
         # Check if element should be rendered in block context
         # @param node [AST::Node] container node or leaf like HorizontalRule
         # @return [Boolean]

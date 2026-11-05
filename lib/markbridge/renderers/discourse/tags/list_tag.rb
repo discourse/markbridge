@@ -12,7 +12,16 @@ module Markbridge
           # line break in front of it off the content before it.
           LIST_SEPARATOR = "\n\n<!---->\n\n"
           NESTED_LIST_SEPARATOR = "\n<!---->"
-          private_constant :LIST_SEPARATOR, :NESTED_LIST_SEPARATOR
+          private_constant :NESTED_LIST_SEPARATOR
+
+          # The output is the list, see Tag#leading_list.
+          def leading_list(element, _interface)
+            element
+          end
+
+          def trailing_list(element, _interface)
+            element
+          end
 
           def render(element, interface)
             child_context = interface.with_parent(element)

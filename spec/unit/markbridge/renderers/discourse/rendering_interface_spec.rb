@@ -193,6 +193,35 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
+  describe "#leading_list and #trailing_list" do
+    let(:list) { Markbridge::AST::List.new }
+    let(:element) { Markbridge::AST::Details.new }
+
+    it "ask the renderer with the context" do
+      allow(renderer).to receive(:leading_list).with(element, context, children: false).and_return(
+        list,
+      )
+      allow(renderer).to receive(:trailing_list).with(element, context, children: false).and_return(
+        list,
+      )
+
+      expect(interface.leading_list(element)).to be(list)
+      expect(interface.trailing_list(element)).to be(list)
+    end
+
+    it "pass children: on" do
+      allow(renderer).to receive(:leading_list).with(element, context, children: true).and_return(
+        list,
+      )
+      allow(renderer).to receive(:trailing_list).with(element, context, children: true).and_return(
+        list,
+      )
+
+      expect(interface.leading_list(element, children: true)).to be(list)
+      expect(interface.trailing_list(element, children: true)).to be(list)
+    end
+  end
+
   describe "#previous_sibling and #next_sibling with a root element" do
     let(:first) { Markbridge::AST::Text.new("a") }
     let(:middle) { Markbridge::AST::Bold.new }

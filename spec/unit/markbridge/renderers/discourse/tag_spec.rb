@@ -24,6 +24,25 @@ RSpec.describe Markbridge::Renderers::Discourse::Tag do
       # With Code on the parent chain the text is not Markdown-escaped.
       expect(described_class::PASSTHROUGH.render(code, interface)).to eq("a*b")
     end
+
+    it "starts and ends with the lists its children start and end with" do
+      first = Markbridge::AST::List.new
+      last = Markbridge::AST::List.new
+      element << first << Markbridge::AST::Text.new("x") << last
+
+      expect(described_class::PASSTHROUGH.leading_list(element, interface)).to be(first)
+      expect(described_class::PASSTHROUGH.trailing_list(element, interface)).to be(last)
+    end
+  end
+
+  describe "#leading_list and #trailing_list" do
+    it "are nil by default" do
+      tag = described_class.new { "" }
+      element << Markbridge::AST::List.new
+
+      expect(tag.leading_list(element, interface)).to be_nil
+      expect(tag.trailing_list(element, interface)).to be_nil
+    end
   end
 
   describe "#render" do

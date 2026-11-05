@@ -118,5 +118,59 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
 
       expect(tag.render(element, interface)).to eq("")
     end
+
+    it "starts and ends with a bullet list" do
+      element = Markbridge::AST::Poll.new(options: %w[A])
+
+      expect(tag.leading_list(element, interface)).to be_a(Markbridge::AST::List).and(
+        have_attributes(ordered?: false),
+      )
+      expect(tag.trailing_list(element, interface)).to be_a(Markbridge::AST::List).and(
+        have_attributes(ordered?: false),
+      )
+    end
+
+    context "with a list in front" do
+      let(:element) { Markbridge::AST::Poll.new(options: %w[A B]) }
+
+      # The list of the options asks too, and gets the real answer.
+      def list_in_front(ordered:)
+        allow(renderer).to receive(:previous_list).and_call_original
+        allow(renderer).to receive(:previous_list).with(element).and_return(
+          Markbridge::AST::List.new(ordered:),
+        )
+      end
+
+      it "puts the separator in front of the options after a bullet list" do
+        list_in_front(ordered: false)
+
+        expect(tag.render(element, interface)).to eq("\n\n<!---->\n\n\n\n- A\n- B\n\n\n")
+      end
+
+      it "writes the options as they are after an ordered list" do
+        list_in_front(ordered: true)
+
+        expect(tag.render(element, interface)).to eq("\n\n- A\n- B\n\n\n")
+      end
+
+      context "without options" do
+        let(:element) { Markbridge::AST::Poll.new }
+
+        it "renders to nothing" do
+          list_in_front(ordered: false)
+
+          expect(tag.render(element, interface)).to eq("")
+        end
+      end
+    end
+  end
+
+  describe "#leading_list and #trailing_list" do
+    it "are nil with the plugin, the BBCode lines are the edges" do
+      element = Markbridge::AST::Poll.new(options: %w[A])
+
+      expect(tag.leading_list(element, interface)).to be_nil
+      expect(tag.trailing_list(element, interface)).to be_nil
+    end
   end
 end

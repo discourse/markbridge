@@ -253,4 +253,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       end
     end
   end
+
+  describe "#leading_list and #trailing_list" do
+    it "are the list itself" do
+      element = Markbridge::AST::List.new
+
+      expect(tag.leading_list(element, interface)).to be(element)
+      expect(tag.trailing_list(element, interface)).to be(element)
+    end
+  end
 end

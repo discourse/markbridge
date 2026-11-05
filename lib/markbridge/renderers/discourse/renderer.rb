@@ -115,7 +115,7 @@ module Markbridge
           outer_index = @child_index
           outer_list = @previous_list
           @child_parent = node
-          @previous_list = nil
+          @previous_list = continued_list(node, context, outer_list)
           tokens = []
           index = -1
           node.children.each do |child|
@@ -157,7 +157,7 @@ module Markbridge
           outer_index = @child_index
           outer_list = @previous_list
           @child_parent = node
-          @previous_list = nil
+          @previous_list = continued_list(node, context, outer_list)
           index = -1
           result =
             @serializer.write_groups(
@@ -178,13 +178,15 @@ module Markbridge
 
         # Renders one child of the element whose children are being
         # rendered, and remembers the last list among them for
-        # #previous_list: text after it with something other than
+        # #previous_list: a list, or a child whose output ends with one
+        # (Tag#trailing_list). Text after it with something other than
         # whitespace in it keeps two lists apart; a child that renders to
         # nothing does not count.
         def render_child(child, context)
           output = render_output(child, context)
-          if child.is_a?(AST::List)
-            @previous_list = child unless output.empty?
+          list = child.is_a?(AST::Text) ? nil : trailing_list(child, context)
+          if list
+            @previous_list = list unless output.empty?
           elsif @previous_list && visible?(output)
             @previous_list = nil
           end
@@ -234,6 +236,47 @@ module Markbridge
           !parent.nil? && parent.children.at(child_index).equal?(element)
         end
 
+        # The list the output of +node+ starts with, as its tag says (see
+        # Tag#leading_list). An element without a tag writes nothing but
+        # its children, so its output starts with what the first child
+        # with something in it starts with; +children: true+ asks that
+        # for an element with a tag, for a tag whose output starts with
+        # the children's.
+        # @param node [AST::Node]
+        # @param context [RenderContext]
+        # @param children [Boolean]
+        # @return [AST::List, nil]
+        def leading_list(node, context, children: false)
+          root_call = enter
+          unless children
+            tag = edge_tag(node)
+            return tag.leading_list(node, interface_for(context)) if tag
+          end
+          first = node.is_a?(AST::Element) && node.children.find { |child| !whitespace?(child) }
+          first ? leading_list(first, context) : nil
+        ensure
+          reset_caches if root_call
+        end
+
+        # The list the output of +node+ ends with, see #leading_list.
+        # @param node [AST::Node]
+        # @param context [RenderContext]
+        # @param children [Boolean]
+        # @return [AST::List, nil]
+        def trailing_list(node, context, children: false)
+          root_call = enter
+          unless children
+            tag = edge_tag(node)
+            return tag.trailing_list(node, interface_for(context)) if tag
+          end
+          last =
+            node.is_a?(AST::Element) &&
+              node.children.reverse_each.find { |child| !whitespace?(child) }
+          last ? trailing_list(last, context) : nil
+        ensure
+          reset_caches if root_call
+        end
+
         private
 
         # Something other than whitespace.
@@ -257,6 +300,29 @@ module Markbridge
 
         def interface_for(context)
           @interface_cache[context.object_id] ||= RenderingInterface.new(self, context)
+        end
+
+        # The list in front of +node+ that the first list inside +node+
+        # continues: the output of +node+ starts with that inner list
+        # (Tag#leading_list), so the inner list's tag has to put the
+        # separator in front. nil when +node+ writes something of its own
+        # first, or when no list came before it.
+        # @param outer_list [AST::List, nil] the last list in front of
+        #   +node+, among the children of its parent
+        # @return [AST::List, nil]
+        def continued_list(node, context, outer_list)
+          outer_list if outer_list && leading_list(node, context)
+        end
+
+        # The tag of +node+ as #render_output finds it.
+        def edge_tag(node)
+          @tag_library[node.class] || resolved_tag(node.class)
+        end
+
+        # Text with nothing but whitespace writes nothing that keeps two
+        # lists apart, see #render_child.
+        def whitespace?(node)
+          node.instance_of?(AST::Text) && node.text.strip.empty?
         end
 
         # Ancestry fallback for tag dispatch (see TagLibrary#resolve),
