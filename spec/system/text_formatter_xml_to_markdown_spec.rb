@@ -234,6 +234,13 @@ RSpec.describe "phpBB3 XML to Markdown" do
       expect(convert(xml)).to eq("[quote]\n[quote=\"X\"]\nin\n[/quote]\n[/quote]\n\nreply")
     end
 
+    it "writes a line break at the start of link text in front of the link" do
+      xml =
+        %(<r>see<br/>\n<URL url="https://e.com/a"><s>[url]</s><br/>\nlabel<e>[/url]</e></URL> ok</r>)
+
+      expect(convert(xml)).to eq("see\n<br>[label](https://e.com/a) ok")
+    end
+
     it "converts an empty quote without author into a blank line" do
       expect(convert("<r>x<QUOTE><s>[quote]</s><e>[/quote]</e></QUOTE>y</r>")).to eq("x\n\ny")
     end
