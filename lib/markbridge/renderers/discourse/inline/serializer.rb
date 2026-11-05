@@ -604,11 +604,13 @@ module Markbridge
             "[#{@escaper.escape(href, in_link_label: true)}](#{LinkDestination.escape(href)})"
           end
 
-          # Whether the buffer ends in something other than whitespace or
-          # an opening parenthesis.
+          # Whether the buffer ends in something other than whitespace, an
+          # opening parenthesis or a <br>. markdown-it reads the <br> as an
+          # HTML tag of its own, so linkify sees the URL at the start of the
+          # text after it.
           def glued_before?(buffer)
             last = buffer[-1]
-            !last.nil? && !last.match?(NOT_GLUED_BEFORE)
+            !last.nil? && !last.match?(NOT_GLUED_BEFORE) && !buffer.end_with?(BR)
           end
 
           # Another bare URL right after this one is written as a link

@@ -544,6 +544,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
         expect(write(tokens.text("a "), tokens.bare_url(href))).to eq("a #{href}")
       end
 
+      it "stays bare after a <br>, which markdown-it reads as an HTML tag of its own" do
+        expect(
+          write(tokens.text("a"), tokens.hard_break, tokens.hard_break, tokens.bare_url(href)),
+        ).to eq("a\n<br>#{href}")
+      end
+
+      it "becomes a link after another HTML tag" do
+        expect(write(tokens.html("<sup>"), tokens.bare_url(href))).to eq("<sup>#{link}")
+      end
+
       it "stays bare after an opening parenthesis and before a closing one" do
         expect(write(tokens.text("("), tokens.bare_url(href), tokens.text(")"))).to eq("(#{href})")
       end

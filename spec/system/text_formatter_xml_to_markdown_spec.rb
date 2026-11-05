@@ -234,6 +234,19 @@ RSpec.describe "phpBB3 XML to Markdown" do
       expect(convert(xml)).to eq("[quote]\n[quote=\"X\"]\nin\n[/quote]\n[/quote]\n\nreply")
     end
 
+    it "writes a link whose text is the href after a line break as the bare URL" do
+      xml =
+        %(<r>see<br/>\n<URL url="https://e.com/a"><s>[url]</s><br/>\nhttps://e.com/a<e>[/url]</e></URL> ok</r>)
+
+      expect(convert(xml)).to eq("see\n<br>https://e.com/a ok")
+    end
+
+    it "writes a link whose text is the href with a space after it as the bare URL" do
+      xml = %(<r><URL url="https://e.com/a"><s>[url]</s>https://e.com/a <e>[/url]</e></URL></r>)
+
+      expect(convert(xml)).to eq("https://e.com/a")
+    end
+
     it "writes a line break at the start of link text in front of the link" do
       xml =
         %(<r>see<br/>\n<URL url="https://e.com/a"><s>[url]</s><br/>\nlabel<e>[/url]</e></URL> ok</r>)
