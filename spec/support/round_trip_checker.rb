@@ -438,6 +438,10 @@ class RoundTripChecker
       [expected_table(node)]
     when AST::Upload
       expected_upload(node, html:)
+    when AST::MarkdownText
+      # In a table the renderer writes as HTML, pre-formatted Markdown is
+      # an island inside a <div>, see Renderer#render_markdown_text.
+      html ? [skeleton("div")] : []
     when AST::Bold
       [skeleton("strong", children: expected_children(node, html:))]
     when AST::Italic
@@ -670,7 +674,10 @@ class RoundTripChecker
   # a file upload is a link with the file name.
   def expected_text(node, out, in_link: false, html: false)
     case node
-    when AST::Text, AST::MarkdownText
+    when AST::MarkdownText
+      # A paragraph of its own in html_mode, see #expected_skeleton.
+      html ? separated(out) { out << node.text } : out << node.text
+    when AST::Text
       out << node.text
     when AST::Image
       # Discourse reads the image options off the alt text and trims it,
