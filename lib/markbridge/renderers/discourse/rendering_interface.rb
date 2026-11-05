@@ -123,6 +123,24 @@ module Markbridge
           @renderer.previous_list(element)
         end
 
+        # The marker for the items of +node+, a list or a node whose
+        # output is a list: the one the list in front did not use, so the
+        # two stay apart. See Renderer#choose_list_marker.
+        # @param node [AST::Node]
+        # @param ordered [Boolean]
+        # @return [String] "- " or "* ", "1. " or "1) "
+        def choose_list_marker(node, ordered:)
+          @renderer.choose_list_marker(node, ordered:)
+        end
+
+        # The marker chosen for +node+ in this render call, nil when none
+        # was. See Renderer#list_marker.
+        # @param node [AST::Node]
+        # @return [String, nil]
+        def list_marker(node)
+          @renderer.list_marker(node)
+        end
+
         # The list the output of +node+ starts with, as its tag says, or
         # nil. With +children: true+ the answer of the first child with
         # something in it, for a tag whose output starts with the

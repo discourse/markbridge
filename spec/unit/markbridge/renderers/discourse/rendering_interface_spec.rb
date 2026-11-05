@@ -193,6 +193,17 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
+  describe "#choose_list_marker and #list_marker" do
+    it "ask the renderer" do
+      list = Markbridge::AST::List.new
+      allow(renderer).to receive(:choose_list_marker).with(list, ordered: true).and_return("1) ")
+      allow(renderer).to receive(:list_marker).with(list).and_return("* ")
+
+      expect(interface.choose_list_marker(list, ordered: true)).to eq("1) ")
+      expect(interface.list_marker(list)).to eq("* ")
+    end
+  end
+
   describe "#leading_list and #trailing_list" do
     let(:list) { Markbridge::AST::List.new }
     let(:element) { Markbridge::AST::Details.new }

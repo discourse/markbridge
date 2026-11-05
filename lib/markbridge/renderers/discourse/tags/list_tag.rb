@@ -5,15 +5,6 @@ module Markbridge
     module Discourse
       module Tags
         class ListTag < Tag
-          # An HTML comment between blank lines: invisible when cooked, and
-          # a block of its own that ends the list before it. Inside a list
-          # item the comment stands on a line of its own without blank
-          # lines, which would make the item loose; ListItemTag takes the
-          # line break in front of it off the content before it.
-          LIST_SEPARATOR = "\n\n<!---->\n\n"
-          NESTED_LIST_SEPARATOR = "\n<!---->"
-          private_constant :NESTED_LIST_SEPARATOR
-
           # The output is the list, see Tag#leading_list.
           def leading_list(element, _interface)
             element
@@ -25,6 +16,15 @@ module Markbridge
 
           def render(element, interface)
             child_context = interface.with_parent(element)
+
+            # Two lists of the same kind in a row would cook as one list,
+            # and the blank line between them would make it loose. A
+            # different marker starts a new list, so the renderer picks
+            # the one the list in front did not use, and the items write
+            # it (ListItemTag).
+            unless interface.html_mode?
+              interface.choose_list_marker(element, ordered: element.ordered?)
+            end
 
             content =
               element
@@ -49,18 +49,7 @@ module Markbridge
             # block with blank lines on both sides.
             parent = interface.context.element
             nested = parent.is_a?(AST::ListItem) || parent.is_a?(AST::List)
-            list = nested ? "\n#{content}" : "\n\n#{content}\n\n"
-
-            # Two lists of the same kind in a row need something between
-            # them, or CommonMark reads the second as more items of the
-            # first and the blank line makes the whole list loose. A change
-            # of kind starts a new list on its own. Whitespace between
-            # them, and nodes that render to nothing, do not keep them
-            # apart; the renderer knows which list came last.
-            previous = interface.previous_list(element)
-            return list unless previous && previous.ordered? == element.ordered?
-
-            "#{nested ? NESTED_LIST_SEPARATOR : LIST_SEPARATOR}#{list}"
+            nested ? "\n#{content}" : "\n\n#{content}\n\n"
           end
         end
       end

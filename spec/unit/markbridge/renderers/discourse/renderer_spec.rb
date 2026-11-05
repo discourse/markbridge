@@ -838,6 +838,67 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
     end
   end
 
+  describe "#choose_list_marker and #list_marker" do
+    let(:first) { Markbridge::AST::List.new }
+
+    it "picks the first marker of the kind for a node that is not the current child" do
+      expect(renderer.choose_list_marker(first, ordered: false)).to eq("- ")
+      expect(renderer.choose_list_marker(first, ordered: true)).to eq("1. ")
+    end
+
+    it "knows no marker for a node outside a render call" do
+      expect(renderer.list_marker(first)).to be_nil
+    end
+
+    it "remembers the marker for the list during the render call" do
+      item = Markbridge::AST::ListItem.new
+      list = Markbridge::AST::List.new << item
+      seen = nil
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(
+        Markbridge::AST::ListItem,
+        Markbridge::Renderers::Discourse::Tag.new do |_element, interface|
+          seen = interface.list_marker(list)
+          "x"
+        end,
+      )
+
+      described_class.new(tag_library: library).render(Markbridge::AST::Document.new << list)
+
+      expect(seen).to eq("- ")
+    end
+
+    it "forgets the markers after the render call" do
+      list =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        )
+      renderer.render(Markbridge::AST::Document.new << list)
+
+      expect(renderer.list_marker(list)).to be_nil
+    end
+
+    it "picks the marker the list in front did not use, by identity of the node" do
+      a =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        )
+      b =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        )
+      c =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        )
+
+      # The three lists are equal in structure; only the node tells them apart.
+      expect(renderer.render(Markbridge::AST::Document.new << a << b << c)).to eq(
+        "\n\n- a\n\n\n\n\n* a\n\n\n\n\n- a\n\n\n",
+      )
+    end
+  end
+
   describe "#render_children with a child whose output ends or starts with a list" do
     let(:untagged) { Class.new(Markbridge::AST::Element) }
 
@@ -853,46 +914,46 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       renderer.render(document).gsub(/\n{3,}/, "\n\n").strip
     end
 
-    it "separates a list from the list at the end of an element without a tag" do
+    it "changes the marker of a list after the list at the end of an element without a tag" do
       document = Markbridge::AST::Document.new
       document << (untagged.new << list("a")) << list("b")
 
-      expect(markdown(document)).to eq("- a\n\n<!---->\n\n- b")
+      expect(markdown(document)).to eq("- a\n\n* b")
     end
 
-    it "separates the list at the start of an element without a tag from the list in front" do
+    it "changes the marker of the list at the start of an element without a tag" do
       document = Markbridge::AST::Document.new
       document << list("a") << (untagged.new << list("b"))
 
-      expect(markdown(document)).to eq("- a\n\n<!---->\n\n- b")
+      expect(markdown(document)).to eq("- a\n\n* b")
     end
 
-    it "does not separate lists of different kinds" do
+    it "keeps the marker for lists of different kinds" do
       document = Markbridge::AST::Document.new
       document << (untagged.new << list("a")) << list("b", ordered: true)
 
       expect(markdown(document)).to eq("- a\n\n1. b")
     end
 
-    it "does not separate when the element writes text after its list" do
+    it "keeps the marker when the element writes text after its list" do
       document = Markbridge::AST::Document.new
       document << (untagged.new << list("a") << Markbridge::AST::Text.new("t")) << list("b")
 
       expect(markdown(document)).to eq("- a\n\nt\n\n- b")
     end
 
-    it "does not separate when the element writes text before its list" do
+    it "keeps the marker when the element writes text before its list" do
       document = Markbridge::AST::Document.new
       document << list("a") << (untagged.new << Markbridge::AST::Text.new("t") << list("b"))
 
       expect(markdown(document)).to eq("- a\n\nt\n\n- b")
     end
 
-    it "does not keep the list in front in view for an element whose output is empty" do
+    it "keeps the list in front in view across an element whose output is empty" do
       document = Markbridge::AST::Document.new
       document << list("a") << untagged.new << list("b")
 
-      expect(markdown(document)).to eq("- a\n\n<!---->\n\n- b")
+      expect(markdown(document)).to eq("- a\n\n* b")
     end
 
     it "does not count an element whose list renders to nothing" do

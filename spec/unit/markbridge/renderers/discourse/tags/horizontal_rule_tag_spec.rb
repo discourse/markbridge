@@ -17,6 +17,26 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::HorizontalRuleTag do
       expect(tag.render(Markbridge::AST::HorizontalRule.new, interface)).to eq("\n\n* * *\n\n")
     end
 
+    it "uses dashes inside a list written with stars" do
+      list = Markbridge::AST::List.new
+      item = Markbridge::AST::ListItem.new
+      context = Markbridge::Renderers::Discourse::RenderContext.new([list, item])
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      allow(renderer).to receive(:list_marker).with(list).and_return("* ")
+
+      expect(tag.render(Markbridge::AST::HorizontalRule.new, interface)).to eq("\n\n- - -\n\n")
+    end
+
+    it "uses stars inside an ordered list" do
+      list = Markbridge::AST::List.new(ordered: true)
+      item = Markbridge::AST::ListItem.new
+      context = Markbridge::Renderers::Discourse::RenderContext.new([list, item])
+      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      allow(renderer).to receive(:list_marker).with(list).and_return("1) ")
+
+      expect(tag.render(Markbridge::AST::HorizontalRule.new, interface)).to eq("\n\n* * *\n\n")
+    end
+
     context "in html_mode" do
       let(:context) { html_context }
 

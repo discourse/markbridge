@@ -35,34 +35,36 @@ module Markbridge
           end
 
           # The plain form is a bullet list, so a bullet list next to the
-          # poll would continue it (see Tag#leading_list).
+          # poll would continue it (see Tag#leading_list). The poll stands
+          # for the list, the marker is chosen for it.
           def leading_list(element, _interface)
-            plain_list(element)
+            element unless @bbcode
           end
 
           def trailing_list(element, _interface)
-            plain_list(element)
+            element unless @bbcode
           end
 
           private
 
-          # A list without items renders to nothing, so a poll without
-          # options does too. The list is no child of the poll's parent,
-          # so its tag cannot ask for the list in front; the separator
-          # that keeps the two apart is put here.
+          # The options as the items of a bullet list, one line each; a
+          # poll without options renders to nothing, like an empty list.
+          # The poll writes the lines itself, with the marker the renderer
+          # picks for it against the list in front.
           def without_plugin(element, interface)
-            list = plain_list(element)
-            element.options.each { |option| list << (AST::ListItem.new << AST::Text.new(option)) }
-            output = interface.render_node(list)
-            return output if output.empty?
+            return "" if element.options.empty?
+            if interface.html_mode?
+              items = element.options.map { |option| "<li>#{HtmlEscaper.escape(option)}</li>" }
+              return "<ul>#{items.join}</ul>"
+            end
 
-            previous = interface.previous_list(element)
-            previous && !previous.ordered? ? "#{ListTag::LIST_SEPARATOR}#{output}" : output
-          end
-
-          # The bullet list of the plain form, empty; nil with the plugin.
-          def plain_list(_element)
-            AST::List.new unless @bbcode
+            marker = interface.choose_list_marker(element, ordered: false)
+            context = interface.with_parent(element)
+            lines =
+              element.options.map do |option|
+                "#{marker}#{interface.render_node(AST::Text.new(option), context:)}"
+              end
+            "\n\n#{lines.join("\n")}\n\n"
           end
 
           def build_poll_bbcode(element)

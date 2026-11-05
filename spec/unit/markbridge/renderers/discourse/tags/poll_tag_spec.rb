@@ -102,7 +102,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
     it "writes the options as a bullet list" do
       element = Markbridge::AST::Poll.new(name: "fav", options: %w[A *B*])
 
-      expect(tag.render(element, interface)).to eq("\n\n- A\n- \\*B\\*\n\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n- A\n- \\*B\\*\n\n")
     end
 
     it "writes a bullet list in html_mode" do
@@ -119,49 +119,26 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
       expect(tag.render(element, interface)).to eq("")
     end
 
-    it "starts and ends with a bullet list" do
+    it "stands for the bullet list its output is, at both edges" do
       element = Markbridge::AST::Poll.new(options: %w[A])
 
-      expect(tag.leading_list(element, interface)).to be_a(Markbridge::AST::List).and(
-        have_attributes(ordered?: false),
-      )
-      expect(tag.trailing_list(element, interface)).to be_a(Markbridge::AST::List).and(
-        have_attributes(ordered?: false),
-      )
+      expect(tag.leading_list(element, interface)).to be(element)
+      expect(tag.trailing_list(element, interface)).to be(element)
     end
 
-    context "with a list in front" do
-      let(:element) { Markbridge::AST::Poll.new(options: %w[A B]) }
+    it "writes the bullet the renderer picks for the poll against the list in front" do
+      element = Markbridge::AST::Poll.new(options: %w[A B])
+      allow(renderer).to receive(:choose_list_marker).with(element, ordered: false).and_return("* ")
 
-      # The list of the options asks too, and gets the real answer.
-      def list_in_front(ordered:)
-        allow(renderer).to receive(:previous_list).and_call_original
-        allow(renderer).to receive(:previous_list).with(element).and_return(
-          Markbridge::AST::List.new(ordered:),
-        )
-      end
+      expect(tag.render(element, interface)).to eq("\n\n* A\n* B\n\n")
+    end
 
-      it "puts the separator in front of the options after a bullet list" do
-        list_in_front(ordered: false)
+    it "picks no marker for a poll without options" do
+      element = Markbridge::AST::Poll.new
+      allow(renderer).to receive(:choose_list_marker)
 
-        expect(tag.render(element, interface)).to eq("\n\n<!---->\n\n\n\n- A\n- B\n\n\n")
-      end
-
-      it "writes the options as they are after an ordered list" do
-        list_in_front(ordered: true)
-
-        expect(tag.render(element, interface)).to eq("\n\n- A\n- B\n\n\n")
-      end
-
-      context "without options" do
-        let(:element) { Markbridge::AST::Poll.new }
-
-        it "renders to nothing" do
-          list_in_front(ordered: false)
-
-          expect(tag.render(element, interface)).to eq("")
-        end
-      end
+      expect(tag.render(element, interface)).to eq("")
+      expect(renderer).not_to have_received(:choose_list_marker)
     end
   end
 

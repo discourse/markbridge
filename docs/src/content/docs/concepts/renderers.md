@@ -71,7 +71,8 @@ A tag that returns a String next to a tag that returns tokens is fine: the seria
 | `has_parent?(klass)` | Boolean ancestor check |
 | `count_parents(klass)` | How deep a specific ancestor is (nested lists, quotes) |
 | `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset:)` | The neighbors of an element among the children of its parent |
-| `previous_list(element)` | The last list in front of the element with nothing visible between them |
+| `previous_list(element)` | The last list in front of the element, or the node whose output ends with one, with nothing visible between them |
+| `choose_list_marker(node, ordered:)`, `list_marker(node)` | The marker for the items of a list, the one the list in front did not use; and the marker chosen for a node in this render call |
 | `leading_list(node, children: false)`, `trailing_list(node, children: false)` | The list the output of `node` starts or ends with, as its tag says (`Tag#leading_list`, `Tag#trailing_list`); with `children: true` the answer for the first or last child with something in it |
 | `block_context?(element)` | Block vs. inline position |
 | `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML or wrap output as a Markdown island (`\n\n…\n\n`); the serializer takes care of it for tokens |

@@ -217,14 +217,50 @@ module Markbridge
         # @return [Integer, nil]
         attr_reader :child_index
 
-        # The last list among the siblings in front of +element+, when
+        # The last list among the siblings in front of +element+, or the
+        # sibling whose output ends with a list (Tag#trailing_list), when
         # nothing but whitespace or nodes that rendered to nothing came
         # after it. nil when there is none, or when +element+ is not the
         # child that #render_children is rendering right now.
         # @param element [AST::Node]
-        # @return [AST::List, nil]
+        # @return [AST::Node, nil]
         def previous_list(element)
           @previous_list if current_child?(element)
+        end
+
+        # The bullet characters and the ordered delimiters the lists are
+        # written with, in the order they are tried.
+        BULLET_MARKERS = ["- ", "* "].freeze
+        ORDERED_MARKERS = ["1. ", "1) "].freeze
+
+        # The marker for the items of +node+, a list or a node whose
+        # output is a list (a poll without the plugin). Two lists of one
+        # kind with the same marker and only whitespace between them cook
+        # as one list, a different bullet character or ordered delimiter
+        # starts a new list, so the list after #previous_list gets the
+        # marker of its kind that list did not use. The marker is
+        # remembered for +node+, see #list_marker.
+        # @param node [AST::Node] the child #render_children is at;
+        #   any other node gets the first marker of its kind
+        # @param ordered [Boolean]
+        # @return [String]
+        def choose_list_marker(node, ordered:)
+          root_call = enter
+          markers = ordered ? ORDERED_MARKERS : BULLET_MARKERS
+          before = @list_markers[previous_list(node)]
+          @list_markers[node] = markers.find { |marker| marker != before }
+        ensure
+          reset_caches if root_call
+        end
+
+        # The marker #choose_list_marker picked for +node+ during this
+        # render call, nil when it picked none. ListItemTag writes it in
+        # front of the items, HorizontalRuleTag picks the characters of
+        # its rule so they differ from it.
+        # @param node [AST::Node]
+        # @return [String, nil]
+        def list_marker(node)
+          @list_markers&.[](node)
         end
 
         # Whether +element+ is the child that #render_children is
@@ -285,7 +321,10 @@ module Markbridge
         # one: a call from inside a tag finds them in place.
         def enter
           root_call = @interface_cache.nil?
-          @interface_cache = {} if root_call
+          if root_call
+            @interface_cache = {}
+            @list_markers = {}.compare_by_identity
+          end
           root_call
         end
 
@@ -296,6 +335,7 @@ module Markbridge
         def reset_caches
           @interface_cache = nil
           @resolved_tags = nil
+          @list_markers = nil
         end
 
         def interface_for(context)

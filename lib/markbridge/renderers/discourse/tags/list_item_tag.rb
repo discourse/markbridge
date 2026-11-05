@@ -34,7 +34,7 @@ module Markbridge
             return "" if content.empty?
 
             parent_list = interface.find_parent(AST::List)
-            @builder.build(content, marker: determine_marker(parent_list))
+            @builder.build(content, marker: determine_marker(parent_list, interface))
           end
 
           private
@@ -122,8 +122,11 @@ module Markbridge
 
           # @param parent_list [AST::List, nil]
           # @return [String]
-          def determine_marker(parent_list)
-            parent_list&.ordered? ? "1. " : "- "
+          # The marker the renderer chose for the list (see
+          # RenderingInterface#choose_list_marker), or the first one of
+          # its kind for an item rendered without its list.
+          def determine_marker(parent_list, interface)
+            interface.list_marker(parent_list) || (parent_list&.ordered? ? "1. " : "- ")
           end
         end
       end

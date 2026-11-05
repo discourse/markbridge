@@ -300,4 +300,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListItemTag do
       end
     end
   end
+
+  describe "the marker" do
+    it "is the one the renderer chose for the list" do
+      list = Markbridge::AST::List.new
+      node = Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+      allow(renderer).to receive(:list_marker).with(list).and_return("* ")
+
+      expect(tag.render(node, interface_for(list))).to eq("* a\n")
+    end
+
+    it "is the first one of the kind when the renderer chose none" do
+      list = Markbridge::AST::List.new(ordered: true)
+      node = Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+
+      expect(tag.render(node, interface_for(list))).to eq("1. a\n")
+    end
+  end
 end
