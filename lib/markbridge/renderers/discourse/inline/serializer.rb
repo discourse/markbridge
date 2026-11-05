@@ -54,6 +54,17 @@ module Markbridge
           # The character in front of a bare URL keeps it from being linked
           # unless it is whitespace or an opening parenthesis.
           NOT_GLUED_BEFORE = /[[:space:](]/
+          # What markdown-it's linkify links on its own: a web or FTP URL
+          # with its scheme, or a mail address with mailto:. A relative
+          # href, an anchor or a protocol-relative URL only links as a
+          # Markdown link.
+          AUTOLINKABLE = %r{\A(?:https?://|ftps?://|mailto:)}i
+          # An href that is no URL but a place on the site: a path, an
+          # anchor, a query. Such a bare link is written as a Markdown
+          # link. A target that is neither, a wiki page name for example,
+          # stays plain text: a link to it would be broken anyway, and a
+          # consumer maps such targets to real URLs on the AST.
+          PATH_LIKE = %r{\A(?:[/#?]|\.{1,2}/)}
 
           BACKTICKS = /`+/
           # Whitespace with a line break in it, see #flat_alt.
@@ -73,6 +84,8 @@ module Markbridge
                            :GLUED_AFTER_PAREN_OK,
                            :PARENTHESIS,
                            :NOT_GLUED_BEFORE,
+                           :AUTOLINKABLE,
+                           :PATH_LIKE,
                            :BACKTICKS,
                            :ALT_LINE_BREAK,
                            :DISCOURSE_OPTION,
@@ -249,9 +262,10 @@ module Markbridge
           # outside the pair is not known here, as a tag that returned a
           # String would not know it either.
           def run(tokens, from, to, html_mode)
-            single = single_string(tokens, from, to)
-            return single if single
+            single_string(tokens, from, to) || joined(tokens, from, to, html_mode)
+          end
 
+          def joined(tokens, from, to, html_mode)
             buffer = +""
             append(buffer, pieces(tokens, from, to, html_mode), html_mode)
             buffer
@@ -380,13 +394,18 @@ module Markbridge
           end
 
           # A bare URL is linked by the Markdown parser on its own only when
-          # whitespace (or the start of the line) stands in front of it and
-          # nothing sticks to its end. Glued to its neighbors it is written
-          # as a Markdown link with the URL as its text, which links
-          # everywhere. The label is the href escaped for a link label: a
-          # raw `]` in it would end the label early.
+          # it has a scheme linkify knows, whitespace (or the start of the
+          # line) stands in front of it and nothing sticks to its end.
+          # Otherwise it is written as a Markdown link with the URL as its
+          # text, which links everywhere, unless the href is no URL and no
+          # path (see PATH_LIKE). The label is the href escaped for a link
+          # label: a raw `]` in it would end the label early.
           def bare_url_piece(href, buffer, following)
-            return href unless glued_before?(buffer) || glued_after?(following, href)
+            if AUTOLINKABLE.match?(href)
+              return href unless glued_before?(buffer) || glued_after?(following, href)
+            elsif !PATH_LIKE.match?(href)
+              return href
+            end
 
             "[#{@escaper.escape(href, in_link_label: true)}](#{LinkDestination.escape(href)})"
           end

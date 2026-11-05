@@ -90,25 +90,16 @@ matcher:
     - Markbridge::Parsers::HTML::Parser#collapse_whitespace
     - Markbridge::Parsers::HTML::Parser#trim_trailing_whitespace
 
-    # RenderingInterface#apply_markers' EDGE_WHITESPACE fast path.
-    # The capture-group sub handles flush content identically (its
-    # edge captures match empty strings), so mutations that disable
-    # the fast path (`unless true`, `unless content`, guard/return
-    # drops) are output-equivalent and only cost a MatchData + capture
-    # allocations per inline tag. The sub's own regex semantics (/m
-    # flag, edge quantifiers) are pinned by wrap_inline specs with
-    # multi-line and one-sided-whitespace content. Bucket A.
-    - Markbridge::Renderers::Discourse::RenderingInterface#apply_markers
-
     # Inline::Serializer#place_markers has the same EDGE_WHITESPACE fast
     # path as apply_markers above, with the same equivalence: the sub
     # gives the same string for content without edge whitespace and
     # only costs the MatchData. Bucket A.
     - Markbridge::Renderers::Discourse::Inline::Serializer#place_markers
 
-    # Inline::Serializer#single_string only keeps a run that is one
-    # String off the pieces array and the buffer; joined with nothing,
-    # the String comes out the same. Bucket A.
+    # Inline::Serializer#run and #single_string only keep a run that is
+    # one String off the pieces array and the buffer; joined with
+    # nothing, the String comes out the same. Bucket A.
+    - Markbridge::Renderers::Discourse::Inline::Serializer#run
     - Markbridge::Renderers::Discourse::Inline::Serializer#single_string
 
     # parse_external_link mutations are all Bucket A: `split(" ", 2)`
@@ -202,6 +193,9 @@ matcher:
     # rendering behavior is pinned by the renderer specs.
     - Markbridge::Renderers::Discourse::Renderer#render
     - Markbridge::Renderers::Discourse::Renderer#render_default
+    # #reset_caches is that housekeeping: dropping the interface cache
+    # reset keeps the entries across calls, which only costs memory.
+    - Markbridge::Renderers::Discourse::Renderer#reset_caches
 
     # Renderer#render_child's `@previous_list && visible?(output)`: the
     # first half only keeps the visibility check off the children when no
@@ -376,21 +370,12 @@ mutation:
     - "send{receiver=lvar{value=document} selector=include?}"
     - "send{receiver=lvar{value=document} selector=match?}"
 
-    # UrlTag#markdown_destination's `if destination.match?(/[()\\]/)`
-    # guard. Both branches give the same destination: gsub without a
-    # match returns an equal copy. The guard only saves that copy on the
-    # common link without these characters. `if true`, `if destination`
-    # and the collapse to always-gsub are the alive mutations. The
-    # parameter is named `destination` only there, so the pattern reaches
-    # nothing else; keyed on `href` it also covered the scheme check in
-    # UrlTag#linkable?, which is an `if href.match?(...)` too.
+    # LinkDestination.escape's `if destination.match?(SPECIAL)` guard.
+    # Both branches give the same destination: gsub without a match
+    # returns an equal copy. The guard only saves that copy on the common
+    # link without these characters. The parameter is named `destination`
+    # only there.
     - "if{condition=send{receiver=lvar{value=destination} selector=match?}}"
-
-    # ImageTag#markdown_destination's `src&.match?(/[()\\]/) ?` guard, the
-    # same guard as above with a safe navigation call (src can be nil).
-    # `if src` and `src&.match?(//)` are the alive mutations, both still
-    # escape every source that needs it. `src&.match?` is used only there.
-    - "if{condition=csend{receiver=lvar{value=src} selector=match?}}"
 
     # Renderer#render_children's `elsif @previous_list && part.match?(VISIBLE)`.
     # Without a list to forget, setting @previous_list to nil changes
@@ -400,15 +385,6 @@ mutation:
     # names the right side: an instance variable name has an @, which the
     # pattern language does not take. `part.match?` is used only there.
     - "if{condition=and{right=send{receiver=lvar{value=part} selector=match?}}}"
-
-    # UrlTag#bare_url's `blank?(text) ? href_as_text(...) : text`. The
-    # rendered text of a bare URL is the escaped href, so rendering the
-    # href as text every time gives the same label; the branch only
-    # saves a Text node and a second escape, which is a quarter of the
-    # time of a glued link. `if true`, `if text` and the collapse to
-    # always-href_as_text are the alive mutations. `blank?` stands alone
-    # as an `if` condition only there.
-    - "if{condition=send{selector=blank?}}"
 
     # `rows_data[header_idx]` / `rows_data[0...header_idx]` / ... —
     # `.at` / `.fetch` equivalences (valid index by construction) and

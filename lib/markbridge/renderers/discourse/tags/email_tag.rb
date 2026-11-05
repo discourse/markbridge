@@ -4,20 +4,19 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Tag for rendering email links
+        # Mail links: a link token pair with a mailto: destination around
+        # the children. Without an address the children stand alone;
+        # without visible text the address is written as a bare URL.
         class EmailTag < Tag
           def render(element, interface)
-            child_context = interface.with_parent(element)
-            text = interface.render_children(element, context: child_context)
+            tokens = interface.render_tokens(element, context: interface.with_parent(element))
             address = element.address
+            return tokens unless address
 
-            return text unless address
+            destination = "mailto:#{address}"
+            return [Inline::Tokens.bare_url(destination)] unless Inline::Tokens.visible?(tokens)
 
-            if interface.html_mode?
-              %(<a href="mailto:#{HtmlEscaper.escape(address)}">#{text}</a>)
-            else
-              "[#{text}](mailto:#{address})"
-            end
+            tokens.unshift(Inline::Tokens.link_open(destination)) << Inline::Tokens.link_close
           end
         end
       end

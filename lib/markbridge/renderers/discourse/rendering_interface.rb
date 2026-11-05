@@ -138,38 +138,6 @@ module Markbridge
           # Check if content has newlines
           node.children.any? { |c| c.instance_of?(AST::Text) && c.text.include?("\n") }
         end
-
-        # Leading or trailing whitespace (Unicode-aware, matching the
-        # flanking-preservation sub in #wrap_inline).
-        EDGE_WHITESPACE = /\A[[:space:]]|[[:space:]]\z/m
-        private_constant :EDGE_WHITESPACE
-
-        # Wraps inline content in markers, with whitespace at the edges
-        # outside the markers. Content with nothing visible in it is
-        # returned as it is.
-        def wrap_inline(content, open_marker, close_marker = nil)
-          close_marker ||= open_marker
-          return content unless content.match?(/[^[:space:]]/)
-
-          apply_markers(content, open_marker, close_marker)
-        end
-
-        private
-
-        # Wrap content in markers, keeping leading/trailing whitespace
-        # outside the markers (Unicode-aware, since CommonMark's flanking
-        # rules treat e.g. nbsp as whitespace).
-        def apply_markers(content, open_marker, close_marker)
-          # Fast path: no edge whitespace to preserve (the common case), so
-          # plain interpolation replaces the capture-group sub below and its
-          # MatchData + capture allocations.
-          return "#{open_marker}#{content}#{close_marker}" unless content.match?(EDGE_WHITESPACE)
-
-          content.sub(/\A([[:space:]]*)(.+?)([[:space:]]*)\z/m) do
-            match = Regexp.last_match
-            "#{match[1]}#{open_marker}#{match[2]}#{close_marker}#{match[3]}"
-          end
-        end
       end
     end
   end

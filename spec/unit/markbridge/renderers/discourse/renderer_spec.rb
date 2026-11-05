@@ -452,6 +452,54 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       )
     end
 
+    it "knows the parent of the children it renders, also one that is not on the chain" do
+      # A tag that asks for its siblings while its parent did not put
+      # itself on the chain: the renderer still knows the parent.
+      seen = nil
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      parent_class = Class.new(Markbridge::AST::Element)
+      child_class = Class.new(Markbridge::AST::Element)
+      library.register(
+        parent_class,
+        Markbridge::Renderers::Discourse::Tag.new do |element, interface|
+          interface.render_tokens(element)
+        end,
+      )
+      library.register(
+        child_class,
+        Markbridge::Renderers::Discourse::Tag.new do |element, interface|
+          seen = interface.previous_sibling(element)
+          "x"
+        end,
+      )
+      first = Markbridge::AST::Text.new("a")
+      parent = parent_class.new << first << child_class.new
+      document = Markbridge::AST::Document.new << Markbridge::AST::Text.new("b") << parent
+
+      described_class.new(tag_library: library).render(document)
+
+      expect(seen).to be(first)
+    end
+
+    it "forgets the resolved tags after a top-level call" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      renderer_with_library = described_class.new(tag_library: library)
+      bold_class = Class.new(Markbridge::AST::Bold)
+      element = bold_class.new << Markbridge::AST::Text.new("a")
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+
+      # Resolved through its ancestry to the Bold tag, and remembered for
+      # this call only: a tag registered for the ancestor afterwards is
+      # found by the next call.
+      renderer_with_library.render_tokens(Markbridge::AST::Document.new([element]), context:)
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new { |_, _| "custom" },
+      )
+
+      expect(renderer_with_library.render(Markbridge::AST::Document.new([element]))).to eq("custom")
+    end
+
     it "knows the position of the child it renders, also after a nested call" do
       positions = []
       renderer_with_tag = nil
@@ -708,31 +756,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
     it "returns true for HorizontalRule elements" do
       hr = Markbridge::AST::HorizontalRule.new
       expect(interface.block_context?(hr)).to be true
-    end
-
-    it "wraps content with markers" do
-      result = interface.wrap_inline("text", "**")
-      expect(result).to eq("**text**")
-    end
-
-    it "uses different close marker if provided" do
-      result = interface.wrap_inline("text", "[", "]")
-      expect(result).to eq("[text]")
-    end
-
-    it "returns content as-is when empty after stripping" do
-      result = interface.wrap_inline("   ", "**")
-      expect(result).to eq("   ")
-    end
-
-    it "preserves leading whitespace" do
-      result = interface.wrap_inline("  text", "**")
-      expect(result).to eq("  **text**")
-    end
-
-    it "preserves trailing whitespace" do
-      result = interface.wrap_inline("text  ", "**")
-      expect(result).to eq("**text**  ")
     end
   end
 
