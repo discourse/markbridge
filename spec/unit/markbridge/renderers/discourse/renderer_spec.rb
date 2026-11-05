@@ -452,6 +452,38 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       )
     end
 
+    it "renders a wrapper after a nested wrapper" do
+      # The nested call must not take the interface cache of the outer
+      # call with it when it ends.
+      inner = Markbridge::AST::Italic.new << Markbridge::AST::Text.new("a")
+      bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("b")
+      document = Markbridge::AST::Document.new([Markbridge::AST::Italic.new << inner << bold])
+
+      expect(renderer.render(document)).to eq("<em>*a*<!---->**b**</em>")
+    end
+
+    it "starts the list bookkeeping afresh for the children of a wrapper" do
+      # A list inside a wrapper that returns tokens does not see the
+      # list in front of the wrapper, so it gets no separator.
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      wrapper_class = Class.new(Markbridge::AST::Element)
+      library.register(
+        wrapper_class,
+        Markbridge::Renderers::Discourse::Tag.new do |element, interface|
+          interface.render_tokens(element)
+        end,
+      )
+      list = ->(text) do
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new(text)
+        )
+      end
+      document =
+        Markbridge::AST::Document.new([list.call("a"), wrapper_class.new << list.call("b")])
+
+      expect(described_class.new(tag_library: library).render(document)).not_to include("<!---->")
+    end
+
     it "knows the parent of the children it renders, also one that is not on the chain" do
       # A tag that asks for its siblings while its parent did not put
       # itself on the chain: the renderer still knows the parent.

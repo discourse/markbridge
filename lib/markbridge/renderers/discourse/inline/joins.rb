@@ -25,12 +25,10 @@ module Markbridge
 
           # A punctuation character or a symbol right at the search start,
           # which is what CommonMark's flanking rules count as punctuation
-          # (ASCII and Unicode alike), as markdown-it does.
-          PUNCTUATION_AT = /\G[\p{P}\p{S}]/
-          # Delimiters that open and close only where CommonMark's flanking
-          # rules allow it: emphasis (* _) and strikethrough (~), with the
-          # pattern that finds the first byte outside a run of each.
-          FLANKING_DELIMITERS = { 42 => /[^*]/, 95 => /[^_]/, 126 => /[^~]/ }.freeze
+          # (ASCII and Unicode alike), as markdown-it does. For a character
+          # outside ASCII only; an ASCII byte is answered from the class
+          # table without a regex.
+          PUNCTUATION_AT = /\A[\p{P}\p{S}]/
           BACKSLASH = 92
 
           # What a byte is to the join rules. WORD: ASCII letters and
@@ -137,7 +135,6 @@ module Markbridge
               .pack("C*")
               .freeze
           private_constant :PUNCTUATION_AT,
-                           :FLANKING_DELIMITERS,
                            :BACKSLASH,
                            :OTHER,
                            :WORD,
@@ -203,29 +200,55 @@ module Markbridge
             if action == BOUNDARY
               buffer << BOUNDARY_COMMENT
             elsif action == CHECK_AFTER
-              index = piece.byteindex(FLANKING_DELIMITERS.fetch(piece.getbyte(0)))
-              buffer << BOUNDARY_COMMENT if punctuation_at?(piece, index)
+              buffer << BOUNDARY_COMMENT if punctuation_at?(piece, after_run(piece))
             elsif action == CHECK_BEFORE
-              index = buffer.byterindex(FLANKING_DELIMITERS.fetch(last_byte))
-              buffer << BOUNDARY_COMMENT if punctuation_at?(buffer, index)
+              buffer << BOUNDARY_COMMENT if punctuation_at?(buffer, before_run(buffer, last_byte))
             elsif !escaped_end?(buffer)
               # Byte offsets: the `!` is the last byte.
               buffer.bytesplice(buffer.bytesize - 1, 0, "\\")
             end
           end
 
+          # The byte offset of the first byte after the run of the piece's
+          # first byte, nil when the piece is the run alone. A delimiter is
+          # ASCII, so the byte after the run starts a character.
+          def self.after_run(piece)
+            run = piece.getbyte(0)
+            index = 1
+            index += 1 while piece.getbyte(index) == run
+            index if index < piece.bytesize
+          end
+
+          # The byte offset of the character in front of the run that ends
+          # the buffer, nil when the buffer is the run alone. The byte in
+          # front of the run may be inside a multi-byte character, so the
+          # search goes back to its first byte.
+          def self.before_run(buffer, run)
+            index = buffer.bytesize - 2
+            index -= 1 while index >= 0 && buffer.getbyte(index) == run
+            return if index.negative?
+
+            index -= 1 while index.positive? && (buffer.getbyte(index) & 0xC0) == 0x80
+            index
+          end
+
           # Whether the character at byte +index+ of +string+ is punctuation
-          # for the flanking rules. +index+ is the start of a character (the
-          # searches that find it match whole characters), nil when there is
-          # no character, which is no punctuation. The match is anchored at
-          # +index+ and reads the whole character, so it needs no copy.
+          # for the flanking rules; nil is no character and no punctuation.
+          # An ASCII byte is answered from the class table, a character
+          # outside ASCII is matched as a whole.
           def self.punctuation_at?(string, index)
             return false if index.nil?
 
-            !string.byteindex(PUNCTUATION_AT, index).nil?
+            byte = string.getbyte(index)
+            return BYTE_CLASSES.getbyte(byte) >= PUNCTUATION if byte < 128
+
+            # The lead byte says how long the character is; a slice that
+            # reaches into the next character is no valid string.
+            length = byte >= 0xF0 ? 4 : byte >= 0xE0 ? 3 : 2
+            string.byteslice(index, length).match?(PUNCTUATION_AT)
           end
 
-          private_class_method :join, :punctuation_at?
+          private_class_method :join, :punctuation_at?, :after_run, :before_run
         end
       end
     end

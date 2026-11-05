@@ -121,6 +121,8 @@ Markbridge
 2. Create handler: `lib/markbridge/parsers/bbcode/handlers/quote_handler.rb`
 3. Register in `HandlerRegistry.default` (lib/markbridge/parsers/bbcode/handler_registry.rb)
 4. Create tag: `lib/markbridge/renderers/discourse/tags/quote_tag.rb`
+   (a block tag returns a String; an inline tag whose markers depend on
+   the neighbors returns `Inline::Tokens`, see `BoldTag`)
 5. Register in `TagLibrary.default` OR use auto_register! for convention-based discovery
 6. Add requires to loader files
 7. Decide on html_mode behavior (see below)

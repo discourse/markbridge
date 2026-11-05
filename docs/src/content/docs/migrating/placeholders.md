@@ -185,9 +185,11 @@ The importer downstream substitutes `[upload|u_screenshot_png_3a7c2]` for the re
 
 A common worry: "if my placeholder contains `[`, won't the Markdown escaper mangle it?" It will not.
 
-Markbridge escapes only `AST::Text` nodes — the textual content from the source document. A Tag's return value is spliced into its parent's output with no transformation. Whatever you return from `Tag#render` is exactly what appears in the surrounding Markdown.
+Markbridge escapes only `AST::Text` nodes — the textual content from the source document. A Tag's return value is written into its parent's output as it is. Whatever you return from `Tag#render` is exactly what appears in the surrounding Markdown.
 
 This is what makes placeholders safe. `"[upload|u_screenshot_png_3a7c2]"`, `"@@MENTION:alice@@"`, `"<<TOPIC:7>>"` all reach the output untouched. Pick whatever sigil pattern your importer parses cleanly downstream.
+
+The one thing that can stand between a placeholder and its neighbor is what the renderer puts at a join: a `!` right in front of a placeholder that starts with `[` gets a backslash (otherwise it would read as an image), and an empty HTML comment (`<!---->`) goes between two runs of emphasis markers. A placeholder with a letter or a digit at both ends never sees either.
 
 The one twist is HTML mode (next section).
 
