@@ -24,6 +24,50 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
       expect(tag.render(element, interface)).to eq("")
     end
 
+    # A line that starts with [spoiler] and ends with [/spoiler] is one block
+    # spoiler to Discourse, so a second spoiler on it needs something after it.
+    context "when a spoiler stands in front" do
+      def paragraph_with(*nodes)
+        paragraph = Markbridge::AST::Paragraph.new
+        nodes.each { |node| paragraph << node }
+        paragraph
+      end
+
+      def spoiler(text)
+        Markbridge::AST::Spoiler.new << Markbridge::AST::Text.new(text)
+      end
+
+      it "writes a comment after the second spoiler" do
+        second = spoiler("y")
+        paragraph_with(spoiler("x"), second)
+
+        expect(tag.render(second, interface_for(paragraph_with(spoiler("x"), second)))).to eq(
+          "[spoiler]y[/spoiler]<!---->",
+        )
+      end
+
+      it "writes the comment also with whitespace between the two" do
+        second = spoiler("y")
+        parent = paragraph_with(spoiler("x"), Markbridge::AST::Text.new(" \n"), second)
+
+        expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]<!---->")
+      end
+
+      it "writes no comment after text between the two" do
+        second = spoiler("y")
+        parent = paragraph_with(spoiler("x"), Markbridge::AST::Text.new(" a "), second)
+
+        expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]")
+      end
+
+      it "writes no comment after the first spoiler" do
+        first = spoiler("x")
+        parent = paragraph_with(first, spoiler("y"))
+
+        expect(tag.render(first, interface_for(parent))).to eq("[spoiler]x[/spoiler]")
+      end
+    end
+
     it "writes only the content inside a link, where Discourse cooks no BBCode" do
       element = Markbridge::AST::Spoiler.new(title: "Reveal")
       element << Markbridge::AST::Text.new("hidden")
