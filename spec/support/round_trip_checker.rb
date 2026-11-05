@@ -25,6 +25,13 @@ require_relative "markdown_it_cooker"
 # Discourse BBCode the renderer writes ([u], [spoiler], [details]) is text
 # to plain markdown-it, and the text check expects it as text.
 #
+# A table the renderer cannot write as a Markdown table is HTML, and
+# everything in it is written in html_mode: HTML tags for emphasis, lists
+# and code, a span for a spoiler, no BBCode. The renderer decides
+# that per table, and the checker reads the decision off the table tag
+# (see RecordingTableTag) rather than guessing it again: both forms are
+# right, the checks only need to know which one to expect.
+#
 # A fifth, normalizer, comes first: the AST has to be one the default
 # normalizer leaves alone, so the tree that is rendered is the tree the
 # expectation reads.
@@ -133,6 +140,32 @@ class RoundTripChecker
   LINKABLE_SCHEME = /\A(?:https?|ftps?|mailto):/i
   SCHEME_LIKE = /\A[a-z][a-z0-9+.-]*:/i
 
+  # The table tag, remembering which tables it wrote as HTML.
+  class RecordingTableTag < Markbridge::Renderers::Discourse::Tags::TableTag
+    HTML_START = /\A\s*<table>/
+
+    # @return [Hash{Markbridge::AST::Table => Boolean}]
+    attr_reader :html_tables
+
+    def initialize
+      super
+      @html_tables = {}.compare_by_identity
+    end
+
+    def render(element, interface)
+      output = super
+      @html_tables[element] = output.match?(HTML_START)
+      output
+    end
+  end
+
+  def initialize
+    @table_tag = RecordingTableTag.new
+    library = Markbridge::Renderers::Discourse::TagLibrary.default
+    library.register(AST::Table, @table_tag)
+    @renderer = Markbridge::Renderers::Discourse::Renderer.new(tag_library: library)
+  end
+
   # @param document [Markbridge::AST::Document]
   # @return [Array<Failure>] empty when the document round-trips
   def failures(document)
@@ -219,7 +252,12 @@ class RoundTripChecker
   # @param document [Markbridge::AST::Document]
   # @return [String]
   def render(document)
-    Markbridge.render(document, normalize: false).markdown
+    Markbridge.render(document, renderer: @renderer, normalize: false).markdown
+  end
+
+  # Whether the renderer wrote +table+ as HTML in the last render.
+  def html_table?(table)
+    @table_tag.html_tables.fetch(table, false)
   end
 
   # @param markdown [String]
@@ -329,61 +367,62 @@ class RoundTripChecker
   end
 
   # @param node [Markbridge::AST::Node]
+  # @param html [Boolean] whether the node is written in html_mode
   # @return [Array<Hash>] the skeleton nodes this AST node stands for.
   #   Document, Paragraph, Text and LineBreak add no node of their own,
   #   their content moves up to the parent. A container with nothing
   #   visible in it renders to nothing and adds no node either.
-  def expected_skeleton(node)
+  def expected_skeleton(node, html: false)
     return [] if node.is_a?(AST::Element) && !visible?(node)
 
     case node
     when AST::List
-      [skeleton(node.ordered? ? "ol" : "ul", children: expected_children(node))]
+      [skeleton(node.ordered? ? "ol" : "ul", children: expected_children(node, html:))]
     when AST::ListItem
-      [skeleton("li", children: expected_children(node))]
+      [skeleton("li", children: expected_children(node, html:))]
     when AST::Quote
-      [skeleton("blockquote", children: expected_children(node))]
+      [skeleton("blockquote", children: expected_children(node, html:))]
     when AST::Code
       [expected_code(node)]
     when AST::Url
-      expected_link(node)
+      expected_link(node, html:)
     when AST::Email
       if node.address
-        [skeleton("a", children: expected_children(node), href: "mailto:#{node.address}")]
+        [skeleton("a", children: expected_children(node, html:), href: "mailto:#{node.address}")]
       else
-        expected_children(node)
+        expected_children(node, html:)
       end
     when AST::Image
       [skeleton("img", href: node.src)]
     when AST::Heading
-      [skeleton("h#{node.level}", children: expected_children(node))]
+      [skeleton("h#{node.level}", children: expected_children(node, html:))]
     when AST::Align
-      [skeleton("div", children: expected_children(node))]
+      [skeleton("div", children: expected_children(node, html:))]
     when AST::Superscript
-      [skeleton("sup", children: expected_children(node))]
+      [skeleton("sup", children: expected_children(node, html:))]
     when AST::Subscript
-      [skeleton("sub", children: expected_children(node))]
+      [skeleton("sub", children: expected_children(node, html:))]
     when AST::Table
       [expected_table(node)]
     when AST::Upload
       [expected_upload(node)]
     when AST::Bold
-      [skeleton("strong", children: expected_children(node))]
+      [skeleton("strong", children: expected_children(node, html:))]
     when AST::Italic
-      [skeleton("em", children: expected_children(node))]
+      [skeleton("em", children: expected_children(node, html:))]
     when AST::Strikethrough
-      [skeleton("s", children: expected_children(node))]
+      [skeleton("s", children: expected_children(node, html:))]
     when AST::HorizontalRule
       [skeleton("hr")]
     when AST::Element
-      expected_children(node)
+      expected_children(node, html:)
     else
       []
     end
   end
 
-  def expected_children(element)
-    element.children.flat_map { |child| expected_skeleton(child) }
+  def expected_children(element, html: false)
+    element.children.flat_map { |child| expected_skeleton(child, html:) }
   end
 
   # Whether the node puts something on the page. Whitespace-only text
@@ -401,6 +440,8 @@ class RoundTripChecker
       !code_text(node).empty?
     when AST::Url
       linkable?(node.href) || node.children.any? { |child| visible?(child) }
+    when AST::Email
+      !node.address.nil? || node.children.any? { |child| visible?(child) }
     when AST::Table
       node.descendants.any?(AST::TableCell)
     when AST::Element
@@ -410,10 +451,12 @@ class RoundTripChecker
     end
   end
 
-  # The renderer takes the first row whose cells are all header cells as
-  # the header row, or the first row, and a Markdown table always has
-  # one. A row without cells is dropped.
+  # In a Markdown table the renderer takes the first row whose cells are
+  # all header cells as the header row, or the first row, and a Markdown
+  # table always has one. An HTML table keeps every cell as it is, and
+  # its content is written in html_mode. A row without cells is dropped.
   def expected_table(node)
+    html = html_table?(node)
     rows =
       node.children.select { |row| row.is_a?(AST::TableRow) && row.children.any?(AST::TableCell) }
     header =
@@ -430,7 +473,8 @@ class RoundTripChecker
             "tr",
             children:
               cells.map do |cell|
-                skeleton(index == header ? "th" : "td", children: expected_children(cell))
+                header_cell = html ? cell.header? : index == header
+                skeleton(header_cell ? "th" : "td", children: expected_children(cell, html:))
               end,
           )
         end,
@@ -448,10 +492,10 @@ class RoundTripChecker
   end
 
   # A link with an href the renderer refuses keeps only its text.
-  def expected_link(node)
-    return expected_children(node) unless linkable?(node.href)
+  def expected_link(node, html: false)
+    return expected_children(node, html:) unless linkable?(node.href)
 
-    [skeleton("a", children: expected_children(node), href: node.href)]
+    [skeleton("a", children: expected_children(node, html:), href: node.href)]
   end
 
   # A code element prints as a fenced block when its block flag is set or
@@ -525,8 +569,10 @@ class RoundTripChecker
   # The text a reader sees, with a separator around every block so that
   # words from two blocks never run into each other. +in_link+ says
   # whether a link is among the ancestors: the underline is plain text
-  # there.
-  def expected_text(node, out, in_link: false)
+  # there. +html+ says whether the node is written in html_mode: no
+  # BBCode there, a details block is a <details> with a <summary>, and
+  # a file upload is a link with the file name.
+  def expected_text(node, out, in_link: false, html: false)
     case node
     when AST::Text, AST::MarkdownText
       out << node.text
@@ -535,61 +581,85 @@ class RoundTripChecker
     when AST::Mention
       out << "@#{node.name}"
     when AST::Upload
-      expected_upload_text(node, out)
+      expected_upload_text(node, out, html:)
     when AST::Url, AST::Email
       # A link without visible text shows its href.
       if node.children.any? { |child| visible?(child) }
-        expected_children_text(node, out, in_link: true)
+        expected_children_text(node, out, in_link: true, html:)
       elsif node.is_a?(AST::Url)
         out << node.href.to_s
+      elsif node.address
+        out << "mailto:#{node.address}"
       end
     when AST::Underline
-      bbcode_text(node, out, in_link:, open: "[u]", close: "[/u]", plain: in_link)
+      plain = in_link || html || !visible?(node)
+      bbcode_text(node, out, in_link:, html:, open: "[u]", close: "[/u]", plain:)
     when AST::Spoiler
       open = node.title ? "[spoiler=#{node.title}]" : "[spoiler]"
-      bbcode_text(node, out, in_link:, open:, close: "[/spoiler]", plain: !visible?(node))
+      plain = html || !visible?(node)
+      bbcode_text(node, out, in_link:, html:, open:, close: "[/spoiler]", plain:)
     when AST::Details
-      separated(out) do
-        bbcode_text(
-          node,
-          out,
-          in_link:,
-          open: "[details]\n",
-          close: "\n[/details]",
-          plain: !visible?(node),
-        )
+      if html
+        summary_text(node.title || "Summary", node, out, in_link:) if visible?(node)
+      else
+        separated(out) do
+          bbcode_text(
+            node,
+            out,
+            in_link:,
+            html:,
+            open: "[details]\n",
+            close: "\n[/details]",
+            plain: !visible?(node),
+          )
+        end
       end
     when AST::Code
       if block_code?(node)
-        separated(out) { expected_children_text(node, out, in_link:) }
+        separated(out) { expected_children_text(node, out, in_link:, html:) }
       else
-        expected_children_text(node, out, in_link:)
+        expected_children_text(node, out, in_link:, html:)
       end
+    when AST::Table
+      separated(out) { expected_children_text(node, out, in_link:, html: html_table?(node)) }
     when *BLOCK_NODES
-      separated(out) { expected_children_text(node, out, in_link:) if node.is_a?(AST::Element) }
+      separated(out) do
+        expected_children_text(node, out, in_link:, html:) if node.is_a?(AST::Element)
+      end
     when AST::Element
-      expected_children_text(node, out, in_link:)
+      expected_children_text(node, out, in_link:, html:)
     end
     out
   end
 
-  def expected_children_text(element, out, in_link: false)
-    element.children.each { |child| expected_text(child, out, in_link:) }
+  def expected_children_text(element, out, in_link: false, html: false)
+    element.children.each { |child| expected_text(child, out, in_link:, html:) }
   end
 
   # BBCode around the content, or the content alone when +plain+.
-  def bbcode_text(node, out, in_link:, open:, close:, plain:)
+  def bbcode_text(node, out, in_link:, html:, open:, close:, plain:)
     out << open unless plain
-    expected_children_text(node, out, in_link:)
+    expected_children_text(node, out, in_link:, html:)
     out << close unless plain
   end
 
-  # An image shows its alt text, a file link its name and size.
-  def expected_upload_text(node, out)
+  # A <details> element: the summary on a line of its own, then the
+  # content, as blocks.
+  def summary_text(title, node, out, in_link:)
+    separated(out) do
+      separated(out) { out << title }
+      expected_children_text(node, out, in_link:, html: true)
+    end
+  end
+
+  # An image shows its alt text, a file link its name and size. In
+  # html_mode the file link has no "|attachment" marker.
+  def expected_upload_text(node, out, html:)
     if node.type == :image
       out << node.alt.to_s
     else
-      out << (node.filename || "attachment") << "|attachment"
+      out << (node.filename || "attachment")
+      out << "|attachment" unless html
       out << " (#{node.size})" if node.size
     end
   end

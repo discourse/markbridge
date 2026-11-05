@@ -127,12 +127,18 @@ class AstGenerator
     AST::Subscript,
     AST::Spoiler,
     AST::Color,
+    AST::Size,
   ].freeze
 
   # Leaves and links that need no edge character of their own.
   INLINE_LEAVES = %i[image email mention upload].freeze
 
   COLORS = %w[red #ff0000].freeze
+  SIZES = [10, 24].freeze
+
+  # What makes a table fall back to HTML: rows of different widths, a
+  # line break in a cell, or a block in a cell.
+  HTML_TABLE_TRIGGERS = %i[uneven break block].freeze
 
   # Inline containers may nest this deep. Two levels are enough to put a
   # link inside emphasis without making the tree hard to read.
@@ -153,7 +159,8 @@ class AstGenerator
 
   private
 
-  # Fills a block container (Document, ListItem, Quote, Align) with a mix
+  # Fills a block container (Document, ListItem, Quote, Align, Details)
+  # with a mix
   # of inline runs and blocks. The first piece is always an inline run, so
   # every container holds at least one non-empty Text and the renderer
   # cannot drop it as empty.
@@ -181,7 +188,7 @@ class AstGenerator
   def build_block(depth:, headings:)
     choices = %i[paragraph code_block rule table]
     choices << :heading if headings
-    choices.concat(%i[list quote align details]) if depth < MAX_DEPTH
+    choices.concat(%i[list quote align details html_table]) if depth < MAX_DEPTH
 
     case choices.sample(random: @random)
     when :paragraph
@@ -192,6 +199,8 @@ class AstGenerator
       spend { AST::HorizontalRule.new }
     when :table
       table
+    when :html_table
+      html_table(depth:)
     when :heading
       heading
     when :list
@@ -220,6 +229,45 @@ class AstGenerator
         row << cell
       end
       table << row
+    end
+    table
+  end
+
+  # A table the renderer writes as HTML, with everything in it in
+  # html_mode: a line break, a block or another table in a cell, or rows
+  # of different widths. One trigger is placed on purpose in the last
+  # cell, the other cells get an inline run and sometimes a block. A
+  # body cell is a header cell now and then: HTML keeps that, a
+  # Markdown table cannot. The cells are block containers, so the table
+  # counts as a nesting level.
+  def html_table(depth:)
+    table = spend { AST::Table.new }
+    columns = 1 + @random.rand(2)
+    rows = 1 + @random.rand(3)
+    trigger = HTML_TABLE_TRIGGERS.sample(random: @random)
+    trigger = :break if trigger == :uneven && rows == 1
+
+    rows.times do |index|
+      row = spend { AST::TableRow.new }
+      count = columns
+      count += 1 if trigger == :uneven && index == rows - 1
+      count.times do |column|
+        header = index.zero? || @random.rand < 0.2
+        cell = spend { AST::TableCell.new(header:) }
+        inline_run(cell)
+        add_block(cell, depth: depth + 1, headings: false) if @random.rand < 0.3
+        row << cell
+      end
+      table << row
+    end
+
+    last = table.children.last.children.last
+    case trigger
+    when :break
+      last << AST::LineBreak.new
+      inline_run(last)
+    when :block
+      last << build_block(depth: depth + 1, headings: false)
     end
     table
   end
@@ -381,6 +429,8 @@ class AstGenerator
       AST::Url.new(href: pick_href)
     elsif klass == AST::Color
       AST::Color.new(color: COLORS.sample(random: @random))
+    elsif klass == AST::Size
+      AST::Size.new(size: SIZES.sample(random: @random))
     else
       klass.new
     end

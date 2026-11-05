@@ -9,13 +9,15 @@
 # Two families of cases:
 #
 # - Inline pairs: a left node and a right node, each with a character
-#   class at the edge that faces the other, in one of nine positions
+#   class at the edge that faces the other, in one of twelve positions
 #   (inside a paragraph, at the start or the end of a line, right after a
 #   block, inside strong emphasis, in a heading, in a list item, in a
-#   link label, in a quote). Ids look like `paragraph/text(*)+bold(a)`.
+#   link label, in a quote, in superscript, in the cell of a Markdown
+#   table and in the cell of a table the renderer writes as HTML). Ids
+#   look like `paragraph/text(*)+bold(a)`.
 # - Block pairs: two blocks (two lists, a quote, a code block, a heading)
 #   with something or nothing between them, or a list followed by text,
-#   in a document, a list item or a quote. Ids look like
+#   in a document, a list item, a quote or a table cell. Ids look like
 #   `blocks/item/ul+space+ol`.
 #
 # Every case is an object that builds a fresh tree on each call of
@@ -128,6 +130,7 @@ module AdjacencyGenerator
       .concat(FIXED_KINDS.map { |kind| Variant.new(kind:, edge: nil) })
       .freeze
   LABEL_VARIANTS = VARIANTS.reject(&:link?).freeze
+  HTML_VARIANTS = VARIANTS.reject { |variant| variant.kind == "markdown" }.freeze
   TEXT_VARIANTS = VARIANTS.select { |variant| variant.kind == "text" }.freeze
   VARIANTS_BY_ID = VARIANTS.to_h { |variant| [variant.id, variant] }.freeze
 
@@ -182,7 +185,11 @@ module AdjacencyGenerator
 
   # Where an inline pair sits. Each builds the document around the two
   # nodes. Text on the outer side of the pair ends in a space, so only
-  # the inner edges face something other than whitespace.
+  # the inner edges face something other than whitespace. The pair in
+  # "cell" sits in a Markdown table unless one of the two writes a
+  # newline, which makes the table HTML; "html-cell" has a header row
+  # wider than its body row, so the table is HTML in every case and the
+  # pair is written in html_mode.
   INLINE_POSITIONS = {
     "paragraph" => ->(left, right) do
       AST::Document.new([AST::Text.new("x "), left, right, AST::Text.new(" y")])
@@ -213,7 +220,21 @@ module AdjacencyGenerator
     end,
     "label" => ->(left, right) { AST::Document.new([AST::Url.new(href: HREF) << left << right]) },
     "quote" => ->(left, right) { AST::Document.new([AST::Quote.new << left << right]) },
+    "sup" => ->(left, right) { AST::Document.new([AST::Superscript.new << left << right]) },
+    "cell" => ->(left, right) { AdjacencyGenerator.table_document([left, right], html: false) },
+    "html-cell" => ->(left, right) { AdjacencyGenerator.table_document([left, right], html: true) },
   }.freeze
+
+  # A table with a header row of words and a body row of one cell that
+  # holds +nodes+. With +html+ the header row has two cells, the body
+  # row one, so the renderer writes the table as HTML.
+  def self.table_document(nodes, html:)
+    header = AST::TableRow.new << (AST::TableCell.new(header: true) << AST::Text.new("x"))
+    header << (AST::TableCell.new(header: true) << AST::Text.new("y")) if html
+    cell = AST::TableCell.new
+    nodes.each { |node| cell << node }
+    AST::Document.new([AST::Table.new << header << (AST::TableRow.new << cell)])
+  end
 
   InlineCase =
     Data.define(:position, :left, :right) do
@@ -226,9 +247,18 @@ module AdjacencyGenerator
       end
     end
 
-  # The variants a position takes on either side.
+  # The variants a position takes on either side. A MarkdownText in
+  # html_mode is a Markdown island with blank lines around it, which no
+  # table cell can hold, so it stays out of "html-cell".
   def self.variants_for(position)
-    position == "label" ? LABEL_VARIANTS : VARIANTS
+    case position
+    when "label"
+      LABEL_VARIANTS
+    when "html-cell"
+      HTML_VARIANTS
+    else
+      VARIANTS
+    end
   end
 
   # [position, variants, offset of the position's first case]
@@ -313,6 +343,7 @@ module AdjacencyGenerator
         nodes.each { |node| quote << node }
         AST::Document.new([quote])
       end,
+    "cell" => ->(nodes) { table_document([AST::Text.new("x"), *nodes], html: false) },
   }.freeze
 
   BlockCase =
