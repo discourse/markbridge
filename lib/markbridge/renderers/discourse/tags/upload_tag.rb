@@ -37,14 +37,33 @@ module Markbridge
         class UploadTag < Tag
           def render(element, interface)
             return build_upload_html(element) if interface.html_mode?
-
-            # Return raw Markdown if available, otherwise reconstruct
-            return element.raw if element.raw
+            return raw(element, interface) if element.raw
 
             build_upload_markdown(element, interface)
           end
 
           private
+
+          # The raw Markdown of the source, with the pipes escaped in a
+          # table cell. One that is escaped already stays as it is.
+          def raw(element, interface)
+            return element.raw unless table_cell?(interface)
+
+            element.raw.gsub(/(?<!\\)\|/, "\\\\|")
+          end
+
+          # A `|` ends the cell of a Markdown table. Discourse keeps the
+          # pipes inside a link or an image since August 2026, plain
+          # markdown-it and older Discourse versions do not, and `\|` works
+          # in all of them: Discourse reads the dimensions and the attachment
+          # marker all the same.
+          def pipe(interface)
+            table_cell?(interface) ? "\\|" : "|"
+          end
+
+          def table_cell?(interface)
+            interface.has_parent?(AST::TableCell)
+          end
 
           def build_upload_markdown(element, interface)
             if element.type == :image
@@ -66,7 +85,7 @@ module Markbridge
             url = build_upload_url(element)
             size_part = " (#{element.size})" if element.size
 
-            "[#{filename}|attachment](#{url})#{size_part}"
+            "[#{filename}#{pipe(interface)}attachment](#{url})#{size_part}"
           end
 
           # The alt text is escaped for a link label, the dimensions are
@@ -76,7 +95,7 @@ module Markbridge
             parts << label(element.alt, element, interface) if element.alt
             parts << element.dimensions if element.dimensions
 
-            parts.join("|")
+            parts.join(pipe(interface))
           end
 
           # Text inside the brackets goes through the renderer like any
