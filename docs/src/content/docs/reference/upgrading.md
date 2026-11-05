@@ -3,7 +3,7 @@ title: Upgrading
 description: Breaking-change notes between Markbridge releases.
 ---
 
-## Upgrading to 0.4.3
+## Upgrading to 0.5.0
 
 The round-trip specs (see the Testing section of AGENTS.md) found a number of output defects. The fixes change the Markdown for the cases below, so check output assertions that cover them:
 
