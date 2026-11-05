@@ -50,7 +50,37 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Tokens do
     expect(described_class.hard_break).to be_frozen
   end
 
+  describe ".placeholder" do
+    it "builds a placeholder token with the text and what will most likely replace it" do
+      expect(described_class.placeholder("[link|1]", like: "https://e.com")).to eq(
+        [:placeholder, "[link|1]", "https://e.com"],
+      )
+    end
+
+    it "refuses a like: that is empty or no String" do
+      expect { described_class.placeholder("[link|1]", like: "") }.to raise_error(
+        ArgumentError,
+        'like: must be a non-empty String, got ""',
+      )
+      expect { described_class.placeholder("[link|1]", like: nil) }.to raise_error(
+        ArgumentError,
+        "like: must be a non-empty String, got nil",
+      )
+      expect { described_class.placeholder("[mention|1]", like: :alice) }.to raise_error(
+        ArgumentError,
+        "like: must be a non-empty String, got :alice",
+      )
+    end
+  end
+
   describe ".visible?" do
+    it "is true for a placeholder whose like: is visible, whatever the placeholder" do
+      expect(described_class.visible?([described_class.placeholder(" ", like: "@a")])).to be(true)
+      expect(described_class.visible?([described_class.placeholder("[x|1]", like: " ")])).to be(
+        false,
+      )
+    end
+
     it "is true for text, Markdown or HTML with something other than whitespace" do
       expect(described_class.visible?([described_class.text(" a")])).to be(true)
       expect(described_class.visible?([described_class.raw("*")])).to be(true)

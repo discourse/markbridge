@@ -469,6 +469,101 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       end
     end
 
+    describe "placeholders" do
+      def placeholder(like = "https://e.com/t/17", text = "[link|17]")
+        tokens.placeholder(text, like:)
+      end
+
+      def strong(*content)
+        [tokens.open(:strong), *content, tokens.close(:strong)]
+      end
+
+      it "writes the placeholder text as it is" do
+        expect(write(tokens.text("see "), placeholder)).to eq("see [link|17]")
+        expect(write(placeholder("x", "*a* [b]"))).to eq("*a* [b]")
+      end
+
+      it "joins a closing marker in front of it as if like stood there" do
+        expect(write(*strong(tokens.text("a.")), placeholder)).to eq("**a.**<!---->[link|17]")
+      end
+
+      it "joins an opening marker after it as if like stood there" do
+        expect(write(placeholder, *strong(tokens.text(".a")))).to eq("[link|17]<!---->**.a**")
+        expect(write(placeholder("https://e.com/"), *strong(tokens.text(".a")))).to eq(
+          "[link|17]**.a**",
+        )
+      end
+
+      it "puts the comment in front of a mention that text is glued to" do
+        expect(write(tokens.text("hi"), placeholder("@alice", "[mention|3]"))).to eq(
+          "hi<!---->[mention|3]",
+        )
+        expect(write(tokens.text("hi "), placeholder("@alice", "[mention|3]"))).to eq(
+          "hi [mention|3]",
+        )
+      end
+
+      it "escapes a ! in front of it only when like starts with [" do
+        expect(write(tokens.text("Look!"), placeholder("[a](u)", "u1"))).to eq("Look\\!u1")
+        expect(write(tokens.text("Look!"), placeholder)).to eq("Look![link|17]")
+      end
+
+      it "decides a bare URL in front of it by the start of like" do
+        expect(write(tokens.bare_url("https://e.com/"), placeholder(" x"))).to eq(
+          "https://e.com/[link|17]",
+        )
+        expect(write(tokens.bare_url("https://e.com/"), placeholder)).to eq(
+          "[https://e.com/](https://e.com/)[link|17]",
+        )
+      end
+
+      it "decides a bare URL after it by the end of like" do
+        expect(write(placeholder("x "), tokens.bare_url("https://e.com/"))).to eq(
+          "[link|17]https://e.com/",
+        )
+        expect(write(placeholder, tokens.bare_url("https://e.com/"))).to eq(
+          "[link|17][https://e.com/](https://e.com/)",
+        )
+      end
+
+      it "joins two placeholders by their like" do
+        expect(write(placeholder, placeholder("@bob", "[mention|4]"))).to eq(
+          "[link|17]<!---->[mention|4]",
+        )
+      end
+
+      it "joins finished Markdown from a tag after it by the end of like" do
+        expect(write(placeholder, tokens.raw("**.a**"))).to eq("[link|17]<!---->**.a**")
+      end
+
+      it "joins another buffer of the same length by its own end" do
+        # The placeholder goes into the buffer of the emphasis, which is
+        # as long as the text in front of the emphasis when the
+        # emphasis is joined with it.
+        expect(write(tokens.text("abcd."), *strong(placeholder("x", "[l|1]")))).to eq(
+          "abcd.**[l|1]**",
+        )
+      end
+
+      it "joins by the buffer again once something else was written after it" do
+        expect(write(placeholder, tokens.text(" "), *strong(tokens.text(".a")))).to eq(
+          "[link|17] **.a**",
+        )
+      end
+
+      it "reads the placeholder itself at the inner edge of emphasis" do
+        expect(write(tokens.text("x"), *strong(placeholder("@alice", "[mention|3]")))).to eq(
+          "x<!---->**[mention|3]**",
+        )
+      end
+
+      it "writes the placeholder text as it is in html_mode" do
+        expect(write(*strong(tokens.text("a.")), placeholder, html_mode: true)).to eq(
+          "<strong>a.</strong>[link|17]",
+        )
+      end
+    end
+
     describe "links" do
       def link(destination, *content)
         [tokens.link_open(destination), *content, tokens.link_close]
@@ -887,6 +982,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       serializer.write_groups(groups.map(&:first), html_mode:, before:) do |child|
         outputs.fetch(child)
       end
+    end
+
+    it "joins finished Markdown of the next group by the end of a placeholder's like" do
+      placeholder = tokens.placeholder("[link|17]", like: "https://e.com/t/17")
+
+      expect(write_groups([[:a, [placeholder]], [:b, "**.a**"]])).to eq("[link|17]<!---->**.a**")
+      expect(write_groups([[:a, [placeholder]], [:b, " **.a**"]])).to eq("[link|17] **.a**")
     end
 
     it "fits an output to the line it starts, from the state of the buffer" do

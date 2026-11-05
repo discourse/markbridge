@@ -131,7 +131,7 @@ Use `find_parent` / `has_parent?` to render differently inside specific ancestor
 
 ## Tags that return inline tokens
 
-A tag that writes a block, a BBCode wrapper or a placeholder returns a String, as above. Inline formatting is different: whether `**`, `*` or `[text](url)` means what it should depends on the characters next to it (the flanking rules of emphasis, where a bare URL ends, a `!` in front of a `[`). The built-in emphasis, link and image tags therefore return tokens, and so do the tags that write an inline HTML tag (superscript, subscript), and the renderer's serializer writes them with the neighbors in view. A custom tag can do the same:
+A tag that writes a block, a BBCode wrapper or a block placeholder returns a String, as above. Inline formatting is different: whether `**`, `*` or `[text](url)` means what it should depends on the characters next to it (the flanking rules of emphasis, where a bare URL ends, a `!` in front of a `[`). The built-in emphasis, link and image tags therefore return tokens, and so do the tags that write an inline HTML tag (superscript, subscript), and the renderer's serializer writes them with the neighbors in view. A custom tag can do the same:
 
 ```ruby
 require "markbridge"
@@ -159,6 +159,7 @@ end
 | `Tokens.code(content)` | a code span with a backtick run longer than any run in the content |
 | `Tokens.hard_break` | a newline; `<br>` on a line that holds nothing else, after a blank line nothing, right after an `html` token `<br>` |
 | `Tokens.html(string)` | raw HTML, as it is; a newline right after it becomes `<br>`, so an opening tag is never alone on its line, where it would open an HTML block |
+| `Tokens.placeholder(text, like:)` | `text`, as it is, joined with its neighbors as if `like` stood there; for a placeholder that a later step replaces, see [Placeholders](/migrating/placeholders/#tell-markbridge-what-replaces-the-placeholder) |
 
 Inside a CommonMark HTML block (`interface.html_mode?`) the serializer writes the HTML form of every token (`<strong>`, `<a href>`, `<img>`, `<br>`, …), so a tag that returns tokens needs no html_mode branch of its own. A tag that returns a String still does (see below).
 

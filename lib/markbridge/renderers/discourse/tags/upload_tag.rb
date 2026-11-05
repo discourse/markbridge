@@ -11,9 +11,15 @@ module Markbridge
         # to render uploads as placeholders or resolve upload:// URLs.
         #
         # @example Custom renderer with placeholder
+        #   # An upload is inline, so the placeholder token says what the
+        #   # importer will put there (see "Placeholders" in the migration
+        #   # guide): the renderer joins it with its neighbors like that.
+        #   Tokens = Markbridge::Renderers::Discourse::Inline::Tokens
+        #
         #   class MyUploadTag < Markbridge::Renderers::Discourse::Tags::UploadTag
         #     def render(element, interface)
-        #       "<<UPLOAD:#{element.sha1}>>"
+        #       like = "![image](upload://#{element.sha1})"
+        #       [Tokens.placeholder("<<UPLOAD:#{element.sha1}>>", like:)]
         #     end
         #   end
         #

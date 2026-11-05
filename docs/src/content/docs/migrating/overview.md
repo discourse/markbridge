@@ -12,7 +12,7 @@ This page is the big picture. The next page — [Placeholders](/migrating/placeh
 Every conversion runs the same parse → AST → render pipeline — the [Introduction](/introduction/) covers it. A migration wraps three points around that pipeline:
 
 - **On the way in**, custom handlers turn source tags into AST nodes — including your own nodes for uploads, mentions, and internal links.
-- **On the way out**, custom Tags format each node. A placeholder Tag is a one-line formatter that returns its placeholder string and nothing else.
+- **On the way out**, custom Tags format each node. A placeholder Tag is a one-line formatter that returns its placeholder and nothing else: a placeholder token that says what the importer will put there for an inline placeholder, a string with blank lines around it for a block.
 - **After the conversion**, you walk the AST to collect what each post referenced and write it into Discourse.
 
 That last step — the read-back — is the heart of the workflow; the [Placeholders](/migrating/placeholders/) page covers it in full.

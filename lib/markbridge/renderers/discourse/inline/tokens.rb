@@ -36,6 +36,9 @@ module Markbridge
           HARD_BREAK = :hard_break
           # Raw HTML that stays inline HTML in Markdown.
           HTML = :html
+          # Text that a later step replaces, with what will most likely
+          # take its place, see {.placeholder}.
+          PLACEHOLDER = :placeholder
 
           # How a text token is escaped: as Markdown text, as the label of
           # a link (also `]`), or not at all (inside a code span).
@@ -125,9 +128,34 @@ module Markbridge
             [HTML, string]
           end
 
+          # Text for a later step to replace, like `[link|17]` that an
+          # importer swaps for the real URL. The serializer writes +text+
+          # as it is, but joins it with its neighbors as if +like+ stood
+          # there: whether a marker next to it needs `<!---->`, whether a
+          # bare URL in front of it can stay bare, whether a `!` in front
+          # of it needs a backslash. In an HTML block +text+ is written as
+          # it is. See "Placeholders" in the Extending guide.
+          #
+          # @param text [String] the placeholder, written as it is
+          # @param like [String] Markdown that will most likely replace
+          #   it, such as `https://example.com/t/17` or `@alice`; its first
+          #   and its last character decide the joins
+          # @return [Array]
+          # @raise [ArgumentError] when +like+ is no String or is empty
+          # @example
+          #   Tokens.placeholder("[link|17]", like: "https://example.com/t/17")
+          def self.placeholder(text, like:)
+            unless like.instance_of?(String) && !like.empty?
+              raise ArgumentError, "like: must be a non-empty String, got #{like.inspect}"
+            end
+
+            [PLACEHOLDER, text, like]
+          end
+
           # Whether the tokens put something on the page: text or Markdown
           # with something other than whitespace in it, code, a link, a
-          # bare URL or an image. Delimiters and hard breaks alone do not.
+          # bare URL, an image or a placeholder whose +like+ is visible.
+          # Delimiters and hard breaks alone do not.
           #
           # @param tokens [Array<Array>]
           # @return [Boolean]
@@ -138,6 +166,8 @@ module Markbridge
               case token.first
               when TEXT, HTML
                 Joins.visible?(token.fetch(1))
+              when PLACEHOLDER
+                Joins.visible?(token.fetch(2))
               when CODE
                 !token.fetch(1).empty?
               when LINK_OPEN, BARE_URL, IMAGE

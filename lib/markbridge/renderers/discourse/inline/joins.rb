@@ -191,6 +191,31 @@ module Markbridge
             buffer << piece
           end
 
+          # Appends +piece+ to +buffer+ with the join that +like+ would need
+          # in its place: +like+ is the text a later step will most likely
+          # put there instead of +piece+ (see Tokens.placeholder). +before+,
+          # when given, stands in the same way for the end of the buffer,
+          # after a placeholder; then a `!` at its end can't take a
+          # backslash, and the boundary comment keeps it from making an
+          # image of a link instead.
+          #
+          # @param buffer [String] changed in place
+          # @param piece [String] the next piece, not empty
+          # @param like [String, nil] stands in for +piece+, nil for none
+          # @param before [String, nil] stands in for the end of +buffer+
+          # @return [String] +buffer+
+          def self.append_like(buffer, piece, like, before = nil)
+            tail = before || buffer
+            last_byte = tail.getbyte(-1)
+            if last_byte
+              after = like || piece
+              action =
+                JOIN_ACTIONS.getbyte((BYTE_CLASSES.getbyte(last_byte) << 8) + after.getbyte(0))
+              join(buffer, after, last_byte, action, tail) unless action == NOTHING
+            end
+            buffer << piece
+          end
+
           # Whether the last character of +string+ is escaped: only an odd
           # run of backslashes in front of it escapes it, `\\!` is an
           # escaped backslash followed by an active `!`. When the run
@@ -212,14 +237,17 @@ module Markbridge
 
           # Carries out the action the table picked. NOTHING never gets
           # here, the caller keeps it out, so the last branch is
-          # ESCAPE_BANG.
-          def self.join(buffer, piece, last_byte, action)
+          # ESCAPE_BANG. +tail+ is what the end of the buffer is read as,
+          # see .append_like.
+          def self.join(buffer, piece, last_byte, action, tail = buffer)
             if action == BOUNDARY
               buffer << BOUNDARY_COMMENT
             elsif action == CHECK_AFTER
               buffer << BOUNDARY_COMMENT if punctuation_at?(piece, after_run(piece))
             elsif action == CHECK_BEFORE
-              buffer << BOUNDARY_COMMENT if punctuation_at?(buffer, before_run(buffer, last_byte))
+              buffer << BOUNDARY_COMMENT if punctuation_at?(tail, before_run(tail, last_byte))
+            elsif !tail.equal?(buffer)
+              buffer << BOUNDARY_COMMENT
             elsif !escaped_end?(buffer)
               # Byte offsets: the `!` is the last byte.
               buffer.bytesplice(buffer.bytesize - 1, 0, "\\")

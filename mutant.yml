@@ -330,6 +330,17 @@ mutation:
     - "if{condition=send{receiver=lvar{value=bare_text} selector=(==)}}"
     - "if{condition=send{receiver=lvar{value=label_text} selector=(==)}}"
 
+    # Serializer#write_tokens and #write_groups take Joins.append unless
+    # a placeholder was written (`if @like_buffer`). join_like gives the
+    # same join without one, so taking it always, or never once the
+    # branch is gone, writes the same Markdown; the check only skips a
+    # method call on every piece. The pattern names the branch by its
+    # body, the pattern language has no instance variable names:
+    # join_like is called with an ivar condition only there. The
+    # behavior after a placeholder is pinned by the placeholder examples
+    # of serializer_spec.rb.
+    - "if{condition=ivar true_branch=send{selector=join_like}}"
+
     # BBCode UrlHandler#content_href peeks at the two tokens after
     # [url]. `peek_ahead(3)` or `peek_ahead(167)` only buffer more
     # tokens, the first two stay the same and the buffer is read in
