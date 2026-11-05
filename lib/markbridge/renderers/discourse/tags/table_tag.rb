@@ -6,19 +6,37 @@ module Markbridge
       module Tags
         # Tag for rendering tables as Markdown pipe tables with HTML fallback
         class TableTag < Tag
+          # Nodes a Markdown table cell cannot hold: they render with a
+          # marker that a cell reads as text. A block of code is not here,
+          # its fence lines make the cell content more than one line.
+          BLOCK_NODES = [
+            AST::List,
+            AST::Quote,
+            AST::Heading,
+            AST::HorizontalRule,
+            AST::Table,
+            AST::Details,
+            AST::Align,
+            AST::Poll,
+            AST::Event,
+          ].freeze
+          private_constant :BLOCK_NODES
+
           def render(element, interface)
             child_context = interface.with_parent(element)
             rows_data = extract_rows(element, interface, child_context)
 
             return "" if rows_data.empty?
 
-            if markdown_compatible?(rows_data, interface)
+            if markdown_compatible?(element, rows_data, interface)
               render_markdown(rows_data)
             else
               # Re-render cells in html_mode so inline Markdown like **bold** becomes
               # <strong>bold</strong>; CommonMark would not parse Markdown inside an HTML block.
               html_rows = extract_rows(element, interface, child_context.with_html_mode(true))
-              render_html(html_rows)
+              html = render_html(html_rows)
+              # Inside an HTML block a blank line would end the block.
+              interface.html_mode? ? html : "\n\n#{html}\n\n"
             end
           end
 
@@ -45,9 +63,15 @@ module Markbridge
             end
           end
 
-          # Check if the table can be rendered as Markdown
-          def markdown_compatible?(rows_data, interface)
+          # Check if the table can be rendered as Markdown: not nested in a
+          # table, no block in a cell, the header row (when there is one)
+          # first, every row as wide as the first, no cell on two lines.
+          def markdown_compatible?(element, rows_data, interface)
             return false if interface.has_parent?(AST::Table)
+            return false if block_in_cell?(element)
+
+            header_idx = rows_data.index { |r| r[:cells].all? { |c| c[:header] } }
+            return false if header_idx&.positive?
 
             cell_count = rows_data.first[:cells].length
             rows_data.all? do |row|
@@ -56,18 +80,15 @@ module Markbridge
             end
           end
 
-          # Render as Markdown pipe table
+          def block_in_cell?(element)
+            element.descendants.any? { |node| BLOCK_NODES.include?(node.class) }
+          end
+
+          # Render as Markdown pipe table. The first row is the header
+          # row: markdown_compatible? lets no other header row through.
           def render_markdown(rows_data)
-            header_idx = rows_data.index { |r| r[:cells].all? { |c| c[:header] } }
-            header_row = header_idx ? rows_data[header_idx] : rows_data.first
-            data_rows =
-              (
-                if header_idx
-                  rows_data[0...header_idx] + rows_data[(header_idx + 1)..]
-                else
-                  rows_data[1..]
-                end
-              )
+            header_row = rows_data.first
+            data_rows = rows_data[1..]
 
             col_count = header_row[:cells].length
             lines = []
@@ -84,23 +105,22 @@ module Markbridge
             "| #{cells.map { |c| c[:content] }.join(" | ")} |"
           end
 
-          # Render as HTML table
+          # Render as HTML table. The header rows at the top go into a
+          # <thead>, the rest into a <tbody>; the rows keep their order, a
+          # header row further down stays where it is.
           def render_html(rows_data)
-            has_header = rows_data.any? { |r| r[:cells].any? { |c| c[:header] } }
+            header_count =
+              rows_data.index { |r| !r[:cells].all? { |c| c[:header] } } || rows_data.length
             lines = ["<table>"]
 
-            if has_header
-              header_rows, body_rows = rows_data.partition { |r| r[:cells].all? { |c| c[:header] } }
+            if header_count.positive?
+              lines << "<thead>"
+              rows_data[0...header_count].each { |row| lines << html_row(row) }
+              lines << "</thead>"
 
-              unless header_rows.empty?
-                lines << "<thead>"
-                header_rows.each { |row| lines << html_row(row) }
-                lines << "</thead>"
-              end
-
-              unless body_rows.empty?
+              if header_count < rows_data.length
                 lines << "<tbody>"
-                body_rows.each { |row| lines << html_row(row) }
+                rows_data[header_count..].each { |row| lines << html_row(row) }
                 lines << "</tbody>"
               end
             else
@@ -108,7 +128,7 @@ module Markbridge
             end
 
             lines << "</table>"
-            "\n\n#{lines.join("\n")}\n\n"
+            lines.join("\n")
           end
 
           # Render a single HTML table row
