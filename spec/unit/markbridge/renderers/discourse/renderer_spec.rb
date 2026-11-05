@@ -60,10 +60,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
       text = Markbridge::AST::Text.new("a < b")
       context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
-      result = described_class.new(html_escaper:).render(text, context:)
+      renderer = described_class.new(html_escaper:)
 
-      expect(result).to eq("HTML-ESCAPED")
+      expect(renderer.render(text, context:)).to eq("HTML-ESCAPED")
       expect(html_escaper).to have_received(:escape).with("a < b")
+      # The serializer gets it too, for the attributes it writes.
+      expect(renderer.render(Markbridge::AST::Image.new(src: "a&b.png"), context:)).to eq(
+        %(<img src="HTML-ESCAPED" alt="HTML-ESCAPED">),
+      )
     end
 
     it "falls back to the HtmlEscaper class when no html_escaper is provided" do
@@ -240,6 +244,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       url << bold
 
       expect(renderer.render(url)).to eq("[**\\[A\\]**](https://example.com)")
+    end
+
+    it "keeps Text verbatim under a subclass of Code" do
+      code = Class.new(Markbridge::AST::Code).new
+      context = Markbridge::Renderers::Discourse::RenderContext.new([code])
+
+      expect(renderer.render(Markbridge::AST::Text.new("a*b"), context:)).to eq("a*b")
     end
 
     it "keeps Text verbatim when the Code is further up the chain" do
@@ -490,6 +501,22 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   end
 
   describe "#render_children" do
+    it "forgets the resolved tags after a top-level call" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      renderer_with_library = described_class.new(tag_library: library)
+      bold_class = Class.new(Markbridge::AST::Bold)
+      element = bold_class.new << Markbridge::AST::Text.new("a")
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+
+      renderer_with_library.render_children(Markbridge::AST::Document.new([element]), context:)
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new { |_, _| "custom" },
+      )
+
+      expect(renderer_with_library.render(Markbridge::AST::Document.new([element]))).to eq("custom")
+    end
+
     it "forgets the lists of the outer level in a nested level" do
       outer =
         Markbridge::AST::List.new << (
@@ -621,6 +648,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
         TypeError,
         /must return a String or inline tokens/,
       )
+    end
+
+    it "raises a TypeError when a tag returns something else that is truthy" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(Markbridge::AST::Bold, Markbridge::Renderers::Discourse::Tag.new { 42 })
+      renderer = described_class.new(tag_library: library)
+
+      expect { renderer.render(Markbridge::AST::Bold.new) }.to raise_error(TypeError, /42/)
     end
 
     it "names the offending node class in the error" do

@@ -48,8 +48,8 @@ module Markbridge
           # get a class of their own, so a class tells them apart without
           # a second comparison; they stay punctuation, which is why they
           # sit above PUNCTUATION. AT is the `@` of a mention: after a word
-          # character it would read as an email address with the text
-          # after it.
+          # character, or punctuation that an email address may hold, it
+          # would read as an email address with the text after it.
           OTHER = 0
           WORD = 1
           PUNCTUATION = 2
@@ -138,7 +138,7 @@ module Markbridge
                   after == UNDERSCORE ? BOUNDARY : CHECK_AFTER
                 elsif FLANKING_CLASSES.include?(before) && (after == WORD || after == TILDE)
                   before == UNDERSCORE ? BOUNDARY : CHECK_BEFORE
-                elsif before == WORD && after == AT
+                elsif after == AT && before != OTHER
                   BOUNDARY
                 else
                   NOTHING
