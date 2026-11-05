@@ -1,0 +1,13 @@
+{
+  "name": "markbridge-discourse-engine-cooker",
+  "private": true,
+  "description": "Builds and runs the pretty-text bundle of Discourse, with its bundled plugins and discourse-bbcode, to cook the Markdown of the specs. Only used by the specs.",
+  "type": "module",
+  "engines": {
+    "node": ">= 22"
+  },
+  "dependencies": {
+    "@babel/core": "7.29.13",
+    "@babel/plugin-transform-modules-amd": "7.29.7"
+  }
+}
