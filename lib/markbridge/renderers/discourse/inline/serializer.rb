@@ -108,6 +108,12 @@ module Markbridge
           def initialize(escaper:, html_escaper: HtmlEscaper)
             @escaper = escaper
             @html_escaper = html_escaper
+            # The buffer the last hard break went into as a newline, and
+            # its length right after. A piece that starts with a newline
+            # follows that break only while nothing else was written to or
+            # taken off the buffer since.
+            @break_buffer = nil
+            @break_end = 0
           end
 
           # Writes one run of tokens.
@@ -143,11 +149,17 @@ module Markbridge
             children.each do |child|
               output = yield(child)
               if output.instance_of?(String)
-                output = after_blank_line(buffer, output, 0) unless html_mode || pending
                 next if output.empty?
 
+                # The hook may take whitespace off the buffer, so the piece
+                # is fitted to the line after it ran. A piece after a
+                # waiting bare URL follows the URL, not the line.
+                after_url = !pending.nil?
                 pending = settle(buffer, pending, output)
                 before&.call(buffer, child)
+                output = start_of_line(buffer, output, 0) unless html_mode || after_url
+                next if output.empty?
+
                 html_mode ? buffer << output : Joins.append(buffer, output)
               else
                 pending =
@@ -184,6 +196,8 @@ module Markbridge
             while index < to
               token = tokens.fetch(index)
               index += 1
+              kind = nil
+              moved_break = false
               if token.instance_of?(String)
                 piece = token
               else
@@ -199,6 +213,9 @@ module Markbridge
                       matching_close(tokens, index - 1, to, Tokens::OPEN, Tokens::CLOSE, value)
                     content =
                       run(tokens, index, close, html_mode, trailing_blank_lines(buffer, blank))
+                    # A break at the end of the content moves out of the
+                    # markers with its newline.
+                    moved_break = after_break?(content)
                     nested = nested_pairs(tokens, index, close)
                     index = close + 1
                     delimiter_piece(value, content, html_mode, nested)
@@ -207,6 +224,7 @@ module Markbridge
                       matching_close(tokens, index - 1, to, Tokens::LINK_OPEN, Tokens::LINK_CLOSE)
                     content =
                       run(tokens, index, close, html_mode, trailing_blank_lines(buffer, blank))
+                    moved_break = after_break?(content)
                     index = close + 1
                     link_piece(value, content, html_mode)
                   when Tokens::CODE
@@ -234,31 +252,52 @@ module Markbridge
                     raise ArgumentError, "unknown inline token #{token.inspect}"
                   end
               end
-              piece = after_blank_line(buffer, piece, blank) unless html_mode || pending
               next if piece.empty?
 
+              after_url = !pending.nil?
               pending = settle(buffer, pending, piece)
               if before
                 before.call(buffer, child)
                 before = nil
               end
+              piece = start_of_line(buffer, piece, blank) unless html_mode || after_url
+              next if piece.empty?
+
               html_mode ? buffer << piece : Joins.append(buffer, piece)
+              # A break written as a newline, or one that left a run at
+              # its end, is where a newline at the start of the next piece
+              # would make a blank line.
+              if (kind == Tokens::HARD_BREAK || moved_break) && piece.end_with?("\n")
+                @break_buffer = buffer
+                @break_end = buffer.bytesize
+              end
             end
             pending
           end
 
-          # Spaces at the start of a piece after a blank line go: a block
-          # ended there, and spaces at the start of the next line would
-          # pull the paragraph after them into that block. What is left
-          # may be nothing, which the caller skips. Not after a bare URL
-          # that still waits: the piece follows the URL, not the blank
-          # line.
-          def after_blank_line(buffer, piece, blank)
+          # A piece that starts a line. Spaces at its start after a blank
+          # line go: a block ended there, and spaces at the start of the
+          # next line would pull the paragraph after them into that block.
+          # A newline at its start right after a hard break becomes <br>,
+          # as the break itself would be on a line that holds nothing
+          # else; two newlines are a blank line the text brings on
+          # purpose. What is left may be nothing, which the caller skips.
+          def start_of_line(buffer, piece, blank)
             first = piece.getbyte(0)
-            blanks = first == SPACE || first == TAB
-            return piece unless blanks && trailing_blank_lines(buffer, blank) == 2
+            if first == NEWLINE
+              return piece unless after_break?(buffer) && piece.getbyte(1) != NEWLINE
 
-            piece.sub(LEADING_BLANKS, "")
+              "<br>#{piece.byteslice(1, piece.bytesize - 1)}"
+            else
+              blanks = first == SPACE || first == TAB
+              return piece unless blanks && trailing_blank_lines(buffer, blank) == 2
+
+              piece.sub(LEADING_BLANKS, "")
+            end
+          end
+
+          def after_break?(buffer)
+            buffer.equal?(@break_buffer) && buffer.bytesize == @break_end
           end
 
           # Nothing but whitespace and <br>, or nothing at all. The regex
