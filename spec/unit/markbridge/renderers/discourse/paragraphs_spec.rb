@@ -57,6 +57,33 @@ RSpec.describe Markbridge::Renderers::Discourse::Paragraphs do
     end
   end
 
+  describe ".wrap" do
+    def wrap(content)
+      described_class.wrap(content, "[x]", "[/x]")
+    end
+
+    it "puts the markers around content without a blank line" do
+      expect(wrap("a\nb")).to eq("[x]a\nb[/x]")
+    end
+
+    it "puts the markers around every paragraph" do
+      expect(wrap("a\n\nb")).to eq("[x]a[/x]\n\n[x]b[/x]")
+    end
+
+    it "keeps whitespace at the edges of a paragraph outside the markers" do
+      expect(wrap(" a \n\n\tb\u00A0")).to eq(" [x]a[/x] \n\n\t[x]b[/x]\u00A0")
+    end
+
+    it "keeps whitespace in the middle of a paragraph inside the markers" do
+      expect(wrap("a b\nc")).to eq("[x]a b\nc[/x]")
+    end
+
+    it "leaves a paragraph with only whitespace as it is" do
+      expect(wrap("a\n\n  ")).to eq("[x]a[/x]\n\n  ")
+      expect(wrap("")).to eq("")
+    end
+  end
+
   describe ".many?" do
     it "is true for content with a blank line" do
       expect(described_class.many?("a\n\nb")).to be(true)

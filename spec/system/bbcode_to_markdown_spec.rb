@@ -333,7 +333,15 @@ RSpec.describe "BBCode to Markdown Conversion" do
       bbcode = "[color=#FFBF00][b]Wolverine (X-Force)[/b][/color]"
 
       result = Markbridge.bbcode_to_markdown(bbcode)
-      expect(result.markdown).to eq('<span style="color: #FFBF00">**Wolverine (X-Force)**</span>')
+      expect(result.markdown).to eq("**Wolverine (X-Force)**")
+    end
+
+    it "converts color with bold inside into BBCode with styling_bbcode: true" do
+      bbcode = "[color=#FFBF00][b]Wolverine (X-Force)[/b][/color]"
+      renderer = Markbridge.discourse_renderer(styling_bbcode: true)
+
+      result = Markbridge.bbcode_to_markdown(bbcode, renderer:)
+      expect(result.markdown).to eq("[color=#FFBF00]**Wolverine (X-Force)**[/color]")
     end
 
     it "converts nested color and list pattern from real forum data" do

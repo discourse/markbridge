@@ -297,6 +297,10 @@ module Markbridge
     #   {Renderers::Discourse::Postprocessor} when no explicit
     #   +postprocessor:+ is given. Strips NBSP and zero-width format
     #   characters from the end of each line.
+    # @param styling_bbcode [Boolean] render colors and sizes as
+    #   +[color=…]+ and +[size=…]+ BBCode for the discourse-bbcode plugin.
+    #   Without it they render as their text only, because Discourse core
+    #   removes the style of a span. Mappings in +tags:+ still win.
     # @return [Renderers::Discourse::Renderer]
     def discourse_renderer(
       tags: nil,
@@ -307,7 +311,8 @@ module Markbridge
       escape_hard_line_breaks: false,
       allow: nil,
       postprocessor: nil,
-      strip_trailing_invisibles: false
+      strip_trailing_invisibles: false,
+      styling_bbcode: false
     )
       # Dup the caller's library before mutating so successive
       # +discourse_renderer+ calls against the same +tag_library:+ don't
@@ -315,6 +320,7 @@ module Markbridge
       # a fresh instance, so the dup is only needed in the explicit
       # +tag_library:+ branch.
       library = tag_library ? tag_library.dup : Renderers::Discourse::TagLibrary.default
+      register_styling_bbcode(library) if styling_bbcode
       library.merge!(tags) if tags
       Array(unregister).each { |klass| library.unregister(klass) }
 
@@ -325,6 +331,11 @@ module Markbridge
     end
 
     private
+
+    def register_styling_bbcode(library)
+      library.register(AST::Color, Renderers::Discourse::Tags::ColorTag.new(bbcode: true))
+      library.register(AST::Size, Renderers::Discourse::Tags::SizeTag.new(bbcode: true))
+    end
 
     def bbcode_diagnostics(parser)
       {

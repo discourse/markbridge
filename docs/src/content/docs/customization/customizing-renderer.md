@@ -39,6 +39,7 @@ Markbridge.discourse_renderer(
   allow: nil,                        # Symbol/Array<Symbol> — markers to leave unescaped
   escape: true,                      # false swaps in IdentityEscaper (no escaping)
   postprocessor: nil,                # custom Postprocessor instance
+  styling_bbcode: false,             # true writes [color] and [size] BBCode
 )
 ```
 
@@ -120,6 +121,24 @@ Markbridge.discourse_renderer(escape: false)
 ```
 
 This swaps in `Markbridge::Renderers::Discourse::IdentityEscaper`, which returns text unchanged. `escape: false` can't be combined with `escape_hard_line_breaks:` or `allow:` (those configure the normal escaper, which `escape: false` replaces); an explicit `escaper:` always wins. To skip escaping for a single node rather than the whole document, use `AST::MarkdownText`.
+
+### `styling_bbcode:` — colors and sizes
+
+Discourse core removes the style of a `<span>`, so by default colors and sizes render as their text only. Discourse shows them with the [discourse-bbcode](https://github.com/discourse/discourse-bbcode) plugin. With `styling_bbcode: true` the renderer writes the BBCode that plugin reads:
+
+```ruby
+renderer = Markbridge.discourse_renderer(styling_bbcode: true)
+
+Markbridge.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:).markdown
+# => "[color=red]a[/color] [size=85]b[/size]"
+```
+
+- A color must be `#rgb`, `#rrggbb` or a name, a size a whole number from 1 to 999. The plugin reads the size as a percentage. Any other value renders as the text only.
+- Every paragraph gets its own tags, because the BBCode can't span a blank line.
+- Inside a link the text renders without BBCode, because Discourse doesn't parse BBCode in link text.
+- Inside an HTML block (for example a table with uneven rows) the output is `<span style="color:red">` or `<span style="font-size:85%">`, the form the plugin lets through.
+
+A tag in `tags:` for `AST::Color` or `AST::Size` wins over this option.
 
 ### `postprocessor:` — clean up the final string
 
