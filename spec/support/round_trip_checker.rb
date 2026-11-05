@@ -173,6 +173,7 @@ class RoundTripChecker
   def initialize(features: nil, cooker: MarkdownItCooker)
     @features = DEFAULT_FEATURES.merge(features || {})
     @cooker = cooker
+    @link_depth = 0
     @table_tag = RecordingTableTag.new
     library = Markbridge::Renderers::Discourse::TagLibrary.default
     library.register(AST::Table, @table_tag)
@@ -418,7 +419,8 @@ class RoundTripChecker
       expected_link(node, html:)
     when AST::Email
       if node.address
-        [skeleton("a", children: expected_children(node, html:), href: "mailto:#{node.address}")]
+        children = inside_link { expected_children(node, html:) }
+        [skeleton("a", children:, href: "mailto:#{node.address}")]
       else
         expected_children(node, html:)
       end
@@ -435,7 +437,7 @@ class RoundTripChecker
     when AST::Table
       [expected_table(node)]
     when AST::Upload
-      [expected_upload(node, html:)]
+      expected_upload(node, html:)
     when AST::Bold
       [skeleton("strong", children: expected_children(node, html:))]
     when AST::Italic
@@ -524,7 +526,11 @@ class RoundTripChecker
 
   # An upload is an image or a link to a file, see UploadTag. In a table
   # the renderer writes as HTML it is a Markdown island inside a <div>.
+  # Inside a link label a file attachment is its name, a link cannot
+  # hold a link.
   def expected_upload(node, html: false)
+    return [] if attachment_name?(node)
+
     destination = upload_destination(node)
     upload =
       if node.type == :image
@@ -532,7 +538,13 @@ class RoundTripChecker
       else
         skeleton("a", href: destination)
       end
-    html ? skeleton("div", children: [upload]) : upload
+    html ? [skeleton("div", children: [upload])] : [upload]
+  end
+
+  # Whether the renderer writes +node+ as its file name: a file
+  # attachment inside a link label.
+  def attachment_name?(node)
+    node.is_a?(AST::Upload) && node.type == :attachment && node.raw.nil? && in_link?
   end
 
   def upload_destination(node)
@@ -543,7 +555,21 @@ class RoundTripChecker
   def expected_link(node, html: false)
     return expected_children(node, html:) unless linkable?(node.href)
 
-    [skeleton("a", children: expected_children(node, html:), href: node.href)]
+    children = inside_link { expected_children(node, html:) }
+    [skeleton("a", children:, href: node.href)]
+  end
+
+  # Runs the block for the content of a link label, where a file
+  # attachment is its name, see #expected_upload.
+  def inside_link
+    @link_depth += 1
+    yield
+  ensure
+    @link_depth -= 1
+  end
+
+  def in_link?
+    @link_depth.positive?
   end
 
   # A code element prints as a fenced block when its block flag is set or
@@ -656,8 +682,12 @@ class RoundTripChecker
       out << "@#{node.name}"
     when AST::Upload
       # In html_mode the upload is a Markdown island, a paragraph of its
-      # own.
-      if html
+      # own. A file attachment inside a link label is its name, text in
+      # both modes.
+      if in_link && node.type == :attachment && node.raw.nil?
+        out << (node.filename || "attachment")
+        out << " (#{node.size})" if node.size
+      elsif html
         separated(out) { expected_upload_text(node, out) }
       else
         expected_upload_text(node, out)
@@ -865,18 +895,29 @@ class RoundTripChecker
       .tr(MarkdownItCooker::CURLY_QUOTES, MarkdownItCooker::STRAIGHT_QUOTES)
   end
 
-  def expected_links(document)
-    document.descendants.filter_map do |node|
-      case node
-      when AST::Url
-        node.href if linkable?(node.href)
-      when AST::Email
-        "mailto:#{node.address}" if node.address
-      when AST::Image
-        node.src if node.src
-      when AST::Upload
-        upload_destination(node)
-      end
+  # The destinations below +element+, in document order. +in_link+ says
+  # whether a link is among the ancestors: a file attachment is its name
+  # there, with no destination of its own.
+  def expected_links(element, in_link: false)
+    element.children.flat_map do |node|
+      own =
+        case node
+        when AST::Url
+          node.href if linkable?(node.href)
+        when AST::Email
+          "mailto:#{node.address}" if node.address
+        when AST::Image
+          node.src if node.src
+        when AST::Upload
+          upload_destination(node) unless in_link && node.type == :attachment && node.raw.nil?
+        end
+      nested =
+        if node.is_a?(AST::Element)
+          expected_links(node, in_link: in_link || node.is_a?(AST::Url) || node.is_a?(AST::Email))
+        else
+          []
+        end
+      [own, *nested].compact
     end
   end
 

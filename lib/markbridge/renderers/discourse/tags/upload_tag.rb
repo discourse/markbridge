@@ -41,10 +41,33 @@ module Markbridge
           # Markdown, and its sanitizer drops the `upload://` href of a
           # raw HTML link.
           def render(element, interface)
+            return name_in_link(element, interface) if attachment_in_link?(element, interface)
+
             interface.markdown_island(build_upload_markdown(element, interface), block: false)
           end
 
           private
+
+          # A file attachment is a link, and a link cannot hold a link:
+          # Markdown reads the inner one and leaves the brackets of the
+          # outer one as text. Like the normalizer unwraps a link inside a
+          # link, the attachment inside a link label is its file name. An
+          # image inside a link label is fine.
+          def attachment_in_link?(element, interface)
+            element.type == :attachment && element.raw.nil? &&
+              (interface.has_parent?(AST::Url) || interface.has_parent?(AST::Email))
+          end
+
+          # The file name and the size as text, in the mode of the link
+          # around it: Markdown in a label, HTML inside an HTML block. The
+          # link is on the parent chain already, which is all the text
+          # needs for the escaping of a label.
+          def name_in_link(element, interface)
+            name = interface.render_node(AST::Text.new(element.filename || "attachment"))
+            size_part = " (#{element.size})" if element.size
+
+            "#{name}#{size_part}"
+          end
 
           def build_upload_markdown(element, interface)
             return raw(element, interface) if element.raw
