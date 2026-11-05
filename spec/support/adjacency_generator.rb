@@ -131,7 +131,6 @@ module AdjacencyGenerator
       .concat(FIXED_KINDS.map { |kind| Variant.new(kind:, edge: nil) })
       .freeze
   LABEL_VARIANTS = VARIANTS.reject(&:link?).freeze
-  HTML_VARIANTS = VARIANTS.reject { |variant| variant.kind == "markdown" }.freeze
   TEXT_VARIANTS = VARIANTS.select { |variant| variant.kind == "text" }.freeze
   VARIANTS_BY_ID = VARIANTS.to_h { |variant| [variant.id, variant] }.freeze
 
@@ -254,19 +253,9 @@ module AdjacencyGenerator
       end
     end
 
-  # The variants a position takes on either side. A MarkdownText in
-  # html_mode is a Markdown island in a div, a block of its own in the
-  # cell, which the checker does not expect for a text, so it stays out
-  # of "html-cell".
+  # The variants a position takes on either side.
   def self.variants_for(position)
-    case position
-    when "label"
-      LABEL_VARIANTS
-    when "html-cell"
-      HTML_VARIANTS
-    else
-      VARIANTS
-    end
+    position == "label" ? LABEL_VARIANTS : VARIANTS
   end
 
   # [position, variants, offset of the position's first case]

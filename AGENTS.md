@@ -282,7 +282,7 @@ expect(token).to match_tag_end("b")
   as HTML, where the pair is written in html_mode), and block pairs (two
   lists with whitespace, a line break or an empty element between them,
   a list followed by text in an item, two blocks in a table cell, ...).
-  CI runs a fixed sample of 2000 of the 1,728,308 inline pairs
+  CI runs a fixed sample of 2000 of the 1,737,404 inline pairs
   (`ADJACENCY_SAMPLE=N` changes the size) plus every block pair. A case
   id names the case: `paragraph/text(*)+bold(a)` or
   `blocks/item/ul+space+ul`.
