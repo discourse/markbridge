@@ -66,7 +66,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       )
       expect(
         write(tokens.text("a\n"), *em(tokens.text(" "), tokens.hard_break, tokens.text("b"))),
-      ).to eq("a\n *<br>b*")
+      ).to eq("a\n <br>*b*")
       expect(write(tokens.text("a"), *em(tokens.hard_break, tokens.text("b")))).to eq("a\n*b*")
     end
 
@@ -183,6 +183,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
         expect(write(*em(tokens.text("  a\t")))).to eq("  *a*\t")
         expect(write(*em(tokens.text(" a ")))).to eq(" *a* ")
         expect(write(*em(tokens.text(" a\nb ")))).to eq(" *a\nb* ")
+      end
+
+      it "keeps a <br> at the edges outside the markers" do
+        expect(
+          write(tokens.text("a"), tokens.hard_break, *em(tokens.hard_break, tokens.text("b"))),
+        ).to eq("a\n<br>*b*")
+        expect(write(*em(tokens.text("b"), tokens.html("<br>")))).to eq("*b*<br>")
+        expect(write(*em(tokens.html("<br> "), tokens.text("b")))).to eq("<br> *b*")
+      end
+
+      it "keeps an escaped <br> in the text inside the markers" do
+        expect(write(*em(tokens.text("<br>b")))).to eq("*\\<br>b*")
       end
 
       it "keeps whitespace on one edge outside the markers" do
@@ -474,6 +486,17 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
 
       it "keeps whitespace at the edges of the label outside the brackets" do
         expect(write(*link("/a", tokens.text(" a ")))).to eq(" [a](/a) ")
+      end
+
+      it "keeps a <br> at the edges of the label outside the brackets" do
+        expect(
+          write(
+            tokens.text("a"),
+            tokens.hard_break,
+            *link("/a", tokens.hard_break, tokens.text("b")),
+          ),
+        ).to eq("a\n<br>[b](/a)")
+        expect(write(*link("/a", tokens.text("b"), tokens.html("<br>")))).to eq("[b](/a)<br>")
       end
 
       it "writes a label with nothing visible without the link" do
