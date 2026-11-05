@@ -1,15 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Renderers::Discourse::Tags::EmailTag do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
-  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
-
-  # The tag returns tokens, the renderer writes them.
-  def rendered(element)
-    renderer.serialize(tag.render(element, interface), context)
-  end
+  include_context "with a renderer tag"
 
   describe "#render" do
     it "renders a markdown mailto link when an address is set" do
@@ -64,7 +56,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EmailTag do
     it_behaves_like "a tag that propagates parent context"
 
     context "in html_mode" do
-      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+      let(:context) { html_context }
 
       it "renders <a href=mailto:...> when address is set" do
         element = Markbridge::AST::Email.new(address: "user@example.com")

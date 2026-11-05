@@ -1,10 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Renderers::Discourse::Tags::AttachmentTag do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
-  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
+  include_context "with a renderer tag"
 
   describe "#render" do
     it "renders attachment with id only" do
@@ -56,7 +53,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::AttachmentTag do
     end
 
     context "in html_mode" do
-      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+      let(:context) { html_context }
 
       it "emits the same HTML comment so the renderer leaves it unwrapped" do
         element = Markbridge::AST::Attachment.new(id: "1234")

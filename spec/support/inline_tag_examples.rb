@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
-# Shared examples for inline-formatting tags that wrap their children
-# with fixed open/close markers and propagate themselves into the parent
-# chain when rendering children.
+# Shared examples for the inline formatting tags. A tag returns inline
+# tokens or a String; +rendered+ writes them the way the renderer does.
+# The examples check the simple output, the empty output, the html_mode
+# output and that the tag puts itself on the parent chain for its
+# children.
 #
 # Required `let`s in the including spec:
 #   - element_class:       the AST::Element subclass the tag operates on
@@ -10,16 +12,7 @@
 #   - simple_output:       what the tag returns when the element wraps "hi"
 #   - html_simple_output:  what the tag returns wrapping "hi" in html_mode
 RSpec.shared_examples "an inline wrapping tag" do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
-  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
-
-  # A tag may return inline tokens instead of a String; the renderer
-  # writes them.
-  def rendered(element)
-    renderer.serialize(tag.render(element, interface), context)
-  end
+  include_context "with a renderer tag"
 
   describe "#render" do
     it "returns the wrapped output for a simple text child" do
@@ -36,7 +29,7 @@ RSpec.shared_examples "an inline wrapping tag" do
     end
 
     context "in html_mode" do
-      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+      let(:context) { html_context }
 
       it "returns the html-mode wrapped output for a simple text child" do
         element = element_class.new

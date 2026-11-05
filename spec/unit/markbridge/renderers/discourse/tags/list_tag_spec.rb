@@ -1,109 +1,31 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
+  include_context "with a renderer tag"
 
   describe "#render" do
-    it "wraps list content with blank lines at top level" do
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-      list = Markbridge::AST::List.new(ordered: false)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new("item")
-      list << item
-
-      result = tag.render(list, interface)
-
-      expect(result).to start_with("\n\n")
-      expect(result).to end_with("\n\n")
-      expect(result).to include("- item")
-    end
-
     it "renders a list without items to nothing" do
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
       list = Markbridge::AST::List.new(ordered: false)
 
       expect(tag.render(list, interface)).to eq("")
     end
 
     it "renders a list whose items are all empty to nothing" do
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
       list = Markbridge::AST::List.new(ordered: false)
       list << Markbridge::AST::ListItem.new
 
       expect(tag.render(list, interface)).to eq("")
     end
 
-    it "passes list in context to children" do
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-      list = Markbridge::AST::List.new(ordered: true)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new("item")
-      list << item
-
-      result = tag.render(list, interface)
-
-      # Should render as ordered because list is in context
-      expect(result).to include("1. item")
-    end
-
-    it "doesn't add extra newlines for nested lists" do
-      outer_list = Markbridge::AST::List.new(ordered: false)
-      context = Markbridge::Renderers::Discourse::RenderContext.new([outer_list])
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-
-      inner_list = Markbridge::AST::List.new(ordered: false)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new("nested item")
-      inner_list << item
-
-      result = tag.render(inner_list, interface)
-
-      expect(result).to start_with("\n")
-      expect(result).not_to start_with("\n\n")
-      # No blank line after the list, it would make the outer list
-      # loose. ListItemTag ends the list in front of text that follows.
-      expect(result).to end_with("- nested item\n")
-      expect(result).not_to end_with("\n\n")
-    end
-
-    it "handles document as parent in context" do
-      document = Markbridge::AST::Document.new
-      context = Markbridge::Renderers::Discourse::RenderContext.new([document])
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-
-      list = Markbridge::AST::List.new(ordered: false)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new("item")
-      list << item
-
-      result = tag.render(list, interface)
-
-      expect(result).to start_with("\n\n")
-      expect(result).to end_with("\n\n")
-    end
-
-    it "creates new context for children" do
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+    it "leaves the context it renders in alone" do
       list = Markbridge::AST::List.new(ordered: false)
 
-      # Verify context is immutable - original unchanged
       tag.render(list, interface)
 
       expect(context.parents).to eq([])
     end
 
-    # Strict equality — the start_with/include checks above pass even
-    # under mutations that swap `content` for nil or `join` for
-    # identity-return. Lock in the exact output shape for a known list.
-    it "renders a single-item top-level list to the exact expected string" do
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+    it "renders a list at the top level between blank lines" do
       list = Markbridge::AST::List.new(ordered: false)
       item = Markbridge::AST::ListItem.new
       item << Markbridge::AST::Text.new("item")
@@ -112,13 +34,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
       expect(tag.render(list, interface)).to eq("\n\n- item\n\n\n")
     end
 
-    # Kills the `rendered_items.join` → `rendered_items` mutation. With a
-    # single item, Array interpolation and String interpolation both look
-    # similar enough to slip past include() checks; two items make the
-    # Array#to_s shape visible.
-    it "joins multiple items without Array inspect delimiters" do
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+    it "renders an ordered list with its own marker" do
+      list = Markbridge::AST::List.new(ordered: true)
+      list << (Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("item"))
+
+      expect(tag.render(list, interface)).to eq("\n\n1. item\n\n\n")
+    end
+
+    it "joins the items one after the other" do
       list = Markbridge::AST::List.new(ordered: false)
       2.times do |i|
         item = Markbridge::AST::ListItem.new
@@ -126,87 +49,36 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         list << item
       end
 
-      result = tag.render(list, interface)
-
-      expect(result).not_to include("[")
-      expect(result).not_to include("]")
-      expect(result).not_to include('\"')
+      expect(tag.render(list, interface)).to eq("\n\n- item0\n- item1\n\n\n")
     end
 
-    # Kills mutations that make `has_list_item_parent` always false
-    # (`= false`, `= nil`, `has_parent?(nil)`), and the `||` drop on
-    # `nested = has_list_parent || has_list_item_parent`. Context has
-    # ListItem but NOT List; only the ListItem-aware branch fires.
-    it "treats a list nested inside a ListItem (but not a List) as nested" do
-      parent_item = Markbridge::AST::ListItem.new
-      context = Markbridge::Renderers::Discourse::RenderContext.new([parent_item])
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-      list = Markbridge::AST::List.new(ordered: false)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new("inner")
-      list << item
+    it "treats a list under a list, a list item, or a subclass of either as nested" do
+      # Only the direct parent counts, and a nested list gets no blank
+      # lines: they would make the outer list loose.
+      parents = [
+        Markbridge::AST::List.new,
+        Markbridge::AST::ListItem.new,
+        Class.new(Markbridge::AST::List).new,
+        Class.new(Markbridge::AST::ListItem).new,
+      ]
 
-      result = tag.render(list, interface)
+      parents.each do |parent|
+        list = Markbridge::AST::List.new(ordered: false)
+        list << (Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("inner"))
 
-      expect(result).to eq("\n- inner\n")
-    end
-
-    it "treats a list inside a ListItem subclass as nested" do
-      item_class = Class.new(Markbridge::AST::ListItem)
-      context = Markbridge::Renderers::Discourse::RenderContext.new([item_class.new])
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-      list = Markbridge::AST::List.new(ordered: false)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new("inner")
-      list << item
-
-      expect(tag.render(list, interface)).to eq("\n- inner\n")
-    end
-
-    it "treats a list inside a List subclass as nested" do
-      list_class = Class.new(Markbridge::AST::List)
-      context = Markbridge::Renderers::Discourse::RenderContext.new([list_class.new])
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-      list = Markbridge::AST::List.new(ordered: false)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new("inner")
-      list << item
-
-      expect(tag.render(list, interface)).to eq("\n- inner\n")
+        expect(tag.render(list, interface_for(parent))).to eq("\n- inner\n"), parent.class.inspect
+      end
     end
 
     it "treats a list inside a quote inside a list item as a block" do
       quote = Markbridge::AST::Quote.new
-      context =
-        Markbridge::Renderers::Discourse::RenderContext.new(
-          [Markbridge::AST::List.new, Markbridge::AST::ListItem.new, quote],
-        )
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
+      parents = [Markbridge::AST::List.new, Markbridge::AST::ListItem.new, quote]
       list = Markbridge::AST::List.new(ordered: false)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new("inner")
-      list << item
+      list << (Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("inner"))
 
-      # Only the direct parent counts. Text after the list inside the
-      # quote would otherwise continue the last item.
-      expect(tag.render(list, interface)).to eq("\n\n- inner\n\n\n")
-    end
-
-    # Same identity tightening for the nested branch: kills mutations on
-    # `"\n#{content}"` that replace content with nil, and on `join` (for
-    # the same reason as the top-level multi-item test).
-    it "renders a nested list to exactly `\\n` + joined-items" do
-      outer_list = Markbridge::AST::List.new(ordered: false)
-      context = Markbridge::Renderers::Discourse::RenderContext.new([outer_list])
-      interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-      inner_list = Markbridge::AST::List.new(ordered: false)
-      item = Markbridge::AST::ListItem.new
-      item << Markbridge::AST::Text.new("nested")
-      inner_list << item
-
-      # A nested item does not indent itself; the item that holds the
-      # nested list indents its whole content.
-      expect(tag.render(inner_list, interface)).to eq("\n- nested\n")
+      # Text after the list inside the quote would otherwise continue
+      # the last item.
+      expect(tag.render(list, interface_for(*parents))).to eq("\n\n- inner\n\n\n")
     end
 
     context "with a list of the same kind in front of it" do
@@ -236,32 +108,26 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         first = list_with_item(ordered: true, text: "a")
         second = list_with_item(ordered: true, text: "b")
 
-        expect(render_in_document(first, second)).to include("<!---->")
+        expect(render_in_document(first, second)).to eq(
+          "\n\n1. a\n\n\n\n\n<!---->\n\n\n\n1. b\n\n\n",
+        )
       end
 
-      it "separates two lists with whitespace between them" do
+      it "separates two lists with nothing visible between them" do
         # A newline between two BBCode lists is a Text node of its own.
-        first = list_with_item(ordered: false, text: "a")
-        second = list_with_item(ordered: false, text: "b")
-        space = Markbridge::AST::Text.new(" \n\t")
+        between = {
+          "whitespace" => Markbridge::AST::Text.new(" \n\t"),
+          "a line break" => Markbridge::AST::LineBreak.new,
+          "an empty list" => Markbridge::AST::List.new(ordered: false),
+          "an element that renders to nothing" => Markbridge::AST::Bold.new,
+        }
 
-        expect(render_in_document(first, space, second)).to include("<!---->")
-      end
+        between.each do |label, node|
+          first = list_with_item(ordered: false, text: "a")
+          second = list_with_item(ordered: false, text: "b")
 
-      it "separates two lists with a line break between them" do
-        first = list_with_item(ordered: false, text: "a")
-        second = list_with_item(ordered: false, text: "b")
-        line_break = Markbridge::AST::LineBreak.new
-
-        expect(render_in_document(first, line_break, second)).to include("<!---->")
-      end
-
-      it "separates two lists with an empty list between them" do
-        first = list_with_item(ordered: false, text: "a")
-        empty = Markbridge::AST::List.new(ordered: false)
-        second = list_with_item(ordered: false, text: "b")
-
-        expect(render_in_document(first, empty, second)).to include("<!---->")
+          expect(render_in_document(first, node, second)).to include("<!---->"), label
+        end
       end
 
       it "separates two nested lists with the comment on a line of its own, without blank lines" do
@@ -272,13 +138,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         outer = Markbridge::AST::List.new(ordered: false) << item
 
         expect(render_in_document(outer)).to eq("\n\n- a\n  - x\n  <!---->\n  - y\n\n\n")
-      end
-
-      it "separates two lists with an element between them that renders to nothing" do
-        first = list_with_item(ordered: false, text: "a")
-        second = list_with_item(ordered: false, text: "b")
-
-        expect(render_in_document(first, Markbridge::AST::Bold.new, second)).to include("<!---->")
       end
 
       it "separates two lists inside an element that has no tag" do
@@ -299,30 +158,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         expect(render_in_document(empty, list)).to eq("\n\n- b\n\n\n")
       end
 
-      it "does not separate a list from a list with emphasis between them" do
+      it "does not separate two lists with something visible between them" do
         # Emphasis renders to tokens, not to a String; what is visible in
         # them counts like text.
-        first = list_with_item(ordered: false, text: "a")
-        second = list_with_item(ordered: false, text: "b")
-        bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x")
+        between = {
+          "text" => Markbridge::AST::Text.new("\nx\n"),
+          "emphasis" => Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x"),
+          "a quote" => Markbridge::AST::Quote.new << Markbridge::AST::Text.new("q"),
+        }
 
-        expect(render_in_document(first, bold, second)).not_to include("<!---->")
-      end
+        between.each do |label, node|
+          first = list_with_item(ordered: false, text: "a")
+          second = list_with_item(ordered: false, text: "b")
 
-      it "does not separate a list from a list with text between them" do
-        first = list_with_item(ordered: false, text: "a")
-        second = list_with_item(ordered: false, text: "b")
-        text = Markbridge::AST::Text.new("\nx\n")
-
-        expect(render_in_document(first, text, second)).not_to include("<!---->")
-      end
-
-      it "does not separate a list from a list with a visible element between them" do
-        first = list_with_item(ordered: false, text: "a")
-        second = list_with_item(ordered: false, text: "b")
-        quote = Markbridge::AST::Quote.new << Markbridge::AST::Text.new("q")
-
-        expect(render_in_document(first, quote, second)).not_to include("<!---->")
+          expect(render_in_document(first, node, second)).not_to include("<!---->"), label
+        end
       end
 
       it "looks only at the last list in front" do
@@ -362,18 +212,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
 
       it "does not separate a list whose parent is not known" do
         list = list_with_item(ordered: false, text: "a")
-        context = Markbridge::Renderers::Discourse::RenderContext.new
-        interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
 
         expect(tag.render(list, interface)).to eq("\n\n- a\n\n\n")
       end
     end
 
     context "in html_mode" do
-      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
-      let(:interface) do
-        Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-      end
+      let(:context) { html_context }
 
       it "renders an unordered list as <ul>" do
         list = Markbridge::AST::List.new(ordered: false)
