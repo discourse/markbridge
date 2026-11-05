@@ -27,7 +27,8 @@ module Markbridge
             return content unless content.match?(/[^[:space:]]/)
 
             title = title_text(element, interface)
-            return "#{title}#{content}" unless @bbcode
+            # Discourse doesn't cook BBCode in the text of a link.
+            return "#{title}#{content}" if !@bbcode || inside_link?(interface)
             return "#{title}#{render_html(content)}" if interface.html_mode?
 
             # `[spoiler]:x` at the start of a line reads as a link
@@ -48,10 +49,14 @@ module Markbridge
           end
 
           # The inline form Discourse cooks the BBCode to. A <details>
-          # would be a block, which an HTML parser moves out of the link
-          # or the emphasis around it.
+          # would be a block, which an HTML parser moves out of the
+          # emphasis around it.
           def render_html(content)
             %(<span class="spoiler">#{content}</span>)
+          end
+
+          def inside_link?(interface)
+            interface.has_parent?(AST::Url) || interface.has_parent?(AST::Email)
           end
         end
       end
