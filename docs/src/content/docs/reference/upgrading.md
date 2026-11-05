@@ -33,6 +33,9 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - Whitespace at the edges of emphasis stays outside the HTML fallback as well: `<strong>` alone on a line, with a hard break inside the emphasis, opened an HTML block.
 - A backslash in front of trailing whitespace inside emphasis or a link label gets a second backslash, so it does not escape the closing marker.
 - An underline whose content starts with `:` gets a backslash in front of the colon: `[u]:x[/u]` at the start of a line read as a link reference definition.
+- `UrlTag`, `EmailTag` and `ImageTag` return inline tokens too, and the serializer writes the link, the bare URL or the image. `RenderingInterface#wrap_inline` is gone; a custom tag that wrapped content with it writes the markers itself or returns tokens.
+- A bare link with an href that linkify does not link on its own but that is a place on the site (a path, an anchor, a query, a protocol-relative URL) is written as `[/path](/path)` in every position. As plain text it did not link when nothing was glued to it. A bare link whose href is neither, a wiki page name for example, stays plain text in every position, also with text glued to it.
+- A mail link without visible text is written as its `mailto:` address instead of an empty link.
 - `RenderingInterface` has `previous_sibling(element)`, `next_sibling(element)` and `sibling(element, offset:)`. For the element the renderer is rendering right now they look at the children of its parent, also when that parent has no tag of its own. For any other element they look at the children of the element on top of the parent chain, or of `RenderContext#root` when the chain is empty. `previous_list(element)` returns the last list in front of the element with nothing visible between them.
 
 ## Upgrading to 0.4.2

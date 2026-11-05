@@ -13,9 +13,9 @@ module Markbridge
           @html_escaper = html_escaper || HtmlEscaper
           @postprocessor = postprocessor || Postprocessor::DEFAULT
           @serializer = Inline::Serializer.new(escaper: @escaper, html_escaper: @html_escaper)
-          # @interface_cache, @resolved_tags, and @resolved_default_tags
-          # are lazily initialized during a top-level #render /
-          # #render_default call and reset to nil after the call completes.
+          # @interface_cache and @resolved_tags are set up by a top-level
+          # call and reset when it completes (see #reset_caches);
+          # @resolved_default_tags stays for the life of the renderer.
         end
 
         # Renders a node to Markdown.
@@ -244,11 +244,11 @@ module Markbridge
 
         # The caches live for one top-level call: the tag library can
         # change between calls, and an interface is cached by the object
-        # id of its context.
+        # id of its context. The default library never changes, so its
+        # resolved tags stay.
         def reset_caches
           @interface_cache = nil
           @resolved_tags = nil
-          @resolved_default_tags = nil
         end
 
         def interface_for(context)
@@ -267,7 +267,7 @@ module Markbridge
         end
 
         # Same as {#resolved_tag}, against the default library backing
-        # #render_default.
+        # #render_default, kept for the life of the renderer.
         def resolved_default_tag(node_class)
           cache = @resolved_default_tags ||= {}
           cache.fetch(node_class) { cache[node_class] = default_tag_library.resolve(node_class) }

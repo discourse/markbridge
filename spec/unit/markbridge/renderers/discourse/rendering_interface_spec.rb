@@ -95,6 +95,28 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
+  describe "#render_tokens" do
+    it "delegates to renderer.render_tokens with the element and current context" do
+      allow(renderer).to receive(:render_tokens).and_return(["tokens"])
+      element = Markbridge::AST::Bold.new
+
+      result = interface.render_tokens(element)
+
+      expect(renderer).to have_received(:render_tokens).with(element, context:)
+      expect(result).to eq(["tokens"])
+    end
+
+    it "uses an explicit context when one is passed" do
+      other_context = Markbridge::Renderers::Discourse::RenderContext.new
+      allow(renderer).to receive(:render_tokens).and_return(["tokens"])
+      element = Markbridge::AST::Bold.new
+
+      interface.render_tokens(element, context: other_context)
+
+      expect(renderer).to have_received(:render_tokens).with(element, context: other_context)
+    end
+  end
+
   describe "context delegation" do
     let(:context) { instance_spy(Markbridge::Renderers::Discourse::RenderContext) }
 
@@ -363,66 +385,6 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
       bold << inner
 
       expect(interface.block_context?(bold)).to be false
-    end
-  end
-
-  describe "#wrap_inline" do
-    it "wraps content with the marker on both sides" do
-      expect(interface.wrap_inline("text", "**")).to eq("**text**")
-    end
-
-    it "uses the close_marker when explicitly different from open_marker" do
-      expect(interface.wrap_inline("text", "<u>", "</u>")).to eq("<u>text</u>")
-    end
-
-    it "returns content unchanged when content is whitespace-only" do
-      expect(interface.wrap_inline("   ", "**")).to eq("   ")
-    end
-
-    it "returns content unchanged when content is Unicode whitespace (e.g. nbsp)" do
-      # CommonMark treats U+00A0 as whitespace, so `** **` would not
-      # parse as bold (the closing `**` is not right-flanking). Match
-      # CommonMark's whitespace definition rather than Ruby's ASCII-only \S.
-      expect(interface.wrap_inline(" ", "**")).to eq(" ")
-    end
-
-    it "returns content unchanged when content is empty" do
-      expect(interface.wrap_inline("", "**")).to eq("")
-    end
-
-    it "preserves leading and trailing whitespace inside the wrap" do
-      expect(interface.wrap_inline("  text  ", "**")).to eq("  **text**  ")
-    end
-
-    it "preserves leading and trailing Unicode whitespace (e.g. nbsp) outside the wrap" do
-      # CommonMark requires the closing delimiter to be right-flanking
-      # (not preceded by Unicode whitespace), so nbsp must be hoisted
-      # outside the wrap just like ASCII space.
-      nbsp = " "
-      expect(interface.wrap_inline("#{nbsp}text#{nbsp}", "**")).to eq("#{nbsp}**text**#{nbsp}")
-    end
-
-    it "preserves leading and trailing whitespace independently when they differ" do
-      # Leading 2 spaces, trailing tab — wrapper must keep each on its own side.
-      expect(interface.wrap_inline("  text\t", "**")).to eq("  **text**\t")
-    end
-
-    it "wraps multi-line content (the inner regex must span newlines)" do
-      expect(interface.wrap_inline("foo\nbar", "**")).to eq("**foo\nbar**")
-    end
-
-    it "preserves edge whitespace around multi-line content (the sub needs /m)" do
-      expect(interface.wrap_inline(" foo\nbar ", "**")).to eq(" **foo\nbar** ")
-    end
-
-    it "preserves leading whitespace when there is no trailing whitespace" do
-      # The trailing capture must accept the empty string ([[:space:]]*).
-      expect(interface.wrap_inline("  text", "**")).to eq("  **text**")
-    end
-
-    it "preserves trailing whitespace when there is no leading whitespace" do
-      # The leading capture must accept the empty string ([[:space:]]*).
-      expect(interface.wrap_inline("text  ", "**")).to eq("**text**  ")
     end
   end
 end

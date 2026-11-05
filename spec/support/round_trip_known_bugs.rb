@@ -18,27 +18,6 @@ module RoundTripKnownBugs
     Entry.new(reason:, cases:)
   end
 
-  # Neighbors that do not glue to a bare URL: whitespace, a line break,
-  # and a `(` in front of it.
-  NOT_GLUED = %w[
-    text(space)
-    text(dot-space)
-    text(nbsp)
-    markdown(space)
-    markdown(dot-space)
-    markdown(nbsp)
-    break
-  ].freeze
-
-  RELATIVE_BARE_URL_CASES =
-    (AdjacencyGenerator::INLINE_POSITIONS.keys - ["label"])
-      .flat_map do |position|
-        NOT_GLUED.flat_map do |neighbor|
-          ["#{position}/#{neighbor}+relative", "#{position}/relative+#{neighbor}"]
-        end << "#{position}/text(()+relative"
-      end
-      .freeze
-
   SPOILER_COLON_CASES =
     %w[item quote]
       .product(%w[break empty])
@@ -52,11 +31,6 @@ module RoundTripKnownBugs
       .freeze
 
   ADJACENCY = [
-    entry(
-      "a bare link with a relative href renders as its plain text when nothing is glued to it, " \
-        "and plain text does not link",
-      cases: RELATIVE_BARE_URL_CASES,
-    ),
     entry(
       "two lists of the same kind in one list item are kept apart by a comment between blank lines, " \
         "which makes the item loose",

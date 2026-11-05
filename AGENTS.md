@@ -88,7 +88,6 @@ live there. The interface provides:
   the parent
 - `previous_list(element)` - the last list in front, with nothing
   visible between
-- `wrap_inline(content, markers)`
 
 ## Module Structure
 
