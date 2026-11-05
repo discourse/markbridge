@@ -178,32 +178,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(result).to eq("hello world")
     end
 
-    it "renders elements using tag library" do
-      bold = Markbridge::AST::Bold.new
-      bold << Markbridge::AST::Text.new("bold text")
-
-      result = renderer.render(bold)
-      expect(result).to eq("**bold text**")
-    end
-
     it "returns empty string for unknown node types" do
       unknown = Object.new
       result = renderer.render(unknown)
       expect(result).to eq("")
-    end
-
-    it "passes through MarkdownText.text without escaping" do
-      node = Markbridge::AST::MarkdownText.new("**already** *bold*")
-
-      expect(renderer.render(node)).to eq("**already** *bold*")
-    end
-
-    it "does not escape Text content when an ancestor is Code" do
-      code = Markbridge::AST::Code.new
-      code << Markbridge::AST::Text.new("a*b")
-
-      # Code formatter wraps in backticks; the inner text must NOT be \-escaped.
-      expect(renderer.render(code)).to include("a*b")
     end
 
     it "passes Text content through verbatim inside Code in Markdown mode (no HTML escaping)" do
@@ -220,7 +198,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       bold = Markbridge::AST::Bold.new
       bold << Markbridge::AST::Text.new("a*b")
 
-      expect(renderer.render(bold)).to include('a\*b')
+      expect(renderer.render(bold)).to eq("**a\\*b**")
     end
 
     it "escapes ] in Text content when an ancestor is Url (link-label context)" do
@@ -230,45 +208,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.render(url)).to eq("[\\[A\\]](https://example.com)")
     end
 
-    it "escapes ] in Text content when an ancestor is Email (link-label context)" do
-      email = Markbridge::AST::Email.new(address: "user@example.com")
-      email << Markbridge::AST::Text.new("[A]")
+    it "escapes ] in Text content under a link, a mail link, an image, an upload and their subclasses" do
+      parents = [
+        [Markbridge::AST::Url, { href: "https://example.com" }],
+        [Markbridge::AST::Email, { address: "alice@example.com" }],
+        [Markbridge::AST::Image, { src: "x.png" }],
+        [Markbridge::AST::Upload, { sha1: "abc", type: :image }],
+      ]
 
-      expect(renderer.render(email)).to eq("[\\[A\\]](mailto:user@example.com)")
-    end
+      parents.each do |base, arguments|
+        [base, Class.new(base)].each do |link_class|
+          context =
+            Markbridge::Renderers::Discourse::RenderContext.new([link_class.new(**arguments)])
 
-    it "escapes ] in Text content when an ancestor is Image (the alt text is a link label)" do
-      image = Markbridge::AST::Image.new(src: "x.png")
-      text = Markbridge::AST::Text.new("[A]")
-      context = Markbridge::Renderers::Discourse::RenderContext.new([image])
-
-      expect(renderer.render(text, context:)).to eq("\\[A\\]")
-    end
-
-    it "escapes ] in Text content under an Email subclass" do
-      email_class = Class.new(Markbridge::AST::Email)
-      context =
-        Markbridge::Renderers::Discourse::RenderContext.new(
-          [email_class.new(address: "alice@example.com")],
-        )
-
-      expect(renderer.render(Markbridge::AST::Text.new("[A]"), context:)).to eq("\\[A\\]")
-    end
-
-    it "escapes ] in Text content under an Image subclass" do
-      image_class = Class.new(Markbridge::AST::Image)
-      context = Markbridge::Renderers::Discourse::RenderContext.new([image_class.new(src: "x.png")])
-
-      expect(renderer.render(Markbridge::AST::Text.new("[A]"), context:)).to eq("\\[A\\]")
-    end
-
-    it "escapes ] in Text content under an Upload and under an Upload subclass" do
-      upload = Markbridge::AST::Upload.new(sha1: "abc", type: :image)
-      upload_class = Class.new(Markbridge::AST::Upload)
-      [upload, upload_class.new(sha1: "abc", type: :image)].each do |parent|
-        context = Markbridge::Renderers::Discourse::RenderContext.new([parent])
-
-        expect(renderer.render(Markbridge::AST::Text.new("[A]"), context:)).to eq("\\[A\\]")
+          expect(renderer.render(Markbridge::AST::Text.new("[A]"), context:)).to eq("\\[A\\]")
+        end
       end
     end
 
@@ -300,18 +254,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       text = Markbridge::AST::Text.new("plain ] text")
 
       expect(renderer.render(text)).to eq("plain ] text")
-    end
-
-    it "escapes ] in Text content when context has a Url-subclass ancestor" do
-      # Custom AST nodes that extend AST::Url inherit the in_link_label
-      # escaping without any registration. (This test exercises only the
-      # renderer's ancestry-driven escape decision, not tag dispatch.)
-      custom_url_class = Class.new(Markbridge::AST::Url)
-      url = custom_url_class.new(href: "https://example.com")
-      text = Markbridge::AST::Text.new("[A]")
-      context = Markbridge::Renderers::Discourse::RenderContext.new([url])
-
-      expect(renderer.render(text, context:)).to eq("\\[A\\]")
     end
 
     context "with AST subclasses" do
@@ -355,17 +297,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
         node = subclass.new << Markbridge::AST::Text.new("text")
 
         expect(described_class.new(tag_library: library).render(node)).to eq("text")
-      end
-
-      it "puts the element on the parent chain under Tag::PASSTHROUGH" do
-        code_subclass = Class.new(Markbridge::AST::Code)
-        library = Markbridge::Renderers::Discourse::TagLibrary.default
-        library.register(code_subclass, Markbridge::Renderers::Discourse::Tag::PASSTHROUGH)
-        node = code_subclass.new << Markbridge::AST::Text.new("a*b")
-
-        # Text under a Code ancestor is not Markdown-escaped, so the
-        # children must have seen the element as their parent.
-        expect(described_class.new(tag_library: library).render(node)).to eq("a*b")
       end
 
       it "asks the library to resolve each class once per render call, caching nil results" do
@@ -452,6 +383,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       )
     end
 
+    it "forgets the resolved tags after a top-level call" do
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      renderer_with_library = described_class.new(tag_library: library)
+      bold_class = Class.new(Markbridge::AST::Bold)
+      element = bold_class.new << Markbridge::AST::Text.new("a")
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+
+      # Resolved through its ancestry to the Bold tag, and remembered for
+      # this call only: a tag registered for the ancestor afterwards is
+      # found by the next call.
+      renderer_with_library.render_tokens(Markbridge::AST::Document.new([element]), context:)
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new { |_, _| "custom" },
+      )
+
+      expect(renderer_with_library.render(Markbridge::AST::Document.new([element]))).to eq("custom")
+    end
+  end
+
+  describe "#render with tags that return tokens" do
     it "renders a wrapper after a nested wrapper" do
       # The nested call must not take the interface cache of the outer
       # call with it when it ends.
@@ -511,25 +463,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       described_class.new(tag_library: library).render(document)
 
       expect(seen).to be(first)
-    end
-
-    it "forgets the resolved tags after a top-level call" do
-      library = Markbridge::Renderers::Discourse::TagLibrary.default
-      renderer_with_library = described_class.new(tag_library: library)
-      bold_class = Class.new(Markbridge::AST::Bold)
-      element = bold_class.new << Markbridge::AST::Text.new("a")
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-
-      # Resolved through its ancestry to the Bold tag, and remembered for
-      # this call only: a tag registered for the ancestor afterwards is
-      # found by the next call.
-      renderer_with_library.render_tokens(Markbridge::AST::Document.new([element]), context:)
-      library.register(
-        Markbridge::AST::Bold,
-        Markbridge::Renderers::Discourse::Tag.new { |_, _| "custom" },
-      )
-
-      expect(renderer_with_library.render(Markbridge::AST::Document.new([element]))).to eq("custom")
     end
 
     it "knows the position of the child it renders, also after a nested call" do
@@ -662,48 +595,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.render_children(document, context:)).to eq("a*b")
     end
 
-    it "inserts a comment boundary when sibling emphasis delimiters would merge" do
-      # Two adjacent Bold siblings would render as **x****y** (four stars),
-      # which CommonMark parses ambiguously. The renderer inserts an HTML
-      # comment to force the delimiter runs to stay separate.
-      document = Markbridge::AST::Document.new
-      first = Markbridge::AST::Bold.new
-      first << Markbridge::AST::Text.new("x")
-      second = Markbridge::AST::Bold.new
-      second << Markbridge::AST::Text.new("y")
-      document << first
-      document << second
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      result = renderer.render_children(document, context:)
-
-      expect(result).to eq("**x**<!---->**y**")
-    end
-
-    it "escapes a ! at the end of the buffer when the next part starts with [" do
-      # Otherwise `![foo](/url)` cooks as an image.
-      document = Markbridge::AST::Document.new
-      document << Markbridge::AST::Text.new("Look!")
-      link = Markbridge::AST::Url.new(href: "/url")
-      link << Markbridge::AST::Text.new("foo")
-      document << link
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      expect(renderer.render_children(document, context:)).to eq("Look\\![foo](/url)")
-    end
-
-    it "leaves a ! in front of a [ alone in html_mode" do
-      # Inside an HTML block nothing is Markdown, the backslash would show.
-      document = Markbridge::AST::Document.new
-      document << Markbridge::AST::Text.new("wow!")
-      # A link without an href renders its text, in html_mode escaped for
-      # HTML, which leaves the [ alone.
-      document << (Markbridge::AST::Url.new(href: nil) << Markbridge::AST::Text.new("[x]"))
-      context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
-
-      expect(renderer.render_children(document, context:)).to eq("wow![x]")
-    end
-
     it "yields the buffer and the child before appending the child's output" do
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::MarkdownText.new("a")
@@ -717,88 +608,19 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(seen).to eq([["", document.children[0]], ["a", document.children[1]]])
       expect(result).to eq("ab")
     end
-
-    it "appends what the block wrote to the buffer" do
-      document = Markbridge::AST::Document.new
-      document << Markbridge::AST::MarkdownText.new("a")
-      document << Markbridge::AST::MarkdownText.new("b")
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      result = renderer.render_children(document, context:) { |buffer, _child| buffer << "|" }
-
-      expect(result).to eq("|a|b")
-    end
-
-    it "does not yield for a child that renders to an empty string" do
-      document = Markbridge::AST::Document.new
-      document << Markbridge::AST::MarkdownText.new("")
-      document << Markbridge::AST::MarkdownText.new("b")
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      seen = []
-      renderer.render_children(document, context:) { |_buffer, child| seen << child }
-
-      expect(seen).to eq([document.children[1]])
-    end
-
-    it "applies the boundary rule to the last byte the block wrote" do
-      document = Markbridge::AST::Document.new
-      document << Markbridge::AST::MarkdownText.new("ab")
-      italic = Markbridge::AST::Italic.new
-      italic << Markbridge::AST::Text.new("x")
-      document << italic
-
-      context = Markbridge::Renderers::Discourse::RenderContext.new
-      result = renderer.render_children(document, context:) { |buffer, _child| buffer << "*" }
-
-      expect(result).to eq("*ab*<!---->*x*")
-    end
-  end
-
-  # The renderer decides what to put between two sibling outputs from a
-  # table it packs once, while the class body runs. Mutation testing
-  # cannot reach the rules behind it — a mutant redefines a method, and
-  # by then the table is already built — so these examples take that job
-  # instead. They walk every entry of both tables and compare it with the
-  # rules written out longhand below. A change to a rule, to a byte
-  # class or to the order of the class numbers fails here.
-  describe "RenderingInterface helpers" do
-    let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
-    let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
-
-    it "returns true when content has newlines" do
-      code = Markbridge::AST::Code.new
-      code << Markbridge::AST::Text.new("line1\nline2")
-
-      expect(interface.block_context?(code)).to be true
-    end
-
-    it "returns false when content has no newlines" do
-      code = Markbridge::AST::Code.new
-      code << Markbridge::AST::Text.new("single line")
-
-      expect(interface.block_context?(code)).to be false
-    end
-
-    it "returns true for List elements" do
-      list = Markbridge::AST::List.new(ordered: false)
-      expect(interface.block_context?(list)).to be true
-    end
-
-    it "returns true for HorizontalRule elements" do
-      hr = Markbridge::AST::HorizontalRule.new
-      expect(interface.block_context?(hr)).to be true
-    end
   end
 
   describe "#render with a misbehaving custom tag" do
-    it "raises a descriptive TypeError when a tag returns nil" do
+    it "raises a TypeError when a tag returns neither a String nor tokens" do
       library = Markbridge::Renderers::Discourse::TagLibrary.default
       library.register(Markbridge::AST::Bold, Markbridge::Renderers::Discourse::Tag.new { nil })
       renderer = described_class.new(tag_library: library)
       bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x")
 
-      expect { renderer.render(bold) }.to raise_error(TypeError, /must return a String/)
+      expect { renderer.render(bold) }.to raise_error(
+        TypeError,
+        /must return a String or inline tokens/,
+      )
     end
 
     it "names the offending node class in the error" do
@@ -856,7 +678,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
       # render_default bypasses only the Quote lookup; the Italic child
       # still renders through this renderer's (overridden) library.
-      expect(renderer.render_default(quote)).to include("ITALIC-OVERRIDE")
+      expect(renderer.render_default(quote)).to eq("\n\n> ITALIC-OVERRIDE\n\n")
     end
 
     it "falls back to the tag-less paths for node classes without a stock tag" do

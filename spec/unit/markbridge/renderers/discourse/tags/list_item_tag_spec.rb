@@ -1,13 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Renderers::Discourse::Tags::ListItemTag do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-
-  def interface_for(*parents, html_mode: false)
-    context = Markbridge::Renderers::Discourse::RenderContext.new(parents, html_mode:)
-    Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-  end
+  include_context "with a renderer tag"
 
   def item(*children)
     children.each_with_object(Markbridge::AST::ListItem.new) { |child, node| node << child }

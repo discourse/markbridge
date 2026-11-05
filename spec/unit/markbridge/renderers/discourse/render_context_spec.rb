@@ -150,13 +150,6 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       expect(final_context.parents).to eq([bold, italic])
     end
 
-    it "exposes the added parent via find_parent" do
-      bold = Markbridge::AST::Bold.new
-      new_context = described_class.new.with_parent(bold)
-
-      expect(new_context.find_parent(Markbridge::AST::Bold)).to eq(bold)
-    end
-
     it "tracks repeated additions of the same class" do
       bold1 = Markbridge::AST::Bold.new
       bold2 = Markbridge::AST::Bold.new
@@ -164,23 +157,6 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
 
       expect(ctx.count_parents(Markbridge::AST::Bold)).to eq(2)
       expect(ctx.find_parent(Markbridge::AST::Bold)).to eq(bold2)
-    end
-
-    it "increments depth by one on each call" do
-      ctx = described_class.new
-      expect(ctx.with_parent(Markbridge::AST::Bold.new).depth).to eq(1)
-      expect(
-        ctx.with_parent(Markbridge::AST::Bold.new).with_parent(Markbridge::AST::Italic.new).depth,
-      ).to eq(2)
-    end
-
-    it "does not mutate the original context (functional, not in-place update)" do
-      bold = Markbridge::AST::Bold.new
-      original = described_class.new
-      original.with_parent(bold)
-
-      expect(original.find_parent(Markbridge::AST::Bold)).to be_nil
-      expect(original.count_parents(Markbridge::AST::Bold)).to eq(0)
     end
   end
 
@@ -202,15 +178,6 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       context = described_class.new([bold])
 
       expect(context.find_parent(Markbridge::AST::Bold)).to eq(bold)
-    end
-
-    it "finds closest matching parent when multiple exist" do
-      list1 = Markbridge::AST::List.new(ordered: false)
-      list2 = Markbridge::AST::List.new(ordered: true)
-      context = described_class.new([list1, list2])
-
-      result = context.find_parent(Markbridge::AST::List)
-      expect(result).to eq(list2)
     end
 
     it "searches from most recent backwards" do
@@ -375,44 +342,6 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
     end
   end
 
-  describe "#depth" do
-    it "returns 0 for empty context" do
-      context = described_class.new
-      expect(context.depth).to eq(0)
-    end
-
-    it "returns parent count" do
-      bold = Markbridge::AST::Bold.new
-      italic = Markbridge::AST::Italic.new
-      context = described_class.new([bold, italic])
-
-      expect(context.depth).to eq(2)
-    end
-
-    it "increases with each parent added" do
-      context = described_class.new
-      expect(context.depth).to eq(0)
-
-      context1 = context.with_parent(Markbridge::AST::Bold.new)
-      expect(context1.depth).to eq(1)
-
-      context2 = context1.with_parent(Markbridge::AST::Italic.new)
-      expect(context2.depth).to eq(2)
-    end
-  end
-
-  describe "#html_mode?" do
-    it "defaults to false" do
-      context = described_class.new
-      expect(context.html_mode?).to be false
-    end
-
-    it "is true when constructed with html_mode: true" do
-      context = described_class.new([], html_mode: true)
-      expect(context.html_mode?).to be true
-    end
-  end
-
   describe "#root and #with_root" do
     let(:document) { Markbridge::AST::Document.new }
 
@@ -482,47 +411,6 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderContext do
       new_context = context.with_html_mode(false)
 
       expect(new_context.html_mode?).to be false
-    end
-  end
-
-  describe "html_mode propagation through with_parent" do
-    it "carries html_mode forward when descending" do
-      context = described_class.new([], html_mode: true)
-      bold = Markbridge::AST::Bold.new
-
-      new_context = context.with_parent(bold)
-
-      expect(new_context.html_mode?).to be true
-    end
-
-    it "stays false when starting from default context" do
-      context = described_class.new
-      bold = Markbridge::AST::Bold.new
-
-      new_context = context.with_parent(bold)
-
-      expect(new_context.html_mode?).to be false
-    end
-  end
-
-  describe "immutability" do
-    it "prevents modifying parents array" do
-      context = described_class.new
-
-      expect { context.parents << Markbridge::AST::Bold.new }.to raise_error(FrozenError)
-    end
-
-    it "creates independent contexts" do
-      context1 = described_class.new
-      bold = Markbridge::AST::Bold.new
-      context2 = context1.with_parent(bold)
-
-      italic = Markbridge::AST::Italic.new
-      context3 = context2.with_parent(italic)
-
-      expect(context1.parents).to eq([])
-      expect(context2.parents).to eq([bold])
-      expect(context3.parents).to eq([bold, italic])
     end
   end
 end

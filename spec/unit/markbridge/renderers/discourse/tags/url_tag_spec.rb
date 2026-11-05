@@ -1,16 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
-  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
+  include_context "with a renderer tag"
   let(:tokens) { Markbridge::Renderers::Discourse::Inline::Tokens }
-
-  # The tag returns tokens, the renderer writes them.
-  def rendered(element)
-    renderer.serialize(tag.render(element, interface), context)
-  end
 
   def link(href, text = "Example")
     element = Markbridge::AST::Url.new(href:)
@@ -93,19 +85,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       expect(rendered(link("//example.com/x"))).to eq("[Example](//example.com/x)")
     end
 
-    it "escapes the destination and wraps one with whitespace in angle brackets" do
-      expect(rendered(link("https://example.com/a(b)c)"))).to eq(
-        "[Example](https://example.com/a\\(b\\)c\\))",
-      )
-      expect(rendered(link("https://example.com/a\\"))).to eq(
-        "[Example](https://example.com/a\\\\)",
-      )
-      expect(rendered(link("Main (Page)"))).to eq("[Example](<Main \\(Page\\)>)")
-      expect(rendered(link("https://example.com/a?b=c&d=e"))).to eq(
-        "[Example](https://example.com/a?b=c&d=e)",
-      )
-    end
-
     it "escapes every ] in the label so none ends the link early" do
       expect(rendered(link("https://example.com", "[A] and [B]"))).to eq(
         "[\\[A\\] and \\[B\\]](https://example.com)",
@@ -119,18 +98,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       expect(rendered(element)).to eq("[![](x.png)](https://example.com)")
     end
 
-    it "keeps edge whitespace of the label outside the link markers" do
-      expect(rendered(link("https://example.com", " label "))).to eq(
-        " [label](https://example.com) ",
-      )
-    end
-
     let(:element_class) { Markbridge::AST::Url }
     let(:element_factory) { Markbridge::AST::Url.new(href: "https://example.com") }
     it_behaves_like "a tag that propagates parent context"
 
     context "in html_mode" do
-      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+      let(:context) { html_context }
 
       it "renders as <a href> for valid hrefs, also without text" do
         expect(rendered(link("https://example.com"))).to eq(
@@ -153,7 +126,8 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
     end
 
     # The serializer decides from the neighbors whether a bare URL can
-    # stay bare. These examples render the whole paragraph.
+    # stay bare, and its spec has the forms. These two examples check
+    # that the token reaches it through the renderer.
     context "with a bare URL next to other content" do
       def render_between(before, after, href: "https://example.com")
         paragraph = Markbridge::AST::Document.new
@@ -176,53 +150,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
         expect(render_between(nil, Markbridge::AST::Text.new("now"))).to eq(
           "[https://example.com](https://example.com)now",
         )
-      end
-
-      it "escapes the label of a glued bare URL like a link label and the destination like one" do
-        expect(render_between("see", nil, href: "https://example.com/a]b_c")).to eq(
-          "see[https://example.com/a\\]b\\_c](https://example.com/a]b_c)",
-        )
-        expect(render_between("see", nil, href: "/a (b)")).to eq("see[/a (b)](</a \\(b\\)>)")
-      end
-
-      it "writes a link when inline code or emphasis stands next to the URL" do
-        code = Markbridge::AST::Code.new << Markbridge::AST::Text.new("x")
-        bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x")
-
-        expect(render_between("see ", code)).to eq(
-          "see [https://example.com](https://example.com)`x`",
-        )
-        expect(render_between(nil, bold)).to eq("[https://example.com](https://example.com)**x**")
-      end
-
-      it "keeps the plain href when sentence punctuation and whitespace follow it" do
-        %w[. , ! ? ... ). ),].each do |punctuation|
-          expect(render_between(nil, Markbridge::AST::Text.new("#{punctuation} next"))).to eq(
-            "https://example.com#{punctuation} next",
-          )
-        end
-      end
-
-      it "writes a link when punctuation follows that linkify keeps in the link" do
-        %w[: .) ?! ., ;].each do |punctuation|
-          expect(render_between(nil, Markbridge::AST::Text.new("#{punctuation} next"))).to eq(
-            "[https://example.com](https://example.com)#{punctuation} next",
-          )
-        end
-      end
-
-      it "keeps the plain href inside parentheses, and links it when the href has a parenthesis" do
-        expect(render_between("(", Markbridge::AST::Text.new(")."))).to eq("(https://example.com).")
-        expect(
-          render_between(nil, Markbridge::AST::Text.new(")"), href: "https://example.com/a(b"),
-        ).to eq("[https://example.com/a(b](https://example.com/a\\(b))")
-      end
-
-      it "writes a link for an href that linkify does not link on its own, whatever the neighbors" do
-        expect(render_between("see ", Markbridge::AST::Text.new(" now"), href: "/t/5")).to eq(
-          "see [/t/5](/t/5) now",
-        )
-        expect(render_between(nil, nil, href: "#top")).to eq("[#top](#top)")
       end
     end
   end

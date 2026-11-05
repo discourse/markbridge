@@ -1,10 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
-  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
+  include_context "with a renderer tag"
 
   describe "#render" do
     it "returns the raw markdown verbatim when present" do
@@ -90,7 +87,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
     end
 
     context "in html_mode" do
-      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+      let(:context) { html_context }
 
       it "renders an image upload as <img> with upload:// src and alt text" do
         element =
