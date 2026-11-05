@@ -33,8 +33,6 @@ class RoundTripChecker
 
   Failure = Data.define(:check, :message)
 
-  CHECKS = %i[normalizer shape structure text links lists].freeze
-
   # Which parent a node of these classes needs, and which children the
   # parent takes. The generators build nothing else, and the shrinker
   # must not either: a table with text in it is no case.
@@ -56,7 +54,6 @@ class RoundTripChecker
     code
     strong
     em
-    del
     a
     img
     h1
@@ -136,26 +133,6 @@ class RoundTripChecker
   LINKABLE_SCHEME = /\A(?:https?|ftps?|mailto):/i
   SCHEME_LIKE = /\A[a-z][a-z0-9+.-]*:/i
 
-  # markdown-it's typographer turns straight quotes into curly ones.
-  CURLY_QUOTES = "\u201C\u201D\u2018\u2019"
-  STRAIGHT_QUOTES = "\"\"''"
-
-  # Without the normalizer: {#failures} has checked that it would change
-  # nothing, and it drops an emptied element in place, which would take
-  # the tree out from under the shrinker's undo.
-  #
-  # @param document [Markbridge::AST::Document]
-  # @return [String]
-  def render(document)
-    Markbridge.render(document, normalize: false).markdown
-  end
-
-  # @param markdown [String]
-  # @return [String]
-  def cook(markdown)
-    MarkdownItCooker.cook(markdown)
-  end
-
   # @param document [Markbridge::AST::Document]
   # @return [Array<Failure>] empty when the document round-trips
   def failures(document)
@@ -234,6 +211,22 @@ class RoundTripChecker
   end
 
   private
+
+  # Without the normalizer: {#failures} has checked that it would change
+  # nothing, and it drops an emptied element in place, which would take
+  # the tree out from under the shrinker's undo.
+  #
+  # @param document [Markbridge::AST::Document]
+  # @return [String]
+  def render(document)
+    Markbridge.render(document, normalize: false).markdown
+  end
+
+  # @param markdown [String]
+  # @return [String]
+  def cook(markdown)
+    MarkdownItCooker.cook(markdown)
+  end
 
   def check_structure(document, fragment)
     expected = expected_skeleton(document)
@@ -629,7 +622,10 @@ class RoundTripChecker
   # escaper writes indentation as no-break spaces. Curly quotes are
   # straight ones, the typographer is display.
   def normalize_text(text)
-    text.gsub(/[[:space:]]+/, " ").strip.tr(CURLY_QUOTES, STRAIGHT_QUOTES)
+    text
+      .gsub(/[[:space:]]+/, " ")
+      .strip
+      .tr(MarkdownItCooker::CURLY_QUOTES, MarkdownItCooker::STRAIGHT_QUOTES)
   end
 
   def expected_links(document)

@@ -63,6 +63,8 @@ class AstGenerator
   # links those in plain text on purpose, and the escaper keeps an
   # autolink as it is.
   LINKIFIED = %r{://|@|\b\w+\.(?:com|org|net|io|edu|gov|info|biz)\b|<[a-z][a-z0-9+.-]*:}i
+  # The path is relative to this file, not SPEC_ROOT: bin/fuzz-render
+  # loads the generator without spec_helper.
   COMMONMARK_LINES =
     JSON
       .parse(File.read(File.expand_path("../fixtures/commonmark_spec_0.31.2.json", __dir__)))
@@ -139,7 +141,6 @@ class AstGenerator
   # @param seed [Integer]
   def initialize(seed)
     @random = Random.new(seed)
-    @budget = MAX_NODES
   end
 
   # @return [Markbridge::AST::Document]

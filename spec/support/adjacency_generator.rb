@@ -221,10 +221,6 @@ module AdjacencyGenerator
         "#{position}/#{left.id}+#{right.id}"
       end
 
-      def family
-        :inline
-      end
-
       def document
         INLINE_POSITIONS.fetch(position).call(left.build(:left), right.build(:right))
       end
@@ -264,8 +260,14 @@ module AdjacencyGenerator
 
   # @return [Enumerator<InlineCase>] every inline case, in id order
   def self.inline_cases
-    Enumerator.new { |yielder| inline_size.times { |index| yielder << inline_at(index) } }
+    Enumerator.new(inline_size) do |yielder|
+      inline_size.times { |index| yielder << inline_at(index) }
+    end
   end
+
+  # The seed the adjacency spec and bin/fuzz-render draw their sample
+  # with, so CI and a local run see the same cases.
+  DEFAULT_SAMPLE_SEED = 1
 
   # A fixed subset of the inline cases. The same count and seed give the
   # same cases as long as the dimensions do not change.
@@ -317,10 +319,6 @@ module AdjacencyGenerator
     Data.define(:position, :left, :between, :right) do
       def id
         "blocks/#{position}/#{left}+#{between}+#{right}"
-      end
-
-      def family
-        :block
       end
 
       def document

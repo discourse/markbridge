@@ -37,6 +37,11 @@ module MarkdownItCooker
   end
 
   REQUIRED = ENV["MARKDOWN_IT_REQUIRED"] == "1"
+  # The typographer turns straight quotes into these curly ones, in
+  # the same order.
+  CURLY_QUOTES = "\u201C\u201D\u2018\u2019"
+  STRAIGHT_QUOTES = "\"\"''"
+
   SKIP_REASON =
     if !defined?(Nokogiri::HTML5)
       "Nokogiri::HTML5 not available on #{RUBY_ENGINE}"
