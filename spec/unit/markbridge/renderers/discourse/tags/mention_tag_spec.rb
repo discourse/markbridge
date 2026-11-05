@@ -13,6 +13,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::MentionTag do
       expect(tag.render(element, interface)).to eq("@gerhard")
     end
 
+    it "gets the boundary comment in front when a word character stands before it" do
+      # Without it, linkify reads the word, the mention and a domain-like
+      # text after it as one email address.
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("v") << Markbridge::AST::Mention.new(name: "alice")
+      document << Markbridge::AST::Text.new(".i")
+
+      expect(renderer.render(document)).to eq("v<!---->@alice.i")
+    end
+
     it "ignores the type and renders the same way for groups" do
       element = Markbridge::AST::Mention.new(name: "Testers", type: :group)
 

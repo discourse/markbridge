@@ -173,6 +173,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
       expect(joined("*x😀**", "a")).to eq("*x😀**<!---->a")
     end
 
+    it "puts the boundary between a word character and a piece that starts with @" do
+      # The two would read as an email address with the text after them.
+      expect(joined("a", "@b")).to eq("a<!---->@b")
+      expect(joined("é", "@b")).to eq("é<!---->@b")
+      expect(joined("1", "@b")).to eq("1<!---->@b")
+      expect(joined("a ", "@b")).to eq("a @b")
+      expect(joined(".", "@b")).to eq(".@b")
+      expect(joined("a", "x@b")).to eq("ax@b")
+    end
+
     it "escapes a ! at the end of the buffer when the next piece starts with [" do
       expect(joined("Hi!", "[x](/a)")).to eq("Hi\\![x](/a)")
     end
@@ -237,6 +247,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
         described_class.const_get(:STAR) => :star,
         described_class.const_get(:UNDERSCORE) => :underscore,
         described_class.const_get(:TILDE) => :tilde,
+        described_class.const_get(:AT) => :at,
       }
     end
 
@@ -264,6 +275,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
         star: "*",
         underscore: "_",
         tilde: "~",
+        at: "@",
       }
     end
 
@@ -285,6 +297,8 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
         :underscore
       when "~".ord
         :tilde
+      when "@".ord
+        :at
       when 48..57, 65..90, 97..122, 128..255
         :word
       when 33..47, 58..64, 91..96, 123..126
@@ -314,6 +328,8 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
         after == "_".ord ? :boundary : :check_after
       elsif flanking.include?(before) && blocking?(after)
         before == "_".ord ? :boundary : :check_before
+      elsif expected_class(before) == :word && after == "@".ord
+        :boundary
       else
         :nothing
       end
@@ -343,7 +359,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
     end
 
     it "numbers every punctuation class at or above PUNCTUATION" do
-      names = %i[punctuation bang bracket backtick star underscore tilde]
+      names = %i[punctuation bang bracket backtick star underscore tilde at]
       threshold = described_class.const_get(:PUNCTUATION)
 
       actual = (0..255).to_h { |byte| [byte, byte_classes.getbyte(byte) >= threshold] }

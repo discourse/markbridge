@@ -42,6 +42,7 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - Spaces at the start of a paragraph, and at the start of text after a blank line, are dropped. After a list they made the paragraph part of the last item.
 - A nested list after a line that opens an HTML block of its own, like the `</div>` of an aligned block, gets no blank line in front any more. The line gets an empty comment in front instead (`<!----></div>`), which ends the block on that line, and the outer list stays tight. The `</table>` of a table still needs the blank line.
 - Whitespace after an HTML tag name is read like markdown-it reads it, which includes the no-break space and the other Unicode spaces: `<style` followed by a no-break space gets a backslash, as it opens an HTML block in markdown-it.
+- A mention right after a word character gets the `<!---->` boundary comment in front: `v<!---->@alice.i`. Without it, linkify read `v@alice.i` as an email address.
 - `RenderingInterface` has `previous_sibling(element)`, `next_sibling(element)` and `sibling(element, offset:)`. For the element the renderer is rendering right now they look at the children of its parent, also when that parent has no tag of its own. For any other element they look at the children of the element on top of the parent chain, or of `RenderContext#root` when the chain is empty. `previous_list(element)` returns the last list in front of the element with nothing visible between them.
 
 ## Upgrading to 0.4.2
