@@ -29,6 +29,11 @@ fi
 
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 
+# The upgrade guide lives on the docs site; UPGRADING.md in the repo root
+# only points there.
+UPGRADING="docs/src/content/docs/reference/upgrading.md"
+UPGRADING_URL="https://markbridge.dev/reference/upgrading/"
+
 features=""
 fixes=""
 perf=""
@@ -86,11 +91,12 @@ done
 {
   echo "## What's Changed"
   echo
-  # UPGRADING.md sections are named after the release that ships them
-  # (newest first); one matching this version means breaking changes.
-  if grep -q "^## ${VERSION} " UPGRADING.md 2>/dev/null; then
+  # The upgrade guide has one "Upgrading to X.Y.Z" section per release
+  # with breaking changes (newest first). One for this version means
+  # the notes get a warning that links to that section.
+  if grep -q "^## Upgrading to ${VERSION}$" "${UPGRADING}" 2>/dev/null; then
     echo "> [!WARNING]"
-    echo "> This release contains breaking changes — see [UPGRADING.md](https://github.com/${REPO}/blob/${TAG}/UPGRADING.md) before updating."
+    echo "> This release contains breaking changes — see [Upgrading to ${VERSION}](${UPGRADING_URL}#upgrading-to-${VERSION//./}) before updating."
     echo
   fi
   if [ -n "${features}" ]; then

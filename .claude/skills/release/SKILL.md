@@ -19,9 +19,11 @@
    `Gemfile.lock`.
 3. Commit exactly those two files as `DEV: Bump version to X.Y.Z`
    (see 8731ca4 for the shape).
-4. Breaking changes? Write the `## X.Y.Z` section in UPGRADING.md
-   *before* releasing — the notes script detects it and prepends a
-   warning callout linking to the file at the tag.
+4. Breaking changes? Write the `## Upgrading to X.Y.Z` section in
+   `docs/src/content/docs/reference/upgrading.md` *before* releasing —
+   the notes script detects it and prepends a warning callout linking
+   to that section on the docs site. (`UPGRADING.md` in the repo root
+   only points to the docs.)
 5. Preview the release notes before pushing:
    `bin/generate-release-notes` — this is exactly what CI will publish.
    Entries come from FEATURE:/FIX:/PERF: commit subjects (rebase
