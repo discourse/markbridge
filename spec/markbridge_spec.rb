@@ -912,6 +912,39 @@ RSpec.describe Markbridge do
       expect(result.markdown).to eq("hello#{zwsp}")
     end
 
+    it "renders color and size as their text by default" do
+      renderer = described_class.discourse_renderer
+
+      result =
+        described_class.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:)
+
+      expect(result.markdown).to eq("a b")
+    end
+
+    it "renders color and size as BBCode with styling_bbcode: true" do
+      renderer = described_class.discourse_renderer(styling_bbcode: true)
+
+      result =
+        described_class.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:)
+
+      expect(result.markdown).to eq("[color=red]a[/color] [size=85]b[/size]")
+    end
+
+    it "lets tags: win over styling_bbcode: true" do
+      renderer =
+        described_class.discourse_renderer(
+          styling_bbcode: true,
+          tags: {
+            Markbridge::AST::Color => Markbridge::Renderers::Discourse::Tags::ColorTag.new,
+          },
+        )
+
+      result =
+        described_class.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:)
+
+      expect(result.markdown).to eq("a [size=85]b[/size]")
+    end
+
     it "forwards :allow to the constructed escaper (lists alias)" do
       renderer = described_class.discourse_renderer(allow: :lists)
 
