@@ -15,18 +15,24 @@ RSpec.shared_examples "an inline wrapping tag" do
   let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
   let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
+  # A tag may return inline tokens instead of a String; the renderer
+  # writes them.
+  def rendered(element)
+    renderer.serialize(tag.render(element, interface), context)
+  end
+
   describe "#render" do
     it "returns the wrapped output for a simple text child" do
       element = element_class.new
       element << Markbridge::AST::Text.new("hi")
 
-      expect(tag.render(element, interface)).to eq(simple_output)
+      expect(rendered(element)).to eq(simple_output)
     end
 
     it "returns the empty-content output when the element has no children" do
       element = element_class.new
 
-      expect(tag.render(element, interface)).to eq(empty_output)
+      expect(rendered(element)).to eq(empty_output)
     end
 
     context "in html_mode" do
@@ -36,7 +42,7 @@ RSpec.shared_examples "an inline wrapping tag" do
         element = element_class.new
         element << Markbridge::AST::Text.new("hi")
 
-        expect(tag.render(element, interface)).to eq(html_simple_output)
+        expect(rendered(element)).to eq(html_simple_output)
       end
     end
 

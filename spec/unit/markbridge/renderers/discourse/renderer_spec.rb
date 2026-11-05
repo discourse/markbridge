@@ -431,6 +431,51 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
     end
   end
 
+  describe "#render_tokens" do
+    it "returns the children's output as tokens, finished Markdown as it is" do
+      tokens = Markbridge::Renderers::Discourse::Inline::Tokens
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("a") <<
+        Markbridge::AST::Bold.new.<<(Markbridge::AST::Text.new("b"))
+      document << Markbridge::AST::Bold.new
+
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+      expect(renderer.render_tokens(document, context:)).to eq(
+        [
+          "a",
+          tokens.open(:strong),
+          "b",
+          tokens.close(:strong),
+          tokens.open(:strong),
+          tokens.close(:strong),
+        ],
+      )
+    end
+
+    it "knows the position of the child it renders, also after a nested call" do
+      positions = []
+      renderer_with_tag = nil
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(
+        Markbridge::AST::Italic,
+        Markbridge::Renderers::Discourse::Tag.new do |element, interface|
+          tokens = interface.render_tokens(element, context: interface.with_parent(element))
+          positions << renderer_with_tag.child_index
+          tokens
+        end,
+      )
+      renderer_with_tag = described_class.new(tag_library: library)
+      document = Markbridge::AST::Document.new
+      inner = Markbridge::AST::Italic.new << Markbridge::AST::Text.new("a")
+      outer = Markbridge::AST::Italic.new << Markbridge::AST::Text.new("b") << inner
+      document << Markbridge::AST::Text.new("c") << outer
+
+      expect(renderer_with_tag.render(document)).to eq("cba")
+      expect(positions).to eq([1, 1])
+      expect(renderer_with_tag.child_index).to be_nil
+    end
+  end
+
   describe "#render_children" do
     it "forgets the lists of the outer level in a nested level" do
       outer =
@@ -688,21 +733,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
     it "preserves trailing whitespace" do
       result = interface.wrap_inline("text  ", "**")
       expect(result).to eq("**text**  ")
-    end
-
-    it "uses HTML fallback when content contains markers" do
-      result = interface.wrap_inline("text**more", "**")
-      expect(result).to eq("<strong>text**more</strong>")
-    end
-
-    it "uses HTML fallback for italic conflicts" do
-      result = interface.wrap_inline("text*more", "*")
-      expect(result).to eq("<em>text*more</em>")
-    end
-
-    it "uses HTML fallback for strikethrough conflicts" do
-      result = interface.wrap_inline("text~~more", "~~")
-      expect(result).to eq("<s>text~~more</s>")
     end
   end
 

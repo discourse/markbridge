@@ -106,6 +106,11 @@ matcher:
     # only costs the MatchData. Bucket A.
     - Markbridge::Renderers::Discourse::Inline::Serializer#place_markers
 
+    # Inline::Serializer#single_string only keeps a run that is one
+    # String off the pieces array and the buffer; joined with nothing,
+    # the String comes out the same. Bucket A.
+    - Markbridge::Renderers::Discourse::Inline::Serializer#single_string
+
     # parse_external_link mutations are all Bucket A: `split(" ", 2)`
     # vs `split(nil, 2)` (Ruby's awk-style behaviour on " " is
     # identical to default whitespace for realistic URLs);
@@ -197,6 +202,11 @@ matcher:
     # rendering behavior is pinned by the renderer specs.
     - Markbridge::Renderers::Discourse::Renderer#render
     - Markbridge::Renderers::Discourse::Renderer#render_default
+
+    # Renderer#render_child's `@previous_list && visible?(output)`: the
+    # first half only keeps the visibility check off the children when no
+    # list came before, the result is the same either way. Bucket A.
+    - Markbridge::Renderers::Discourse::Renderer#render_child
 
     # MediaWiki InlineParser depth-bookkeeping. The remaining alive
     # mutations on `#initialize`'s `depth: 0` default and on
