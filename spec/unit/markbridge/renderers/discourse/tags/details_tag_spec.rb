@@ -22,17 +22,17 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
       )
     end
 
-    it "renders an element with no content to nothing" do
+    it "renders an element with no content to a blank line, which keeps the text around it apart" do
       element = Markbridge::AST::Details.new(title: "Empty")
 
-      expect(tag.render(element, interface)).to eq("")
+      expect(tag.render(element, interface)).to eq("\n\n")
     end
 
-    it "renders whitespace-only content to nothing" do
+    it "renders whitespace-only content to a blank line" do
       element = Markbridge::AST::Details.new(title: "Empty")
       element << Markbridge::AST::Text.new(" \n ")
 
-      expect(tag.render(element, interface)).to eq("")
+      expect(tag.render(element, interface)).to eq("\n\n")
     end
 
     it "omits the =\"…\" when no title is set, producing bare [details]" do
@@ -69,6 +69,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
 
     context "in html_mode" do
       let(:context) { html_context }
+
+      it "renders an element with no content to nothing, a blank line would end the HTML block" do
+        expect(tag.render(Markbridge::AST::Details.new(title: "Empty"), interface)).to eq("")
+      end
 
       it "renders <details><summary>title</summary>…</details>" do
         element = Markbridge::AST::Details.new(title: "Show more")

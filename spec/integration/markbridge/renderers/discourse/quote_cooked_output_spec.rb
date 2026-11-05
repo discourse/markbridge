@@ -15,6 +15,10 @@ RSpec.describe "quote cooked output", skip: CookedOutput::SKIP_REASON do
     expect(cook("[quote][quote=X]in[/quote][/quote]reply")).not_to include("<blockquote>")
   end
 
+  it "cooks the text around an empty quote into two paragraphs" do
+    expect(cook("x[quote][/quote]y")).to eq("<p>x</p>\n<p>y</p>\n")
+  end
+
   it "cooks nested quotes without author into nested blockquotes" do
     expect(cook("[quote][quote]in[/quote]out[/quote]")).to eq(
       "<blockquote>\n<blockquote>\n<p>in</p>\n</blockquote>\n<p>out</p>\n</blockquote>\n",

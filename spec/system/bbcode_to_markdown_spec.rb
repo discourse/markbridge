@@ -240,9 +240,9 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq("`code text`")
     end
 
-    it "renders empty code tags to nothing" do
+    it "renders empty code tags to a blank line" do
       result = Markbridge.bbcode_to_markdown("a [code][/code] b")
-      expect(result.markdown).to eq("a  b")
+      expect(result.markdown).to eq("a \n\nb")
     end
 
     it "handles nested formatting" do
@@ -451,9 +451,9 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq("> - a\n> - b")
     end
 
-    it "converts an empty quote without author into nothing" do
+    it "converts an empty quote without author into a blank line" do
       result = Markbridge.bbcode_to_markdown("x[quote][/quote]y")
-      expect(result.markdown).to eq("xy")
+      expect(result.markdown).to eq("x\n\ny")
     end
 
     it "separates two consecutive named quotes with a blank line" do

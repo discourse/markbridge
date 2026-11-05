@@ -14,8 +14,13 @@ module Markbridge
             content = interface.render_children(element, context: child_context)
 
             # An empty element renders to nothing — a bare `` pair or an
-            # empty fence would only add noise to the output.
-            return "" if content.empty?
+            # empty fence would only add noise to the output. An empty code
+            # block is still a block, so a blank line keeps the text in
+            # front and after it apart, except in an HTML block, which a
+            # blank line would end.
+            if content.empty?
+              return interface.block_context?(element) && !interface.html_mode? ? "\n\n" : ""
+            end
 
             if interface.block_context?(element)
               if interface.html_mode?
