@@ -242,6 +242,26 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to end_with("\n````\n\n")
     end
 
+    it "keeps a pipe outside a table" do
+      element = Markbridge::AST::Code.new
+      element << Markbridge::AST::Text.new("a | b")
+
+      expect(tag.render(element, interface)).to eq("`a | b`")
+    end
+
+    context "in a table cell" do
+      let(:context) do
+        Markbridge::Renderers::Discourse::RenderContext.new([Markbridge::AST::TableCell.new])
+      end
+
+      it "escapes every pipe, which would end the cell" do
+        element = Markbridge::AST::Code.new
+        element << Markbridge::AST::Text.new("a | b | c")
+
+        expect(tag.render(element, interface)).to eq("`a \\| b \\| c`")
+      end
+    end
+
     context "in html_mode" do
       let(:context) { html_context }
 

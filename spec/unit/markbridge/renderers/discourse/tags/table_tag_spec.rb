@@ -121,6 +121,28 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(result).to include("<td>line1\nline2</td>")
     end
 
+    it "falls back to HTML when a cell holds a block" do
+      list =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        )
+      table = Markbridge::AST::Table.new
+      table << (Markbridge::AST::TableRow.new << (Markbridge::AST::TableCell.new << list))
+
+      result = tag.render(table, interface)
+
+      expect(result).to eq("\n\n<table>\n<tr><td><ul><li>a</li></ul></td></tr>\n</table>\n\n")
+    end
+
+    it "writes no blank lines around the table in html_mode, they would end the HTML block" do
+      table = build_table([[{ text: "A", header: true }, { text: "B", header: true }], ["1"]])
+
+      result = tag.render(table, interface_for(html_mode: true))
+
+      expect(result).to start_with("<table>\n")
+      expect(result).to end_with("\n</table>")
+    end
+
     it "falls back to HTML for nested tables" do
       outer_table = Markbridge::AST::Table.new
       parent_context = Markbridge::Renderers::Discourse::RenderContext.new([outer_table])
@@ -363,11 +385,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(result).to include("| --- |")
     end
 
-    # Kills `r[:cells].all? { c[:header] }` → `.any?`. An earlier row
-    # with mixed header/data cells must NOT become header_idx; only a
-    # pure all-header row qualifies. Put the mixed row first and the
-    # all-header row second — correct picks row 1, `.any?` picks row 0.
-    it "does not promote a mixed-header row above a true all-header row" do
+    # A row with header and data cells mixed is no header row. The
+    # header row comes second here, so the table is HTML, in the order
+    # of the source: a Markdown table would have to move the header row
+    # up.
+    it "writes a table whose header row is not the first row as HTML" do
       table =
         build_table(
           [
@@ -379,16 +401,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
 
       result = tag.render(table, interface)
 
-      # "H1 | H2" is the header row; the mixed row falls into data.
-      expect(result).to eq("\n\n| H1 | H2 |\n| --- | --- |\n| M | data |\n| d1 | d2 |\n\n")
+      expect(result).to eq(
+        "\n\n<table>\n<tr><th>M</th><td>data</td></tr>\n<tr><th>H1</th><th>H2</th></tr>\n" \
+          "<tr><td>d1</td><td>d2</td></tr>\n</table>\n\n",
+      )
     end
 
-    # Kills `header_idx = nil` and `r[:cells].all? { … }` → truthy-all?
-    # mutations. When a header row appears MID-TABLE (row 1 is all
-    # headers, rows 0 and 2 are data), rendering must reorder so the
-    # header row heads the output and the other rows become data
-    # rows.
-    it "places a mid-table header row at the top of the Markdown output" do
+    it "keeps a header row in the middle of the table where it is" do
       table =
         build_table(
           [
@@ -400,8 +419,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
 
       result = tag.render(table, interface)
 
-      # Header first, separator, then the two data rows in original order.
-      expect(result).to eq("\n\n| H1 | H2 |\n| --- | --- |\n| pre1 | pre2 |\n| post1 | post2 |\n\n")
+      expect(result).to eq(
+        "\n\n<table>\n<tr><td>pre1</td><td>pre2</td></tr>\n<tr><th>H1</th><th>H2</th></tr>\n" \
+          "<tr><td>post1</td><td>post2</td></tr>\n</table>\n\n",
+      )
     end
 
     # Kills drop-AST-guard mutations on `next unless child.is_a?(AST::TableRow)`
@@ -617,29 +638,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
     # Kills `r[:cells].all? { c[:header] }` → `.any?` mutations on the
     # partition guard. A row where only SOME cells are headers must
     # NOT go into <thead>; it lands in <tbody> with mixed th/td cells.
-    # Also kills the INNER `r[:cells].any? { c[:header] }` → `.all?`
-    # on the has_header probe — with the mutation, a mixed row
-    # (one header, one data) returns false for `.all?`, so has_header
-    # flips to false and <tbody> disappears.
-    it "routes a mixed-header row to <tbody>, not <thead>" do
+    # A mixed row is no header row, so the table has no <thead> and
+    # with it no <tbody>; the header cell stays a <th>.
+    it "writes a table that starts with a mixed row without thead and tbody" do
       table =
         build_table(
           [
-            [{ text: "H", header: true }, "x"], # mixed — not a header-only row
+            [{ text: "H", header: true }, "x"],
             %w[d1 d2],
-            %w[d3 d4 d5], # uneven — forces HTML fallback
+            %w[d3 d4 d5], # uneven, so the table is HTML
           ],
         )
 
       result = tag.render(table, interface)
 
-      # No <thead> because no row has all cells as headers.
       expect(result).not_to include("<thead>")
-      # <tbody> must still appear — the inner-any-vs-all mutation
-      # would flip has_header to false and drop <tbody> entirely.
-      expect(result).to include("<tbody>")
-      expect(result).to include("<th>H</th>")
-      expect(result).to include("<td>x</td>")
+      expect(result).not_to include("<tbody>")
+      expect(result).to include("<tr><th>H</th><td>x</td></tr>")
     end
   end
 

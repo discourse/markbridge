@@ -26,6 +26,9 @@ module Markbridge
             elsif interface.html_mode?
               "<code>#{content}</code>"
             else
+              # A pipe in a code span still splits the cell of a Markdown
+              # table, the escaped pipe does not and reads back as a pipe.
+              content = content.gsub("|", "\\|") if interface.has_parent?(AST::TableCell)
               render_inline(content)
             end
           end

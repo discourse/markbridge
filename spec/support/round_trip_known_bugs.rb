@@ -31,10 +31,6 @@ module RoundTripKnownBugs
 
   STRUCTURE = [
     entry(
-      "a block in a cell, a header row that is not the first row, or a table in a table: the renderer writes the table as a Markdown table, moves the header row up, or ends the HTML block with the blank lines around the inner table",
-      cases: [50, 53, 206, 240],
-    ),
-    entry(
       "in html_mode a paragraph next to other content has no <p>, a blank line in text or block code ends the HTML block, an empty emphasis or quote is written, and a spoiler is a <details> block",
       cases: [
         3,
