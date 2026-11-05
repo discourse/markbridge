@@ -72,10 +72,8 @@ class AstGenerator
       .freeze
 
   # Texts with nothing visible in them. They stand between nodes, never
-  # first in a container. No newline among them: a newline next to a
-  # LineBreak is the known bug of two line breaks in a row (see the
-  # known bugs of the structure round-trip).
-  WHITESPACE_TEXTS = [" ", "  ", "\u00A0"].freeze
+  # first in a container.
+  WHITESPACE_TEXTS = [" ", "  ", "\u00A0", "\n"].freeze
 
   # Lines for block code. Some carry leading spaces, some carry fence
   # characters, so the renderer has to widen the fence it picks.

@@ -60,6 +60,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       expect(write(tokens.text("a"), *em(tokens.hard_break, tokens.text("b")))).to eq("a\n*b*")
     end
 
+    it "writes a newline at the start of the text after a hard break as <br>" do
+      expect(write(tokens.text("x"), tokens.hard_break, "\ny")).to eq("x\n<br>y")
+      expect(write(tokens.text("x"), tokens.hard_break, tokens.text("\n"))).to eq("x\n<br>")
+      # The newline at the edge of the emphasis stands outside the markers.
+      expect(write(tokens.text("x"), tokens.hard_break, *em("\ny"))).to eq("x\n<br>*y*")
+      expect(write(*em(tokens.text("x"), tokens.hard_break, "\ny"))).to eq("*x\n<br>y*")
+      expect(write(*em(tokens.text("x"), tokens.hard_break), "\ny")).to eq("*x*\n<br>y")
+      # Two newlines are a blank line the text brings on purpose.
+      expect(write(tokens.text("x"), tokens.hard_break, "\n\ny")).to eq("x\n\n\ny")
+      # A newline after anything but a hard break is a break of its own.
+      expect(write(tokens.text("x\n"), "\ny")).to eq("x\n\ny")
+      expect(write(tokens.text("x"), tokens.hard_break, "a", "\ny")).to eq("x\na\ny")
+      expect(
+        write(tokens.text("x"), tokens.hard_break, tokens.bare_url("https://e.com/"), "\ny"),
+      ).to eq("x\nhttps://e.com/\ny")
+    end
+
     it "writes nothing for a hard break after a blank line" do
       expect(write(tokens.text("a\n\n"), tokens.hard_break, tokens.text("b"))).to eq("a\n\nb")
       expect(write(tokens.text("a\n \n\t"), tokens.hard_break, tokens.text("b"))).to eq("a\n \n\tb")
@@ -148,6 +165,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
         expect(write(tokens.open(:strong), tokens.raw("a*"), tokens.close(:strong))).to eq(
           "<strong>a*</strong>",
         )
+        expect(
+          write(tokens.open(:strong), tokens.text("a"), tokens.html("*"), tokens.close(:strong)),
+        ).to eq("<strong>a*</strong>")
         expect(write(tokens.open(:s), tokens.raw("a~"), tokens.close(:s))).to eq("<s>a~</s>")
         expect(write(tokens.open(:s), tokens.raw(" ~a "), tokens.close(:s))).to eq(" <s>~a</s> ")
       end
