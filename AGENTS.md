@@ -257,6 +257,10 @@ expect(token).to match_tag_end("b")
   default; `STRUCTURE_SEEDS=3000 bundle exec rspec <file>` runs more. A
   construct the generator leaves out because of an open bug is marked
   with a comment that names the bug; the fix removes the exclusion.
+  `AstGenerator.new(seed, attributed_quotes: true)` adds quotes with an
+  author or a post reference, which only the runs through the Discourse
+  engine ask for: plain markdown-it reads `[/quote]` after a table as a
+  row, Discourse does not.
 - `spec/integration/markbridge/renderers/discourse/adjacency_roundtrip_spec.rb`
   puts two nodes next to each other on purpose (`AdjacencyGenerator`):
   every inline node kind with every character class at the edge that

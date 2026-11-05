@@ -145,8 +145,16 @@ class AstGenerator
   MAX_INLINE_DEPTH = 2
 
   # @param seed [Integer]
-  def initialize(seed)
+  # @param seed [Integer]
+  # @param attributed_quotes [Boolean] whether half of the quotes get an
+  #   author or a post reference. Those are Discourse BBCode: Discourse
+  #   finds the closing tag first and cooks the lines between as blocks,
+  #   plain markdown-it reads `[/quote]` right after a table as a row of
+  #   it. So only a run that cooks with the Discourse engine asks for
+  #   them.
+  def initialize(seed, attributed_quotes: false)
     @random = Random.new(seed)
+    @attributed_quotes = attributed_quotes
   end
 
   # @return [Markbridge::AST::Document]
@@ -272,12 +280,17 @@ class AstGenerator
     table
   end
 
-  # No title: a quoted title cooks with curly quotes, which plain
-  # markdown-it shows as text.
+  # A title half of the time, made of plain words: the renderer writes it
+  # into the tag as it is.
   def details(depth:)
-    details = spend { AST::Details.new }
+    title = "#{word} #{word}" if @random.rand(2).zero?
+    details = spend { AST::Details.new(title:) }
     fill_block_container(details, depth: depth + 1, headings: false)
     details
+  end
+
+  def word
+    WORDS.sample(random: @random)
   end
 
   def paragraph
@@ -293,12 +306,29 @@ class AstGenerator
     heading
   end
 
+  # With attributed quotes, half of them get a full post reference or a
+  # name only (see #initialize).
   def quote(depth:)
-    # No author: an attributed quote renders Discourse BBCode, which
-    # plain markdown-it does not know.
-    quote = spend { AST::Quote.new }
+    quote = spend { build_quote }
     fill_block_container(quote, depth: depth + 1, headings: true)
     quote
+  end
+
+  def build_quote
+    return AST::Quote.new unless @attributed_quotes
+
+    case @random.rand(4)
+    when 0
+      AST::Quote.new(
+        username: word,
+        post_number: 1 + @random.rand(9),
+        topic_id: 1 + @random.rand(99),
+      )
+    when 1
+      AST::Quote.new(author: word)
+    else
+      AST::Quote.new
+    end
   end
 
   def align(depth:)

@@ -4,9 +4,7 @@
 # site: the BBCode of the plugins becomes the plugin's HTML where the
 # plugin is there, the plain forms cook as Markdown where it is not, and
 # the sanitizer keeps what the renderer writes in html_mode.
-RSpec.describe "cooked output of the Discourse engine",
-               :discourse_engine,
-               skip: DiscourseEngineCooker::SKIP_REASON do
+RSpec.describe "cooked output of the Discourse engine", :discourse_engine do
   def text(value)
     Markbridge::AST::Text.new(value)
   end

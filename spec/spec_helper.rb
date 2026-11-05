@@ -31,4 +31,8 @@ RSpec.configure do |config|
   config.disable_monkey_patching!
   config.order = :random
   Kernel.srand config.seed
+
+  # The examples that cook with Discourse's own engine run where it is
+  # built (bin/discourse-engine) or required, see DiscourseEngineCooker.
+  config.filter_run_excluding(discourse_engine: true) if DiscourseEngineCooker::SKIP_REASON
 end
