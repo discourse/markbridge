@@ -1,17 +1,12 @@
 # frozen_string_literal: true
 
-require "nokogiri"
-
 # Where two siblings meet, the serializer puts an empty HTML comment
 # between their delimiters when the Markdown parser would read them wrong
-# (see Inline::Joins). Some of these comments are only needed
-# for cmark-gfm, which does not count a `~` as punctuation next to an
-# emphasis delimiter. markdown-it does, so here the comment has to change
-# nothing. Every case is checked on the cooked HTML.
-RSpec.describe "emphasis join cooked output", skip: MarkdownItCooker::SKIP_REASON do
-  def cook(markdown)
-    MarkdownItCooker.cook(markdown)
-  end
+# (see Inline::Joins). Every case is checked on the cooked HTML: the
+# emphasis and the strikethrough come out as elements with the right
+# text, and nothing else shows.
+RSpec.describe "emphasis join cooked output", skip: CookedOutput::SKIP_REASON do
+  include CookedOutput
 
   # @param name [Symbol] an AST class, :Text for a Text node
   def node(name, text)
@@ -25,7 +20,7 @@ RSpec.describe "emphasis join cooked output", skip: MarkdownItCooker::SKIP_REASO
   def paragraph(*nodes)
     document = Markbridge::AST::Document.new
     nodes.each { |child| document << child }
-    Nokogiri::HTML5.fragment(cook(Markbridge.render(document).markdown)).at_css("p")
+    fragment(cook_ast(document)).at_css("p")
   end
 
   # The cooked paragraph: each [selector, text] pair, then all of its text.
