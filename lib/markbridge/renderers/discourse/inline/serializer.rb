@@ -127,6 +127,13 @@ module Markbridge
             # taken off the buffer since.
             @break_buffer = nil
             @break_end = 0
+            # The buffer the last placeholder went into, its length right
+            # after and the text that will most likely replace it. The
+            # next piece is joined with that text instead of the end of
+            # the placeholder.
+            @like_buffer = nil
+            @like_end = 0
+            @like = nil
           end
 
           # Writes one run of tokens.
@@ -137,7 +144,7 @@ module Markbridge
           def write(tokens, html_mode: false)
             buffer = +""
             pending = write_tokens(buffer, tokens, 0, tokens.size, html_mode, nil)
-            Joins.append(buffer, bare_url_piece(pending, buffer, nil)) if pending
+            append(buffer, bare_url_piece(pending, buffer, nil)) if pending
             drop_trailing_breaks(buffer, html_mode)
           end
 
@@ -172,13 +179,19 @@ module Markbridge
                 output = start_of_line(buffer, output) unless html_mode
                 next if output.empty?
 
-                html_mode ? buffer << output : Joins.append(buffer, output)
+                if html_mode
+                  buffer << output
+                elsif @like_buffer
+                  append(buffer, output)
+                else
+                  Joins.append(buffer, output)
+                end
               else
                 pending =
                   write_tokens(buffer, output, 0, output.size, html_mode, pending, before, child)
               end
             end
-            Joins.append(buffer, bare_url_piece(pending, buffer, nil)) if pending
+            append(buffer, bare_url_piece(pending, buffer, nil)) if pending
             drop_trailing_breaks(buffer, html_mode)
           end
 
@@ -220,6 +233,7 @@ module Markbridge
               token = tokens.fetch(index)
               index += 1
               kind = nil
+              like = nil
               moved_break = false
               if token.instance_of?(String)
                 piece = token
@@ -230,6 +244,9 @@ module Markbridge
                   when Tokens::TEXT
                     text_piece(token, html_mode)
                   when Tokens::HTML
+                    value
+                  when Tokens::PLACEHOLDER
+                    like = token.fetch(2) unless html_mode
                     value
                   when Tokens::OPEN
                     close =
@@ -277,7 +294,7 @@ module Markbridge
               end
               next if piece.empty?
 
-              pending = settle(buffer, pending, piece)
+              pending = settle(buffer, pending, like || piece)
               if before
                 before.call(buffer, child)
                 before = nil
@@ -285,7 +302,19 @@ module Markbridge
               piece = start_of_line(buffer, piece, blank, after_html) unless html_mode
               next if piece.empty?
 
-              html_mode ? buffer << piece : Joins.append(buffer, piece)
+              if html_mode
+                buffer << piece
+              elsif like
+                append(buffer, piece, like)
+                @like_buffer = buffer
+                @like_end = buffer.bytesize
+                @like = like
+              elsif @like_buffer
+                append(buffer, piece)
+              else
+                # No placeholder written so far, the common case.
+                Joins.append(buffer, piece)
+              end
               # An HTML tag alone on its line opens an HTML block, so the
               # piece after it must not start with a newline; start_of_line
               # writes <br> for the newline of a break too.
@@ -388,8 +417,26 @@ module Markbridge
           # it, is known. Another bare URL as +following+ glues like text.
           # @return [nil]
           def settle(buffer, pending, following)
-            Joins.append(buffer, bare_url_piece(pending, buffer, following)) if pending
+            append(buffer, bare_url_piece(pending, buffer, following)) if pending
             nil
+          end
+
+          # Joins +piece+ with the buffer (see Joins). Right after a
+          # placeholder the join reads the text that will most likely
+          # replace it instead of the end of the buffer, and +like+ stands
+          # in for a placeholder as +piece+.
+          def append(buffer, piece, like = nil)
+            if after_placeholder?(buffer)
+              Joins.append_like(buffer, piece, like, @like)
+            elsif like
+              Joins.append_like(buffer, piece, like)
+            else
+              Joins.append(buffer, piece)
+            end
+          end
+
+          def after_placeholder?(buffer)
+            buffer.equal?(@like_buffer) && buffer.bytesize == @like_end
           end
 
           # The index of the +close_kind+ token that ends the +open_kind+
@@ -445,7 +492,7 @@ module Markbridge
           def joined(tokens, from, to, html_mode, blank)
             buffer = +""
             pending = write_tokens(buffer, tokens, from, to, html_mode, nil, blank:)
-            Joins.append(buffer, bare_url_piece(pending, buffer, nil)) if pending
+            append(buffer, bare_url_piece(pending, buffer, nil)) if pending
             buffer
           end
 
@@ -609,8 +656,9 @@ module Markbridge
           # HTML tag of its own, so linkify sees the URL at the start of the
           # text after it.
           def glued_before?(buffer)
-            last = buffer[-1]
-            !last.nil? && !last.match?(NOT_GLUED_BEFORE) && !buffer.end_with?(BR)
+            tail = after_placeholder?(buffer) ? @like : buffer
+            last = tail[-1]
+            !last.nil? && !last.match?(NOT_GLUED_BEFORE) && !tail.end_with?(BR)
           end
 
           # Another bare URL right after this one is written as a link

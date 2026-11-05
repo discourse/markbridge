@@ -10,11 +10,14 @@ module Markbridge
         # Applications using Markbridge should provide their own custom tag
         # to render events as placeholders or convert them to another format.
         #
+        # An event is a block, so a placeholder for it keeps the blank
+        # lines around it (see "Placeholders" in the migration guide).
+        #
         # @example Custom renderer with placeholder
         #   class MyEventTag < Markbridge::Renderers::Discourse::Tags::EventTag
         #     def render(element, interface)
         #       id = register_event(element)
-        #       "<<EVENT:#{id}>>"
+        #       "\n\n<<EVENT:#{id}>>\n\n"
         #     end
         #   end
         class EventTag < Tag
