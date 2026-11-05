@@ -202,6 +202,15 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
         expect(write(tokens.open(:u), tokens.text(" a "), tokens.close(:u))).to eq("[u] a [/u]")
       end
 
+      it "falls back to HTML for strikethrough with a nested strikethrough at an edge" do
+        inner = [tokens.open(:s), tokens.text("a"), tokens.close(:s)]
+
+        expect(write(tokens.open(:s), *inner, tokens.close(:s))).to eq("<s>~~a~~</s>")
+        expect(write(tokens.open(:s), *inner, tokens.text(" b"), tokens.close(:s))).to eq(
+          "<s>~~a~~ b</s>",
+        )
+      end
+
       it "falls back to HTML for strikethrough with a nested tilde pair at an edge" do
         inner = [tokens.open(:s), tokens.text("a"), tokens.close(:s)]
 
