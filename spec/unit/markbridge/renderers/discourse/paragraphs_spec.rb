@@ -70,6 +70,17 @@ RSpec.describe Markbridge::Renderers::Discourse::Paragraphs do
       expect(wrap("a\n\nb")).to eq("[x]a[/x]\n\n[x]b[/x]")
     end
 
+    # `[x]:a` at the start of a line is a link reference definition.
+    it "escapes a colon right after a BBCode tag" do
+      expect(described_class.wrap(":a", "[x]", "[/x]")).to eq("[x]\\:a[/x]")
+      expect(described_class.wrap(" :a\n\n:b", "[x]", "[/x]")).to eq(" [x]\\:a[/x]\n\n[x]\\:b[/x]")
+    end
+
+    it "leaves a colon alone after a marker that is no BBCode tag, and one not at the start" do
+      expect(described_class.wrap(":a", "**", "**")).to eq("**:a**")
+      expect(described_class.wrap("a:", "[x]", "[/x]")).to eq("[x]a:[/x]")
+    end
+
     it "keeps whitespace at the edges of a paragraph outside the markers" do
       expect(wrap(" a \n\n\tb\u00A0")).to eq(" [x]a[/x] \n\n\t[x]b[/x]\u00A0")
     end

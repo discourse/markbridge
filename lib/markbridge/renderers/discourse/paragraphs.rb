@@ -73,7 +73,13 @@ module Markbridge
         def self.wrap(content, open, close)
           map(content) do |paragraph|
             lead, core, trail = paragraph.match(EDGES).captures
-            core.empty? ? paragraph : "#{lead}#{open}#{core}#{close}#{trail}"
+            next paragraph if core.empty?
+
+            # A BBCode tag at the start of a line with a `:` right after
+            # it reads as a link reference definition, `[color=red]:x`,
+            # and cooks to nothing; the backslash keeps the colon text.
+            core = "\\#{core}" if open.start_with?("[") && core.start_with?(":")
+            "#{lead}#{open}#{core}#{close}#{trail}"
           end
         end
       end
