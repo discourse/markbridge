@@ -73,6 +73,7 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - A bare URL right after a `<br>` stays bare: markdown-it reads the `<br>` as an HTML tag of its own and links the URL after it.
 - `Markbridge::Renderers::Discourse::Inline::Tokens.placeholder(text, like:)` is a new token for a placeholder that a later step replaces, like an importer that swaps `[link|17]` for a URL. The serializer writes `text` as it is and joins it with its neighbors as if `like` stood there, so `<!---->` goes in where the replacement needs it. [Placeholders](/migrating/placeholders/#tell-markbridge-what-replaces-the-placeholder) explains when to use it and how to pick `like:`.
 - An upload inside the cell of a Markdown table has the `|` in front of its dimensions and in front of the `attachment` marker escaped, `![a\|64x64](upload://a.png)` and `[a.pdf\|attachment](upload://a.pdf)`, also in the raw Markdown an `AST::Upload` carries. Without the backslash the pipe ended the cell in plain markdown-it and in Discourse before August 2026; Discourse reads the dimensions and the marker with the backslash as well.
+- The destination of an upload is written like the destination of a link: a parenthesis or a backslash in the file name gets a backslash, a file name with whitespace is wrapped in `<…>`.
 
 ## Upgrading to 0.4.2
 

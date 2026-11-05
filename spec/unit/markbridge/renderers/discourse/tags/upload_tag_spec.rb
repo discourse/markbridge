@@ -86,6 +86,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
       expect(tag.render(element, interface)).to eq("[attachment|attachment](upload://abc123)")
     end
 
+    it "wraps a destination with whitespace in <>, like a link destination" do
+      element =
+        Markbridge::AST::Upload.new(sha1: "abc", filename: "my report.pdf", type: :attachment)
+
+      expect(tag.render(element, interface)).to eq(
+        "[my report.pdf|attachment](<upload://my report.pdf>)",
+      )
+    end
+
+    it "escapes a parenthesis in the destination, which would end it" do
+      element = Markbridge::AST::Upload.new(sha1: "abc", filename: "a(1).png", alt: "x")
+
+      expect(tag.render(element, interface)).to eq("![x](upload://a\\(1\\).png)")
+    end
+
     context "in a table cell" do
       let(:context) do
         Markbridge::Renderers::Discourse::RenderContext.new([Markbridge::AST::TableCell.new])
