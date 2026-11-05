@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "nokogiri"
-
 # Nested list indentation is only correct if CommonMark puts every
 # block back where it belongs. The Markdown string alone does not show
 # that: an item indented two columns too far turns its code fence into
@@ -9,27 +7,26 @@ require "nokogiri"
 RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
   include CookedOutput
 
-  def fragment(bbcode)
-    Nokogiri::HTML5.fragment(cook(bbcode))
+  def cooked(bbcode)
+    fragment(cook(bbcode))
   end
 
   it "cooks a code block three levels deep into a pre with the code as its text" do
-    pre =
-      fragment("[list][*]a[list][*]b[list][*]c[code]x\ny[/code][/list][/list][/list]").css("pre")
+    pre = cooked("[list][*]a[list][*]b[list][*]c[code]x\ny[/code][/list][/list][/list]").css("pre")
 
     expect(pre.size).to eq(1)
     expect(pre.text).to eq("x\ny\n")
   end
 
   it "cooks a code block into a pre when ordered and unordered lists alternate" do
-    doc = fragment("[list=1][*]a[list][*]b[list=1][*]c[code]x\ny[/code][/list][/list][/list]")
+    doc = cooked("[list=1][*]a[list][*]b[list=1][*]c[code]x\ny[/code][/list][/list][/list]")
 
     expect(doc.css("pre").text).to eq("x\ny\n")
     expect(doc.css("ol li ul li ol li pre").size).to eq(1)
   end
 
   it "keeps a code block inside its own item and the text after it in the outer item" do
-    doc = fragment("[list][*]outer[list][*][code]  x[/code][/list]after[/list]")
+    doc = cooked("[list][*]outer[list][*][code]  x[/code][/list]after[/list]")
 
     expect(doc.css("ul li ul li pre").text).to eq("  x\n")
     # The text after the nested list is its own paragraph in the outer item.
@@ -38,7 +35,7 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
   end
 
   it "keeps a code block inside an ordered item that also has a paragraph" do
-    doc = fragment("[list=1][*]parent[code]def f\n  return 1\nend[/code][/list]")
+    doc = cooked("[list=1][*]parent[code]def f\n  return 1\nend[/code][/list]")
 
     expect(doc.css("ol > li > p").text).to eq("parent")
     expect(doc.css("ol > li > pre").text).to eq("def f\n  return 1\nend\n")
@@ -46,7 +43,7 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
 
   it "cooks a nested list after an HTML table inside a list item into a real list" do
     doc =
-      fragment(
+      cooked(
         "[list][*]item[table][tr][td]a[/td][/tr][tr][td]b[/td][td]c[/td][/tr][/table]" \
           "[list][*]x[/list][/list]",
       )
@@ -56,15 +53,14 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
   end
 
   it "keeps text after a nested list in the outer item" do
-    html = fragment("[list][*]a[list=1][*]b[/list]c[/list]")
+    html = cooked("[list][*]a[list=1][*]b[/list]c[/list]")
 
     expect(html.css("ol li").map(&:text)).to eq(["b"])
     expect(html.at_css("ul > li").text).to include("c")
   end
 
   it "keeps the outer list tight when an item has text after its nested list" do
-    html =
-      Nokogiri::HTML5.fragment(cook_html("<ul><li>x<ul><li>a</li></ul>tail</li><li>y</li></ul>"))
+    html = fragment(cook_html("<ul><li>x<ul><li>a</li></ul>tail</li><li>y</li></ul>"))
 
     expect(html.css("p")).to be_empty
     expect(html.css("ul > li > ul > li").map(&:text)).to eq(["a"])
@@ -72,14 +68,14 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
   end
 
   it "keeps the outer list tight when a line break stands between the nested list and the text" do
-    html = fragment("[list][*]x[list][*]a[/list]\n[br]\ntail[*]y[/list]")
+    html = cooked("[list][*]x[list][*]a[/list]\n[br]\ntail[*]y[/list]")
 
     expect(html.css("p")).to be_empty
     expect(html.css("ul > li > ul > li").map(&:text)).to eq(["a"])
   end
 
   it "keeps the outer list tight when an aligned block ends a nested list and another list follows" do
-    html = fragment("[list=1][*]x[list][*][center]a[/center][/list][list=1][*]b[/list][/list]")
+    html = cooked("[list=1][*]x[list][*][center]a[/center][/list][list=1][*]b[/list][/list]")
 
     expect(html.css("ol > li > p")).to be_empty
     expect(html.css("ol > li > ul > li div").map { |div| div.text.strip }).to eq(["a"])
@@ -87,28 +83,28 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
   end
 
   it "keeps text after a list inside a quote out of the last list item" do
-    html = fragment("[list][*]a[quote][list][*]b[/list]c[/quote][/list]")
+    html = cooked("[list][*]a[quote][list][*]b[/list]c[/quote][/list]")
 
     expect(html.css("blockquote li").map(&:text)).to eq(["b"])
     expect(html.at_css("blockquote").text).to include("c")
   end
 
   it "cooks two lists of the same kind into two lists" do
-    html = fragment("[list][*]a[/list][list][*]b[/list]")
+    html = cooked("[list][*]a[/list][list][*]b[/list]")
 
     expect(html.css("ul").size).to eq(2)
     expect(html.css("p")).to be_empty
   end
 
   it "cooks two lists on their own lines into two lists" do
-    html = fragment("[list][*]a[/list]\n[list][*]b[/list]")
+    html = cooked("[list][*]a[/list]\n[list][*]b[/list]")
 
     expect(html.css("ul").size).to eq(2)
     expect(html.css("p")).to be_empty
   end
 
   it "cooks two ordered lists with a blank line and a line break between them into two lists" do
-    html = fragment("[list=1][*]a[/list]\n\n[br]\n[list=1][*]b[/list]")
+    html = cooked("[list=1][*]a[/list]\n\n[br]\n[list=1][*]b[/list]")
 
     expect(html.css("ol").size).to eq(2)
     expect(html.css("p")).to be_empty

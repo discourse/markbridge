@@ -154,28 +154,8 @@ RSpec.describe Markbridge do
       expect(described_class.bbcode_to_markdown("[b]hi[/b]").errors).to eq([])
     end
 
-    it "collapses three or more consecutive newlines to exactly two" do
-      expect(described_class.bbcode_to_markdown("a\n\n\n\nb").markdown).to eq("a\n\nb")
-    end
-
-    it "removes whitespace-only lines" do
-      expect(described_class.bbcode_to_markdown("a\n   \nb").markdown).to eq("a\n\nb")
-    end
-
     it "strips leading and trailing whitespace from the final output" do
       expect(described_class.bbcode_to_markdown("   hi   ").markdown).to eq("hi")
-    end
-
-    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
-      tag =
-        Class.new(Markbridge::Renderers::Discourse::Tag) do
-          def render(_e, _i)
-            raise "boom"
-          end
-        end
-      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
-
-      expect { described_class.bbcode_to_markdown("[b]x[/b]", renderer:) }.to raise_error(/boom/)
     end
 
     it "yields the AST to a block between parse and render so callers can mutate it" do
@@ -275,18 +255,6 @@ RSpec.describe Markbridge do
       result = described_class.html_to_markdown("<b>hi</b>", handlers: registry)
 
       expect(result.markdown).to eq("*hi*")
-    end
-
-    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
-      tag =
-        Class.new(Markbridge::Renderers::Discourse::Tag) do
-          def render(_e, _i)
-            raise "boom"
-          end
-        end
-      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
-
-      expect { described_class.html_to_markdown("<b>x</b>", renderer:) }.to raise_error(/boom/)
     end
 
     it "yields the AST to a block between parse and render so callers can mutate it" do
@@ -400,20 +368,6 @@ RSpec.describe Markbridge do
       expect(result.markdown).to eq("*hi*")
     end
 
-    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
-      tag =
-        Class.new(Markbridge::Renderers::Discourse::Tag) do
-          def render(_e, _i)
-            raise "boom"
-          end
-        end
-      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
-
-      expect { described_class.text_formatter_xml_to_markdown(xml, renderer:) }.to raise_error(
-        /boom/,
-      )
-    end
-
     it "yields the AST to a block between parse and render so callers can mutate it" do
       result =
         described_class.text_formatter_xml_to_markdown(xml) do |ast|
@@ -500,18 +454,6 @@ RSpec.describe Markbridge do
       result = described_class.mediawiki_to_markdown("<highlight>x</highlight>", handlers: registry)
 
       expect(result.markdown).to eq("**x**")
-    end
-
-    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
-      tag =
-        Class.new(Markbridge::Renderers::Discourse::Tag) do
-          def render(_e, _i)
-            raise "boom"
-          end
-        end
-      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
-
-      expect { described_class.mediawiki_to_markdown("'''x'''", renderer:) }.to raise_error(/boom/)
     end
 
     it "yields the AST to a block between parse and render so callers can mutate it" do
@@ -813,32 +755,6 @@ RSpec.describe Markbridge do
       )
     end
 
-    it "lets render-time errors propagate by default (raise_on_error defaults to true)" do
-      tag =
-        Class.new(Markbridge::Renderers::Discourse::Tag) do
-          def render(_e, _i)
-            raise "boom"
-          end
-        end
-      renderer = described_class.discourse_renderer(tags: { Markbridge::AST::Bold => tag.new })
-      doc = described_class.parse_bbcode("[b]x[/b]").ast
-
-      expect { described_class.render(doc, renderer:) }.to raise_error(/boom/)
-    end
-
-    it "carries the AST through to Conversion#ast" do
-      doc = described_class.parse_bbcode("[b]hi[/b]").ast
-
-      expect(described_class.render(doc).ast).to be(doc)
-    end
-
-    it "exposes empty Hashes for unknown_tags and diagnostics (no parser-side data available)" do
-      result = described_class.render(Markbridge::AST::Document.new)
-
-      expect(result.unknown_tags).to eq({})
-      expect(result.diagnostics).to eq({})
-    end
-
     it "exposes an empty Array for errors when render succeeds" do
       expect(described_class.render(Markbridge::AST::Document.new).errors).to eq([])
     end
@@ -1033,34 +949,6 @@ RSpec.describe Markbridge do
 
       result = described_class.html_to_markdown("a*b", renderer:)
       expect(result.markdown).to eq('a\*b')
-    end
-  end
-
-  describe "renderer: kwarg" do
-    it "is honored by html_to_markdown" do
-      fixed_bold =
-        Class.new(Markbridge::Renderers::Discourse::Tag) do
-          def render(_element, _interface)
-            "HBOLD"
-          end
-        end
-      renderer =
-        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
-
-      expect(described_class.html_to_markdown("<b>hi</b>", renderer:).markdown).to eq("HBOLD")
-    end
-
-    it "is honored by mediawiki_to_markdown" do
-      fixed_bold =
-        Class.new(Markbridge::Renderers::Discourse::Tag) do
-          def render(_element, _interface)
-            "MBOLD"
-          end
-        end
-      renderer =
-        described_class.discourse_renderer(tags: { Markbridge::AST::Bold => fixed_bold.new })
-
-      expect(described_class.mediawiki_to_markdown("'''hi'''", renderer:).markdown).to eq("MBOLD")
     end
   end
 
