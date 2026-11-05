@@ -66,8 +66,8 @@ All tag names are case-insensitive. Aliases in the same row use the same handler
 |---|---|---|
 | `[quote]` | `[quote="name"]…[/quote]`; without attribution `> …`, or `[quote]…[/quote]` around a quote with attribution | `AST::Quote` |
 | `[spoiler]`, `[hide]` | `[spoiler]…[/spoiler]` | `AST::Spoiler` |
-| `[color]` | `<span style="color: …">` | `AST::Color` |
-| `[size]` | `<span style="font-size: …">` | `AST::Size` |
+| `[color]` | The text; `[color=…]…[/color]` with `styling_bbcode: true` | `AST::Color` |
+| `[size]` | The text; `[size=…]…[/size]` with `styling_bbcode: true` | `AST::Size` |
 | `[center]`, `[left]`, `[right]`, `[justify]` | `<div align="…">` | `AST::Align` |
 
 ### Lists

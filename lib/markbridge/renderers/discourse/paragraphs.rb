@@ -10,14 +10,16 @@ module Markbridge
       #
       # The serializer does that for emphasis, strikethrough and underline.
       # A custom tag that writes its own markers into a String can use
-      # {.map} for the same.
+      # {.wrap} or {.map} for the same.
       module Paragraphs
         # One or more blank lines.
         BREAK = /\n[[:blank:]]*\n/
         # The same with all the blank lines of a run, captured so that
         # split keeps them.
         SPLIT = /(\n[[:blank:]]*\n(?:[[:blank:]]*\n)*)/
-        private_constant :BREAK, :SPLIT
+        # Whitespace at the start and at the end, and what is between.
+        EDGES = /\A([[:space:]]*)(.*?)([[:space:]]*)\z/m
+        private_constant :BREAK, :SPLIT, :EDGES
 
         # Whether +content+ has a blank line that markup would have to be
         # closed and opened again around. A blank line inside a code fence
@@ -55,6 +57,24 @@ module Markbridge
             .each_with_index
             .map { |part, index| index.odd? ? part : yield(part, index.zero?, index == last) }
             .join
+        end
+
+        # Puts +open+ and +close+ around every paragraph of +content+.
+        # Whitespace at the edges of a paragraph stays outside, and a
+        # paragraph with only whitespace stays as it is.
+        #
+        # @param content [String]
+        # @param open [String]
+        # @param close [String]
+        # @return [String]
+        # @example
+        #   Paragraphs.wrap("a \n\nb", "[color=red]", "[/color]")
+        #   # => "[color=red]a[/color] \n\n[color=red]b[/color]"
+        def self.wrap(content, open, close)
+          map(content) do |paragraph|
+            lead, core, trail = paragraph.match(EDGES).captures
+            core.empty? ? paragraph : "#{lead}#{open}#{core}#{close}#{trail}"
+          end
         end
       end
     end

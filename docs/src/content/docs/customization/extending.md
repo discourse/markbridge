@@ -131,7 +131,7 @@ Use `find_parent` / `has_parent?` to render differently inside specific ancestor
 
 ## Tags that return inline tokens
 
-A tag that writes a block, a BBCode wrapper or a placeholder returns a String, as above. Inline formatting is different: whether `**`, `*` or `[text](url)` means what it should depends on the characters next to it (the flanking rules of emphasis, where a bare URL ends, a `!` in front of a `[`). The built-in emphasis, link and image tags therefore return tokens, and so do the tags that write an inline HTML tag (superscript, subscript, color, size), and the renderer's serializer writes them with the neighbors in view. A custom tag can do the same:
+A tag that writes a block, a BBCode wrapper or a placeholder returns a String, as above. Inline formatting is different: whether `**`, `*` or `[text](url)` means what it should depends on the characters next to it (the flanking rules of emphasis, where a bare URL ends, a `!` in front of a `[`). The built-in emphasis, link and image tags therefore return tokens, and so do the tags that write an inline HTML tag (superscript, subscript), and the renderer's serializer writes them with the neighbors in view. A custom tag can do the same:
 
 ```ruby
 require "markbridge"
@@ -162,7 +162,7 @@ end
 
 Inside a CommonMark HTML block (`interface.html_mode?`) the serializer writes the HTML form of every token (`<strong>`, `<a href>`, `<img>`, `<br>`, …), so a tag that returns tokens needs no html_mode branch of its own. A tag that returns a String still does (see below).
 
-Inline markup can't span a blank line: the blank line ends the paragraph, and the markers stay visible as text. A tag that writes its own markers into a String can close them before every blank line and open them again after it with `Markbridge::Renderers::Discourse::Paragraphs.map(content) { |paragraph| "[x]#{paragraph}[/x]" }`. Content with a code fence is yielded as a whole.
+Inline markup can't span a blank line: the blank line ends the paragraph, and the markers stay visible as text. A tag that writes its own markers into a String can close them before every blank line and open them again after it with `Markbridge::Renderers::Discourse::Paragraphs.wrap(content, "[x]", "[/x]")`, which keeps whitespace at the edges of every paragraph outside the markers. `Paragraphs.map(content) { |paragraph| … }` yields the paragraphs for anything else. Content with a code fence is one paragraph.
 
 A Tag must return a String — returning `nil` (or anything else) raises a `TypeError`. To handle only some nodes, defer the rest with `render_default(node)` instead of falling through to `nil`.
 
