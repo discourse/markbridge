@@ -107,7 +107,7 @@ RSpec.describe "phpBB3 XML to Markdown" do
 
       result = Markbridge.text_formatter_xml_to_markdown(xml)
 
-      expect(result.markdown).to eq("[spoiler=Reveal]hidden content[/spoiler]")
+      expect(result.markdown).to eq("Reveal: [spoiler]hidden content[/spoiler]")
     end
 
     it "converts color tags into their text" do

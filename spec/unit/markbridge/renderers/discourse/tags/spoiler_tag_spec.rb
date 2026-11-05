@@ -24,11 +24,25 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
       expect(tag.render(element, interface)).to eq("")
     end
 
-    it "uses [spoiler=title] form when a title is set" do
+    it "writes the title as text in front of the spoiler" do
       element = Markbridge::AST::Spoiler.new(title: "Click me")
       element << Markbridge::AST::Text.new("hidden")
 
-      expect(tag.render(element, interface)).to eq("[spoiler=Click me]hidden[/spoiler]")
+      expect(tag.render(element, interface)).to eq("Click me: [spoiler]hidden[/spoiler]")
+    end
+
+    it "escapes the title like any text" do
+      element = Markbridge::AST::Spoiler.new(title: " *Season 3* ")
+      element << Markbridge::AST::Text.new("hidden")
+
+      expect(tag.render(element, interface)).to eq("\\*Season 3\\*: [spoiler]hidden[/spoiler]")
+    end
+
+    it "ignores a title that is only whitespace" do
+      element = Markbridge::AST::Spoiler.new(title: " \n")
+      element << Markbridge::AST::Text.new("hidden")
+
+      expect(tag.render(element, interface)).to eq("[spoiler]hidden[/spoiler]")
     end
 
     let(:element_class) { Markbridge::AST::Spoiler }
@@ -44,11 +58,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
         expect(tag.render(element, interface)).to eq(%(<span class="spoiler">hidden</span>))
       end
 
-      it "has no place for the title" do
-        element = Markbridge::AST::Spoiler.new(title: "Reveal")
+      it "writes the title as escaped text in front of the span" do
+        element = Markbridge::AST::Spoiler.new(title: "A & B")
         element << Markbridge::AST::Text.new("hidden")
 
-        expect(tag.render(element, interface)).to eq(%(<span class="spoiler">hidden</span>))
+        expect(tag.render(element, interface)).to eq(
+          %(A &amp; B: <span class="spoiler">hidden</span>),
+        )
       end
 
       it "writes no span around nothing visible" do
