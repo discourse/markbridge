@@ -126,19 +126,19 @@ RSpec.describe "phpBB3 XML to Markdown" do
       expect(result.markdown).to eq("big text")
     end
 
-    it "converts color and size tags into BBCode with styling_bbcode: true" do
+    it "converts color and size tags into BBCode with the bbcode feature" do
       xml =
         '<r><COLOR color="#FF0000">red</COLOR> <SIZE size="85"><s>[size=85]</s>small<e>[/size]</e></SIZE></r>'
-      renderer = Markbridge.discourse_renderer(styling_bbcode: true)
+      renderer = Markbridge.discourse_renderer(features: { bbcode: true })
 
       result = Markbridge.text_formatter_xml_to_markdown(xml, renderer:)
 
       expect(result.markdown).to eq("[color=#FF0000]red[/color] [size=85]small[/size]")
     end
 
-    it "closes and reopens color around a blank line with styling_bbcode: true" do
+    it "closes and reopens color around a blank line with the bbcode feature" do
       xml = "<r><COLOR color=\"red\">a<br/>\n<br/>\nb</COLOR></r>"
-      renderer = Markbridge.discourse_renderer(styling_bbcode: true)
+      renderer = Markbridge.discourse_renderer(features: { bbcode: true })
 
       result = Markbridge.text_formatter_xml_to_markdown(xml, renderer:)
 

@@ -95,4 +95,28 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
       expect(tag.render(element, html_interface)).to eq("\n\n[poll]\n* A\n* B\n[/poll]\n\n")
     end
   end
+
+  context "with bbcode: false" do
+    let(:tag) { described_class.new(bbcode: false) }
+
+    it "writes the options as a bullet list" do
+      element = Markbridge::AST::Poll.new(name: "fav", options: %w[A *B*])
+
+      expect(tag.render(element, interface)).to eq("\n\n- A\n- \\*B\\*\n\n\n")
+    end
+
+    it "writes a bullet list in html_mode" do
+      element = Markbridge::AST::Poll.new(options: %w[A B])
+
+      expect(tag.render(element, interface_for(html_mode: true))).to eq(
+        "<ul><li>A</li><li>B</li></ul>",
+      )
+    end
+
+    it "renders a poll without options to nothing, also with raw BBCode" do
+      element = Markbridge::AST::Poll.new(raw: "[poll]ORIGINAL[/poll]")
+
+      expect(tag.render(element, interface)).to eq("")
+    end
+  end
 end

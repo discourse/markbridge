@@ -4,13 +4,14 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Placeholder tag for rendering polls.
+        # Renders {AST::Poll} as the +[poll]+ BBCode of the poll plugin: the
+        # raw BBCode of the source when the parser kept it, otherwise the
+        # BBCode built from the attributes and the options.
         #
-        # This is a STUB implementation that outputs the original raw BBCode.
-        # Applications using Markbridge should provide their own custom tag
-        # to render polls as placeholders or convert them to another format.
+        # With +bbcode: false+, for a site without the plugin, the options
+        # are written as a bullet list. The raw BBCode is of no use there.
         #
-        # @example Custom renderer with placeholder
+        # @example A placeholder for the importer
         #   class MyPollTag < Markbridge::Renderers::Discourse::Tags::PollTag
         #     def render(element, interface)
         #       id = register_poll(element)
@@ -18,12 +19,27 @@ module Markbridge
         #     end
         #   end
         class PollTag < Tag
-          def render(element, _interface)
+          # @param bbcode [Boolean] write the BBCode of the plugin
+          def initialize(bbcode: true)
+            @bbcode = bbcode
+          end
+
+          def render(element, interface)
+            return without_plugin(element, interface) unless @bbcode
+
             body = element.raw || build_poll_bbcode(element)
             "\n\n#{body}\n\n"
           end
 
           private
+
+          # A list without items renders to nothing, so a poll without
+          # options does too.
+          def without_plugin(element, interface)
+            list = AST::List.new
+            element.options.each { |option| list << (AST::ListItem.new << AST::Text.new(option)) }
+            interface.render_node(list)
+          end
 
           def build_poll_bbcode(element)
             attrs = build_attributes(element)

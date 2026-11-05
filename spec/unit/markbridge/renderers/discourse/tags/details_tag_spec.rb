@@ -99,6 +99,55 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
     end
   end
 
+  context "with bbcode: false" do
+    let(:tag) { described_class.new(bbcode: false) }
+
+    it "writes the title as a paragraph in bold in front of the content" do
+      element = Markbridge::AST::Details.new(title: "Show more")
+      element << Markbridge::AST::Text.new("hidden body")
+
+      expect(tag.render(element, interface)).to eq("\n\n**Show more**\n\nhidden body\n\n")
+    end
+
+    it "escapes the title like any text" do
+      element = Markbridge::AST::Details.new(title: " *x* ")
+      element << Markbridge::AST::Text.new("body")
+
+      expect(tag.render(element, interface)).to eq("\n\n**\\*x\\***\n\nbody\n\n")
+    end
+
+    it "writes only the content without a title" do
+      element = Markbridge::AST::Details.new(title: " ")
+      element << Markbridge::AST::Text.new("body")
+
+      expect(tag.render(element, interface)).to eq("\n\nbody\n\n")
+    end
+
+    it "renders an element with no content to nothing" do
+      element = Markbridge::AST::Details.new(title: "Empty")
+
+      expect(tag.render(element, interface)).to eq("")
+    end
+
+    context "in html_mode" do
+      let(:context) { html_context }
+
+      it "writes the title as a paragraph in bold, HTML-escaped and without edge whitespace" do
+        element = Markbridge::AST::Details.new(title: " A & B ")
+        element << Markbridge::AST::Text.new("body")
+
+        expect(tag.render(element, interface)).to eq("<p><strong>A &amp; B</strong></p>body")
+      end
+
+      it "writes only the content without a title" do
+        element = Markbridge::AST::Details.new
+        element << Markbridge::AST::Text.new("body")
+
+        expect(tag.render(element, interface)).to eq("body")
+      end
+    end
+  end
+
   describe "auto-registration" do
     it "is registered against AST::Details in the default TagLibrary" do
       library = Markbridge::Renderers::Discourse::TagLibrary.default
