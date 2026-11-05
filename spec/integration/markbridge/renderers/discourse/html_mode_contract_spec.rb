@@ -25,7 +25,14 @@ RSpec.describe "html_mode rendering contract" do
   # The tags of the plugin features write one form with the plugin and
   # another without it, so every tag runs in both libraries.
   LIBRARIES = {
-    "with the default features" => -> { Markbridge::Renderers::Discourse::TagLibrary.default },
+    "with every plugin" => -> do
+      Markbridge.discourse_renderer(
+        features: {
+          bbcode: true,
+        },
+        sizes: ->(size) { size },
+      ).tag_library
+    end,
     "with every feature off" => -> do
       Markbridge.discourse_renderer(
         features: {

@@ -912,8 +912,26 @@ RSpec.describe Markbridge do
       expect(result.markdown).to eq("hello#{zwsp}")
     end
 
-    it "renders color and size as their text by default" do
+    it "raises for a color or size until the bbcode feature is decided" do
       renderer = described_class.discourse_renderer
+
+      expect { described_class.bbcode_to_markdown("[size=85]b[/size]", renderer:) }.to raise_error(
+        Markbridge::UndecidedFeatureError,
+      )
+      expect { described_class.bbcode_to_markdown("[color=red]a[/color]") }.to raise_error(
+        Markbridge::UndecidedFeatureError,
+      )
+    end
+
+    it "collects the undecided feature in errors with raise_on_error: false" do
+      result = described_class.bbcode_to_markdown("[size=85]b[/size]", raise_on_error: false)
+
+      expect(result.markdown).to eq("")
+      expect(result.errors.map(&:class)).to eq([Markbridge::UndecidedFeatureError])
+    end
+
+    it "renders color and size as their text with bbcode: false" do
+      renderer = described_class.discourse_renderer(features: { bbcode: false })
 
       result =
         described_class.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:)
@@ -921,13 +939,53 @@ RSpec.describe Markbridge do
       expect(result.markdown).to eq("a b")
     end
 
-    it "renders color and size as BBCode with the bbcode feature" do
-      renderer = described_class.discourse_renderer(features: { bbcode: true })
+    it "renders color and size as BBCode with bbcode: true and the sizes mapped" do
+      renderer =
+        described_class.discourse_renderer(features: { bbcode: true }, sizes: { "4" => 113 })
 
       result =
-        described_class.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:)
+        described_class.bbcode_to_markdown("[color=red]a[/color] [size=4]b[/size]", renderer:)
 
-      expect(result.markdown).to eq("[color=red]a[/color] [size=85]b[/size]")
+      expect(result.markdown).to eq("[color=red]a[/color] [size=113]b[/size]")
+    end
+
+    it "maps colors through colors:" do
+      renderer =
+        described_class.discourse_renderer(
+          features: {
+            bbcode: true,
+          },
+          sizes: {
+          },
+          colors: ->(value) { value.delete("-") },
+        )
+
+      result = described_class.bbcode_to_markdown("[color=dark-red]a[/color]", renderer:)
+
+      expect(result.markdown).to eq("[color=darkred]a[/color]")
+    end
+
+    it "raises for bbcode: true without sizes:" do
+      expect { described_class.discourse_renderer(features: { bbcode: true }) }.to raise_error(
+        ArgumentError,
+        /bbcode: true } needs sizes:/,
+      )
+    end
+
+    it "raises for a mapping without bbcode: true" do
+      expect { described_class.discourse_renderer(sizes: {}) }.to raise_error(
+        ArgumentError,
+        "sizes: needs features: { bbcode: true }",
+      )
+      expect {
+        described_class.discourse_renderer(features: { bbcode: false }, colors: {})
+      }.to raise_error(ArgumentError, "colors: needs features: { bbcode: true }")
+    end
+
+    it "raises for a mapping that is neither a Hash nor callable" do
+      expect {
+        described_class.discourse_renderer(features: { bbcode: true }, sizes: 100)
+      }.to raise_error(ArgumentError, "sizes: must be a Hash or respond to call")
     end
 
     it "lets tags: win over features:" do
@@ -936,8 +994,10 @@ RSpec.describe Markbridge do
           features: {
             bbcode: true,
           },
+          sizes: ->(value) { value },
           tags: {
-            Markbridge::AST::Color => Markbridge::Renderers::Discourse::Tags::ColorTag.new,
+            Markbridge::AST::Color =>
+              Markbridge::Renderers::Discourse::Tags::ColorTag.new(bbcode: false),
           },
         )
 

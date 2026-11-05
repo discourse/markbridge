@@ -64,4 +64,4 @@ Reach for `parse_*` when you want to inspect or transform the tree before render
 
 - **`unknown_tags`** — tags the parser didn't recognize, with a count each. The parser never raises on them; what you do with the list is your call.
 - **`diagnostics`** — parser-specific notes (auto-closed tags, depth limits hit, unclosed raw tags, and so on). Also carries `:normalization` — the nesting fixes the [normalizer](/concepts/normalization/) applied on the way to render, absent when nothing changed.
-- **`errors`** — render-time errors collected instead of raised, when you pass `raise_on_error: false`. Empty otherwise.
+- **`errors`** — render-time errors collected instead of raised, when you pass `raise_on_error: false`. Empty otherwise. One to expect in a migration is `Markbridge::UndecidedFeatureError`: a post has a color or size and the renderer was not told whether the site has the discourse-bbcode plugin (see [`features:`](/customization/customizing-renderer/#features--the-plugins-of-the-target-site)).

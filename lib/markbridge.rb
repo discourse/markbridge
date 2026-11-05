@@ -9,6 +9,9 @@ require_relative "markbridge/normalizer"
 require_relative "markbridge/renderers/discourse"
 
 module Markbridge
+  # The tags of the plugins bundled with Discourse, by feature. The
+  # discourse-bbcode plugin (:bbcode) has its own registration, its tags
+  # take the mappings.
   FEATURE_TAGS = {
     details: {
       AST::Details => Renderers::Discourse::Tags::DetailsTag,
@@ -22,12 +25,9 @@ module Markbridge
     post_event: {
       AST::Event => Renderers::Discourse::Tags::EventTag,
     },
-    bbcode: {
-      AST::Color => Renderers::Discourse::Tags::ColorTag,
-      AST::Size => Renderers::Discourse::Tags::SizeTag,
-    },
   }.freeze
-  private_constant :FEATURE_TAGS
+  FEATURES = (FEATURE_TAGS.keys + [:bbcode]).freeze
+  private_constant :FEATURE_TAGS, :FEATURES
 
   class << self
     # Parse BBCode to AST.
@@ -319,15 +319,30 @@ module Markbridge
     #   characters from the end of each line.
     # @param features [Hash{Symbol => Boolean}, nil] the plugins of the
     #   target site. +:details+, +:spoiler+, +:poll+ and +:post_event+ are
-    #   bundled with Discourse and on by default; +:bbcode+ is the
-    #   discourse-bbcode plugin, which needs an install, and off by
-    #   default. With a feature off, the tag writes a plain form instead
-    #   of the plugin's BBCode: the title in bold and the content for a
-    #   details block, the content for a spoiler, the options as a list
-    #   for a poll, a paragraph with the name and the dates for an event,
-    #   the text for colors and sizes. Mappings in +tags:+ still win.
+    #   bundled with Discourse and on by default. With one of them off,
+    #   the tag writes a plain form instead of the plugin's BBCode: the
+    #   title in bold and the content for a details block, the content
+    #   for a spoiler, the options as a list for a poll, a paragraph with
+    #   the name and the dates for an event. +:bbcode+ is the
+    #   discourse-bbcode plugin, which needs an install, and starts
+    #   undecided: a color or size in a post raises
+    #   {UndecidedFeatureError} until it is +false+ (the text only) or
+    #   +true+ (the BBCode, with +sizes:+). Mappings in +tags:+ still win.
+    # @param sizes [Hash, #call, nil] with +bbcode: true+, the mapping
+    #   from the size values of the source forum to the percent value
+    #   the plugin reads: a whole number from 1 to 999, or nil to drop a
+    #   size. A Hash is read with +fetch+, so an unknown value raises
+    #   KeyError. Required with +bbcode: true+, because every forum has
+    #   its own scale.
+    # @param colors [Hash, #call, nil] with +bbcode: true+, a mapping from
+    #   the color values of the source forum to +#rgb+, +#rrggbb+ or a
+    #   name, or nil to drop a color. Without it the values are written
+    #   as they are, and a value the plugin does not accept raises
+    #   ArgumentError.
     # @return [Renderers::Discourse::Renderer]
-    # @raise [ArgumentError] for a feature that does not exist
+    # @raise [ArgumentError] for a feature that does not exist, for
+    #   +bbcode: true+ without +sizes:+, and for a mapping without
+    #   +bbcode: true+
     def discourse_renderer(
       tags: nil,
       tag_library: nil,
@@ -338,7 +353,9 @@ module Markbridge
       allow: nil,
       postprocessor: nil,
       strip_trailing_invisibles: false,
-      features: nil
+      features: nil,
+      sizes: nil,
+      colors: nil
     )
       # Dup the caller's library before mutating so successive
       # +discourse_renderer+ calls against the same +tag_library:+ don't
@@ -346,7 +363,7 @@ module Markbridge
       # a fresh instance, so the dup is only needed in the explicit
       # +tag_library:+ branch.
       library = tag_library ? tag_library.dup : Renderers::Discourse::TagLibrary.default
-      register_features(library, features) if features
+      register_features(library, features || {}, sizes:, colors:)
       library.merge!(tags) if tags
       Array(unregister).each { |klass| library.unregister(klass) }
 
@@ -358,22 +375,44 @@ module Markbridge
 
     private
 
-    # The tags a feature decides over. Only the features named are
-    # registered, so the other tags of the library stay as they are.
-    def register_features(library, features)
+    # Registers the tags of the features named, so the other tags of the
+    # library stay as they are.
+    def register_features(library, features, sizes:, colors:)
       features.each do |feature, enabled|
-        tags =
-          FEATURE_TAGS.fetch(feature) do
-            raise ArgumentError,
-                  "unknown feature #{feature.inspect}, the features are " \
-                    "#{FEATURE_TAGS.keys.join(", ")}"
-          end
+        unless FEATURES.include?(feature)
+          raise ArgumentError,
+                "unknown feature #{feature.inspect}, the features are #{FEATURES.join(", ")}"
+        end
         unless [true, false].include?(enabled)
           raise ArgumentError, "feature #{feature} must be true or false, got #{enabled.inspect}"
         end
+        next if feature == :bbcode
 
-        tags.each { |klass, tag_class| library.register(klass, tag_class.new(bbcode: enabled)) }
+        FEATURE_TAGS[feature].each do |klass, tag_class|
+          library.register(klass, tag_class.new(bbcode: enabled))
+        end
       end
+
+      register_bbcode_feature(library, features[:bbcode], sizes:, colors:)
+    end
+
+    def register_bbcode_feature(library, bbcode, sizes:, colors:)
+      if bbcode == true && sizes.nil?
+        raise ArgumentError,
+              "features: { bbcode: true } needs sizes:, the mapping from the size values of " \
+                "the source forum to percent"
+      end
+      { sizes:, colors: }.each do |name, mapping|
+        next if mapping.nil?
+        unless mapping.respond_to?(:call) || mapping.respond_to?(:fetch)
+          raise ArgumentError, "#{name}: must be a Hash or respond to call"
+        end
+        raise ArgumentError, "#{name}: needs features: { bbcode: true }" unless bbcode == true
+      end
+      return if bbcode.nil?
+
+      library.register(AST::Color, Renderers::Discourse::Tags::ColorTag.new(bbcode:, colors:))
+      library.register(AST::Size, Renderers::Discourse::Tags::SizeTag.new(bbcode:, sizes:))
     end
 
     def bbcode_diagnostics(parser)

@@ -329,16 +329,17 @@ RSpec.describe "BBCode to Markdown Conversion" do
   end
 
   describe "color and size wrapping structural elements" do
-    it "converts color around bold" do
+    it "converts color around bold into the text without the bbcode plugin" do
       bbcode = "[color=#FFBF00][b]Wolverine (X-Force)[/b][/color]"
+      renderer = Markbridge.discourse_renderer(features: { bbcode: false })
 
-      result = Markbridge.bbcode_to_markdown(bbcode)
+      result = Markbridge.bbcode_to_markdown(bbcode, renderer:)
       expect(result.markdown).to eq("**Wolverine (X-Force)**")
     end
 
     it "converts color with bold inside into BBCode with the bbcode feature" do
       bbcode = "[color=#FFBF00][b]Wolverine (X-Force)[/b][/color]"
-      renderer = Markbridge.discourse_renderer(features: { bbcode: true })
+      renderer = Markbridge.discourse_renderer(features: { bbcode: true }, sizes: {})
 
       result = Markbridge.bbcode_to_markdown(bbcode, renderer:)
       expect(result.markdown).to eq("[color=#FFBF00]**Wolverine (X-Force)**[/color]")
@@ -351,8 +352,9 @@ RSpec.describe "BBCode to Markdown Conversion" do
         [list]Level 2: Deals 266 damage.
         Level 3: Deals 331 damage.[/list][/color][/list]
       BBCODE
+      renderer = Markbridge.discourse_renderer(features: { bbcode: false })
 
-      result = Markbridge.bbcode_to_markdown(bbcode)
+      result = Markbridge.bbcode_to_markdown(bbcode, renderer:)
       expect(result.markdown).not_to include("[/color]")
       expect(result.markdown).not_to include("[/list]")
       expect(result.markdown).to include("**Godlike Power - Green 14**")
