@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "adjacency_generator"
-
 # The round-trip cases that fail today. A case on one of these lists is
 # expected to fail; the specs fail when a listed case starts to pass, so a
 # fix removes its entry in the same commit. The lists are empty right now.

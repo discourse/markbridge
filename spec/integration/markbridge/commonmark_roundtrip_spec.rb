@@ -92,9 +92,6 @@ module CommonMarkRoundTrip
     ul
   ].to_set.freeze
 
-  CURLY_QUOTES = "\u201C\u201D\u2018\u2019"
-  STRAIGHT_QUOTES = "\"\"''"
-
   # Reasons, so that the id lists below stay readable.
   EMPTY_ELEMENT = "an element without content renders to nothing"
   LINK_WITHOUT_TEXT =
@@ -201,7 +198,11 @@ module CommonMarkRoundTrip
       next unless node.text?
       next if node.ancestors.any? { |ancestor| ancestor.name == "pre" }
 
-      text = node.text.gsub(/\s+/, " ").tr(CURLY_QUOTES, STRAIGHT_QUOTES)
+      text =
+        node
+          .text
+          .gsub(/\s+/, " ")
+          .tr(MarkdownItCooker::CURLY_QUOTES, MarkdownItCooker::STRAIGHT_QUOTES)
       text = text.lstrip if block_boundary?(node.previous_sibling, node.parent)
       text = text.rstrip if block_boundary?(node.next_sibling, node.parent)
       text.empty? ? node.remove : node.content = text
