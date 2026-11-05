@@ -51,8 +51,7 @@ module Markbridge
         # @param element [AST::Node]
         # @param interface [RenderingInterface]
         # @return [AST::List, nil]
-        def leading_list(element, interface) # rubocop:disable Lint/UnusedMethodArgument
-          nil
+        def leading_list(_element, _interface)
         end
 
         # The list the output of this tag ends with, when it ends with
@@ -63,8 +62,7 @@ module Markbridge
         # @param element [AST::Node]
         # @param interface [RenderingInterface]
         # @return [AST::List, nil]
-        def trailing_list(element, interface) # rubocop:disable Lint/UnusedMethodArgument
-          nil
+        def trailing_list(_element, _interface)
         end
 
         # A tag that renders only the element's children, with the element

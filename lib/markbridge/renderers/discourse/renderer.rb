@@ -247,8 +247,10 @@ module Markbridge
         def choose_list_marker(node, ordered:)
           root_call = enter
           markers = ordered ? ORDERED_MARKERS : BULLET_MARKERS
+          # The marker of this kind that the list in front did not use;
+          # the first one when none is in front.
           before = @list_markers[previous_list(node)]
-          @list_markers[node] = markers.find { |marker| marker != before }
+          @list_markers[node] = (markers - [before]).first
         ensure
           reset_caches if root_call
         end
@@ -289,7 +291,7 @@ module Markbridge
             return tag.leading_list(node, interface_for(context)) if tag
           end
           first = node.is_a?(AST::Element) && node.children.find { |child| !whitespace?(child) }
-          first ? leading_list(first, context) : nil
+          leading_list(first, context) if first
         ensure
           reset_caches if root_call
         end
@@ -308,7 +310,7 @@ module Markbridge
           last =
             node.is_a?(AST::Element) &&
               node.children.reverse_each.find { |child| !whitespace?(child) }
-          last ? trailing_list(last, context) : nil
+          trailing_list(last, context) if last
         ensure
           reset_caches if root_call
         end
@@ -344,12 +346,13 @@ module Markbridge
 
         # The list in front of +node+ that the first list inside +node+
         # continues: the output of +node+ starts with that inner list
-        # (Tag#leading_list), so the inner list's tag has to put the
-        # separator in front. nil when +node+ writes something of its own
-        # first, or when no list came before it.
-        # @param outer_list [AST::List, nil] the last list in front of
+        # (Tag#leading_list), so the inner list gets the other marker.
+        # nil when +node+ writes something of its own first, or when no
+        # list came before it; the question is asked only then, it costs
+        # a tag lookup on every element.
+        # @param outer_list [AST::Node, nil] the last list in front of
         #   +node+, among the children of its parent
-        # @return [AST::List, nil]
+        # @return [AST::Node, nil]
         def continued_list(node, context, outer_list)
           outer_list if outer_list && leading_list(node, context)
         end
@@ -361,8 +364,8 @@ module Markbridge
 
         # Text with nothing but whitespace writes nothing that keeps two
         # lists apart, see #render_child.
-        def whitespace?(node)
-          node.instance_of?(AST::Text) && node.text.strip.empty?
+        def whitespace?(child)
+          child.instance_of?(AST::Text) && child.text.strip.empty?
         end
 
         # Ancestry fallback for tag dispatch (see TagLibrary#resolve),

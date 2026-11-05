@@ -21,10 +21,8 @@ module Markbridge
             # and the blank line between them would make it loose. A
             # different marker starts a new list, so the renderer picks
             # the one the list in front did not use, and the items write
-            # it (ListItemTag).
-            unless interface.html_mode?
-              interface.choose_list_marker(element, ordered: element.ordered?)
-            end
+            # it (ListItemTag). In html_mode nothing reads it.
+            interface.choose_list_marker(element, ordered: element.ordered?)
 
             content =
               element

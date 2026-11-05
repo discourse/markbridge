@@ -59,10 +59,9 @@ module Markbridge
             end
 
             marker = interface.choose_list_marker(element, ordered: false)
-            context = interface.with_parent(element)
             lines =
               element.options.map do |option|
-                "#{marker}#{interface.render_node(AST::Text.new(option), context:)}"
+                "#{marker}#{interface.render_node(AST::Text.new(option))}"
               end
             "\n\n#{lines.join("\n")}\n\n"
           end
