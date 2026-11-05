@@ -34,14 +34,36 @@ module Markbridge
             "\n\n#{body}\n\n"
           end
 
+          # The plain form is a bullet list, so a bullet list next to the
+          # poll would continue it (see Tag#leading_list). The poll stands
+          # for the list, the marker is chosen for it.
+          def leading_list(element, _interface)
+            element unless @bbcode
+          end
+
+          def trailing_list(element, _interface)
+            element unless @bbcode
+          end
+
           private
 
-          # A list without items renders to nothing, so a poll without
-          # options does too.
+          # The options as the items of a bullet list, one line each; a
+          # poll without options renders to nothing, like an empty list.
+          # The poll writes the lines itself, with the marker the renderer
+          # picks for it against the list in front.
           def without_plugin(element, interface)
-            list = AST::List.new
-            element.options.each { |option| list << (AST::ListItem.new << AST::Text.new(option)) }
-            interface.render_node(list)
+            return "" if element.options.empty?
+            if interface.html_mode?
+              items = element.options.map { |option| "<li>#{HtmlEscaper.escape(option)}</li>" }
+              return "<ul>#{items.join}</ul>"
+            end
+
+            marker = interface.choose_list_marker(element, ordered: false)
+            lines =
+              element.options.map do |option|
+                "#{marker}#{interface.render_node(AST::Text.new(option))}"
+              end
+            "\n\n#{lines.join("\n")}\n\n"
           end
 
           def build_poll_bbcode(element)

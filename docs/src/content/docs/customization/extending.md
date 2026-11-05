@@ -123,7 +123,9 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 | `has_parent?(klass)` | Boolean parent check |
 | `count_parents(klass)` | Depth of a specific ancestor type (useful for nested lists) |
 | `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset:)` | The neighbors of an element among the children of its parent (nil at the edges) |
-| `previous_list(element)` | The last list in front of the element with nothing visible between them (nil when there is none) |
+| `previous_list(element)` | The last list in front of the element, or the node whose output ends with one, with nothing visible between them (nil when there is none) |
+| `choose_list_marker(node, ordered:)`, `list_marker(node)` | The marker for the items of a list, or of a node that writes a list of its own: the one the list in front did not use, `- ` or `* `, `1. ` or `1) `. `list_marker` returns the marker chosen for a node in this render call, `ListItemTag` and `HorizontalRuleTag` read it |
+| `leading_list(node, children: false)`, `trailing_list(node, children: false)` | The list the output of `node` starts or ends with, as its tag says through `Tag#leading_list` and `Tag#trailing_list` (nil when it starts or ends with something else). With `children: true` the answer for the first or last child with something in it, for a tag whose output starts or ends with the children's, like the plain form of `DetailsTag` |
 | `block_context?(element)` | True if the current position is a block context |
 | `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML or wrap output as a Markdown island; the serializer takes care of it for tokens |
 

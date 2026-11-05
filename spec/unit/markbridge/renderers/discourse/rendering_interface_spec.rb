@@ -193,6 +193,46 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
+  describe "#choose_list_marker and #list_marker" do
+    it "ask the renderer" do
+      list = Markbridge::AST::List.new
+      allow(renderer).to receive(:choose_list_marker).with(list, ordered: true).and_return("1) ")
+      allow(renderer).to receive(:list_marker).with(list).and_return("* ")
+
+      expect(interface.choose_list_marker(list, ordered: true)).to eq("1) ")
+      expect(interface.list_marker(list)).to eq("* ")
+    end
+  end
+
+  describe "#leading_list and #trailing_list" do
+    let(:list) { Markbridge::AST::List.new }
+    let(:element) { Markbridge::AST::Details.new }
+
+    it "ask the renderer with the context" do
+      allow(renderer).to receive(:leading_list).with(element, context, children: false).and_return(
+        list,
+      )
+      allow(renderer).to receive(:trailing_list).with(element, context, children: false).and_return(
+        list,
+      )
+
+      expect(interface.leading_list(element)).to be(list)
+      expect(interface.trailing_list(element)).to be(list)
+    end
+
+    it "pass children: on" do
+      allow(renderer).to receive(:leading_list).with(element, context, children: true).and_return(
+        list,
+      )
+      allow(renderer).to receive(:trailing_list).with(element, context, children: true).and_return(
+        list,
+      )
+
+      expect(interface.leading_list(element, children: true)).to be(list)
+      expect(interface.trailing_list(element, children: true)).to be(list)
+    end
+  end
+
   describe "#previous_sibling and #next_sibling with a root element" do
     let(:first) { Markbridge::AST::Text.new("a") }
     let(:middle) { Markbridge::AST::Bold.new }

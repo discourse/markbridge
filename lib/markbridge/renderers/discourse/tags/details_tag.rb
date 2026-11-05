@@ -52,6 +52,22 @@ module Markbridge
             "\n\n#{opener}\n\n#{content}\n\n[/details]\n\n"
           end
 
+          # The plain form starts with the content when there is no title,
+          # and ends with the content in any case, so a list at that edge
+          # of the content is at the edge of the output (see
+          # Tag#leading_list). The BBCode form has its own lines there.
+          def leading_list(element, interface)
+            return nil if @bbcode || !element.title.to_s.strip.empty?
+
+            interface.leading_list(element, children: true)
+          end
+
+          def trailing_list(element, interface)
+            return nil if @bbcode
+
+            interface.trailing_list(element, children: true)
+          end
+
           private
 
           def render_html(title, content)

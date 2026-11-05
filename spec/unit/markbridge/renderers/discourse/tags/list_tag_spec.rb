@@ -97,23 +97,27 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         renderer.render(document)
       end
 
-      it "puts a comment between blank lines in front of the list" do
+      it "writes the other bullet, so the two do not cook as one list" do
         first = list_with_item(ordered: false, text: "a")
         second = list_with_item(ordered: false, text: "b")
 
-        expect(render_in_document(first, second)).to eq("\n\n- a\n\n\n\n\n<!---->\n\n\n\n- b\n\n\n")
+        expect(render_in_document(first, second)).to eq("\n\n- a\n\n\n\n\n* b\n\n\n")
       end
 
-      it "separates two ordered lists" do
+      it "writes the other delimiter after an ordered list" do
         first = list_with_item(ordered: true, text: "a")
         second = list_with_item(ordered: true, text: "b")
 
-        expect(render_in_document(first, second)).to eq(
-          "\n\n1. a\n\n\n\n\n<!---->\n\n\n\n1. b\n\n\n",
-        )
+        expect(render_in_document(first, second)).to eq("\n\n1. a\n\n\n\n\n1) b\n\n\n")
       end
 
-      it "separates two lists with nothing visible between them" do
+      it "goes back to the first marker for the third list" do
+        lists = %w[a b c].map { |text| list_with_item(ordered: false, text:) }
+
+        expect(render_in_document(*lists)).to include("- a", "* b", "- c")
+      end
+
+      it "changes the marker with nothing visible between the lists" do
         # A newline between two BBCode lists is a Text node of its own.
         between = {
           "whitespace" => Markbridge::AST::Text.new(" \n\t"),
@@ -126,39 +130,38 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
           first = list_with_item(ordered: false, text: "a")
           second = list_with_item(ordered: false, text: "b")
 
-          expect(render_in_document(first, node, second)).to include("<!---->"), label
+          expect(render_in_document(first, node, second)).to include("* b"), label
         end
       end
 
-      it "separates two nested lists with the comment on a line of its own, without blank lines" do
-        # Blank lines inside the item would make the outer list loose.
+      it "changes the marker of a nested list after a nested list" do
         item = Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
         item << list_with_item(ordered: false, text: "x") <<
           list_with_item(ordered: false, text: "y")
         outer = Markbridge::AST::List.new(ordered: false) << item
 
-        expect(render_in_document(outer)).to eq("\n\n- a\n  - x\n  <!---->\n  - y\n\n\n")
+        expect(render_in_document(outer)).to eq("\n\n- a\n  - x\n  * y\n\n\n")
       end
 
-      it "separates two lists inside an element that has no tag" do
+      it "changes the marker inside an element that has no tag" do
         # Such an element is not on the parent chain, the renderer still
         # knows it as the parent of the lists.
         wrapper = Class.new(Markbridge::AST::Element).new
         wrapper << list_with_item(ordered: false, text: "a")
         wrapper << list_with_item(ordered: false, text: "b")
 
-        expect(render_in_document(wrapper)).to include("<!---->")
+        expect(render_in_document(wrapper)).to include("* b")
       end
 
-      it "does not separate a list from an empty list in front of it" do
-        # The empty list renders to nothing, a comment would stand alone.
+      it "keeps the marker after an empty list in front of it" do
+        # The empty list renders to nothing.
         empty = Markbridge::AST::List.new(ordered: false)
         list = list_with_item(ordered: false, text: "b")
 
         expect(render_in_document(empty, list)).to eq("\n\n- b\n\n\n")
       end
 
-      it "does not separate two lists with something visible between them" do
+      it "keeps the marker with something visible between the lists" do
         # Emphasis renders to tokens, not to a String; what is visible in
         # them counts like text.
         between = {
@@ -171,7 +174,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
           first = list_with_item(ordered: false, text: "a")
           second = list_with_item(ordered: false, text: "b")
 
-          expect(render_in_document(first, node, second)).not_to include("<!---->"), label
+          expect(render_in_document(first, node, second)).to include("- b"), label
         end
       end
 
@@ -181,28 +184,28 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         middle = list_with_item(ordered: true, text: "b")
         last = list_with_item(ordered: false, text: "c")
 
-        expect(render_in_document(first, middle, last)).not_to include("<!---->")
+        expect(render_in_document(first, middle, last)).to include("- c")
       end
 
-      it "separates two lists whose classes are subclasses of List" do
+      it "changes the marker for subclasses of List" do
         list_class = Class.new(Markbridge::AST::List)
         first = list_class.new(ordered: false)
         first << (Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a"))
         second = list_class.new(ordered: false)
         second << (Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("b"))
 
-        expect(render_in_document(first, second)).to include("<!---->")
+        expect(render_in_document(first, second)).to include("* b")
       end
 
-      it "does not separate an ordered list from an unordered one" do
+      it "keeps the marker after a list of the other kind" do
         # A change of list kind starts a new list on its own.
         first = list_with_item(ordered: false, text: "a")
         second = list_with_item(ordered: true, text: "b")
 
-        expect(render_in_document(first, second)).not_to include("<!---->")
+        expect(render_in_document(first, second)).to include("1. b")
       end
 
-      it "does not separate a list from text in front of it" do
+      it "keeps the marker after text" do
         list = list_with_item(ordered: false, text: "a")
 
         expect(render_in_document(Markbridge::AST::Text.new("before"), list)).to eq(
@@ -210,7 +213,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         )
       end
 
-      it "does not separate a list whose parent is not known" do
+      it "keeps the marker for a list whose parent is not known" do
         list = list_with_item(ordered: false, text: "a")
 
         expect(tag.render(list, interface)).to eq("\n\n- a\n\n\n")
@@ -251,6 +254,15 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
 
         expect(tag.render(outer, interface)).to eq("<ul><li>a<ul><li>b</li></ul></li></ul>")
       end
+    end
+  end
+
+  describe "#leading_list and #trailing_list" do
+    it "are the list itself" do
+      element = Markbridge::AST::List.new
+
+      expect(tag.leading_list(element, interface)).to be(element)
+      expect(tag.trailing_list(element, interface)).to be(element)
     end
   end
 end

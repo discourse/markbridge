@@ -35,10 +35,7 @@ module Markbridge
             end
           return escaped unless escaped.match?(WHITESPACE)
 
-          escaped = escaped.gsub(ANGLE_BRACKETS) { |char| "\\#{char}" } if escaped.match?(
-            ANGLE_BRACKETS,
-          )
-          "<#{escaped}>"
+          "<#{escaped.gsub(ANGLE_BRACKETS) { |char| "\\#{char}" }}>"
         end
       end
     end
