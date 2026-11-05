@@ -362,7 +362,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
         table = build_uneven_table_with(spoiler)
 
         result = tag.render(table, interface)
-        expect(result).to include(%(<td><span class="spoiler">hidden</span></td>))
+        expect(result).to include(%(<td>Reveal: <span class="spoiler">hidden</span></td>))
       end
     end
   end
