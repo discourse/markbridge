@@ -595,9 +595,9 @@ class RoundTripChecker
       plain = in_link || html || !visible?(node)
       bbcode_text(node, out, in_link:, html:, open: "[u]", close: "[/u]", plain:)
     when AST::Spoiler
-      open = node.title ? "[spoiler=#{node.title}]" : "[spoiler]"
+      out << "#{node.title.strip}: " if node.title.to_s.match?(/[^[:space:]]/) && visible?(node)
       plain = html || !visible?(node)
-      bbcode_text(node, out, in_link:, html:, open:, close: "[/spoiler]", plain:)
+      bbcode_text(node, out, in_link:, html:, open: "[spoiler]", close: "[/spoiler]", plain:)
     when AST::Details
       if html
         summary_text(node.title || "Summary", node, out, in_link:) if visible?(node)
