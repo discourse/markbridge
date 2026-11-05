@@ -74,6 +74,7 @@ module AdjacencyGenerator
   ADDRESS = "alice@example.com"
   IMAGE_SRC = "https://example.com/image.png"
   UPLOAD = "image.png"
+  ATTACHMENT = "report.pdf"
 
   # A node kind with the character at the edge that faces its neighbor.
   # +edge+ is nil for the kinds whose content is fixed.
@@ -119,7 +120,7 @@ module AdjacencyGenerator
     email
     image
   ].freeze
-  FIXED_KINDS = %w[url relative mention upload break empty untagged].freeze
+  FIXED_KINDS = %w[url relative mention upload sized_upload attachment break empty untagged].freeze
 
   VARIANTS =
     EDGED_KINDS
@@ -172,6 +173,12 @@ module AdjacencyGenerator
       AST::Mention.new(name: "alice")
     when "upload"
       AST::Upload.new(sha1: "abc", filename: UPLOAD, type: :image, alt: "x")
+    when "sized_upload"
+      # The `|` in front of the dimensions ends a table cell unless it is
+      # escaped, the one of the attachment marker too.
+      AST::Upload.new(sha1: "abc", filename: UPLOAD, type: :image, alt: "x", dimensions: "64x64")
+    when "attachment"
+      AST::Upload.new(sha1: "abc", filename: ATTACHMENT, type: :attachment, size: "1 KB")
     when "break"
       AST::LineBreak.new
     when "empty"

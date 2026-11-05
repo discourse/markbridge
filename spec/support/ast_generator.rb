@@ -417,9 +417,27 @@ class AstGenerator
     when :mention
       spend { AST::Mention.new(name: WORDS.sample(random: @random)) }
     else
-      spend do
-        AST::Upload.new(sha1: "abc123", filename: "image.png", type: :image, alt: label_text)
-      end
+      spend { upload }
+    end
+  end
+
+  # An image upload, half of them with dimensions, or a file attachment,
+  # half of them with a size. The `|` in front of the dimensions and of
+  # the attachment marker is what ends a table cell when it is not
+  # escaped.
+  def upload
+    if @random.rand < 0.3
+      size = @random.rand < 0.5 ? "1.2 KB" : nil
+      AST::Upload.new(sha1: "abc123", filename: "#{label_text}.pdf", type: :attachment, size:)
+    else
+      dimensions = @random.rand < 0.5 ? "64x64" : nil
+      AST::Upload.new(
+        sha1: "abc123",
+        filename: "image.png",
+        type: :image,
+        alt: label_text,
+        dimensions:,
+      )
     end
   end
 
