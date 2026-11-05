@@ -24,6 +24,15 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
       expect(tag.render(element, interface)).to eq("")
     end
 
+    it "writes only the content inside a link, where Discourse cooks no BBCode" do
+      element = Markbridge::AST::Spoiler.new(title: "Reveal")
+      element << Markbridge::AST::Text.new("hidden")
+      link = Markbridge::AST::Url.new(href: "https://example.com")
+
+      expect(tag.render(element, interface_for(link))).to eq("Reveal: hidden")
+      expect(tag.render(element, interface_for(link, html_mode: true))).to eq("Reveal: hidden")
+    end
+
     it "writes the title as text in front of the spoiler" do
       element = Markbridge::AST::Spoiler.new(title: "Click me")
       element << Markbridge::AST::Text.new("hidden")
