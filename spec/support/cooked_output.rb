@@ -46,4 +46,10 @@ module CookedOutput
   def fragment(html)
     Nokogiri::HTML5.fragment(html)
   end
+
+  # @param xml [String] s9e/TextFormatter XML
+  # @return [String] the HTML that markdown-it cooks from our Markdown
+  def cook_text_formatter(xml)
+    cook_markdown(Markbridge.text_formatter_xml_to_markdown(xml).markdown)
+  end
 end

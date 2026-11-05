@@ -53,6 +53,9 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - A text that starts with a newline right after a hard line break gets `<br>` for that newline: `x\n<br>y`. The two newlines were a blank line, which ended the paragraph and made a list loose.
 - A mention right after anything but whitespace gets the `<!---->` boundary comment in front: `v<!---->@alice.i`. Without it, linkify read `v@alice.i` as an email address.
 - A line break written as `<br>` at the end of a block goes again: it protected the line against the newline of the next piece, and nothing follows.
+- The TextFormatter parser treats whitespace like phpBB shows it. The newline after `<br/>` and spaces at the start of a line are removed outside of `<CODE>`, so `a<br/>\nb` renders as `a\nb` instead of `a\n\nb`. Two `<br/>` in a row are an empty line in phpBB and become a blank line in the text (`a\n\nb`), not two `AST::LineBreak` nodes, so they stay a paragraph break. A space between two inline elements is kept: `<B>a</B> <I>b</I>` renders as `**a** *b*`.
+- The TextFormatter parser skips `<i>` (lowercase), the text s9e ignored. It rendered as italic before.
+- The TextFormatter `AttachmentHandler` and `ImageHandler` return `nil`, so the fallback text in their content is skipped. An `<ATTACHMENT>` with content raised `NoMethodError` before, and an `AST::Image` no longer gets the URL as a child.
 - `RenderingInterface` has `previous_sibling(element)`, `next_sibling(element)` and `sibling(element, offset:)`. For the element the renderer is rendering right now they look at the children of its parent, also when that parent has no tag of its own. For any other element they look at the children of the element on top of the parent chain, or of `RenderContext#root` when the chain is empty. `previous_list(element)` returns the last list in front of the element with nothing visible between them.
 
 ## Upgrading to 0.4.2

@@ -31,7 +31,9 @@ TextFormatter wraps content in one of two roots:
 - `<t>` — plain text (no BBCode was used).
 - `<r>` — rich text (contains formatted elements).
 
-Inside `<r>`, formatted children use **uppercase element names** by convention (`<B>`, `<URL>`, `<CODE>`). Each formatted element may wrap its original BBCode markup in `<s>` (start) and `<e>` (end) tags — Markbridge ignores these during parsing.
+Inside `<r>`, formatted children use **uppercase element names** by convention (`<B>`, `<URL>`, `<CODE>`). Each formatted element may wrap its original BBCode markup in `<s>` (start) and `<e>` (end) tags — Markbridge ignores these during parsing. It also ignores `<i>` (lowercase), which holds text that s9e did not use, like the newline after `[list]` or a `[/b]` without a matching `[b]`. `<I>` (uppercase) is italic.
+
+A line break is stored as `<br/>` followed by a newline in the next text node (`a<br/>\nb`). Forums render the XML as HTML, so that newline and any spaces at the start of a line are not visible. Markbridge removes them outside of `<CODE>`, so `a<br/>\nb` becomes `a\nb` and indented lines don't turn into code blocks. Two `<br/>` become a blank line. Text inside `<CODE>` stays as it is.
 
 ## Supported elements
 
@@ -76,6 +78,7 @@ renderer.render(ast)
 
 - **Invalid XML** falls back to treating the input as plain text instead of raising.
 - **Unknown elements** are skipped — their children are still processed.
+- **Leaf elements** like `<IMG>` and `<ATTACHMENT>` skip their content. It is only the fallback text (the URL or the filename).
 - **Stateless handler API**: like the HTML parser, handlers are callables receiving `(element:, parent:, processor:)`. The `processor:` argument is the parser instance and exposes `process_children(xml_element, ast_node)` for handlers that want to recurse manually. Lambdas are accepted.
 
 ## When to use this vs. the BBCode parser

@@ -12,7 +12,7 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::AttachmentHandler d
     it "populates Attachment fields from XML attributes" do
       xml = '<ATTACHMENT id="abc" index="2" filename="photo.jpg" alt="photo"/>'
 
-      result = handler.process(element: build_element(xml), parent:)
+      handler.process(element: build_element(xml), parent:)
 
       attachment = parent.children[0]
       expect(attachment).to be_a(Markbridge::AST::Attachment)
@@ -20,7 +20,12 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::AttachmentHandler d
       expect(attachment.index).to eq("2")
       expect(attachment.filename).to eq("photo.jpg")
       expect(attachment.alt).to eq("photo")
-      expect(result).to eq(attachment)
+    end
+
+    it "returns nil so that the fallback filename in the content is skipped" do
+      xml = '<ATTACHMENT index="0"><s>[attachment=0]</s>a.png<e>[/attachment]</e></ATTACHMENT>'
+
+      expect(handler.process(element: build_element(xml), parent:)).to be_nil
     end
 
     it "leaves all fields nil when no attributes are present" do

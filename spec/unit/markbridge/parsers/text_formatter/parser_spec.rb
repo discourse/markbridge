@@ -79,16 +79,224 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
       expect(parser.unknown_tags).to be_empty
     end
 
-    it "drops whitespace-only text nodes" do
-      doc = parser.parse("<r>   \n\t  </r>")
+    it "turns two <br> in a row into a blank line in the text before them" do
+      doc = parser.parse("<t>a<br/>\n<br/>\nb</t>")
 
-      expect(doc.children).to be_empty
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Text])
+      expect(doc.children[0].text).to eq("a\n\nb")
     end
 
-    it "keeps text nodes that contain any non-whitespace character" do
-      doc = parser.parse("<r>  a  </r>")
+    it "keeps the nodes before two <br> in a row" do
+      doc = parser.parse("<r>a <B>b</B> c<br/>\n<br/>\nd</r>")
 
-      expect(doc.children.map(&:text)).to eq(["  a  "])
+      expect(doc.children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::Bold, Markbridge::AST::Text],
+      )
+      expect(doc.children[2].text).to eq(" c\n\nd")
+    end
+
+    it "keeps a third <br> in a row as a LineBreak after the blank line" do
+      doc = parser.parse("<t>a<br/>\n<br/>\n<br/>\nb</t>")
+
+      expect(doc.children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::LineBreak, Markbridge::AST::Text],
+      )
+      expect(doc.children[0].text).to eq("a\n\n")
+    end
+
+    it "keeps two <br> with visible content between them as two LineBreaks" do
+      doc = parser.parse("<r>a<br/>\n<B>b</B><br/>\nc</r>")
+
+      expect(doc.children.map(&:class)).to eq(
+        [
+          Markbridge::AST::Text,
+          Markbridge::AST::LineBreak,
+          Markbridge::AST::Bold,
+          Markbridge::AST::LineBreak,
+          Markbridge::AST::Text,
+        ],
+      )
+    end
+
+    it "keeps a <br> at the end of the post" do
+      doc = parser.parse("<t>a<br/></t>")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Text, Markbridge::AST::LineBreak])
+    end
+
+    it "keeps a <br> at the end of a pre-parsed post" do
+      doc = parser.parse(Nokogiri.XML("<t>a<br/></t>"))
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Text, Markbridge::AST::LineBreak])
+    end
+
+    it "keeps a <br> at the end of an element inside that element" do
+      doc = parser.parse("<r><B>a<br/></B>b</r>")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Bold, Markbridge::AST::Text])
+      expect(doc.children[0].children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::LineBreak],
+      )
+    end
+
+    it "keeps a <br> in front of an element that follows it" do
+      doc = parser.parse("<r>a<br/><B>b</B></r>")
+
+      expect(doc.children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::LineBreak, Markbridge::AST::Bold],
+      )
+    end
+
+    it "keeps a <br> in front of a leaf that follows it" do
+      doc = parser.parse(%(<r>a<br/><IMG src="https://example.com/a.png"/></r>))
+
+      expect(doc.children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::LineBreak, Markbridge::AST::Image],
+      )
+    end
+
+    it "keeps two <br> in different elements as two LineBreaks" do
+      doc = parser.parse("<r><B>a<br/></B><br/>b</r>")
+
+      expect(doc.children.map(&:class)).to eq(
+        [Markbridge::AST::Bold, Markbridge::AST::LineBreak, Markbridge::AST::Text],
+      )
+      expect(doc.children[0].children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::LineBreak],
+      )
+    end
+
+    it "skips <i>, the text s9e ignored" do
+      doc = parser.parse("<r>x<i>[/b]</i> y</r>")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Text])
+      expect(doc.children[0].text).to eq("x y")
+      expect(parser.unknown_tags).to be_empty
+    end
+
+    it "still treats uppercase <I> as italic" do
+      doc = parser.parse("<r><I>a</I><i>b</i></r>")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Italic])
+      expect(doc.children[0].children[0].text).to eq("a")
+    end
+
+    context "with whitespace" do
+      def texts(element)
+        element.children.grep(Markbridge::AST::Text).map(&:text)
+      end
+
+      it "drops whitespace-only text nodes" do
+        doc = parser.parse("<r>   \n\t  </r>")
+
+        expect(doc.children).to be_empty
+      end
+
+      it "removes whitespace at the start of the post and keeps it at the end" do
+        doc = parser.parse("<r> \n a  </r>")
+
+        expect(texts(doc)).to eq(["a  "])
+      end
+
+      it "keeps a non-breaking space at the start of a line" do
+        doc = parser.parse("<r> a</r>")
+
+        expect(texts(doc)).to eq([" a"])
+      end
+
+      it "keeps whitespace in the middle of a line" do
+        doc = parser.parse("<r>x<B>b</B>  a  b</r>")
+
+        expect(texts(doc)).to eq(["x", "  a  b"])
+      end
+
+      it "keeps whitespace-only text between two inline elements" do
+        doc = parser.parse("<r><B>a</B> <I>b</I></r>")
+
+        expect(doc.children.map(&:class)).to eq(
+          [Markbridge::AST::Bold, Markbridge::AST::Text, Markbridge::AST::Italic],
+        )
+        expect(doc.children[1].text).to eq(" ")
+      end
+
+      it "drops whitespace-only text with a newline between two inline elements" do
+        doc = parser.parse("<r><B>a</B>\n<I>b</I></r>")
+
+        expect(doc.children.map(&:class)).to eq([Markbridge::AST::Bold, Markbridge::AST::Italic])
+      end
+
+      it "removes the newline and the indentation after a line break" do
+        doc = parser.parse("<t>a<br/>\n    b</t>")
+
+        expect(texts(doc)).to eq(%w[a b])
+      end
+
+      it "removes the indentation at the start of an inline element at the start of a line" do
+        doc = parser.parse("<r>a<br/>\n<B><s>[b]</s>    b<e>[/b]</e></B></r>")
+
+        expect(texts(doc.children[2])).to eq(["b"])
+      end
+
+      it "keeps the space after inline content at the start of a line" do
+        doc = parser.parse("<r>a<br/>\n<B>b</B> c</r>")
+
+        expect(texts(doc)).to eq(["a", " c"])
+      end
+
+      it "keeps the space after an attachment at the start of a line" do
+        doc = parser.parse(%(<r>a<br/>\n<ATTACHMENT index="0">a.png</ATTACHMENT> c</r>))
+
+        expect(texts(doc)).to eq(["a", " c"])
+      end
+
+      it "removes whitespace at the start of a block and after it" do
+        doc = parser.parse("<r>x<QUOTE>\n  a</QUOTE>\n  b</r>")
+
+        expect(texts(doc.children[1])).to eq(["a"])
+        expect(texts(doc)).to eq(%w[x b])
+      end
+
+      it "starts every parse at the start of a line" do
+        parser.parse("<r>a</r>")
+        doc = parser.parse("<r>  b</r>")
+
+        expect(texts(doc)).to eq(["b"])
+      end
+
+      it "keeps the text in <CODE> as it is" do
+        doc = parser.parse("<r>a<br/><CODE>\n  x\n    y</CODE></r>")
+
+        expect(texts(doc.children[2])).to eq(["\n  x\n    y"])
+      end
+
+      it "keeps text with a newline in the middle of a line" do
+        doc = parser.parse("<r>a<B>b</B>\nc</r>")
+
+        expect(texts(doc)).to eq(%W[a \nc])
+      end
+
+      it "keeps the text in a subclass of AST::Code as it is" do
+        code_class = Class.new(Markbridge::AST::Code)
+        handler =
+          Class.new do
+            define_method(:process) do |parent:, **|
+              node = code_class.new
+              parent << node
+              node
+            end
+          end
+        parser = described_class.new { |r| r.register("CODE", handler.new) }
+
+        doc = parser.parse("<r><CODE>\n  x</CODE></r>")
+
+        expect(texts(doc.children[0])).to eq(["\n  x"])
+      end
+
+      it "drops whitespace-only text in <CODE>" do
+        doc = parser.parse("<r><CODE><s>[code]</s>\n<e>[/code]</e></CODE></r>")
+
+        expect(doc.children[0].children).to be_empty
+      end
     end
 
     it "ignores comment nodes (neither element nor text)" do
