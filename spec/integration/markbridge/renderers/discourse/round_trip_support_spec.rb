@@ -59,7 +59,7 @@ RSpec.describe "the round-trip support" do
       expect(checks(document)).to eq([:shape])
     end
 
-    context "with the HTML markdown-it cooks" do
+    context "with the HTML markdown-it cooks", skip: MarkdownItCooker::SKIP_REASON do
       def cooked(document, html)
         allow(MarkdownItCooker).to receive(:cook).and_return(html)
         checks(document)
