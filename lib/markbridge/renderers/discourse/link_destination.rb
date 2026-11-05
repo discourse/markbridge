@@ -7,7 +7,8 @@ module Markbridge
       module LinkDestination
         SPECIAL = /[()\\]/
         WHITESPACE = /\s/
-        private_constant :SPECIAL, :WHITESPACE
+        ANGLE_BRACKETS = /[<>]/
+        private_constant :SPECIAL, :WHITESPACE, :ANGLE_BRACKETS
 
         # An unbalanced parenthesis ends a CommonMark destination early, so
         # every parenthesis gets a backslash; balanced ones would be fine,
@@ -15,7 +16,8 @@ module Markbridge
         # would escape the parenthesis after it, also the one that closes
         # the destination. A destination with whitespace is wrapped in
         # <>, relevant for relative targets like MediaWiki page names
-        # ("Main Page") or image files with a space in the name.
+        # ("Main Page") or image files with a space in the name; a `<` or
+        # `>` inside the brackets gets a backslash, or it ends them.
         #
         # The match? in front of the gsub saves the copy that gsub makes
         # also without a match: links are frequent, these characters are
@@ -31,7 +33,12 @@ module Markbridge
             else
               destination
             end
-          escaped.match?(WHITESPACE) ? "<#{escaped}>" : escaped
+          return escaped unless escaped.match?(WHITESPACE)
+
+          escaped = escaped.gsub(ANGLE_BRACKETS) { |char| "\\#{char}" } if escaped.match?(
+            ANGLE_BRACKETS,
+          )
+          "<#{escaped}>"
         end
       end
     end
