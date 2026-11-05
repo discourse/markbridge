@@ -688,7 +688,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       )
     end
 
-    it "writes the HTML tags of a delimiter, also around nothing visible" do
+    it "writes the newline in front of a blank line in text as an entity" do
+      # A blank line would end the HTML block.
+      expect(html(tokens.text("a\n\nb"))).to eq("a&#10;\nb")
+    end
+
+    it "writes the HTML tags of a delimiter, not around nothing visible" do
       expect(html(tokens.open(:strong), tokens.text("a"), tokens.close(:strong))).to eq(
         "<strong>a</strong>",
       )
@@ -697,7 +702,8 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       expect(html(tokens.open(:u), tokens.text("a"), tokens.close(:u))).to eq(
         %(<span class="bbcode-u">a</span>),
       )
-      expect(html(*em(tokens.text(" ")))).to eq("<em> </em>")
+      expect(html(*em(tokens.text(" ")))).to eq(" ")
+      expect(html(*em)).to eq("")
     end
 
     it "writes a code span as a code element" do

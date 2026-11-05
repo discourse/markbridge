@@ -89,6 +89,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
         expect(tag.render(element, interface)).to eq("<blockquote>Hi</blockquote>")
       end
 
+      it "renders nothing for an empty quote" do
+        expect(tag.render(Markbridge::AST::Quote.new, interface)).to eq("")
+      end
+
       it "drops BBCode attribution in html_mode" do
         element = Markbridge::AST::Quote.new(author: "John")
         element << Markbridge::AST::Text.new("Hi")

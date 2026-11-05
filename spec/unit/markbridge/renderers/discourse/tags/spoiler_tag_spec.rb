@@ -37,31 +37,25 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
     context "in html_mode" do
       let(:context) { html_context }
 
-      it "renders <details> with default summary" do
+      it "renders the span Discourse cooks the BBCode to" do
         element = Markbridge::AST::Spoiler.new
         element << Markbridge::AST::Text.new("hidden")
 
-        expect(tag.render(element, interface)).to eq(
-          "<details><summary>Spoiler</summary>hidden</details>",
-        )
+        expect(tag.render(element, interface)).to eq(%(<span class="spoiler">hidden</span>))
       end
 
-      it "uses the title as <summary> when present" do
+      it "has no place for the title" do
         element = Markbridge::AST::Spoiler.new(title: "Reveal")
         element << Markbridge::AST::Text.new("hidden")
 
-        expect(tag.render(element, interface)).to eq(
-          "<details><summary>Reveal</summary>hidden</details>",
-        )
+        expect(tag.render(element, interface)).to eq(%(<span class="spoiler">hidden</span>))
       end
 
-      it "HTML-escapes the title" do
-        element = Markbridge::AST::Spoiler.new(title: %(<scary> & "stuff"))
-        element << Markbridge::AST::Text.new("x")
+      it "writes no span around nothing visible" do
+        element = Markbridge::AST::Spoiler.new
+        element << Markbridge::AST::Text.new(" \n")
 
-        expect(tag.render(element, interface)).to eq(
-          "<details><summary>&lt;scary&gt; &amp; &quot;stuff&quot;</summary>x</details>",
-        )
+        expect(tag.render(element, interface)).to eq(" \n")
       end
     end
   end

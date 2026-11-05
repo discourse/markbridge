@@ -289,13 +289,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
         table
       end
 
-      it "drops the <p> wrapper since the surrounding <td> already provides block context" do
+      it "keeps the <p> of a paragraph" do
         para = Markbridge::AST::Paragraph.new
         para << Markbridge::AST::Text.new("hello")
         table = build_uneven_table_with(para)
 
         result = tag.render(table, interface)
-        expect(result).to include("<td>hello</td>")
+        expect(result).to include("<td><p>hello</p></td>")
       end
 
       it "renders unordered lists as <ul><li>" do
@@ -356,13 +356,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
         expect(result).to include("<td><hr></td>")
       end
 
-      it "renders spoilers as <details><summary>" do
+      it "renders spoilers as the span Discourse cooks them to" do
         spoiler = Markbridge::AST::Spoiler.new(title: "Reveal")
         spoiler << Markbridge::AST::Text.new("hidden")
         table = build_uneven_table_with(spoiler)
 
         result = tag.render(table, interface)
-        expect(result).to include("<td><details><summary>Reveal</summary>hidden</details></td>")
+        expect(result).to include(%(<td><span class="spoiler">hidden</span></td>))
       end
     end
   end

@@ -302,6 +302,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
         )
       end
 
+      it "writes the newline of a blank line as an entity, which would end the HTML block" do
+        element = Markbridge::AST::Code.new(block: true)
+        element << Markbridge::AST::Text.new("a\n\nb\n  \nc")
+
+        expect(tag.render(element, interface)).to eq("<pre><code>a&#10;\nb&#10;  \nc</code></pre>")
+      end
+
       it "HTML-escapes block code content" do
         element = Markbridge::AST::Code.new
         element << Markbridge::AST::Text.new("a < b\n&& c")

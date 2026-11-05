@@ -44,11 +44,11 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ParagraphTag do
           )
         end
 
-        it "drops the <p> wrapper since the surrounding <td> already provides block context" do
+        it "keeps the <p>, without it the paragraph runs into the text next to it" do
           element = Markbridge::AST::Paragraph.new
           element << Markbridge::AST::Text.new("hello")
 
-          expect(tag.render(element, interface)).to eq("hello")
+          expect(tag.render(element, interface)).to eq("<p>hello</p>")
         end
       end
     end

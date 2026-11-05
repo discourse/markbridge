@@ -24,6 +24,12 @@ matcher:
   subjects:
     - "Markbridge*"
   ignore:
+    # HtmlBlock.without_blank_lines: the `include?("\n")` guard in
+    # front of the gsub only saves the copy gsub makes when nothing
+    # matches, so every mutation of the guard gives the same text.
+    # Bucket A.
+    - Markbridge::Renderers::Discourse::HtmlBlock.without_blank_lines
+
 
 # Central-dispatcher method. The surviving mutations here are all
     # flow-control permutations (`if X && Y && Z` → variants that OR

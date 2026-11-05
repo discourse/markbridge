@@ -2,7 +2,7 @@
 
 # The round-trip cases that fail today. A case on one of these lists is
 # expected to fail; the specs fail when a listed case starts to pass, so a
-# fix removes its entry in the same commit.
+# fix removes its entry in the same commit. The lists are empty right now.
 #
 # An entry names its reason and the cases it covers. A case in the
 # adjacency list is a case id (see AdjacencyGenerator) or a Regexp that
@@ -16,53 +16,9 @@ module RoundTripKnownBugs
     Entry.new(reason:, cases:)
   end
 
-  ADJACENCY = [
-    entry(
-      "in html_mode a paragraph next to other content has no <p>, a blank line in text or block code ends the HTML block, an empty emphasis or quote is written, and a spoiler is a <details> block",
-      cases: [
-        "blocks/cell/ol+empty+ol",
-        "blocks/cell/ol+empty+ul",
-        "blocks/cell/ul+empty+ol",
-        "blocks/cell/ul+empty+ul",
-        %r{\Ahtml-cell/.*spoiler},
-      ],
-    ),
-  ].freeze
+  ADJACENCY = [].freeze
 
-  STRUCTURE = [
-    entry(
-      "in html_mode a paragraph next to other content has no <p>, a blank line in text or block code ends the HTML block, an empty emphasis or quote is written, and a spoiler is a <details> block",
-      cases: [
-        3,
-        7,
-        23,
-        52,
-        66,
-        73,
-        86,
-        112,
-        117,
-        122,
-        133,
-        135,
-        139,
-        145,
-        155,
-        192,
-        196,
-        202,
-        204,
-        210,
-        211,
-        213,
-        234,
-        238,
-        242,
-        250,
-        251,
-      ],
-    ),
-  ].freeze
+  STRUCTURE = [].freeze
 
   LISTS = { adjacency: ADJACENCY, structure: STRUCTURE }.freeze
 
