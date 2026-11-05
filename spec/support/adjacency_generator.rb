@@ -308,11 +308,20 @@ module AdjacencyGenerator
   DEFAULT_SAMPLE_SEED = 1
 
   # A fixed subset of the inline cases. The same count and seed give the
-  # same cases as long as the dimensions do not change.
+  # same cases as long as the dimensions do not change, on every Ruby:
+  # the indices are drawn with Random#rand, a partial Fisher-Yates
+  # shuffle, because Array#sample draws its own way on TruffleRuby and
+  # CI ran other cases there than on CRuby.
   # @return [Array<InlineCase>]
   def self.inline_sample(count, seed:)
-    indices = (0...inline_size).to_a.sample(count, random: Random.new(seed)).sort
-    indices.map { |index| inline_at(index) }
+    random = Random.new(seed)
+    indices = (0...inline_size).to_a
+    count = [count, indices.size].min
+    count.times do |position|
+      other = position + random.rand(indices.size - position)
+      indices[position], indices[other] = indices[other], indices[position]
+    end
+    indices.first(count).sort.map { |index| inline_at(index) }
   end
 
   BLOCKS = {
