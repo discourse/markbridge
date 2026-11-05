@@ -10,6 +10,7 @@
 #   bin/fuzz-render --only pairs
 #   bin/fuzz-render --seeds 3000 --only trees --output tmp/fuzz-render
 #   bin/fuzz-render --sample 5000             # a random subset of the pairs
+#   bin/fuzz-render --sample 5000 --sample-seed 7   # another subset
 #   bin/fuzz-render --all                     # run the known bugs too
 #
 # Every failure is shrunk, and the failures whose shrunk trees have the
@@ -31,7 +32,7 @@ require_relative "../spec/support/round_trip_checker"
 require_relative "../spec/support/round_trip_known_bugs"
 
 class FuzzRender
-  Family = Data.define(:name, :list, :cases, :size)
+  Family = Data.define(:name, :list, :cases)
   Result = Data.define(:family, :id, :checks, :reason)
 
   FAMILIES = %w[pairs blocks trees].freeze
@@ -40,7 +41,7 @@ class FuzzRender
     @seeds = 300
     @only = FAMILIES
     @sample = nil
-    @sample_seed = 1
+    @sample_seed = AdjacencyGenerator::DEFAULT_SAMPLE_SEED
     @output = nil
     @all = false
     parse(argv)
@@ -48,16 +49,16 @@ class FuzzRender
     @failed = []
     @stale = []
     @known = []
-    # signature => [report, ids]
+    # signature => [report, ids, checks]
     @groups = {}
-    @counts = Hash.new(0)
   end
 
   def run
     reason = MarkdownItCooker::SKIP_REASON || MarkdownItCooker.missing
     abort "bin/fuzz-render: #{reason}" if reason
 
-    families.each { |family| run_family(family) }
+    @families = families
+    @families.each { |family| run_family(family) }
     finish
   end
 
@@ -74,9 +75,11 @@ class FuzzRender
         opts.on("--sample N", Integer, "run N random pairs instead of all of them") do |n|
           @sample = n
         end
-        opts.on("--sample-seed N", Integer, "the seed that picks the sample (default: 1)") do |n|
-          @sample_seed = n
-        end
+        opts.on(
+          "--sample-seed N",
+          Integer,
+          "the seed that picks the sample (default: #{@sample_seed})",
+        ) { |n| @sample_seed = n }
         opts.on("--output DIR", "write failures.txt and summary.txt to DIR") { |dir| @output = dir }
         opts.on("--all", "run the known bugs like every other case") { @all = true }
       end
@@ -92,15 +95,13 @@ class FuzzRender
         else
           AdjacencyGenerator.inline_cases
         end
-      size = @sample || AdjacencyGenerator.inline_size
-      list << Family.new(name: "pairs", list: :adjacency, cases:, size:)
+      list << Family.new(name: "pairs", list: :adjacency, cases:)
     end
     if @only.include?("blocks")
-      cases = AdjacencyGenerator.block_cases
-      list << Family.new(name: "blocks", list: :adjacency, cases:, size: cases.size)
+      list << Family.new(name: "blocks", list: :adjacency, cases: AdjacencyGenerator.block_cases)
     end
     if @only.include?("trees") && @seeds.positive?
-      list << Family.new(name: "trees", list: :structure, cases: (1..@seeds), size: @seeds)
+      list << Family.new(name: "trees", list: :structure, cases: (1..@seeds))
     end
     list
   end
@@ -111,7 +112,7 @@ class FuzzRender
       run_case(family, kase)
       progress(family, index + 1, started) if ((index + 1) % 5000).zero?
     end
-    progress(family, family.size, started)
+    progress(family, family.cases.size, started)
   end
 
   # @param kase [AdjacencyGenerator::InlineCase, AdjacencyGenerator::BlockCase, Integer]
@@ -120,7 +121,6 @@ class FuzzRender
     build = kase.is_a?(Integer) ? -> { AstGenerator.new(kase).document } : -> { kase.document }
     reason = @all ? nil : RoundTripKnownBugs.reason(family.list, id)
     checks = @checker.failures(build.call).map(&:check)
-    @counts[family.name] += 1
 
     if checks.empty?
       @stale << Result.new(family: family.name, id:, checks:, reason:) if reason
@@ -128,13 +128,14 @@ class FuzzRender
       @known << Result.new(family: family.name, id:, checks:, reason:)
     else
       @failed << Result.new(family: family.name, id:, checks:, reason: nil)
-      group(family, id, build.call)
+      group(family, id, build.call, checks)
     end
   end
 
   # Shrinks the document and files it under the shape of what is left.
-  # The first case of a shape gets the report.
-  def group(family, id, document)
+  # The first case of a shape gets the report, and its checks name the
+  # group in the summary.
+  def group(family, id, document, checks)
     before = document.descendants.size
     @checker.shrink(document)
     signature = AstDump.signature(document)
@@ -143,13 +144,13 @@ class FuzzRender
       group[1] << "#{family.name} #{id}"
     else
       label = "#{family.name} #{id}, shrunk from #{before} to #{document.descendants.size} nodes"
-      @groups[signature] = [@checker.report(document, label:), ["#{family.name} #{id}"]]
+      @groups[signature] = [@checker.report(document, label:), ["#{family.name} #{id}"], checks]
     end
   end
 
   def progress(family, done, started)
     elapsed = (Time.now - started).round
-    warn "#{family.name}: #{done}/#{family.size} in #{elapsed}s, #{@failed.size} failed"
+    warn "#{family.name}: #{done}/#{family.cases.size} in #{elapsed}s, #{@failed.size} failed"
   end
 
   def finish
@@ -177,10 +178,10 @@ class FuzzRender
 
   def summary_text
     lines = ["family         cases   failed    known"]
-    @counts.each do |family, count|
-      failed = @failed.count { |result| result.family == family }
-      known = @known.count { |result| result.family == family }
-      lines << format("%-12s %8d %8d %8d", family, count, failed, known)
+    @families.each do |family|
+      failed = @failed.count { |result| result.family == family.name }
+      known = @known.count { |result| result.family == family.name }
+      lines << format("%-12s %8d %8d %8d", family.name, family.cases.size, failed, known)
     end
 
     unless @failed.empty?
@@ -194,9 +195,8 @@ class FuzzRender
       @groups
         .values
         .sort_by { |_, ids| -ids.size }
-        .each do |report, ids|
-          checks = report.lines.grep(/\A(structure|text|links|lists|shape):/).map(&:strip)
-          lines << "  #{ids.size} cases, e.g. #{ids.first}: #{checks.join("; ")}"
+        .each do |_, ids, checks|
+          lines << "  #{ids.size} cases, e.g. #{ids.first}: #{checks.join(", ")}"
         end
       lines << "" << "failed cases:"
       @failed.each do |result|

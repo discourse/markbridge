@@ -212,6 +212,14 @@ expect(token).to match_tag_end("b")
 
 **Best practices:**
 - Test public APIs, not private methods
+- A renderer tag spec starts with `include_context "with a renderer tag"`
+  (`spec/support/renderer_tag_context.rb`): tag, renderer, context,
+  interface, `html_context`, `interface_for(*parents)` and `rendered`.
+  The forms the serializer writes (markers, links, images, breaks,
+  joins) belong in the serializer and joins specs, a tag spec checks
+  what the tag hands over
+- A cooked-output spec includes `CookedOutput` (`cook`, `cook_html`,
+  `cook_ast`, `cook_markdown`, `fragment`) and queries the fragment
 - Use `described_class` instead of hardcoded names
 - Keep tests independent (random order execution)
 - Use `expect`, never `should`
@@ -257,7 +265,10 @@ expect(token).to match_tag_end("b")
   fail today, with a reason. Both specs
   run every listed case and fail when it starts to pass, so a fix
   removes the entry in the same commit. A new failure that is not fixed
-  right away gets an entry there, not an exclusion in a generator.
+  right away gets an entry there, not an exclusion in a generator. The
+  two specs share the `round-trip cases` shared example
+  (`spec/support/round_trip_examples.rb`); the support code has a smoke
+  spec next to them (`round_trip_support_spec.rb`).
 - `bin/fuzz-render` runs every inline pair, every block pair and as many
   seeds as asked for outside RSpec (`--only pairs|blocks|trees`,
   `--sample N`, `--seeds N`, `--all` to run the known bugs too). Every
