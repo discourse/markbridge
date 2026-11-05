@@ -178,6 +178,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
     let(:element_class) { Markbridge::AST::Quote }
     it_behaves_like "a tag that propagates parent context"
 
+    it "renders an empty quote to a blank line, which keeps the text around it apart" do
+      expect(tag.render(Markbridge::AST::Quote.new, interface)).to eq("\n\n")
+    end
+
+    it "renders an empty quote with author to a blank line" do
+      expect(tag.render(Markbridge::AST::Quote.new(author: "X"), interface)).to eq("\n\n")
+    end
+
     context "in html_mode" do
       let(:context) { html_context }
 
@@ -188,7 +196,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
         expect(tag.render(element, interface)).to eq("<blockquote>Hi</blockquote>")
       end
 
-      it "renders nothing for an empty quote" do
+      it "renders nothing for an empty quote, a blank line would end the HTML block" do
         expect(tag.render(Markbridge::AST::Quote.new, interface)).to eq("")
       end
 

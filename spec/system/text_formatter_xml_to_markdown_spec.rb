@@ -234,8 +234,18 @@ RSpec.describe "phpBB3 XML to Markdown" do
       expect(convert(xml)).to eq("[quote]\n[quote=\"X\"]\nin\n[/quote]\n[/quote]\n\nreply")
     end
 
-    it "converts an empty quote without author into nothing" do
-      expect(convert("<r>x<QUOTE><s>[quote]</s><e>[/quote]</e></QUOTE>y</r>")).to eq("xy")
+    it "converts an empty quote without author into a blank line" do
+      expect(convert("<r>x<QUOTE><s>[quote]</s><e>[/quote]</e></QUOTE>y</r>")).to eq("x\n\ny")
+    end
+
+    it "converts an empty quote with author into a blank line" do
+      xml = %(<r>a.<QUOTE author="X"><s>[quote="X"]</s><e>[/quote]</e></QUOTE>\n\nb.</r>)
+
+      expect(convert(xml)).to eq("a.\n\nb.")
+    end
+
+    it "converts an empty code block into a blank line" do
+      expect(convert("<r>x<CODE><s>[code]</s><e>[/code]</e></CODE>y</r>")).to eq("x\n\ny")
     end
 
     it "removes the indentation at the start of a line" do

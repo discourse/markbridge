@@ -10,7 +10,10 @@ module Markbridge
           def render(element, interface)
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
-            return "" if content.empty?
+            # An empty quote shows nothing, but it is still a block: the
+            # blank line keeps the text in front and after it apart. In an
+            # HTML block a blank line would end the block.
+            return interface.html_mode? ? "" : "\n\n" if content.empty?
             return "<blockquote>#{content}</blockquote>" if interface.html_mode?
 
             # A block at the start or the end brings its own blank lines.

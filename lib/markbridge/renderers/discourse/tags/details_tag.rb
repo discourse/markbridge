@@ -29,7 +29,10 @@ module Markbridge
 
             # A details block with nothing to show renders to nothing —
             # an empty [details] shell would only add noise to the output.
-            return "" if content.empty?
+            # It is still a block, so a blank line keeps the text in front
+            # and after it apart, except in an HTML block, which a blank
+            # line would end.
+            return interface.html_mode? ? "" : "\n\n" if content.empty?
 
             return render_html(element.title, content) if interface.html_mode?
 

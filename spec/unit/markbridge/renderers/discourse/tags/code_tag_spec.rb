@@ -85,6 +85,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::CodeTag do
       expect(result).to eq("")
     end
 
+    it "renders an empty code block to a blank line, which keeps the text around it apart" do
+      element = Markbridge::AST::Code.new(language: "ruby", block: true)
+
+      expect(tag.render(element, interface)).to eq("\n\n")
+    end
+
+    it "renders an empty code block to nothing in html_mode, a blank line would end the HTML block" do
+      element = Markbridge::AST::Code.new(block: true)
+
+      expect(tag.render(element, interface_for(html_mode: true))).to eq("")
+    end
+
     it "does not add a blank line when the content ends with a newline" do
       element = Markbridge::AST::Code.new(block: true)
       element << Markbridge::AST::Text.new("x\n")
