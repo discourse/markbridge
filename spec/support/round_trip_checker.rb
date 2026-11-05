@@ -167,8 +167,12 @@ class RoundTripChecker
   #   text follows them: the BBCode of a plugin is text to plain
   #   markdown-it, the plain form without the plugin cooks. With bbcode
   #   on, the sizes of the generator are written as they are.
-  def initialize(features: nil)
+  # @param cooker [#cook, #cooks?] what cooks the Markdown:
+  #   MarkdownItCooker, or a profile of DiscourseEngineCooker, which
+  #   cooks the BBCode of the plugins it has into their HTML
+  def initialize(features: nil, cooker: MarkdownItCooker)
     @features = DEFAULT_FEATURES.merge(features || {})
+    @cooker = cooker
     @table_tag = RecordingTableTag.new
     library = Markbridge::Renderers::Discourse::TagLibrary.default
     library.register(AST::Table, @table_tag)
@@ -273,7 +277,7 @@ class RoundTripChecker
   # @param markdown [String]
   # @return [String]
   def cook(markdown)
-    MarkdownItCooker.cook(markdown)
+    @cooker.cook(markdown)
   end
 
   def check_structure(document, fragment)
@@ -299,10 +303,19 @@ class RoundTripChecker
     )
   end
 
+  # Discourse keeps the short URL of an upload it cannot resolve in
+  # data-orig-src or data-orig-href, and its heading anchors are no links
+  # of the document.
   def check_links(document, fragment)
     expected = expected_links(document).sort
     actual =
-      fragment.css("a[href], img[src]").map { |node| decode(node["href"] || node["src"]) }.sort
+      fragment
+        .css("a[href], img[src]")
+        .reject { |node| anchor?(node) }
+        .map do |node|
+          decode(node["data-orig-href"] || node["href"] || node["data-orig-src"] || node["src"])
+        end
+        .sort
     return if expected == actual
 
     Failure.new(
@@ -391,7 +404,14 @@ class RoundTripChecker
     when AST::ListItem
       [skeleton("li", children: expected_children(node, html:))]
     when AST::Quote
-      [skeleton("blockquote", children: expected_children(node, html:))]
+      # The BBCode of an attributed quote is text to plain markdown-it,
+      # the content stands on its own. In html_mode the quote is a
+      # blockquote without attribution.
+      if bbcode_quote?(node) && !html && !@cooker.cooks?(:quote)
+        expected_children(node, html:)
+      else
+        [skeleton("blockquote", children: expected_children(node, html:))]
+      end
     when AST::Code
       [expected_code(node)]
     when AST::Url
@@ -558,9 +578,17 @@ class RoundTripChecker
       when "code"
         [skeleton("code", text: node.text)]
       when "a"
+        next [] if anchor?(node)
+
         [skeleton("a", children: actual_skeleton(node.children), href: decode(node["href"]))]
       when "img"
-        [skeleton("img", href: decode(node["src"]))]
+        [skeleton("img", href: decode(node["data-orig-src"] || node["src"]))]
+      when "div"
+        # Discourse puts a div around a table and a block spoiler; the AST
+        # has no node for either.
+        next actual_skeleton(node.children) if TRANSPARENT_DIVS.intersect?(classes(node))
+
+        [skeleton("div", children: actual_skeleton(node.children))]
       when *STRUCTURAL_ELEMENTS
         [skeleton(node.name, children: actual_skeleton(node.children))]
       else
@@ -572,6 +600,19 @@ class RoundTripChecker
   # markdown-it percent-encodes `]` and `\` in a destination.
   def decode(value)
     URI.decode_uri_component(value.to_s)
+  end
+
+  # The classes Discourse gives a div the AST has no node for: around a
+  # table, a block spoiler, and the title line of an attributed quote.
+  TRANSPARENT_DIVS = Set["md-table", "spoiler", "title", "quote-controls"].freeze
+
+  def classes(node)
+    node["class"].to_s.split
+  end
+
+  # The anchor link Discourse puts into a heading.
+  def anchor?(node)
+    node.name == "a" && classes(node).include?("anchor")
   end
 
   def format_skeleton(nodes, level: 0)
@@ -598,7 +639,11 @@ class RoundTripChecker
     when AST::Text, AST::MarkdownText
       out << node.text
     when AST::Image
-      out << node.alt.to_s
+      # Discourse reads the image options off the alt text and trims it,
+      # Unicode spaces included.
+      alt = node.alt.to_s
+      alt = alt.gsub(/\A[[:space:]]+|[[:space:]]+\z/, "") if @cooker.cooks?(:image_options)
+      out << alt
     when AST::Mention
       out << "@#{node.name}"
     when AST::Upload
@@ -613,19 +658,19 @@ class RoundTripChecker
         out << "mailto:#{node.address}"
       end
     when AST::Underline
-      plain = in_link || html || !visible?(node)
+      plain = in_link || html || !visible?(node) || @cooker.cooks?(:underline)
       bbcode_text(node, out, in_link:, html:, open: "[u]", close: "[/u]", plain:)
     when AST::Color, AST::Size
-      # The BBCode of discourse-bbcode is text to plain markdown-it; in
-      # html_mode and in a link the tag writes no BBCode.
+      # The BBCode of discourse-bbcode is text to a cooker without the
+      # plugin; in html_mode and in a link the tag writes no BBCode.
       value = node.is_a?(AST::Color) ? node.color : node.size
       open = node.is_a?(AST::Color) ? "[color=#{value}]" : "[size=#{value}]"
       close = node.is_a?(AST::Color) ? "[/color]" : "[/size]"
-      plain = !@features[:bbcode] || html || in_link || !visible?(node)
+      plain = !@features[:bbcode] || html || in_link || !visible?(node) || @cooker.cooks?(:bbcode)
       bbcode_text(node, out, in_link:, html:, open:, close:, plain:)
     when AST::Spoiler
       out << "#{node.title.strip}: " if node.title.to_s.match?(/[^[:space:]]/) && visible?(node)
-      plain = html || in_link || !visible?(node) || !@features[:spoiler]
+      plain = html || in_link || !visible?(node) || !@features[:spoiler] || @cooker.cooks?(:spoiler)
       bbcode_text(node, out, in_link:, html:, open: "[spoiler]", close: "[/spoiler]", plain:)
     when AST::Details
       if !@features[:details]
@@ -636,6 +681,9 @@ class RoundTripChecker
         end
       elsif html
         summary_text(node.title || "Summary", node, out, in_link:) if visible?(node)
+      elsif @cooker.cooks?(:details)
+        # The summary of the cooked block is the title, nothing without one.
+        summary_text(node.title.to_s, node, out, in_link:, html: false) if visible?(node)
       else
         separated(out) do
           bbcode_text(
@@ -643,8 +691,31 @@ class RoundTripChecker
             out,
             in_link:,
             html:,
-            open: "[details]\n",
+            open: "#{details_opener(node)}\n",
             close: "\n[/details]",
+            plain: !visible?(node),
+          )
+        end
+      end
+    when AST::Quote
+      if html || !bbcode_quote?(node)
+        separated(out) { expected_children_text(node, out, in_link:, html:) }
+      elsif @cooker.cooks?(:quote)
+        # The engine puts the name in a title line above the quote.
+        separated(out) do
+          name = quote_name(node)
+          separated(out) { out << "#{name}:" } if name
+          expected_children_text(node, out, in_link:, html:)
+        end
+      else
+        separated(out) do
+          bbcode_text(
+            node,
+            out,
+            in_link:,
+            html:,
+            open: "#{quote_opener(node)}\n",
+            close: "\n[/quote]",
             plain: !visible?(node),
           )
         end
@@ -685,12 +756,44 @@ class RoundTripChecker
     title.empty? ? nil : title
   end
 
+  # The opening tag DetailsTag writes.
+  def details_opener(node)
+    node.title ? %([details="#{node.title}"]) : "[details]"
+  end
+
+  # Whether QuoteTag writes the quote as BBCode: attributed, or around an
+  # attributed quote (Discourse cooks no `[quote="…"]` inside a Markdown
+  # blockquote).
+  def bbcode_quote?(node)
+    return true if quote_name(node)
+
+    node.descendants(AST::Quote).any? { |inner| quote_name(inner) }
+  end
+
+  # @return [String, nil] the name QuoteTag writes into the opening tag
+  def quote_name(node)
+    return node.username if node.username && node.post_number && node.topic_id
+
+    node.author || node.username
+  end
+
+  # The opening tag QuoteTag writes.
+  def quote_opener(node)
+    if node.username && node.post_number && node.topic_id
+      %([quote="#{node.username}, post:#{node.post_number}, topic:#{node.topic_id}"])
+    elsif quote_name(node)
+      %([quote="#{quote_name(node)}"])
+    else
+      "[quote]"
+    end
+  end
+
   # A <details> element: the summary on a line of its own, then the
   # content, as blocks.
-  def summary_text(title, node, out, in_link:)
+  def summary_text(title, node, out, in_link:, html: true)
     separated(out) do
       separated(out) { out << title }
-      expected_children_text(node, out, in_link:, html: true)
+      expected_children_text(node, out, in_link:, html:)
     end
   end
 

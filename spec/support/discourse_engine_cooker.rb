@@ -16,10 +16,10 @@ require "open3"
 # run. +renderer+ gives the renderer whose features match a profile, so a
 # spec writes the Markdown for the site it cooks on.
 #
-# Tag an example group with +discourse_engine: true+ and guard it with
-# +DiscourseEngineCooker::SKIP_REASON+. The specs read the cooked HTML with
-# Nokogiri::HTML5, which JRuby's Nokogiri does not have, so JRuby skips
-# them in any case.
+# Tag an example group with +:discourse_engine+. spec_helper leaves those
+# examples out when +SKIP_REASON+ says why they cannot run. The specs read
+# the cooked HTML with Nokogiri::HTML5, which JRuby's Nokogiri does not
+# have, so JRuby leaves them out in any case.
 module DiscourseEngineCooker
   DIRECTORY = File.expand_path("discourse_engine", __dir__)
   SCRIPT = File.join(DIRECTORY, "cook.mjs")
@@ -67,6 +67,43 @@ module DiscourseEngineCooker
       },
     },
   }.freeze
+
+  # What the engine cooks per profile, for a check that has to know
+  # whether BBCode becomes HTML or stays text: `[u]`, `[quote="…"]` and
+  # the image options in the alt text (which Discourse trims) are
+  # Discourse core, the rest comes with the plugins of the profile.
+  COOKS = {
+    stock: %i[underline quote image_options details spoiler poll],
+    all: %i[underline quote image_options details spoiler poll post_event bbcode],
+    none: %i[underline quote image_options],
+  }.freeze
+
+  # One profile as a cooker, with the same +cook+ as MarkdownItCooker, so
+  # RoundTripChecker can cook with either.
+  Profile =
+    Struct.new(:name) do
+      def cook(markdown)
+        DiscourseEngineCooker.cook(markdown, profile: name)
+      end
+
+      # @param feature [Symbol] :underline, or a key of the renderer's
+      #   +features:+
+      # @return [Boolean] whether the site of this profile cooks the
+      #   BBCode of the feature
+      def cooks?(feature)
+        COOKS.fetch(name).include?(feature)
+      end
+
+      def features
+        PROFILES.fetch(name).fetch(:features)
+      end
+    end
+
+  # @param name [Symbol] a key of PROFILES
+  # @return [Profile]
+  def self.profile(name)
+    Profile.new(name)
+  end
 
   def self.node?
     ENV

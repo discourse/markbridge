@@ -12,6 +12,12 @@
 #   bin/fuzz-render --sample 5000             # a random subset of the pairs
 #   bin/fuzz-render --sample 5000 --sample-seed 7   # another subset
 #   bin/fuzz-render --all                     # run the known bugs too
+#   bin/fuzz-render --engine all              # cook with the Discourse engine
+#
+# With --engine the cases cook with Discourse's own engine, on the given
+# profile of DiscourseEngineCooker (bin/discourse-engine builds it), the
+# structure seeds get attributed quotes, and the known bugs come from
+# the engine lists.
 #
 # Every failure is shrunk, and the failures whose shrunk trees have the
 # same shape (see AstDump.signature) are one group: one report, the AST,
@@ -30,6 +36,7 @@ require_relative "../spec/support/ast_generator"
 require_relative "../spec/support/adjacency_generator"
 require_relative "../spec/support/round_trip_checker"
 require_relative "../spec/support/round_trip_known_bugs"
+require_relative "../spec/support/discourse_engine_cooker"
 
 class FuzzRender
   Family = Data.define(:name, :list, :cases)
@@ -44,8 +51,15 @@ class FuzzRender
     @sample_seed = AdjacencyGenerator::DEFAULT_SAMPLE_SEED
     @output = nil
     @all = false
+    @engine = nil
     parse(argv)
-    @checker = RoundTripChecker.new
+    @checker =
+      if @engine
+        cooker = DiscourseEngineCooker.profile(@engine)
+        RoundTripChecker.new(features: cooker.features, cooker:)
+      else
+        RoundTripChecker.new
+      end
     @failed = []
     @stale = []
     @known = []
@@ -54,7 +68,8 @@ class FuzzRender
   end
 
   def run
-    reason = MarkdownItCooker::SKIP_REASON || MarkdownItCooker.missing
+    cooker = @engine ? DiscourseEngineCooker : MarkdownItCooker
+    reason = cooker::SKIP_REASON || cooker.missing
     abort "bin/fuzz-render: #{reason}" if reason
 
     @families = families
@@ -82,6 +97,11 @@ class FuzzRender
         ) { |n| @sample_seed = n }
         opts.on("--output DIR", "write failures.txt and summary.txt to DIR") { |dir| @output = dir }
         opts.on("--all", "run the known bugs like every other case") { @all = true }
+        opts.on(
+          "--engine PROFILE",
+          DiscourseEngineCooker::PROFILES.keys.map(&:to_s),
+          "cook with the Discourse engine on this profile (stock, all or none)",
+        ) { |profile| @engine = profile.to_sym }
       end
       .parse!(argv)
   end
@@ -95,15 +115,25 @@ class FuzzRender
         else
           AdjacencyGenerator.inline_cases
         end
-      list << Family.new(name: "pairs", list: :adjacency, cases:)
+      list << Family.new(name: "pairs", list: known_bugs(:adjacency), cases:)
     end
     if @only.include?("blocks")
-      list << Family.new(name: "blocks", list: :adjacency, cases: AdjacencyGenerator.block_cases)
+      list <<
+        Family.new(
+          name: "blocks",
+          list: known_bugs(:adjacency),
+          cases: AdjacencyGenerator.block_cases,
+        )
     end
     if @only.include?("trees") && @seeds.positive?
-      list << Family.new(name: "trees", list: :structure, cases: (1..@seeds))
+      list << Family.new(name: "trees", list: known_bugs(:structure), cases: (1..@seeds))
     end
     list
+  end
+
+  # The known-bug list of the cooker, see RoundTripKnownBugs::LISTS.
+  def known_bugs(list)
+    @engine ? :"#{list}_engine" : list
   end
 
   def run_family(family)
@@ -118,7 +148,12 @@ class FuzzRender
   # @param kase [AdjacencyGenerator::InlineCase, AdjacencyGenerator::BlockCase, Integer]
   def run_case(family, kase)
     id = kase.is_a?(Integer) ? kase : kase.id
-    build = kase.is_a?(Integer) ? -> { AstGenerator.new(kase).document } : -> { kase.document }
+    build =
+      if kase.is_a?(Integer)
+        -> { AstGenerator.new(kase, attributed_quotes: !@engine.nil?).document }
+      else
+        -> { kase.document }
+      end
     reason = @all ? nil : RoundTripKnownBugs.reason(family.list, id)
     checks = @checker.failures(build.call).map(&:check)
 
