@@ -4,13 +4,14 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Placeholder tag for rendering polls.
+        # Renders {AST::Poll} as the +[poll]+ BBCode of the poll plugin: the
+        # raw BBCode of the source when the parser kept it, otherwise the
+        # BBCode built from the attributes and the options.
         #
-        # This is a STUB implementation that outputs the original raw BBCode.
-        # Applications using Markbridge should provide their own custom tag
-        # to render polls as placeholders or convert them to another format.
+        # With +bbcode: false+, for a site without the plugin, the options
+        # are written as a bullet list. The raw BBCode is of no use there.
         #
-        # @example Custom renderer with placeholder
+        # @example A placeholder for the importer
         #   class MyPollTag < Markbridge::Renderers::Discourse::Tags::PollTag
         #     def render(element, interface)
         #       id = register_poll(element)
@@ -18,12 +19,29 @@ module Markbridge
         #     end
         #   end
         class PollTag < Tag
-          def render(element, _interface)
+          # @param bbcode [Boolean] write the BBCode of the plugin
+          def initialize(bbcode: true)
+            @bbcode = bbcode
+          end
+
+          def render(element, interface)
+            return without_plugin(element, interface) unless @bbcode
+
             body = element.raw || build_poll_bbcode(element)
             "\n\n#{body}\n\n"
           end
 
           private
+
+          def without_plugin(element, interface)
+            return "" if element.options.empty?
+
+            list = AST::List.new(ordered: false)
+            element.options.each do |option|
+              list << (AST::ListItem.new << AST::Text.new(option.to_s))
+            end
+            interface.render_node(list, context: interface.with_parent(element))
+          end
 
           def build_poll_bbcode(element)
             attrs = build_attributes(element)

@@ -65,17 +65,17 @@ For the exact list, see [`HandlerRegistry.default`](https://github.com/discourse
 
 ## Colors and sizes
 
-`<COLOR>` and `<SIZE>` render as their text by default, because Discourse core removes the style of a `<span>`. If the Discourse site uses the discourse-bbcode plugin, build the renderer with `styling_bbcode: true` to keep them as `[color=…]` and `[size=…]` BBCode. phpBB 3.x stores `[size]` as a percentage, and the plugin reads it the same way:
+`<COLOR>` and `<SIZE>` render as their text by default, because Discourse core removes the style of a `<span>`. If the Discourse site uses the discourse-bbcode plugin, build the renderer with `features: { bbcode: true }` to keep them as `[color=…]` and `[size=…]` BBCode. phpBB 3.x stores `[size]` as a percentage, and the plugin reads it the same way:
 
 ```ruby
-renderer = Markbridge.discourse_renderer(styling_bbcode: true)
+renderer = Markbridge.discourse_renderer(features: { bbcode: true })
 
 xml = '<r><SIZE size="85"><s>[size=85]</s>small<e>[/size]</e></SIZE></r>'
 Markbridge.text_formatter_xml_to_markdown(xml, renderer:).markdown
 # => "[size=85]small[/size]"
 ```
 
-See [Customizing the renderer](/customization/customizing-renderer/) for the details of `styling_bbcode:`.
+See [Customizing the renderer](/customization/customizing-renderer/#features--the-plugins-of-the-target-site) for `features:`.
 
 ## Using the parser directly
 

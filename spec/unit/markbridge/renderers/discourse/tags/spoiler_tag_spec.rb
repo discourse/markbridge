@@ -74,5 +74,30 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
         expect(tag.render(element, interface)).to eq(" \n")
       end
     end
+
+    context "with bbcode: false" do
+      let(:tag) { described_class.new(bbcode: false) }
+
+      it "writes the content as it is" do
+        element = Markbridge::AST::Spoiler.new
+        element << Markbridge::AST::Text.new(":hidden")
+
+        expect(tag.render(element, interface)).to eq(":hidden")
+      end
+
+      it "keeps the title in front" do
+        element = Markbridge::AST::Spoiler.new(title: "Reveal")
+        element << Markbridge::AST::Text.new("hidden")
+
+        expect(tag.render(element, interface)).to eq("Reveal: hidden")
+      end
+
+      it "writes the content as it is in html_mode" do
+        element = Markbridge::AST::Spoiler.new(title: "Reveal")
+        element << Markbridge::AST::Text.new("hidden")
+
+        expect(tag.render(element, interface_for(html_mode: true))).to eq("Reveal: hidden")
+      end
+    end
   end
 end

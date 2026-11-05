@@ -4,13 +4,15 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Placeholder tag for rendering events.
+        # Renders {AST::Event} as the +[event]+ BBCode of the discourse-events
+        # plugin: the raw BBCode of the source when the parser kept it,
+        # otherwise the BBCode built from the attributes.
         #
-        # This is a STUB implementation that outputs the original raw BBCode.
-        # Applications using Markbridge should provide their own custom tag
-        # to render events as placeholders or convert them to another format.
+        # With +bbcode: false+, for a site without the plugin, the event is
+        # a paragraph with the name and the dates, so the reader still sees
+        # it.
         #
-        # @example Custom renderer with placeholder
+        # @example A placeholder for the importer
         #   class MyEventTag < Markbridge::Renderers::Discourse::Tags::EventTag
         #     def render(element, interface)
         #       id = register_event(element)
@@ -18,12 +20,29 @@ module Markbridge
         #     end
         #   end
         class EventTag < Tag
-          def render(element, _interface)
+          # @param bbcode [Boolean] write the BBCode of the plugin
+          def initialize(bbcode: true)
+            @bbcode = bbcode
+          end
+
+          def render(element, interface)
+            return without_plugin(element, interface) unless @bbcode
+
             body = element.raw || build_event_bbcode(element)
             "\n\n#{body}\n\n"
           end
 
           private
+
+          def without_plugin(element, interface)
+            dates = element.starts_at.to_s
+            dates = "#{dates} to #{element.ends_at}" if element.ends_at
+            text = [element.name.to_s, dates].reject(&:empty?).join(", ")
+            return "" if text.empty?
+
+            paragraph = AST::Paragraph.new << AST::Text.new(text)
+            interface.render_node(paragraph, context: interface.with_parent(element))
+          end
 
           def build_event_bbcode(element)
             attrs = build_attributes(element)

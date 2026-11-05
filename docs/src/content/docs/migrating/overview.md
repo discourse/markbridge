@@ -146,7 +146,7 @@ posts.each do |post|
 end
 ```
 
-See [Customizing the renderer](/customization/customizing-renderer/) for every kwarg.
+See [Customizing the renderer](/customization/customizing-renderer/) for every kwarg. `features:` is the one to look at first: it says which plugins the target site has, so a `[spoiler]`, a `[details]` block, a poll or a color is written in a form the site can show.
 
 ## Where next
 

@@ -4,24 +4,29 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Renders {AST::Details} as a Discourse +[details=…]…[/details]+
-        # collapsible block.
+        # Renders {AST::Details} as the +[details="…"]…[/details]+ block of
+        # the discourse-details plugin.
         #
-        # Markdown form: the BBCode is bracketed with leading and trailing
-        # blank lines so consecutive details blocks don't merge and
-        # adjacent inline content starts a new paragraph against the
-        # block. Inside, the rendered children are stripped so the
-        # +[details]+ opener and the body sit on adjacent lines without
-        # a stray blank between them — matching Discourse's BBCode
-        # parser expectations.
+        # Markdown form: the BBCode has blank lines around it, so
+        # consecutive details blocks don't merge and inline content next
+        # to the block starts a new paragraph. The content inside is
+        # stripped, so the opening tag and the body stand on adjacent
+        # lines.
         #
-        # HTML-block form (inside a CommonMark HTML block — when
-        # +interface.html_mode?+ is +true+): a raw
-        # +<details><summary>…</summary>…</details>+ element. The
-        # +title+ is HTML-escaped for the +<summary>+ text.
+        # html_mode form: a raw +<details><summary>…</summary>…</details>+,
+        # with the title HTML-escaped.
+        #
+        # With +bbcode: false+, for a site without the plugin, the title is
+        # a paragraph in bold in front of the content. Discourse core's
+        # sanitizer has no +<details>+, so there is no HTML form.
         class DetailsTag < Tag
           DEFAULT_TITLE = "Summary"
           private_constant :DEFAULT_TITLE
+
+          # @param bbcode [Boolean] write the BBCode of the plugin
+          def initialize(bbcode: true)
+            @bbcode = bbcode
+          end
 
           def render(element, interface)
             child_context = interface.with_parent(element)
@@ -31,6 +36,7 @@ module Markbridge
             # an empty [details] shell would only add noise to the output.
             return "" if content.empty?
 
+            return without_plugin(element, content, interface, child_context) unless @bbcode
             return render_html(element.title, content) if interface.html_mode?
 
             # Blank lines keep the content apart from the two tag lines:
@@ -48,6 +54,18 @@ module Markbridge
           def render_html(title, content)
             label = title ? HtmlEscaper.escape(title) : DEFAULT_TITLE
             "<details><summary>#{label}</summary>#{content}</details>"
+          end
+
+          # The title as a paragraph in bold, rendered like any paragraph,
+          # then the content.
+          def without_plugin(element, content, interface, context)
+            title = element.title.to_s.strip
+            html = interface.html_mode?
+            return html ? content : "\n\n#{content}\n\n" if title.empty?
+
+            paragraph = AST::Paragraph.new << (AST::Bold.new << AST::Text.new(title))
+            heading = interface.render_node(paragraph, context:)
+            html ? "#{heading}#{content}" : "\n\n#{heading.strip}\n\n#{content}\n\n"
           end
         end
       end

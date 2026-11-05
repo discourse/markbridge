@@ -921,8 +921,8 @@ RSpec.describe Markbridge do
       expect(result.markdown).to eq("a b")
     end
 
-    it "renders color and size as BBCode with styling_bbcode: true" do
-      renderer = described_class.discourse_renderer(styling_bbcode: true)
+    it "renders color and size as BBCode with the bbcode feature" do
+      renderer = described_class.discourse_renderer(features: { bbcode: true })
 
       result =
         described_class.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:)
@@ -930,10 +930,12 @@ RSpec.describe Markbridge do
       expect(result.markdown).to eq("[color=red]a[/color] [size=85]b[/size]")
     end
 
-    it "lets tags: win over styling_bbcode: true" do
+    it "lets tags: win over features:" do
       renderer =
         described_class.discourse_renderer(
-          styling_bbcode: true,
+          features: {
+            bbcode: true,
+          },
           tags: {
             Markbridge::AST::Color => Markbridge::Renderers::Discourse::Tags::ColorTag.new,
           },
@@ -943,6 +945,83 @@ RSpec.describe Markbridge do
         described_class.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:)
 
       expect(result.markdown).to eq("a [size=85]b[/size]")
+    end
+
+    it "writes the plain forms for the features that are off" do
+      renderer =
+        described_class.discourse_renderer(
+          features: {
+            details: false,
+            spoiler: false,
+            poll: false,
+            post_event: false,
+          },
+        )
+      document = Markbridge::AST::Document.new
+      document << (Markbridge::AST::Details.new(title: "More") << Markbridge::AST::Text.new("body"))
+      document << (
+        Markbridge::AST::Spoiler.new(title: "Reveal") << Markbridge::AST::Text.new("hidden")
+      )
+      document << Markbridge::AST::Poll.new(options: %w[A B])
+      document << Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-01-01")
+
+      result = described_class.render(document, renderer:)
+
+      expect(result.markdown).to eq(
+        "**More**\n\nbody\n\nReveal: hidden\n\n- A\n- B\n\nMeeting, 2026-01-01",
+      )
+    end
+
+    it "writes the BBCode of the bundled plugins by default" do
+      document = Markbridge::AST::Document.new
+      document << (Markbridge::AST::Details.new << Markbridge::AST::Text.new("body"))
+      document << Markbridge::AST::Poll.new(options: %w[A])
+      document << Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-01-01")
+
+      result = described_class.render(document, renderer: described_class.discourse_renderer)
+
+      expect(result.markdown).to eq(
+        "[details]\n\nbody\n\n[/details]\n\n[poll]\n* A\n[/poll]\n\n" \
+          "[event name=\"Meeting\" start=\"2026-01-01\"]\n[/event]",
+      )
+    end
+
+    it "registers only the tags of the features named" do
+      base = Markbridge::Renderers::Discourse::TagLibrary.default
+      base.register(
+        Markbridge::AST::Details,
+        Markbridge::Renderers::Discourse::Tag.new { |_e, _i| "CUSTOM" },
+      )
+
+      renderer = described_class.discourse_renderer(tag_library: base, features: { poll: false })
+      document =
+        Markbridge::AST::Document.new << (
+          Markbridge::AST::Details.new << Markbridge::AST::Text.new("x")
+        )
+
+      expect(described_class.render(document, renderer:).markdown).to eq("CUSTOM")
+    end
+
+    it "raises for a feature that does not exist" do
+      expect { described_class.discourse_renderer(features: { polls: false }) }.to raise_error(
+        ArgumentError,
+        "unknown feature :polls, the features are details, spoiler, poll, post_event, bbcode",
+      )
+    end
+
+    it "raises for a feature value that is not true or false" do
+      expect { described_class.discourse_renderer(features: { poll: "no" }) }.to raise_error(
+        ArgumentError,
+        'feature poll must be true or false, got "no"',
+      )
+    end
+
+    it "exposes the tag library of the renderer it built" do
+      renderer = described_class.discourse_renderer(features: { poll: false })
+
+      expect(renderer.tag_library[Markbridge::AST::Poll]).to be_a(
+        Markbridge::Renderers::Discourse::Tags::PollTag,
+      )
     end
 
     it "forwards :allow to the constructed escaper (lists alias)" do
