@@ -20,7 +20,18 @@ module RoundTripKnownBugs
 
   STRUCTURE = [].freeze
 
-  LISTS = { adjacency: ADJACENCY, structure: STRUCTURE }.freeze
+  # The same cases cooked with the Discourse engine (any profile; the
+  # reason names the profile when it matters).
+  ADJACENCY_ENGINE = [].freeze
+
+  STRUCTURE_ENGINE = [].freeze
+
+  LISTS = {
+    adjacency: ADJACENCY,
+    structure: STRUCTURE,
+    adjacency_engine: ADJACENCY_ENGINE,
+    structure_engine: STRUCTURE_ENGINE,
+  }.freeze
 
   # @param list [Symbol] :adjacency or :structure
   # @param id [String, Integer] a case id or a seed
