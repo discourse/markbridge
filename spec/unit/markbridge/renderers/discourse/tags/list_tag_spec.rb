@@ -264,6 +264,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         expect(render_in_document(first, empty, second)).to include("<!---->")
       end
 
+      it "separates two nested lists with the comment on a line of its own, without blank lines" do
+        # Blank lines inside the item would make the outer list loose.
+        item = Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        item << list_with_item(ordered: false, text: "x") <<
+          list_with_item(ordered: false, text: "y")
+        outer = Markbridge::AST::List.new(ordered: false) << item
+
+        expect(render_in_document(outer)).to eq("\n\n- a\n  - x\n  <!---->\n  - y\n\n\n")
+      end
+
       it "separates two lists with an element between them that renders to nothing" do
         first = list_with_item(ordered: false, text: "a")
         second = list_with_item(ordered: false, text: "b")

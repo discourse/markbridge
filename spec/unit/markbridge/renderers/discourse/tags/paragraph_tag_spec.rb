@@ -7,6 +7,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ParagraphTag do
   let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
   describe "#render" do
+    it "takes spaces off the start of the content" do
+      paragraph = Markbridge::AST::Paragraph.new << Markbridge::AST::Text.new("   x")
+
+      expect(tag.render(paragraph, interface)).to eq("\n\nx\n\n")
+    end
+
+    it "keeps a no-break space at the start of the content" do
+      paragraph = Markbridge::AST::Paragraph.new << Markbridge::AST::Text.new("\u00A0x")
+
+      expect(tag.render(paragraph, interface)).to eq("\n\n\u00A0x\n\n")
+    end
+
     it "brackets content with leading and trailing blank lines" do
       element = Markbridge::AST::Paragraph.new
       element << Markbridge::AST::Text.new("hello")

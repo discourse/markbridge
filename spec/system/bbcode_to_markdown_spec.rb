@@ -723,7 +723,7 @@ RSpec.describe "BBCode to Markdown Conversion" do
         )
       expect(result.markdown).to eq(
         "- outer\n  - parent\n\n    <div align=\"center\">\n\n    - a\n    - b\n\n" \
-          "    </div>\n\n    - c",
+          "    <!----></div>\n    - c",
       )
     end
 

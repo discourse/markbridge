@@ -634,6 +634,16 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
       it "escapes every backtick in an HTML tag attribute (gsub not sub)" do
         expect(escaper.escape('<a title="`a` `b`">')).to eq('\\<a title="\\`a\\` \\`b\\`">')
       end
+
+      # markdown-it reads whitespace with JavaScript's \s, which includes
+      # the no-break space: "<style" and a no-break space start an HTML
+      # block there, and an attribute after a no-break space is an
+      # attribute.
+      it "treats a no-break space like whitespace after a tag name" do
+        expect(escaper.escape("<style\u00A0")).to eq("\\<style\u00A0")
+        expect(escaper.escape("<div\u00A0class=x>")).to eq("\\<div\u00A0class=x>")
+        expect(escaper.escape("<b\u2003>")).to eq("\\<b\u2003>")
+      end
     end
 
     # Exercises the private escape_image_open branches directly. The public

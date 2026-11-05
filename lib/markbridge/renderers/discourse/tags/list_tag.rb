@@ -6,9 +6,13 @@ module Markbridge
       module Tags
         class ListTag < Tag
           # An HTML comment between blank lines: invisible when cooked, and
-          # a block of its own that ends the list before it.
+          # a block of its own that ends the list before it. Inside a list
+          # item the comment stands on a line of its own without blank
+          # lines, which would make the item loose; ListItemTag takes the
+          # line break in front of it off the content before it.
           LIST_SEPARATOR = "\n\n<!---->\n\n"
-          private_constant :LIST_SEPARATOR
+          NESTED_LIST_SEPARATOR = "\n<!---->"
+          private_constant :LIST_SEPARATOR, :NESTED_LIST_SEPARATOR
 
           def render(element, interface)
             child_context = interface.with_parent(element)
@@ -35,12 +39,8 @@ module Markbridge
             # quote or an aligned block that sits in an item) the list is a
             # block with blank lines on both sides.
             parent = interface.context.element
-            list =
-              if parent.is_a?(AST::ListItem) || parent.is_a?(AST::List)
-                "\n#{content}"
-              else
-                "\n\n#{content}\n\n"
-              end
+            nested = parent.is_a?(AST::ListItem) || parent.is_a?(AST::List)
+            list = nested ? "\n#{content}" : "\n\n#{content}\n\n"
 
             # Two lists of the same kind in a row need something between
             # them, or CommonMark reads the second as more items of the
@@ -51,7 +51,7 @@ module Markbridge
             previous = interface.previous_list(element)
             return list unless previous && previous.ordered? == element.ordered?
 
-            "#{LIST_SEPARATOR}#{list}"
+            "#{nested ? NESTED_LIST_SEPARATOR : LIST_SEPARATOR}#{list}"
           end
         end
       end

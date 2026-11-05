@@ -107,14 +107,43 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListItemTag do
         expect(tag.render(node, interface_for(list))).to eq("- <table>\n  </table>\n\n  - a\n")
       end
 
-      it "keeps the blank line after an aligned block" do
+      it "ends the block of an aligned block with a comment in front of its last line" do
+        # The `</div>` line is a block of its own, after a blank line.
+        # An empty comment in front turns it into a comment block that
+        # ends on the same line, so no blank line is needed in front of
+        # the nested list.
         nested = list(items: [item(text("a"))])
         island = Markbridge::AST::MarkdownText.new(%(<div align="center">\n\nx\n\n</div>))
         node = item(island, nested)
 
         expect(tag.render(node, interface_for(list))).to eq(
-          %(- <div align="center">\n\n  x\n\n  </div>\n\n  - a\n),
+          %(- <div align="center">\n\n  x\n\n  <!----></div>\n  - a\n),
         )
+      end
+
+      # Content without a newline in it: the whole buffer is the last
+      # line, so the offset the search starts from has to be zero.
+      it "ends the block of a single HTML line with a comment in front of it" do
+        nested = list(items: [item(text("a"))])
+        node = item(Markbridge::AST::MarkdownText.new("<div>"), nested)
+
+        expect(tag.render(node, interface_for(list))).to eq("- <!----><div>\n  - a\n")
+      end
+
+      it "finds the line and the blank line in front of it after a multi-byte character" do
+        nested = list(items: [item(text("a"))])
+        node = item(Markbridge::AST::MarkdownText.new("\u00A0ü\n\n</div>"), nested)
+
+        expect(tag.render(node, interface_for(list))).to eq("- \u00A0ü\n\n  <!----></div>\n  - a\n")
+      end
+
+      it "puts the comment after the indentation of the line" do
+        nested = list(items: [item(text("a"))])
+        node = item(Markbridge::AST::MarkdownText.new("x\n\n  </div>"), nested)
+        expect(tag.render(node, interface_for(list))).to eq("- x\n\n    <!----></div>\n  - a\n")
+
+        node = item(Markbridge::AST::MarkdownText.new("x\n\n   </div>"), nested)
+        expect(tag.render(node, interface_for(list))).to eq("- x\n\n     <!----></div>\n  - a\n")
       end
 
       it "does not keep the blank line when the line in front only looks like HTML" do
@@ -134,15 +163,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListItemTag do
         expect(tag.render(node, interface_for(list))).to eq(
           "- text\n\n  <table>\n  </table>\n\n  - a\n",
         )
-      end
-
-      # Content without a newline in it: the whole buffer is the last
-      # line, so the offset the search starts from has to be zero.
-      it "keeps the blank line when the whole content is one opening tag" do
-        nested = list(items: [item(text("a"))])
-        node = item(Markbridge::AST::MarkdownText.new("<div>"), nested)
-
-        expect(tag.render(node, interface_for(list))).to eq("- <div>\n\n  - a\n")
       end
 
       it "tightens a nested list of a subclass of AST::List as well" do

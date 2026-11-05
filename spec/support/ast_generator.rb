@@ -168,20 +168,14 @@ class AstGenerator
     (1 + @random.rand(3)).times { add_block(container, depth:, headings:) }
   end
 
-  # Appends one block, unless the budget is used up. Two Lists never end up
-  # as neighbors: two lists of the same kind inside a list item make the
-  # item loose today (see the known bugs of the adjacency round-trip), so
-  # a text run goes between them.
+  # Appends one block, unless the budget is used up.
   #
   # @return [void]
   def add_block(container, depth:, headings:)
     return if exhausted?
 
     block = build_block(depth:, headings:)
-    return if block.nil?
-
-    inline_run(container) if block.is_a?(AST::List) && container.children.last.is_a?(AST::List)
-    container << block
+    container << block unless block.nil?
   end
 
   # @return [Markbridge::AST::Node, nil]

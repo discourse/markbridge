@@ -96,6 +96,13 @@ matcher:
     # only costs the MatchData. Bucket A.
     - Markbridge::Renderers::Discourse::Inline::Serializer#place_markers
 
+    # Inline::Serializer#after_blank_line and Tags::ParagraphTag#render
+    # ask match? before sub: sub without a match returns a copy, and
+    # that is one String per paragraph and per piece after a blank line
+    # saved. Bucket A.
+    - Markbridge::Renderers::Discourse::Inline::Serializer#after_blank_line
+    - Markbridge::Renderers::Discourse::Tags::ParagraphTag#render
+
     # Inline::Joins.after_run, .before_run and .punctuation_at? walk
     # bytes. Their bounds survive mutation: a count that starts on the
     # run itself or one byte off lands on the same byte after the walk,
@@ -203,8 +210,10 @@ matcher:
     # rendering behavior is pinned by the renderer specs.
     - Markbridge::Renderers::Discourse::Renderer#render
     - Markbridge::Renderers::Discourse::Renderer#render_default
-    # #reset_caches is that housekeeping: dropping the interface cache
-    # reset keeps the entries across calls, which only costs memory.
+    # #enter and #reset_caches are that housekeeping: setting the cache
+    # up again inside a call, or keeping its entries across calls, only
+    # costs memory.
+    - Markbridge::Renderers::Discourse::Renderer#enter
     - Markbridge::Renderers::Discourse::Renderer#reset_caches
 
     # Renderer#render_child's `@previous_list && visible?(output)`: the
