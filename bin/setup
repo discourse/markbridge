@@ -6,8 +6,11 @@ set -vx
 bundle install
 
 # markdown-it for the cooked-output specs. Without Node they are skipped.
+# The second package builds Discourse's own engine for the specs that cook
+# with it; `bin/discourse-engine` runs the build, see AGENTS.md.
 if command -v npm >/dev/null; then
   npm ci --prefix spec/support/markdown_it
+  npm ci --prefix spec/support/discourse_engine
 fi
 
 # Do any other automated setup that you need to do here

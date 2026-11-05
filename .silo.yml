@@ -25,12 +25,16 @@ setup:
   - bundle exec lefthook install -f
   - (cd docs && CI=true pnpm install)
   # markdown-it for the cooked-output specs, without it they are skipped.
+  # The second package builds Discourse's own engine (bin/discourse-engine,
+  # a manual step: it fetches parts of Discourse).
   - npm ci --prefix spec/support/markdown_it
+  - npm ci --prefix spec/support/discourse_engine
 
 sync:
   - for engine in 3.3 3.4 "4.0" jruby truffleruby; do bin/with-ruby "$engine" bundle install; done
   - (cd docs && CI=true pnpm install)
   - npm ci --prefix spec/support/markdown_it
+  - npm ci --prefix spec/support/discourse_engine
 
 update:
   - sudo dnf update -y
