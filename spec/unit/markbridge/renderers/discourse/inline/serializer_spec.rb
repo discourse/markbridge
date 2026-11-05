@@ -24,6 +24,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       expect(serializer.write([tokens.open(:em), tokens.text("a"), tokens.close(:em)])).to eq("*a*")
     end
 
+    it "names an unknown token in the error" do
+      expect { write(:nope) }.to raise_error(ArgumentError, "unknown inline token :nope")
+    end
+
+    it "goes on with the token after a link" do
+      expect(
+        write(tokens.link_open("u"), tokens.text("x"), tokens.link_close, tokens.text("y")),
+      ).to eq("[x](u)y")
+    end
+
     it "escapes text" do
       expect(write(tokens.text("# a *b*"))).to eq("\\# a \\*b\\*")
     end
@@ -62,11 +72,19 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
 
     it "writes a newline at the start of the text after a hard break as <br>" do
       expect(write(tokens.text("x"), tokens.hard_break, "\ny")).to eq("x\n<br>y")
-      expect(write(tokens.text("x"), tokens.hard_break, tokens.text("\n"))).to eq("x\n<br>")
+      expect(write(tokens.text("x"), tokens.hard_break, tokens.text("\n"), "a")).to eq("x\n<br>a")
       # The newline at the edge of the emphasis stands outside the markers.
       expect(write(tokens.text("x"), tokens.hard_break, *em("\ny"))).to eq("x\n<br>*y*")
       expect(write(*em(tokens.text("x"), tokens.hard_break, "\ny"))).to eq("*x\n<br>y*")
       expect(write(*em(tokens.text("x"), tokens.hard_break), "\ny")).to eq("*x*\n<br>y")
+      # A break at the end of a link label moves out of the label too.
+      link = [tokens.link_open("u"), tokens.text("x"), tokens.hard_break, tokens.link_close]
+      expect(write(*link, "\ny")).to eq("[x](u)\n<br>y")
+      # A newline at the end of the content is no break.
+      expect(write(*em(tokens.text("x\n")), "\ny")).to eq("*x*\n\ny")
+      expect(write(tokens.link_open("u"), tokens.text("x\n"), tokens.link_close, "\ny")).to eq(
+        "[x](u)\n\ny",
+      )
       # Two newlines are a blank line the text brings on purpose.
       expect(write(tokens.text("x"), tokens.hard_break, "\n\ny")).to eq("x\n\n\ny")
       # A newline after anything but a hard break is a break of its own.
@@ -75,6 +93,25 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       expect(
         write(tokens.text("x"), tokens.hard_break, tokens.bare_url("https://e.com/"), "\ny"),
       ).to eq("x\nhttps://e.com/\ny")
+    end
+
+    it "writes <br> for a break on a line that holds nothing else, also at the start" do
+      expect(write(tokens.hard_break, tokens.hard_break, tokens.text("b"))).to eq("\n<br>b")
+    end
+
+    it "takes a <br> at the end of the run off again" do
+      # Nothing follows, so the <br> protects no line.
+      expect(write(tokens.text("a"), tokens.hard_break, tokens.hard_break)).to eq("a\n")
+      expect(write(tokens.hard_break, tokens.hard_break)).to eq("\n")
+      expect(write(tokens.text("a\n"), tokens.hard_break, tokens.text(" "))).to eq("a\n<br> ")
+      expect(write(tokens.text("a\n"), tokens.hard_break, html_mode: true)).to eq("a\n<br>")
+    end
+
+    it "does not take a newline at the start of the text after a <br> for a break" do
+      # The break was written as <br>, so the newline makes no blank line.
+      expect(write(tokens.text("a"), tokens.hard_break, tokens.hard_break, "\ny")).to eq(
+        "a\n<br>\ny",
+      )
     end
 
     it "writes nothing for a hard break after a blank line" do
@@ -89,8 +126,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
     end
 
     it "writes no markers around nothing but whitespace and <br>" do
-      expect(write(*em(tokens.hard_break, "<br>"))).to eq("\n<br>")
+      expect(write(*em(tokens.hard_break, "<br>"), "a")).to eq("\n<br>a")
+      expect(write(*em("<br>"))).to eq("<br>")
+      expect(write(*em("<br>", tokens.text(" ")))).to eq("<br> ")
+      expect(write(*em(tokens.text(" "), "<br>"))).to eq(" <br>")
       expect(write(*em(tokens.text(" "), "<br>", tokens.text(" ")))).to eq(" <br> ")
+    end
+
+    it "keeps the spaces at the start of a piece after a blank line in html_mode" do
+      expect(write("a\n\n", "   b", html_mode: true)).to eq("a\n\n   b")
+    end
+
+    it "keeps the spaces at the start of a piece after a waiting bare URL" do
+      href = "https://example.com/"
+
+      expect(write("a\n\n", tokens.bare_url(href), "   b")).to eq("a\n\n#{href}   b")
     end
 
     it "takes the spaces at the start of a piece after a blank line off" do
@@ -186,6 +236,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
         ).to eq("<strong>*a*<!---->*.y*</strong>")
       end
 
+      it "sees one pair spanning the content through a pair of the same kind inside it" do
+        inner = [
+          tokens.open(:em),
+          tokens.open(:em),
+          tokens.text("a"),
+          tokens.close(:em),
+          tokens.close(:em),
+        ]
+
+        expect(write(tokens.open(:strong), *inner, tokens.close(:strong))).to eq("**<em>*a*</em>**")
+      end
+
       it "wraps emphasis with one nested pair spanning the content, not a bare marker character" do
         inner = [tokens.open(:em), tokens.text("a"), tokens.close(:em)]
 
@@ -200,6 +262,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
 
       it "keeps whitespace at the edges inside the BBCode underline" do
         expect(write(tokens.open(:u), tokens.text(" a "), tokens.close(:u))).to eq("[u] a [/u]")
+      end
+
+      it "falls back to HTML for strikethrough with a raw tilde at an edge" do
+        expect(write(tokens.open(:s), tokens.raw("~a"), tokens.close(:s))).to eq("<s>~a</s>")
       end
 
       it "falls back to HTML for strikethrough with a nested strikethrough at an edge" do
@@ -688,6 +754,41 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       serializer.write_groups(groups.map(&:first), html_mode:, before:) do |child|
         outputs.fetch(child)
       end
+    end
+
+    it "fits an output to the line it starts, from the state of the buffer" do
+      expect(write_groups([[:a, "a\n\n"], [:b, "   b"]])).to eq("a\n\nb")
+      expect(write_groups([[:a, "a\n"], [:b, "   b"]])).to eq("a\n   b")
+      expect(write_groups([[:a, "\n"], [:b, "   b"]])).to eq("\n   b")
+      expect(write_groups([[:a, "\n\n"], [:b, "   b"]])).to eq("\n\nb")
+      expect(write_groups([[:a, "a\n\n"], [:b, "   b"]], html_mode: true)).to eq("a\n\n   b")
+      expect(
+        write_groups([[:a, "a\n\n"], [:b, [tokens.bare_url("https://e.com/")]], [:c, "   b"]]),
+      ).to eq("a\n\nhttps://e.com/   b")
+    end
+
+    it "goes on after an output that is empty, without a word to the hook" do
+      seen = []
+
+      expect(write_groups([[:a, "a"], [:b, ""], [:c, "c"]]) { |_, child| seen << child }).to eq(
+        "ac",
+      )
+      expect(seen).to eq(%i[a c])
+      expect(write_groups([[:a, "a"], [:b, []], [:c, "c"]])).to eq("ac")
+      expect(write_groups([[:a, "a\n\n"], [:b, "   "], [:c, "c"]])).to eq("a\n\nc")
+    end
+
+    it "lets a waiting bare URL wait through an empty output" do
+      groups = [[:a, [tokens.bare_url("https://e.com/")]], [:b, ""], [:c, "now"]]
+
+      expect(write_groups(groups)).to eq("[https://e.com/](https://e.com/)now")
+    end
+
+    it "takes a <br> at the end of the group off again, not in html_mode" do
+      groups = [[:a, "a\n"], [:b, [tokens.hard_break]], [:c, [tokens.hard_break]]]
+
+      expect(write_groups(groups)).to eq("a\n")
+      expect(write_groups(groups, html_mode: true)).to eq("a\n<br><br>")
     end
 
     it "writes finished Markdown and tokens one after the other" do
