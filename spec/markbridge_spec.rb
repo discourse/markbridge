@@ -522,7 +522,7 @@ RSpec.describe Markbridge do
 
       # MediaWiki wraps the Bold in a Paragraph, so the appended Text is a
       # second top-level child and a paragraph break separates them.
-      expect(result.markdown).to eq("**hi**\n\n extra")
+      expect(result.markdown).to eq("**hi**\n\nextra")
     end
   end
 
@@ -701,7 +701,7 @@ RSpec.describe Markbridge do
         end
 
       # Paragraph wrap puts the appended Text after a blank line.
-      expect(result.markdown).to eq("**hi**\n\n extra")
+      expect(result.markdown).to eq("**hi**\n\nextra")
     end
   end
 

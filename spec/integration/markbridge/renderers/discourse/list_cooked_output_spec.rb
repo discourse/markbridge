@@ -78,6 +78,14 @@ RSpec.describe "list cooked output", skip: CookedOutput::SKIP_REASON do
     expect(html.css("ul > li > ul > li").map(&:text)).to eq(["a"])
   end
 
+  it "keeps the outer list tight when an aligned block ends a nested list and another list follows" do
+    html = fragment("[list=1][*]x[list][*][center]a[/center][/list][list=1][*]b[/list][/list]")
+
+    expect(html.css("ol > li > p")).to be_empty
+    expect(html.css("ol > li > ul > li div").map { |div| div.text.strip }).to eq(["a"])
+    expect(html.css("ol > li > ol > li").map(&:text)).to eq(["b"])
+  end
+
   it "keeps text after a list inside a quote out of the last list item" do
     html = fragment("[list][*]a[quote][list][*]b[/list]c[/quote][/list]")
 

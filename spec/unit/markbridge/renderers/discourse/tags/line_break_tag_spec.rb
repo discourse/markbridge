@@ -7,15 +7,57 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::LineBreakTag do
   let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
 
   describe "#render" do
-    it "returns a single newline" do
-      expect(tag.render(Markbridge::AST::LineBreak.new, interface)).to eq("\n")
+    it "returns the hard break token" do
+      expect(tag.render(Markbridge::AST::LineBreak.new, interface)).to eq(
+        [Markbridge::Renderers::Discourse::Inline::Tokens.hard_break],
+      )
+    end
+
+    it "renders as <br> after a line that holds only whitespace" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("a") << Markbridge::AST::LineBreak.new <<
+        Markbridge::AST::Text.new(" \t")
+      document << Markbridge::AST::LineBreak.new << Markbridge::AST::Text.new("b")
+
+      expect(renderer.render(document)).to eq("a\n \t<br>b")
+    end
+
+    it "renders as nothing after a blank line" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("a\n\n") << Markbridge::AST::LineBreak.new <<
+        Markbridge::AST::Text.new("b")
+
+      expect(renderer.render(document)).to eq("a\n\nb")
+    end
+
+    it "renders as <br> at the start of an emphasis that starts a line" do
+      first =
+        Markbridge::AST::Bold.new << Markbridge::AST::Text.new("a") <<
+          Markbridge::AST::LineBreak.new
+      second =
+        Markbridge::AST::Bold.new << Markbridge::AST::LineBreak.new <<
+          Markbridge::AST::Text.new("b")
+      document = Markbridge::AST::Document.new << first << second
+
+      expect(renderer.render(document)).to eq("**a**\n**<br>b**")
+    end
+
+    it "renders as a newline, and as <br> after another break" do
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("a") << Markbridge::AST::LineBreak.new <<
+        Markbridge::AST::LineBreak.new
+      document << Markbridge::AST::Text.new("b")
+
+      expect(renderer.render(document)).to eq("a\n<br>b")
     end
 
     context "in html_mode" do
       let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
 
       it "renders <br>" do
-        expect(tag.render(Markbridge::AST::LineBreak.new, interface)).to eq("<br>")
+        expect(
+          renderer.serialize(tag.render(Markbridge::AST::LineBreak.new, interface), context),
+        ).to eq("<br>")
       end
     end
 

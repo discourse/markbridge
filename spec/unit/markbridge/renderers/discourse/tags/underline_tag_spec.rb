@@ -36,7 +36,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UnderlineTag do
       element << Markbridge::AST::LineBreak.new
       element << Markbridge::AST::LineBreak.new
 
-      expect(renderer.render(element)).to eq("\n\n")
+      expect(renderer.render(element)).to eq("\n<br>")
     end
 
     # Discourse's BBCode plugin cooks `[u]…[/u]` from Markdown source but does
