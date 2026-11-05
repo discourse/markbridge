@@ -214,11 +214,54 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
     it "leaves a ! alone when the next piece does not start with [" do
       expect(joined("Hi!", "x")).to eq("Hi!x")
     end
+
+    # The escaper would escape these inside one text, see
+    # MarkdownEscaper; across two pieces the join has to.
+    it "escapes a < at the end of the buffer when the next piece would start raw HTML" do
+      expect(joined("x<", "!y")).to eq("x\\<!y")
+      expect(joined("x<", "?y")).to eq("x\\<?y")
+      expect(joined("x<", "/y")).to eq("x\\</y")
+      expect(joined("x<", "div")).to eq("x\\<div")
+      expect(joined("x<", "Z")).to eq("x\\<Z")
+    end
+
+    it "leaves a < alone in front of a digit, a space or a non-ASCII character" do
+      expect(joined("x<", "5")).to eq("x<5")
+      expect(joined("x<", " y")).to eq("x< y")
+      expect(joined("x<", "äy")).to eq("x<äy")
+    end
+
+    it "leaves a < that is already escaped alone" do
+      expect(joined("x\\<", "!y")).to eq("x\\<!y")
+    end
+
+    it "escapes the second of two dashes that meet, a dash to the typographer" do
+      expect(joined("x-", "-y")).to eq("x-\\-y")
+      expect(joined("x-", "-")).to eq("x-\\-")
+    end
+
+    it "leaves a dash alone next to anything else" do
+      expect(joined("x-", "y")).to eq("x-y")
+      expect(joined("x", "-y")).to eq("x-y")
+      expect(joined("x-", "\\-y")).to eq("x-\\-y")
+    end
   end
 
   describe ".append_like" do
     def append_like(buffer, piece, like, before = nil)
       described_class.append_like(+buffer, piece, like, before)
+    end
+
+    it "escapes a < in front of a placeholder that stands for raw HTML" do
+      expect(append_like("x<", "[p|1]", "!y")).to eq("x\\<[p|1]")
+    end
+
+    it "keeps a dash apart from a placeholder that stands for one with a comment, no backslash can go there" do
+      expect(append_like("x-", "[d|1]", "-y")).to eq("x-<!---->[d|1]")
+    end
+
+    it "escapes a dash after a placeholder with a backslash, the piece is real" do
+      expect(append_like("[d|1]", "-y", nil, "x-")).to eq("[d|1]\\-y")
     end
 
     it "joins the piece as if like stood in its place" do
@@ -291,6 +334,8 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
         described_class.const_get(:UNDERSCORE) => :underscore,
         described_class.const_get(:TILDE) => :tilde,
         described_class.const_get(:AT) => :at,
+        described_class.const_get(:LT) => :lt,
+        described_class.const_get(:DASH) => :dash,
       }
     end
 
@@ -300,7 +345,8 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
         described_class.const_get(:BOUNDARY) => :boundary,
         described_class.const_get(:CHECK_AFTER) => :check_after,
         described_class.const_get(:CHECK_BEFORE) => :check_before,
-        described_class.const_get(:ESCAPE_BANG) => :escape_bang,
+        described_class.const_get(:ESCAPE_BEFORE) => :escape_before,
+        described_class.const_get(:ESCAPE_AFTER) => :escape_after,
       }
     end
 
@@ -319,6 +365,8 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
         underscore: "_",
         tilde: "~",
         at: "@",
+        lt: "<",
+        dash: "-",
       }
     end
 
@@ -342,6 +390,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
         :tilde
       when "@".ord
         :at
+      when "<".ord
+        :lt
+      when "-".ord
+        :dash
       when 48..57, 65..90, 97..122, 128..255
         :word
       when 33..47, 58..64, 91..96, 123..126
@@ -363,10 +415,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
       merging = "*_~`".bytes
       flanking = "*_~".bytes
 
+      html_start = "!/?".bytes + ("a".."z").map(&:ord) + ("A".."Z").map(&:ord)
+
       if before == after && merging.include?(before)
         :boundary
       elsif before == "!".ord && after == "[".ord
-        :escape_bang
+        :escape_before
+      elsif before == "<".ord && html_start.include?(after)
+        :escape_before
+      elsif before == "-".ord && after == "-".ord
+        :escape_after
       elsif flanking.include?(after) && blocking?(before)
         after == "_".ord ? :boundary : :check_after
       elsif flanking.include?(before) && blocking?(after)
@@ -383,7 +441,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
     end
 
     it "gives every action a number of its own" do
-      expect(action_names.size).to eq(5)
+      expect(action_names.size).to eq(6)
     end
 
     it "holds a class for every byte" do
@@ -402,7 +460,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
     end
 
     it "numbers every punctuation class at or above PUNCTUATION" do
-      names = %i[punctuation bang bracket backtick star underscore tilde at]
+      names = %i[punctuation bang bracket backtick star underscore tilde at lt dash]
       threshold = described_class.const_get(:PUNCTUATION)
 
       actual = (0..255).to_h { |byte| [byte, byte_classes.getbyte(byte) >= threshold] }

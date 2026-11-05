@@ -18,6 +18,13 @@ module Markbridge
         # the same delimiter would merge into one longer run, the
         # comment keeps them apart. A `!` right in front of a link makes
         # it an image, a backslash keeps it a `!`.
+        #
+        # Two more joins are what the escaper would escape inside one
+        # text, but cannot see across two pieces: a `<` at the end of the
+        # buffer with a `!`, `?`, `/` or a letter after it would start raw
+        # HTML (a declaration like `<!y` eats the text up to the next
+        # `>`), so the `<` gets a backslash; two `-` that meet would be a
+        # dash to Discourse's typographer, so the second gets one.
         module Joins
           # Inserted between two pieces. Invisible when cooked, and
           # punctuation to the flanking rules.
@@ -49,7 +56,9 @@ module Markbridge
           # a second comparison; they stay punctuation, which is why they
           # sit above PUNCTUATION. AT is the `@` of a mention: after a word
           # character, or punctuation that an email address may hold, it
-          # would read as an email address with the text after it.
+          # would read as an email address with the text after it. LT and
+          # DASH are the `<` and the `-` that the escaper would escape
+          # inside one text, see the module comment.
           OTHER = 0
           WORD = 1
           PUNCTUATION = 2
@@ -60,7 +69,9 @@ module Markbridge
           UNDERSCORE = 7
           TILDE = 8
           AT = 9
-          CLASS_COUNT = 10
+          LT = 10
+          DASH = 11
+          CLASS_COUNT = 12
           # A 256-byte string read with getbyte, so classifying a byte is
           # one read instead of a chain of comparisons.
           BYTE_CLASSES =
@@ -71,6 +82,10 @@ module Markbridge
                   BANG
                 when 42
                   STAR
+                when 45
+                  DASH
+                when 60
+                  LT
                 when 64
                   AT
                 when 91
@@ -96,17 +111,26 @@ module Markbridge
               .pack("C*")
               .freeze
 
-          # What a join between two pieces has to do.
+          # What a join between two pieces has to do. ESCAPE_BEFORE puts a
+          # backslash in front of the last byte of the buffer (a `!` or a
+          # `<`), ESCAPE_AFTER one in front of the first byte of the piece
+          # (a `-`).
           NOTHING = 0
           BOUNDARY = 1
           CHECK_AFTER = 2
           CHECK_BEFORE = 3
-          ESCAPE_BANG = 4
+          ESCAPE_BEFORE = 4
+          ESCAPE_AFTER = 5
           # Runs that merge into a single longer run during Markdown
           # parsing: emphasis (* _), strikethrough (~), code spans (`).
           MERGING_CLASSES = [STAR, UNDERSCORE, TILDE, BACKTICK].freeze
           # Runs that open and close only where the flanking rules allow it.
           FLANKING_CLASSES = [STAR, UNDERSCORE, TILDE].freeze
+          # The bytes after a `<` that start raw HTML (CommonMark 6.6): a
+          # tag name or `/`, a declaration `!`, a processing instruction
+          # `?`. Bytes, not classes: a digit or a non-ASCII byte is a word
+          # character too, but starts no tag.
+          HTML_START_BYTES = [33, 47, 63, *65..90, *97..122].freeze
 
           # The action per join, in CLASS_COUNT rows of 256 bytes (2304 in
           # all), read with JOIN_ACTIONS.getbyte((class of the byte in front
@@ -128,12 +152,17 @@ module Markbridge
             Array
               .new(CLASS_COUNT * 256) do |index|
                 before = index >> 8
-                after = BYTE_CLASSES.getbyte(index & 255)
+                byte = index & 255
+                after = BYTE_CLASSES.getbyte(byte)
 
                 if before == after && MERGING_CLASSES.include?(before)
                   BOUNDARY
                 elsif before == BANG && after == BRACKET
-                  ESCAPE_BANG
+                  ESCAPE_BEFORE
+                elsif before == LT && HTML_START_BYTES.include?(byte)
+                  ESCAPE_BEFORE
+                elsif before == DASH && after == DASH
+                  ESCAPE_AFTER
                 elsif FLANKING_CLASSES.include?(after) && (before == WORD || before == TILDE)
                   after == UNDERSCORE ? BOUNDARY : CHECK_AFTER
                 elsif FLANKING_CLASSES.include?(before) && (after == WORD || after == TILDE)
@@ -162,15 +191,19 @@ module Markbridge
                            :UNDERSCORE,
                            :TILDE,
                            :AT,
+                           :LT,
+                           :DASH,
                            :CLASS_COUNT,
                            :BYTE_CLASSES,
                            :NOTHING,
                            :BOUNDARY,
                            :CHECK_AFTER,
                            :CHECK_BEFORE,
-                           :ESCAPE_BANG,
+                           :ESCAPE_BEFORE,
+                           :ESCAPE_AFTER,
                            :MERGING_CLASSES,
                            :FLANKING_CLASSES,
+                           :HTML_START_BYTES,
                            :JOIN_ACTIONS
 
           # Appends +piece+ to +buffer+ with what the join between them
@@ -211,7 +244,7 @@ module Markbridge
               after = like || piece
               action =
                 JOIN_ACTIONS.getbyte((BYTE_CLASSES.getbyte(last_byte) << 8) + after.getbyte(0))
-              join(buffer, after, last_byte, action, tail) unless action == NOTHING
+              join(buffer, after, last_byte, action, tail, !like.nil?) unless action == NOTHING
             end
             buffer << piece
           end
@@ -237,19 +270,23 @@ module Markbridge
 
           # Carries out the action the table picked. NOTHING never gets
           # here, the caller keeps it out, so the last branch is
-          # ESCAPE_BANG. +tail+ is what the end of the buffer is read as,
-          # see .append_like.
-          def self.join(buffer, piece, last_byte, action, tail = buffer)
+          # ESCAPE_BEFORE. +tail+ is what the end of the buffer is read
+          # as, and +stand_in+ says whether +piece+ stands for the piece
+          # that is appended, see .append_like: a stand-in gets no
+          # backslash, the comment keeps the two apart instead.
+          def self.join(buffer, piece, last_byte, action, tail = buffer, stand_in = false)
             if action == BOUNDARY
               buffer << BOUNDARY_COMMENT
             elsif action == CHECK_AFTER
               buffer << BOUNDARY_COMMENT if punctuation_at?(piece, after_run(piece))
             elsif action == CHECK_BEFORE
               buffer << BOUNDARY_COMMENT if punctuation_at?(tail, before_run(tail, last_byte))
+            elsif action == ESCAPE_AFTER
+              buffer << (stand_in ? BOUNDARY_COMMENT : "\\")
             elsif !tail.equal?(buffer)
               buffer << BOUNDARY_COMMENT
             elsif !escaped_end?(buffer)
-              # Byte offsets: the `!` is the last byte.
+              # Byte offsets: the `!` or `<` is the last byte.
               buffer.bytesplice(buffer.bytesize - 1, 0, "\\")
             end
           end
