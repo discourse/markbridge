@@ -29,7 +29,12 @@ module Markbridge
           # outside ASCII only; an ASCII byte is answered from the class
           # table without a regex.
           PUNCTUATION_AT = /\A[\p{P}\p{S}]/
+          # Whitespace outside ASCII, matched on the one character.
+          SPACE_AT = /\A[[:space:]]/
           BACKSLASH = 92
+          SPACE = 32
+          TAB = 9
+          CR = 13
 
           # What a byte is to the join rules. WORD: ASCII letters and
           # digits, and every non-ASCII byte. On the side of the join away
@@ -135,7 +140,11 @@ module Markbridge
               .pack("C*")
               .freeze
           private_constant :PUNCTUATION_AT,
+                           :SPACE_AT,
                            :BACKSLASH,
+                           :SPACE,
+                           :TAB,
+                           :CR,
                            :OTHER,
                            :WORD,
                            :PUNCTUATION,
@@ -242,13 +251,57 @@ module Markbridge
             byte = string.getbyte(index)
             return BYTE_CLASSES.getbyte(byte) >= PUNCTUATION if byte < 128
 
-            # The lead byte says how long the character is; a slice that
-            # reaches into the next character is no valid string.
-            length = byte >= 0xF0 ? 4 : byte >= 0xE0 ? 3 : 2
-            string.byteslice(index, length).match?(PUNCTUATION_AT)
+            string.byteslice(index, char_length(byte)).match?(PUNCTUATION_AT)
           end
 
-          private_class_method :join, :punctuation_at?, :after_run, :before_run
+          # Whether the character at byte +index+ of +string+ is whitespace
+          # as [[:space:]] reads it; nil is no character. A regex over the
+          # whole string would scan it for its encoding first, which costs
+          # as much as the string is long.
+          def self.space_at?(string, index)
+            return false if index.nil?
+
+            byte = string.getbyte(index)
+            return false if byte.nil?
+            return byte == SPACE || (byte >= TAB && byte <= CR) if byte < 128
+            return false if byte < 0xC2
+
+            string.byteslice(index, char_length(byte)).match?(SPACE_AT)
+          end
+
+          # The byte offset of the last character of +string+, nil for an
+          # empty string.
+          def self.last_char_index(string)
+            index = string.bytesize - 1
+            index -= 1 while index.positive? && (string.getbyte(index) & 0xC0) == 0x80
+            index.negative? ? nil : index
+          end
+
+          # Whether +string+ holds a character that is not whitespace.
+          def self.visible?(string)
+            index = 0
+            while (byte = string.getbyte(index))
+              return true unless space_at?(string, index)
+
+              index += byte < 128 ? 1 : char_length(byte)
+            end
+            false
+          end
+
+          # The length in bytes of the character whose lead byte is +byte+.
+          # A slice that reaches into the next character is no valid
+          # string, so a slice is cut to the character.
+          def self.char_length(byte)
+            if byte >= 0xF0
+              4
+            elsif byte >= 0xE0
+              3
+            else
+              2
+            end
+          end
+
+          private_class_method :join, :punctuation_at?, :after_run, :before_run, :char_length
         end
       end
     end

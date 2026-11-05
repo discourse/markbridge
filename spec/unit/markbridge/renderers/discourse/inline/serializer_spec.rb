@@ -80,6 +80,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       expect(write("a\n\n", "   ", "b")).to eq("a\n\nb")
       expect(write("a\n \n", "   b")).to eq("a\n \nb")
       expect(write("a\n\n", " \t b")).to eq("a\n\nb")
+      expect(write("a\n\n", "\tb")).to eq("a\n\nb")
       expect(write("a\n\n", tokens.text(" \n "), "b")).to eq("a\n\n\n b")
       expect(write("a\n\n", "\u00A0b")).to eq("a\n\n\u00A0b")
       expect(write("a\n", "   ", "b")).to eq("a\n   b")
