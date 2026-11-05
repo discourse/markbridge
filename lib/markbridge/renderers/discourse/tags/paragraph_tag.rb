@@ -17,12 +17,10 @@ module Markbridge
             content = interface.render_children(element, context: child_context)
 
             if interface.html_mode?
-              # Inside a table cell the surrounding <td> already provides the
-              # block context, so a <p> wrapper just adds vertical margin —
-              # and if the paragraph contains a block element (e.g. a list),
-              # `<p><ul>…</ul></p>` is invalid per HTML5. Drop the wrapper.
-              return content if interface.has_parent?(AST::TableCell)
-
+              # Also inside a table cell: without the <p> the paragraph
+              # runs into the text next to it. A block inside the
+              # paragraph closes the <p> early in the HTML parser, which
+              # is what the Markdown form does as well.
               return "<p>#{content}</p>"
             end
 

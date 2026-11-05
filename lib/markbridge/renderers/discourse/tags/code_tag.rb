@@ -69,9 +69,10 @@ module Markbridge
             "\n\n#{fence}#{language}\n#{content.chomp}\n#{fence}\n\n"
           end
 
+          # A blank line in the code would end the HTML block around it.
           def render_html_block(content, language)
             class_attr = %( class="language-#{HtmlEscaper.escape(language)}") if language
-            "<pre><code#{class_attr}>#{content}</code></pre>"
+            "<pre><code#{class_attr}>#{HtmlBlock.without_blank_lines(content)}</code></pre>"
           end
 
           def calculate_fence(content)

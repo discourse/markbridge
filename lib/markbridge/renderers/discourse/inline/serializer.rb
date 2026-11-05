@@ -441,7 +441,7 @@ module Markbridge
 
           def text_piece(token, html_mode)
             _, string, mode = token
-            return @html_escaper.escape(string) if html_mode
+            return HtmlBlock.without_blank_lines(@html_escaper.escape(string)) if html_mode
 
             case mode
             when Tokens::ESCAPE
@@ -462,9 +462,10 @@ module Markbridge
           # +nested+ says whether a nested pair stands at the start, at
           # the end, and whether that is one pair spanning the content.
           def delimiter_piece(name, content, html_mode, nested)
+            return content if nothing_to_wrap?(content)
+
             open, close, html_open, html_close, char = DELIMITERS.fetch(name)
             return "#{html_open}#{content}#{html_close}" if html_mode
-            return content if nothing_to_wrap?(content)
 
             if char && edge_whitespace?(content)
               match = content.match(EDGES)
