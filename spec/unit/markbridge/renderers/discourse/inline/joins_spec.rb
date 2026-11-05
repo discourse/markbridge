@@ -379,4 +379,61 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
       expect(actual).to eq(expected)
     end
   end
+
+  describe ".space_at?" do
+    it "knows ASCII whitespace by its byte" do
+      expect(described_class.space_at?("a b", 1)).to be(true)
+      expect(described_class.space_at?("a\tb", 1)).to be(true)
+      expect(described_class.space_at?("a\nb", 1)).to be(true)
+      expect(described_class.space_at?("a\rb", 1)).to be(true)
+      expect(described_class.space_at?("a\fb", 1)).to be(true)
+      expect(described_class.space_at?("a\vb", 1)).to be(true)
+      expect(described_class.space_at?("a\bb", 1)).to be(false)
+      expect(described_class.space_at?("a!b", 1)).to be(false)
+      expect(described_class.space_at?("a~b", 1)).to be(false)
+    end
+
+    it "matches a character outside ASCII as a whole" do
+      expect(described_class.space_at?("a\u00A0b", 1)).to be(true)
+      expect(described_class.space_at?("a\u2003b", 1)).to be(true)
+      expect(described_class.space_at?("a\u3000b", 1)).to be(true)
+      expect(described_class.space_at?("a\u2003\u2003", 1)).to be(true)
+      expect(described_class.space_at?("aéb", 1)).to be(false)
+      expect(described_class.space_at?("a漢b", 1)).to be(false)
+      expect(described_class.space_at?("a😀b", 1)).to be(false)
+    end
+
+    it "is false past the end and for no index" do
+      expect(described_class.space_at?("a", 1)).to be(false)
+      expect(described_class.space_at?("a", nil)).to be(false)
+    end
+  end
+
+  describe ".last_char_index" do
+    it "finds the start of the last character" do
+      expect(described_class.last_char_index("ab")).to eq(1)
+      expect(described_class.last_char_index("aé")).to eq(1)
+      expect(described_class.last_char_index("a漢")).to eq(1)
+      expect(described_class.last_char_index("a😀")).to eq(1)
+      expect(described_class.last_char_index("😀")).to eq(0)
+      expect(described_class.last_char_index("a")).to eq(0)
+      expect(described_class.last_char_index("")).to be_nil
+    end
+  end
+
+  describe ".visible?" do
+    it "is true for a character that is not whitespace" do
+      expect(described_class.visible?("a")).to be(true)
+      expect(described_class.visible?(" a")).to be(true)
+      expect(described_class.visible?("\u00A0é")).to be(true)
+      expect(described_class.visible?("  \u2003漢 ")).to be(true)
+    end
+
+    it "is false for whitespace alone and for nothing" do
+      expect(described_class.visible?("")).to be(false)
+      expect(described_class.visible?(" \t\n")).to be(false)
+      expect(described_class.visible?("\u00A0\u2003\u3000")).to be(false)
+      expect(described_class.visible?(" \u00A0 ")).to be(false)
+    end
+  end
 end

@@ -34,12 +34,10 @@ module Markbridge
             u: ["[u]", "[/u]", %(<span class="bbcode-u">), "</span>", nil, false],
           }.freeze
 
-          VISIBLE = /[^[:space:]]/
           # Whitespace and <br> only: nothing a marker could wrap.
           NOTHING_TO_WRAP = /\A(?:[[:space:]]|<br>)*\z/
           # Leading or trailing whitespace, Unicode-aware: CommonMark's
           # flanking rules treat a no-break space as whitespace too.
-          EDGE_WHITESPACE = /\A[[:space:]]|[[:space:]]\z/m
           EDGES = /\A([[:space:]]*)(.+?)([[:space:]]*)\z/m
 
           # Text after a bare URL glues to it, unless it starts with
@@ -75,6 +73,7 @@ module Markbridge
           NEWLINE = 10
           SPACE = 32
           TAB = 9
+          LT = 60
           # Whitespace with a line break in it, see #flat_alt.
           ALT_LINE_BREAK = /[[:space:]]*\n[[:space:]]*/
           # The parts after a `|` in the alt text that Discourse reads as
@@ -85,9 +84,7 @@ module Markbridge
             /\A(?:[1-9][0-9]*x[1-9][0-9]*(?:[[:space:]]*,[[:space:]]*x?[1-9][0-9]{0,2}[%x]?)?|video|audio|thumbnail)\z/
           DATA_ATTRIBUTE = /\A[\w\-:.]*=/
 
-          private_constant :VISIBLE,
-                           :NOTHING_TO_WRAP,
-                           :EDGE_WHITESPACE,
+          private_constant :NOTHING_TO_WRAP,
                            :EDGES,
                            :GLUED_AFTER,
                            :GLUED_AFTER_PAREN_OK,
@@ -100,6 +97,7 @@ module Markbridge
                            :NEWLINE,
                            :SPACE,
                            :TAB,
+                           :LT,
                            :ALT_LINE_BREAK,
                            :DISCOURSE_OPTION,
                            :DATA_ATTRIBUTE
@@ -256,11 +254,28 @@ module Markbridge
           # that still waits: the piece follows the URL, not the blank
           # line.
           def after_blank_line(buffer, piece, blank)
-            unless piece.match?(LEADING_BLANKS) && trailing_blank_lines(buffer, blank) == 2
-              return piece
-            end
+            first = piece.getbyte(0)
+            blanks = first == SPACE || first == TAB
+            return piece unless blanks && trailing_blank_lines(buffer, blank) == 2
 
             piece.sub(LEADING_BLANKS, "")
+          end
+
+          # Nothing but whitespace and <br>, or nothing at all. The regex
+          # runs only when the first character lets it match; a regex over
+          # the whole content scans it for its encoding first.
+          def nothing_to_wrap?(content)
+            first = content.getbyte(0)
+            return true if first.nil?
+            return false unless first == LT || Joins.space_at?(content, 0)
+
+            content.match?(NOTHING_TO_WRAP)
+          end
+
+          # Whitespace at the start or at the end of the content, checked on
+          # the two characters alone.
+          def edge_whitespace?(content)
+            Joins.space_at?(content, 0) || Joins.space_at?(content, Joins.last_char_index(content))
           end
 
           # How many of the lines at the end of the buffer hold nothing but
@@ -398,9 +413,9 @@ module Markbridge
           def delimiter_piece(name, content, html_mode, nested = NO_PAIRS)
             open, close, html_open, html_close, char, pair_edge_fine = DELIMITERS.fetch(name)
             return "#{html_open}#{content}#{html_close}" if html_mode
-            return content if content.match?(NOTHING_TO_WRAP)
+            return content if nothing_to_wrap?(content)
 
-            if char && content.match?(EDGE_WHITESPACE)
+            if char && edge_whitespace?(content)
               match = content.match(EDGES)
               lead = match[1]
               core = match[2]
@@ -455,9 +470,7 @@ module Markbridge
           # Content without whitespace at its edges, the common case, takes
           # the plain interpolation.
           def place_markers(content, open, close)
-            unless content.match?(EDGE_WHITESPACE)
-              return "#{open}#{keep_backslash(content)}#{close}"
-            end
+            return "#{open}#{keep_backslash(content)}#{close}" unless edge_whitespace?(content)
 
             match = content.match(EDGES)
             "#{match[1]}#{open}#{keep_backslash(match[2])}#{close}#{match[3]}"
@@ -465,7 +478,7 @@ module Markbridge
 
           def link_piece(destination, content, html_mode)
             return html_link(destination, content) if html_mode
-            return content unless content.match?(VISIBLE)
+            return content unless Joins.visible?(content)
 
             place_markers(content, "[", "](#{LinkDestination.escape(destination)})")
           end

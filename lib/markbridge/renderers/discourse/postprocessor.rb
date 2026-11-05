@@ -81,7 +81,10 @@ module Markbridge
         NEWLINE_RUN_START = "\n\n\n"
         # A line with nothing but spaces and tabs on it.
         WHITESPACE_LINE = /^[ \t]+$/
-        private_constant :NEWLINE_RUN, :NEWLINE_RUN_START, :WHITESPACE_LINE
+        SPACE = 32
+        TAB = 9
+        NEWLINE = 10
+        private_constant :NEWLINE_RUN, :NEWLINE_RUN_START, :WHITESPACE_LINE, :SPACE, :TAB, :NEWLINE
 
         # The two checks in front of the gsubs save the copy that gsub makes
         # also when nothing matches. Most text has neither three newlines
@@ -90,7 +93,7 @@ module Markbridge
           prose = prose.gsub(TRAILING_INVISIBLE_RE, "") if @strip_trailing_invisibles
           # Whitespace-only lines are cleared first, so the blank lines
           # they leave are part of the newline run that is collapsed next.
-          prose = prose.gsub(WHITESPACE_LINE, "") if prose.match?(WHITESPACE_LINE)
+          prose = prose.gsub(WHITESPACE_LINE, "") if whitespace_line?(prose)
           prose = prose.gsub(NEWLINE_RUN, "\n\n") if prose.include?(NEWLINE_RUN_START)
           prose
         end
@@ -120,6 +123,22 @@ module Markbridge
         # back as it is — the scan would put the same bytes into a new
         # string, and a document whose fences are the only reason it comes
         # here is the common one.
+        # Whether a line of +prose+ holds nothing but spaces and tabs. A
+        # walk over the line starts; the regex would scan the whole text,
+        # and scan it once more for its encoding first.
+        def whitespace_line?(prose)
+          start = 0
+          while start
+            index = start
+            index += 1 while (byte = prose.getbyte(index)) == SPACE || byte == TAB
+            return true if index > start && (byte.nil? || byte == NEWLINE)
+
+            newline = prose.byteindex("\n", index)
+            start = newline && newline + 1
+          end
+          false
+        end
+
         def clean_around_fences(text)
           return text unless needs_cleaning?(text)
 

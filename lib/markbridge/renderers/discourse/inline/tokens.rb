@@ -125,9 +125,6 @@ module Markbridge
             [HTML, string]
           end
 
-          VISIBLE = /[^[:space:]]/
-          private_constant :VISIBLE
-
           # Whether the tokens put something on the page: text or Markdown
           # with something other than whitespace in it, code, a link, a
           # bare URL or an image. Delimiters and hard breaks alone do not.
@@ -136,11 +133,11 @@ module Markbridge
           # @return [Boolean]
           def self.visible?(tokens)
             tokens.any? do |token|
-              next token.match?(VISIBLE) if token.instance_of?(String)
+              next Joins.visible?(token) if token.instance_of?(String)
 
               case token.first
               when TEXT, HTML
-                token.fetch(1).match?(VISIBLE)
+                Joins.visible?(token.fetch(1))
               when CODE
                 !token.fetch(1).empty?
               when LINK_OPEN, BARE_URL, IMAGE
