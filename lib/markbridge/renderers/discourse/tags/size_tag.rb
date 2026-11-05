@@ -4,21 +4,20 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Tag for rendering sized text
-        # Note: Discourse doesn't support inline size changes by default
-        # Renders as plain text with HTML comment noting the size was lost
+        # Tag for rendering sized text as a span with a style, which needs
+        # HTML to be enabled; Discourse has no Markdown for it. The tags
+        # are inline tokens, see SuperscriptTag. Without a size the
+        # content stands alone.
         class SizeTag < Tag
-          def render(element, interface)
-            child_context = interface.with_parent(element)
-            content = interface.render_children(element, context: child_context)
+          CLOSE = Inline::Tokens.html("</span>")
+          private_constant :CLOSE
 
-            if element.size
-              # Render as HTML span with style - requires HTML to be enabled
-              # Alternative: just output the text without size
-              "<span style=\"font-size: #{element.size}px\">#{content}</span>"
-            else
-              content
-            end
+          def render(element, interface)
+            tokens = interface.render_tokens(element, context: interface.with_parent(element))
+            return tokens unless element.size
+
+            open = Inline::Tokens.html(%(<span style="font-size: #{element.size}px">))
+            tokens.unshift(open) << CLOSE
           end
         end
       end

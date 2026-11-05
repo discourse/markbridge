@@ -107,6 +107,19 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       expect(write(tokens.text("a\n"), tokens.hard_break, html_mode: true)).to eq("a\n<br>")
     end
 
+    it "writes a break or a newline right after an HTML tag as <br>" do
+      # The tag alone on its line would open an HTML block.
+      expect(write(tokens.html("<sup>"), tokens.hard_break, "a", tokens.html("</sup>"))).to eq(
+        "<sup><br>a</sup>",
+      )
+      expect(write(tokens.html("<sup>"), tokens.text("\na"), tokens.html("</sup>"))).to eq(
+        "<sup><br>a</sup>",
+      )
+      # Two newlines are a blank line the text brings on purpose.
+      expect(write(tokens.html("<sup>"), tokens.text("\n\na"))).to eq("<sup>\n\na")
+      expect(write(tokens.html("<sup>"), "x", tokens.hard_break, "a")).to eq("<sup>x\na")
+    end
+
     it "does not take a newline at the start of the text after a <br> for a break" do
       # The break was written as <br>, so the newline makes no blank line.
       expect(write(tokens.text("a"), tokens.hard_break, tokens.hard_break, "\ny")).to eq(
