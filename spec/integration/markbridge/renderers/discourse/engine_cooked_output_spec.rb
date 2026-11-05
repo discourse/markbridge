@@ -224,7 +224,7 @@ RSpec.describe "cooked output of the Discourse engine",
       cooked = cook_none(html_table(details("More", "body")), html_table(spoiler("hidden")))
 
       cells = cooked.css("td").map(&:text)
-      expect(cooked.at_css("td > p > strong").text).to eq("More")
+      expect(cooked.at_css("td > div > p > strong").text).to eq("More")
       expect(cells).to include("Morebody").and include("hidden")
       expect(cooked.css("details, span.spoiler")).to be_empty
     end

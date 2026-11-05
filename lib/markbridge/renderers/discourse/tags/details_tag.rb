@@ -60,15 +60,19 @@ module Markbridge
           end
 
           # The title as a paragraph in bold, rendered like any paragraph,
-          # then the content.
+          # then the content. In html_mode a div keeps the block apart from
+          # the text around it, as the blank lines do in Markdown.
           def without_plugin(element, content, interface)
             title = element.title.to_s.strip
-            html = interface.html_mode?
-            return html ? content : "\n\n#{content}\n\n" if title.empty?
+            heading = ""
+            unless title.empty?
+              paragraph = AST::Paragraph.new << (AST::Bold.new << AST::Text.new(title))
+              heading = interface.render_node(paragraph)
+            end
+            return "<div>#{heading}#{content}</div>" if interface.html_mode?
 
-            paragraph = AST::Paragraph.new << (AST::Bold.new << AST::Text.new(title))
-            heading = interface.render_node(paragraph)
-            html ? "#{heading}#{content}" : "\n\n#{heading.strip}\n\n#{content}\n\n"
+            heading = "#{heading.strip}\n\n" unless heading.empty?
+            "\n\n#{heading}#{content}\n\n"
           end
         end
       end

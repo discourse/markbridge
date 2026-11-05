@@ -425,9 +425,16 @@ class RoundTripChecker
     when AST::HorizontalRule
       [skeleton("hr")]
     when AST::Details
-      # Without the plugin the title is a paragraph in bold in front.
-      title = !@features[:details] && details_title(node) ? [skeleton("strong")] : []
-      title + expected_children(node, html:)
+      return expected_children(node, html:) if @features[:details]
+
+      # Without the plugin the title is a paragraph in bold in front, and
+      # in html_mode a div holds both.
+      title = details_title(node) ? [skeleton("strong")] : []
+      if html
+        [skeleton("div", children: title + expected_children(node, html:))]
+      else
+        title + expected_children(node, html:)
+      end
     when AST::Element
       expected_children(node, html:)
     else
