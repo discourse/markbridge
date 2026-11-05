@@ -449,7 +449,7 @@ module Markbridge
           # Content that would break the marker gets the HTML tags.
           # +nested+ says whether a nested pair stands at the start, at
           # the end, and whether that is one pair spanning the content.
-          def delimiter_piece(name, content, html_mode, nested = NO_PAIRS)
+          def delimiter_piece(name, content, html_mode, nested)
             open, close, html_open, html_close, char, pair_edge_fine = DELIMITERS.fetch(name)
             return "#{html_open}#{content}#{html_close}" if html_mode
             return content if nothing_to_wrap?(content)
