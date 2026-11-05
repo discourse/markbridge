@@ -103,7 +103,7 @@ matcher:
     - Markbridge::Renderers::Discourse::Inline::Serializer#place_markers
 
     # Inline::Serializer#nothing_to_wrap?, #edge_whitespace? and
-    # #delimiter_piece look at the first and the last character before
+    # #paragraph_piece look at the first and the last character before
     # they run the regex that gives the same answer: the regex and the
     # match it leaves behind cost a String per emphasis. #nested_pairs
     # returns the shared NO_PAIRS where the computation would build the
@@ -116,7 +116,7 @@ matcher:
     # copy the whole text. Bucket A.
     - Markbridge::Renderers::Discourse::Inline::Serializer#nothing_to_wrap?
     - Markbridge::Renderers::Discourse::Inline::Serializer#edge_whitespace?
-    - Markbridge::Renderers::Discourse::Inline::Serializer#delimiter_piece
+    - Markbridge::Renderers::Discourse::Inline::Serializer#paragraph_piece
     - Markbridge::Renderers::Discourse::Inline::Serializer#nested_pairs
     - Markbridge::Renderers::Discourse::Inline::Serializer#trailing_blank_lines
     - Markbridge::Renderers::Discourse::Inline::Serializer#initialize

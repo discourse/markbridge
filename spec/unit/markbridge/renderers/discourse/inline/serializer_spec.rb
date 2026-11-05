@@ -337,6 +337,83 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
         expect(write(tokens.open(:s), tokens.raw("\\~"), tokens.close(:s))).to eq("~~\\~~~")
       end
 
+      describe "content with a blank line" do
+        def strong(*content)
+          [tokens.open(:strong), *content, tokens.close(:strong)]
+        end
+
+        it "wraps every paragraph in its own markers" do
+          expect(write(*strong(tokens.text("a\n\nb")))).to eq("**a**\n\n**b**")
+          expect(write(tokens.open(:u), tokens.text("a\n\nb"), tokens.close(:u))).to eq(
+            "[u]a[/u]\n\n[u]b[/u]",
+          )
+        end
+
+        it "keeps a blank line at an edge outside the markers" do
+          expect(write(*strong(tokens.text("a\n\n")))).to eq("**a**\n\n")
+          expect(write(tokens.text("x "), *strong(tokens.raw("\n\na")))).to eq("x \n\n**a**")
+        end
+
+        it "writes a paragraph with nothing visible without markers" do
+          expect(write(*strong(tokens.text("a\n\n  \n\nb")))).to eq("**a**\n\n  \n\n**b**")
+        end
+
+        it "keeps whitespace at the edges of every paragraph outside the markers" do
+          expect(write(*em(tokens.text("a \n\n b")))).to eq("*a* \n\n *b*")
+        end
+
+        it "picks the HTML fallback for every paragraph on its own" do
+          expect(write(tokens.open(:s), tokens.raw("a~\n\nb"), tokens.close(:s))).to eq(
+            "<s>a~</s>\n\n~~b~~",
+          )
+          expect(write(tokens.open(:s), tokens.raw("a\n\n~b"), tokens.close(:s))).to eq(
+            "~~a~~\n\n<s>~b</s>",
+          )
+        end
+
+        it "keeps a nested pair at the start or the end of the content at that edge" do
+          expect(write(*strong(*em(tokens.text("a")), tokens.text(" b\n\nc")))).to eq(
+            "***a* b**\n\n**c**",
+          )
+          expect(write(*strong(tokens.text("a\n\nb "), *em(tokens.text("c"))))).to eq(
+            "**a**\n\n**b *c***",
+          )
+        end
+
+        it "falls back to HTML for a marker character at the outer edges without a nested pair" do
+          expect(write(*strong(tokens.raw("*a\n\nb")))).to eq("<strong>*a</strong>\n\n**b**")
+          expect(write(*strong(tokens.raw("a\n\nb*")))).to eq("**a**\n\n<strong>b*</strong>")
+        end
+
+        it "takes a split nested pair at the edges between the paragraphs as a pair" do
+          expect(
+            write(*strong(tokens.text("a"), *em(tokens.text("b\n\nc")), tokens.text("d"))),
+          ).to eq("**a*b***\n\n***c*d**")
+        end
+
+        it "falls back to HTML for a paragraph with pairs at both edges that do not span it" do
+          expect(
+            write(
+              *strong(*em(tokens.text("a\n\nb")), tokens.text(" "), *em(tokens.text("c\n\nd"))),
+            ),
+          ).to eq("<strong>*a*</strong>\n\n<strong>*b* *c*</strong>\n\n<strong>*d*</strong>")
+        end
+
+        it "takes a nested pair that spans the content as spanning every paragraph" do
+          expect(write(*strong(*em(tokens.text("a\n\nb"))))).to eq("***a***\n\n***b***")
+        end
+
+        it "wraps content with a code fence as a whole" do
+          expect(write(*strong(tokens.raw("a\n\n```\nx\n```")))).to eq("**a\n\n```\nx\n```**")
+        end
+
+        it "writes the HTML tags around the whole content in an HTML block" do
+          expect(write(*strong(tokens.raw("a\n\nb")), html_mode: true)).to eq(
+            "<strong>a\n\nb</strong>",
+          )
+        end
+      end
+
       it "has no HTML fallback for the underline" do
         expect(write(tokens.open(:u), tokens.raw("[u]a[/u]"), tokens.close(:u))).to eq(
           "[u][u]a[/u][/u]",

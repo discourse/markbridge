@@ -212,6 +212,42 @@ RSpec.describe "phpBB3 XML to Markdown" do
       expect(convert("<t>a<br/>\n          b</t>")).to eq("a\nb")
     end
 
+    it "closes and reopens bold around a blank line" do
+      xml = "<r><B><s>[b]</s>a<br/>\n<br/>\nb<e>[/b]</e></B> c</r>"
+
+      expect(convert(xml)).to eq("**a**\n\n**b** c")
+    end
+
+    it "closes bold before a blank line at its end" do
+      xml = "<r><B><s>[b]</s>a<br/>\n<br/>\n<e>[/b]</e></B>b</r>"
+
+      expect(convert(xml)).to eq("**a**\n\nb")
+    end
+
+    it "closes and reopens italic, strikethrough and underline around a blank line" do
+      expect(convert("<r><I>a<br/>\n<br/>\nb</I></r>")).to eq("*a*\n\n*b*")
+      expect(convert("<r><S>a<br/>\n<br/>\nb</S></r>")).to eq("~~a~~\n\n~~b~~")
+      expect(convert("<r><U>a<br/>\n<br/>\nb</U></r>")).to eq("[u]a[/u]\n\n[u]b[/u]")
+    end
+
+    it "closes and reopens nested formatting around a blank line" do
+      xml = "<r><B><s>[b]</s><I><s>[i]</s>a<br/><br/>b<e>[/i]</e></I><e>[/b]</e></B></r>"
+
+      expect(convert(xml)).to eq("***a***\n\n***b***")
+    end
+
+    it "closes and reopens bold around a blank line in a list item" do
+      xml = "<r><LIST><LI><s>[*]</s><B>a<br/>\n<br/>\nb</B></LI></LIST></r>"
+
+      expect(convert(xml)).to eq("- **a**\n\n  **b**")
+    end
+
+    it "closes and reopens bold around a blank line in a quote" do
+      xml = "<r><QUOTE author=\"alice\"><B>a<br/>\n<br/>\nb</B></QUOTE></r>"
+
+      expect(convert(xml)).to eq("[quote=\"alice\"]\n**a**\n\n**b**\n[/quote]")
+    end
+
     it "removes the indentation inside an inline element at the start of a line" do
       xml = "<r>a<br/>\n<B><s>[b]</s>          b<e>[/b]</e></B></r>"
 
