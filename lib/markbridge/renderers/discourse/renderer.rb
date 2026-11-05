@@ -412,12 +412,12 @@ module Markbridge
           end
         end
 
-        # In html_mode, surround pre-formatted Markdown with blank lines so that
-        # CommonMark terminates the enclosing HTML block (e.g. <table>) and
-        # parses the content as Markdown before the closing tags reopen another
-        # HTML block.
+        # In html_mode, pre-formatted Markdown is a Markdown island in a
+        # `<div>`: the blank lines end the enclosing HTML block (e.g. a
+        # <table>) so that CommonMark parses the content as Markdown, and
+        # the `</div>` line opens the block again for the rest of the cell.
         def render_markdown_text(node, context)
-          context.html_mode? ? HtmlBlock.island(node.text) : node.text
+          context.html_mode? ? HtmlBlock.enclosed_island(node.text) : node.text
         end
 
         # Text nodes are the most frequent nodes, so this walks the parent
@@ -433,8 +433,12 @@ module Markbridge
         # element). The tags write their own brackets around it.
         def render_text(node, context)
           # In html_mode even inside a code block we must HTML-escape, otherwise a
-          # stray `<` in a code cell would break the surrounding <td>.
-          return @html_escaper.escape(node.text) if context.html_mode?
+          # stray `<` in a code cell would break the surrounding <td>. A
+          # blank line would end the block, like the serializer's text
+          # it is written as the entity.
+          if context.html_mode?
+            return HtmlBlock.without_blank_lines(@html_escaper.escape(node.text))
+          end
 
           in_link_label = false
 

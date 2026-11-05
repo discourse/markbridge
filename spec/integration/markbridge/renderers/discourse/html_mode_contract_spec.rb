@@ -7,15 +7,18 @@
 # and only re-enters Markdown parsing across blank lines (spec §4.6).
 # Every registered tag must therefore render in html_mode as either:
 #
-#   - a raw HTML fragment (verbatim splice into the surrounding block), or
-#   - a `\n\n…\n\n` wrap (deliberate Markdown island; the blank lines
-#     close the HTML block, CommonMark parses the inner Markdown, and
-#     the next blank line re-opens the block).
+#   - a raw HTML fragment (verbatim splice into the surrounding block,
+#     with no blank line in it), or
+#   - a Markdown island in a `<div>`, `<div>\n\n…\n\n</div>`, which
+#     `interface.markdown_island` writes: the blank lines close the HTML
+#     block, CommonMark parses the inner Markdown, and the `</div>` line
+#     re-opens the block for the rest of the cell.
 #
 # Plain text without Markdown sigils is also fine (no parsing surface).
 # This spec catches the regression where a new tag emits Markdown into
 # an HTML block — the Markdown would render literally rather than being
-# interpreted.
+# interpreted — and the one where a tag writes a bare island or another
+# blank line, after which the rest of the cell is Markdown.
 #
 # It runs through the shared example that ships in `markbridge/rspec`,
 # so consumers' custom tags go through exactly this check.

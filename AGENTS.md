@@ -145,13 +145,24 @@ one of two forms when `interface.html_mode?` is true:
    output is spliced verbatim into the surrounding block. Prefer this
    form when the tag has a natural HTML representation.
 
-2. **Markdown island** — wrap the tag's normal Markdown output in
-   `\n\n…\n\n` via `HtmlBlock.island`. The blank lines close the HTML
-   block; CommonMark parses the inner content as Markdown; the next
-   blank line re-opens the block. Cost: blank-line wrapping forces a
-   `<p>` margin around inline content, so use this form only for tags
-   with no clean HTML equivalent (e.g. `EventTag`/`PollTag` stubs that
-   defer rendering to downstream BBCode plugins).
+2. **Markdown island** — write the tag's Markdown through
+   `interface.markdown_island(markdown, block:)`. In html_mode that is
+   the Markdown between blank lines inside a `<div>`
+   (`HtmlBlock.enclosed_island`): the blank lines close the HTML block,
+   CommonMark parses the inner content as Markdown, and the `</div>`
+   line re-opens the block. Outside html_mode it is the Markdown itself,
+   with blank lines around it when `block: true`, so one call serves
+   both modes. Cost: blank-line wrapping forces a `<p>` margin around
+   inline content, so use this form only for Markdown with no HTML
+   equivalent: `EventTag`/`PollTag` write the BBCode of the plugins that
+   way, `UploadTag` the upload Markdown (Discourse reads the dimensions
+   and the `attachment` marker only from its Markdown forms and drops
+   the `upload://` href of a raw HTML link), the renderer an
+   `AST::MarkdownText`. A bare island, `\n\n…\n\n`, is not an option:
+   after it what follows on the same lines is Markdown until a line
+   opens an HTML block again, and the table tag strips the cell content,
+   which ate its blank lines at a cell edge. `HtmlBlock.safe?` rejects
+   it, like any other blank line in raw HTML.
 
 `Markbridge::Renderers::Discourse::HtmlBlock` owns everything about
 HTML blocks: `island` builds the wrap, `opens?` says whether a line

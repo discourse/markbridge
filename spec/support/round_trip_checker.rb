@@ -522,19 +522,17 @@ class RoundTripChecker
     )
   end
 
-  # An upload is an image or a link to a file, see UploadTag. Discourse
-  # drops the upload:// href of a raw HTML link (its sanitizer knows the
-  # scheme in Markdown links and images only), so the link to a file in
-  # a table the renderer writes as HTML has no href there.
+  # An upload is an image or a link to a file, see UploadTag. In a table
+  # the renderer writes as HTML it is a Markdown island inside a <div>.
   def expected_upload(node, html: false)
     destination = upload_destination(node)
-    return skeleton("img", href: destination) if node.type == :image
-
-    skeleton("a", href: dropped_href?(node, html:) ? nil : destination)
-  end
-
-  def dropped_href?(node, html:)
-    node.type != :image && html && @cooker.cooks?(:attachment)
+    upload =
+      if node.type == :image
+        skeleton("img", href: destination)
+      else
+        skeleton("a", href: destination)
+      end
+    html ? skeleton("div", children: [upload]) : upload
   end
 
   def upload_destination(node)
@@ -657,7 +655,13 @@ class RoundTripChecker
     when AST::Mention
       out << "@#{node.name}"
     when AST::Upload
-      expected_upload_text(node, out, html:)
+      # In html_mode the upload is a Markdown island, a paragraph of its
+      # own.
+      if html
+        separated(out) { expected_upload_text(node, out) }
+      else
+        expected_upload_text(node, out)
+      end
     when AST::Url, AST::Email
       # A link without visible text shows its href.
       if node.children.any? { |child| visible?(child) }
@@ -810,19 +814,19 @@ class RoundTripChecker
   # An image shows its alt text, a file link its name and size. Discourse
   # reads the dimensions and the attachment marker off the text and trims
   # the alt text (see expected_text for AST::Image), plain markdown-it
-  # shows both. In html_mode the renderer writes neither.
-  def expected_upload_text(node, out, html:)
+  # shows both.
+  def expected_upload_text(node, out)
     if node.type == :image
       alt = node.alt.to_s
       if @cooker.cooks?(:image_options)
         alt = alt.gsub(/\A[[:space:]]+|[[:space:]]+\z/, "")
-      elsif node.dimensions && !html
+      elsif node.dimensions
         alt = "#{alt}|#{node.dimensions}"
       end
       out << alt
     else
       out << (node.filename || "attachment")
-      out << "|attachment" unless html || @cooker.cooks?(:attachment)
+      out << "|attachment" unless @cooker.cooks?(:attachment)
       out << " (#{node.size})" if node.size
     end
   end
@@ -862,15 +866,7 @@ class RoundTripChecker
   end
 
   def expected_links(document)
-    links = []
-    collect_links(document, links, html: false)
-    links
-  end
-
-  # In document order; +html+ says whether +node+ is in a table the
-  # renderer writes as HTML, see #expected_upload.
-  def collect_links(node, links, html:)
-    link =
+    document.descendants.filter_map do |node|
       case node
       when AST::Url
         node.href if linkable?(node.href)
@@ -879,13 +875,9 @@ class RoundTripChecker
       when AST::Image
         node.src if node.src
       when AST::Upload
-        upload_destination(node) unless dropped_href?(node, html:)
+        upload_destination(node)
       end
-    links << link if link
-    return unless node.is_a?(AST::Element)
-
-    html ||= html_table?(node) if node.is_a?(AST::Table)
-    node.children.each { |child| collect_links(child, links, html:) }
+    end
   end
 
   # Whether an item of +list+ holds something the renderer writes with

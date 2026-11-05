@@ -41,7 +41,8 @@ RSpec.shared_examples "an html_mode safe tag" do
     output = markbridge_renderer.serialize(output, markbridge_html_mode_interface.context)
 
     expect(Markbridge::Renderers::Discourse::HtmlBlock.safe?(output)).to be(true),
-    "Expected #{tag.class} to render raw HTML or a \\n\\n-wrapped " \
-      "Markdown island in html_mode, got: #{output.inspect}"
+    "Expected #{tag.class} to render raw HTML without a blank line, or a " \
+      "Markdown island in a <div> (interface.markdown_island) in html_mode, " \
+      "got: #{output.inspect}"
   end
 end

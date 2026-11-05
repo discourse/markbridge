@@ -51,6 +51,30 @@ module Markbridge
           @context.html_mode?
         end
 
+        # Markdown that Discourse has to read as Markdown because it has
+        # no HTML form: the BBCode of a plugin (`[poll]`, `[event]`), an
+        # upload (`![a|64x64](upload://…)`), or a placeholder the
+        # importer replaces with one of them. Outside an HTML block it is
+        # the Markdown itself, with a blank line on both sides when
+        # +block+ is true, so a poll or an event stands alone. Inside an
+        # HTML block (see #html_mode?) it is a Markdown island in a
+        # `<div>`, block or not: the blank lines end the HTML block, so
+        # Discourse cooks the Markdown, and the `</div>` line opens the
+        # block again for the rest of the cell. See
+        # HtmlBlock.enclosed_island. A tag that returns a String writes
+        # such Markdown through this method only; the html_mode contract
+        # check rejects a bare blank line inside an HTML block.
+        # @param markdown [String]
+        # @param block [Boolean] whether the Markdown is a block of its own
+        # @return [String]
+        # @example A placeholder for a poll
+        #   interface.markdown_island("[poll|3]", block: true)
+        def markdown_island(markdown, block:)
+          return HtmlBlock.enclosed_island(markdown) if html_mode?
+
+          block ? HtmlBlock.island(markdown) : markdown
+        end
+
         def find_parent(klass)
           @context.find_parent(klass)
         end

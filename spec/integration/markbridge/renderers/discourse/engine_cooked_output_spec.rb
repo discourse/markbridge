@@ -22,14 +22,16 @@ RSpec.describe "cooked output of the Discourse engine", :discourse_engine do
     Nokogiri::HTML5.fragment(DiscourseEngineCooker.cook(markdown, profile:))
   end
 
-  # A table the renderer has to write as HTML, with +node+ in a cell.
-  def html_table(node)
+  # A table the renderer has to write as HTML, with +nodes+ in a cell.
+  def html_table(*nodes)
     table = Markbridge::AST::Table.new
     table << (
       Markbridge::AST::TableRow.new << (Markbridge::AST::TableCell.new << text("a")) <<
         (Markbridge::AST::TableCell.new << text("b"))
     )
-    table << (Markbridge::AST::TableRow.new << (Markbridge::AST::TableCell.new << node))
+    cell = Markbridge::AST::TableCell.new
+    nodes.each { |node| cell << node }
+    table << (Markbridge::AST::TableRow.new << cell)
     table
   end
 
@@ -130,6 +132,45 @@ RSpec.describe "cooked output of the Discourse engine", :discourse_engine do
 
       expect(cooked.at_css("img")["data-orig-src"]).to eq("upload://pic.png")
       expect(cooked.at_css("a.attachment")["data-orig-href"]).to eq("upload://f.pdf")
+    end
+
+    it "keeps the dimensions and the link of an upload inside an HTML table" do
+      # The upload is a Markdown island in the cell: Discourse reads the
+      # dimensions and the attachment marker only from its Markdown, and
+      # its sanitizer drops the upload:// href of a raw HTML link.
+      image =
+        Markbridge::AST::Upload.new(
+          sha1: "abc",
+          filename: "pic.png",
+          alt: "pic",
+          dimensions: "64x32",
+        )
+      file = Markbridge::AST::Upload.new(sha1: "def", filename: "f.pdf", type: :attachment)
+
+      cooked = cook_all(html_table(image), html_table(file))
+
+      image_cooked = cooked.at_css("td img")
+      expect([image_cooked["data-orig-src"], image_cooked["width"], image_cooked["height"]]).to eq(
+        %w[upload://pic.png 64 32],
+      )
+      expect(cooked.at_css("td a.attachment")["data-orig-href"]).to eq("upload://f.pdf")
+    end
+
+    it "cooks a poll and an event inside an HTML table, with text after them" do
+      # The BBCode is a Markdown island in a div in the cell, so Discourse
+      # cooks it also first in the cell, and the text after it stays
+      # HTML: after a bare island the ~~~ opened a code fence.
+      poll = Markbridge::AST::Poll.new(options: %w[Yes No])
+      event = Markbridge::AST::Event.new(name: "Meetup", starts_at: "2026-01-01")
+
+      cooked = cook_all(html_table(poll, text("~~~ after")), html_table(event, text("after")))
+
+      poll_cell, event_cell = cooked.css("table").map { |table| table.css("td").last }
+      expect(poll_cell.css("div.poll li").map(&:text)).to eq(%w[Yes No])
+      expect(poll_cell.text).to end_with("~~~ after")
+      expect(event_cell.at_css("div.discourse-post-event")["data-name"]).to eq("Meetup")
+      expect(event_cell.text).to end_with("after")
+      expect(cooked.css("pre")).to be_empty
     end
 
     it "writes a size inside a link as text, Discourse does not cook BBCode there" do

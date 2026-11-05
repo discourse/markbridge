@@ -255,8 +255,9 @@ module AdjacencyGenerator
     end
 
   # The variants a position takes on either side. A MarkdownText in
-  # html_mode is a Markdown island with blank lines around it, which no
-  # table cell can hold, so it stays out of "html-cell".
+  # html_mode is a Markdown island in a div, a block of its own in the
+  # cell, which the checker does not expect for a text, so it stays out
+  # of "html-cell".
   def self.variants_for(position)
     case position
     when "label"
