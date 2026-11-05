@@ -184,6 +184,17 @@ RSpec.describe "cooked output of the Discourse engine", :discourse_engine do
       expect(cooked.css("p span[style]").map(&:text)).to eq([":y"])
     end
 
+    it "keeps two dashes apart that meet across two text pieces" do
+      # Inside a link Discourse writes BBCode as text, so `x-` and `-y`
+      # meet; the typographer turns `--` into a dash.
+      link = Markbridge::AST::Url.new(href: "https://example.com")
+      link << text("x-") << (Markbridge::AST::Underline.new << text("-y"))
+
+      cooked = cook_all(link)
+
+      expect(cooked.at_css("a").text).to eq("x--y")
+    end
+
     it "writes a size inside a link as text, Discourse does not cook BBCode there" do
       link = Markbridge::AST::Url.new(href: "https://example.com") << sized("150", "x")
 
