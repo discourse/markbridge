@@ -60,6 +60,41 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
       expect(rendered(element)).to eq("[https://example.com*really*](https://example.com)")
     end
 
+    it "keeps whitespace at the edges of a bare link's text outside the bare URL" do
+      expect(tag.render(link("https://example.com", " https://example.com\t"), interface)).to eq(
+        [tokens.text(" "), tokens.bare_url("https://example.com"), tokens.text("\t")],
+      )
+      expect(tag.render(link("https://example.com", "https://example.com "), interface)).to eq(
+        [tokens.bare_url("https://example.com"), tokens.text(" ")],
+      )
+      expect(tag.render(link("https://example.com", "\u00A0https://example.com"), interface)).to eq(
+        [tokens.text("\u00A0"), tokens.bare_url("https://example.com")],
+      )
+    end
+
+    it "keeps line breaks in front of and after a bare link's text as hard breaks" do
+      element = Markbridge::AST::Url.new(href: "https://example.com")
+      element << Markbridge::AST::LineBreak.new << Markbridge::AST::Text.new("https://example.com")
+      element << Markbridge::AST::LineBreak.new
+
+      expect(tag.render(element, interface)).to eq(
+        [tokens.hard_break, tokens.bare_url("https://example.com"), tokens.hard_break],
+      )
+    end
+
+    it "writes a bare link after a line break as the bare URL" do
+      element = Markbridge::AST::Url.new(href: "https://example.com")
+      element << Markbridge::AST::LineBreak.new << Markbridge::AST::Text.new(" https://example.com")
+      document = Markbridge::AST::Document.new
+      document << Markbridge::AST::Text.new("see") << Markbridge::AST::LineBreak.new << element
+
+      expect(renderer.render(document)).to eq("see\n<br> https://example.com")
+    end
+
+    it "returns the text alone for a bare link's text with an href the renderer does not link" do
+      expect(tag.render(link("javascript:x", " javascript:x"), interface)).to eq([" javascript:x"])
+    end
+
     it "returns the children alone for an href without a scheme the renderer links" do
       expect(tag.render(link("javascript:alert(1)"), interface)).to eq(["Example"])
       expect(tag.render(link("data:text/html,x"), interface)).to eq(["Example"])

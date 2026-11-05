@@ -46,6 +46,43 @@ RSpec.describe Markbridge::AST::Url do
       expect(element.bare?).to be true
     end
 
+    it "is bare when the text is the href with whitespace at its edges" do
+      element = described_class.new(href: "https://example.com")
+      element << Markbridge::AST::Text.new(" \u00A0https://example.com\n")
+
+      expect(element.bare?).to be true
+    end
+
+    it "is bare with line breaks in front of the text and after it" do
+      element = described_class.new(href: "https://example.com")
+      element << Markbridge::AST::LineBreak.new << Markbridge::AST::Text.new("https://example.com")
+      element << Markbridge::AST::LineBreak.new << Markbridge::AST::LineBreak.new
+
+      expect(element.bare?).to be true
+    end
+
+    it "is not bare with a line break between two parts of the text" do
+      element = described_class.new(href: "https://example.com")
+      element << Markbridge::AST::Text.new("https://")
+      element << Markbridge::AST::LineBreak.new << Markbridge::AST::Text.new("example.com")
+
+      expect(element.bare?).to be false
+    end
+
+    it "is not bare with line breaks only" do
+      element = described_class.new(href: "https://example.com")
+      element << Markbridge::AST::LineBreak.new
+
+      expect(element.bare?).to be false
+    end
+
+    it "is not bare when whitespace is inside the href-like text" do
+      element = described_class.new(href: "https://example.com")
+      element << Markbridge::AST::Text.new("https://example .com")
+
+      expect(element.bare?).to be false
+    end
+
     it "is not bare when the text differs from the href" do
       element = described_class.new(href: "https://example.com")
       element << Markbridge::AST::Text.new("click here")
