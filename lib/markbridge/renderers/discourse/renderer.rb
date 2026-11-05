@@ -5,6 +5,8 @@ module Markbridge
     module Discourse
       # Renders AST to Discourse-flavored Markdown in-memory.
       class Renderer
+        # @return [TagLibrary] the library the renderer renders with
+        attr_reader :tag_library
         attr_reader :postprocessor
 
         def initialize(tag_library: nil, escaper: nil, html_escaper: nil, postprocessor: nil)

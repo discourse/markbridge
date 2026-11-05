@@ -9,6 +9,26 @@ require_relative "markbridge/normalizer"
 require_relative "markbridge/renderers/discourse"
 
 module Markbridge
+  FEATURE_TAGS = {
+    details: {
+      AST::Details => Renderers::Discourse::Tags::DetailsTag,
+    },
+    spoiler: {
+      AST::Spoiler => Renderers::Discourse::Tags::SpoilerTag,
+    },
+    poll: {
+      AST::Poll => Renderers::Discourse::Tags::PollTag,
+    },
+    post_event: {
+      AST::Event => Renderers::Discourse::Tags::EventTag,
+    },
+    bbcode: {
+      AST::Color => Renderers::Discourse::Tags::ColorTag,
+      AST::Size => Renderers::Discourse::Tags::SizeTag,
+    },
+  }.freeze
+  private_constant :FEATURE_TAGS
+
   class << self
     # Parse BBCode to AST.
     #
@@ -297,11 +317,17 @@ module Markbridge
     #   {Renderers::Discourse::Postprocessor} when no explicit
     #   +postprocessor:+ is given. Strips NBSP and zero-width format
     #   characters from the end of each line.
-    # @param styling_bbcode [Boolean] render colors and sizes as
-    #   +[color=…]+ and +[size=…]+ BBCode for the discourse-bbcode plugin.
-    #   Without it they render as their text only, because Discourse core
-    #   removes the style of a span. Mappings in +tags:+ still win.
+    # @param features [Hash{Symbol => Boolean}, nil] the plugins of the
+    #   target site. +:details+, +:spoiler+, +:poll+ and +:post_event+ are
+    #   bundled with Discourse and on by default; +:bbcode+ is the
+    #   discourse-bbcode plugin, which needs an install, and off by
+    #   default. With a feature off, the tag writes a plain form instead
+    #   of the plugin's BBCode: the title in bold and the content for a
+    #   details block, the content for a spoiler, the options as a list
+    #   for a poll, a paragraph with the name and the dates for an event,
+    #   the text for colors and sizes. Mappings in +tags:+ still win.
     # @return [Renderers::Discourse::Renderer]
+    # @raise [ArgumentError] for a feature that does not exist
     def discourse_renderer(
       tags: nil,
       tag_library: nil,
@@ -312,7 +338,7 @@ module Markbridge
       allow: nil,
       postprocessor: nil,
       strip_trailing_invisibles: false,
-      styling_bbcode: false
+      features: nil
     )
       # Dup the caller's library before mutating so successive
       # +discourse_renderer+ calls against the same +tag_library:+ don't
@@ -320,7 +346,7 @@ module Markbridge
       # a fresh instance, so the dup is only needed in the explicit
       # +tag_library:+ branch.
       library = tag_library ? tag_library.dup : Renderers::Discourse::TagLibrary.default
-      register_styling_bbcode(library) if styling_bbcode
+      register_features(library, features) if features
       library.merge!(tags) if tags
       Array(unregister).each { |klass| library.unregister(klass) }
 
@@ -332,9 +358,22 @@ module Markbridge
 
     private
 
-    def register_styling_bbcode(library)
-      library.register(AST::Color, Renderers::Discourse::Tags::ColorTag.new(bbcode: true))
-      library.register(AST::Size, Renderers::Discourse::Tags::SizeTag.new(bbcode: true))
+    # The tags a feature decides over. Only the features named are
+    # registered, so the other tags of the library stay as they are.
+    def register_features(library, features)
+      features.each do |feature, enabled|
+        tags =
+          FEATURE_TAGS.fetch(feature) do
+            raise ArgumentError,
+                  "unknown feature #{feature.inspect}, the features are " \
+                    "#{FEATURE_TAGS.keys.join(", ")}"
+          end
+        unless [true, false].include?(enabled)
+          raise ArgumentError, "feature #{feature} must be true or false, got #{enabled.inspect}"
+        end
+
+        tags.each { |klass, tag_class| library.register(klass, tag_class.new(bbcode: enabled)) }
+      end
     end
 
     def bbcode_diagnostics(parser)

@@ -97,4 +97,54 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EventTag do
       )
     end
   end
+
+  context "with bbcode: false" do
+    let(:tag) { described_class.new(bbcode: false) }
+
+    it "writes a paragraph with the name and the dates" do
+      element =
+        Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-01-01", ends_at: "2026-01-02")
+
+      expect(tag.render(element, interface)).to eq("\n\nMeeting, 2026-01-01 to 2026-01-02\n\n")
+    end
+
+    it "leaves out an end it does not have and escapes the name" do
+      element = Markbridge::AST::Event.new(name: "*Meeting*", starts_at: "2026-01-01")
+
+      expect(tag.render(element, interface)).to eq("\n\n\\*Meeting\\*, 2026-01-01\n\n")
+    end
+
+    it "writes the dates alone without a name" do
+      element = Markbridge::AST::Event.new(name: nil, starts_at: "2026-01-01")
+
+      expect(tag.render(element, interface)).to eq("\n\n2026-01-01\n\n")
+    end
+
+    it "writes the end alone without a start" do
+      element = Markbridge::AST::Event.new(name: "Meeting", starts_at: nil, ends_at: "2026-01-02")
+
+      expect(tag.render(element, interface)).to eq("\n\nMeeting, 2026-01-02\n\n")
+    end
+
+    it "renders an event without a name and dates to nothing" do
+      element = Markbridge::AST::Event.new(name: "", starts_at: nil)
+
+      expect(tag.render(element, interface)).to eq("")
+    end
+
+    it "writes the paragraph also when the raw BBCode is there" do
+      element =
+        Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-01-01", raw: "[event][/event]")
+
+      expect(tag.render(element, interface)).to eq("\n\nMeeting, 2026-01-01\n\n")
+    end
+
+    it "writes a <p> in html_mode" do
+      element = Markbridge::AST::Event.new(name: "A & B", starts_at: "2026-01-01")
+
+      expect(tag.render(element, interface_for(html_mode: true))).to eq(
+        "<p>A &amp; B, 2026-01-01</p>",
+      )
+    end
+  end
 end

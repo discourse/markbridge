@@ -11,7 +11,7 @@ module Markbridge
         # renders only the text, as inline tokens that the serializer joins
         # with the neighbors. With +bbcode: true+ it writes
         # +[size=…]…[/size]+ for the plugin (see
-        # +Markbridge.discourse_renderer(styling_bbcode: true)+). The
+        # +Markbridge.discourse_renderer(features: { bbcode: true })+). The
         # plugin reads the value as a percentage, like phpBB 3.x does.
         class SizeTag < Tag
           # A whole number from 1 to 999, the range the plugin lets through.
