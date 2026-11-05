@@ -69,13 +69,14 @@ module DiscourseEngineCooker
   }.freeze
 
   # What the engine cooks per profile, for a check that has to know
-  # whether BBCode becomes HTML or stays text: `[u]`, `[quote="…"]` and
-  # the image options in the alt text (which Discourse trims) are
-  # Discourse core, the rest comes with the plugins of the profile.
+  # whether BBCode becomes HTML or stays text: `[u]`, `[quote="…"]`, the
+  # image options in the alt text (which Discourse trims) and the
+  # `|attachment` marker of a file upload are Discourse core, the rest
+  # comes with the plugins of the profile.
   COOKS = {
-    stock: %i[underline quote image_options details spoiler poll],
-    all: %i[underline quote image_options details spoiler poll post_event bbcode],
-    none: %i[underline quote image_options],
+    stock: %i[underline quote image_options attachment details spoiler poll],
+    all: %i[underline quote image_options attachment details spoiler poll post_event bbcode],
+    none: %i[underline quote image_options attachment],
   }.freeze
 
   # One profile as a cooker, with the same +cook+ as MarkdownItCooker, so
