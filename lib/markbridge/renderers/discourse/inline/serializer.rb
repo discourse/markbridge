@@ -35,6 +35,8 @@ module Markbridge
           }.freeze
 
           VISIBLE = /[^[:space:]]/
+          # Whitespace and <br> only: nothing a marker could wrap.
+          NOTHING_TO_WRAP = /\A(?:[[:space:]]|<br>)*\z/
           # Leading or trailing whitespace, Unicode-aware: CommonMark's
           # flanking rules treat a no-break space as whitespace too.
           EDGE_WHITESPACE = /\A[[:space:]]|[[:space:]]\z/m
@@ -67,6 +69,12 @@ module Markbridge
           PATH_LIKE = %r{\A(?:[/#?]|\.{1,2}/)}
 
           BACKTICKS = /`+/
+          # Spaces and tabs at the start of a piece. Not a no-break space:
+          # the escaper writes one where it wants indentation kept.
+          LEADING_BLANKS = /\A[ \t]+/
+          NEWLINE = 10
+          SPACE = 32
+          TAB = 9
           # Whitespace with a line break in it, see #flat_alt.
           ALT_LINE_BREAK = /[[:space:]]*\n[[:space:]]*/
           # The parts after a `|` in the alt text that Discourse reads as
@@ -78,6 +86,7 @@ module Markbridge
           DATA_ATTRIBUTE = /\A[\w\-:.]*=/
 
           private_constant :VISIBLE,
+                           :NOTHING_TO_WRAP,
                            :EDGE_WHITESPACE,
                            :EDGES,
                            :GLUED_AFTER,
@@ -87,6 +96,10 @@ module Markbridge
                            :AUTOLINKABLE,
                            :PATH_LIKE,
                            :BACKTICKS,
+                           :LEADING_BLANKS,
+                           :NEWLINE,
+                           :SPACE,
+                           :TAB,
                            :ALT_LINE_BREAK,
                            :DISCOURSE_OPTION,
                            :DATA_ATTRIBUTE
@@ -132,6 +145,7 @@ module Markbridge
             children.each do |child|
               output = yield(child)
               if output.instance_of?(String)
+                output = after_blank_line(buffer, output, 0) unless html_mode || pending
                 next if output.empty?
 
                 pending = settle(buffer, pending, output)
@@ -157,14 +171,22 @@ module Markbridge
           # before the first piece of these tokens is written.
           #
           # @return [String, nil] the href of a bare URL that still waits
-          def write_tokens(buffer, tokens, from, to, html_mode, pending, before = nil, child = nil)
+          def write_tokens(
+            buffer,
+            tokens,
+            from,
+            to,
+            html_mode,
+            pending,
+            before = nil,
+            child = nil,
+            blank: 0
+          )
             index = from
             while index < to
               token = tokens.fetch(index)
               index += 1
               if token.instance_of?(String)
-                next if token.empty?
-
                 piece = token
               else
                 kind, value = token
@@ -177,14 +199,16 @@ module Markbridge
                   when Tokens::OPEN
                     close =
                       matching_close(tokens, index - 1, to, Tokens::OPEN, Tokens::CLOSE, value)
-                    content = run(tokens, index, close, html_mode)
+                    content =
+                      run(tokens, index, close, html_mode, trailing_blank_lines(buffer, blank))
                     nested = nested_pairs(tokens, index, close)
                     index = close + 1
                     delimiter_piece(value, content, html_mode, nested)
                   when Tokens::LINK_OPEN
                     close =
                       matching_close(tokens, index - 1, to, Tokens::LINK_OPEN, Tokens::LINK_CLOSE)
-                    content = run(tokens, index, close, html_mode)
+                    content =
+                      run(tokens, index, close, html_mode, trailing_blank_lines(buffer, blank))
                     index = close + 1
                     link_piece(value, content, html_mode)
                   when Tokens::CODE
@@ -205,14 +229,15 @@ module Markbridge
                   when Tokens::IMAGE
                     image_piece(token, html_mode)
                   when Tokens::HARD_BREAK
-                    html_mode ? "<br>" : "\n"
+                    html_mode ? "<br>" : hard_break_piece(trailing_blank_lines(buffer, blank))
                   when Tokens::CLOSE, Tokens::LINK_CLOSE
                     raise ArgumentError, "#{kind} token without an open token in front of it"
                   else
                     raise ArgumentError, "unknown inline token #{token.inspect}"
                   end
-                next if piece.empty?
               end
+              piece = after_blank_line(buffer, piece, blank) unless html_mode || pending
+              next if piece.empty?
 
               pending = settle(buffer, pending, piece)
               if before
@@ -222,6 +247,56 @@ module Markbridge
               html_mode ? buffer << piece : Joins.append(buffer, piece)
             end
             pending
+          end
+
+          # Spaces at the start of a piece after a blank line go: a block
+          # ended there, and spaces at the start of the next line would
+          # pull the paragraph after them into that block. What is left
+          # may be nothing, which the caller skips. Not after a bare URL
+          # that still waits: the piece follows the URL, not the blank
+          # line.
+          def after_blank_line(buffer, piece, blank)
+            unless piece.match?(LEADING_BLANKS) && trailing_blank_lines(buffer, blank) == 2
+              return piece
+            end
+
+            piece.sub(LEADING_BLANKS, "")
+          end
+
+          # How many of the lines at the end of the buffer hold nothing but
+          # spaces and tabs, up to two. +blank+ is the count in front of
+          # the buffer: for a nested run, the count of the outer buffer it
+          # is written into.
+          def trailing_blank_lines(buffer, blank)
+            lines = 0
+            index = buffer.bytesize - 1
+            while index >= 0
+              byte = buffer.getbyte(index)
+              if byte == NEWLINE
+                lines += 1
+                return lines if lines == 2
+              elsif byte != SPACE && byte != TAB
+                return lines
+              end
+              index -= 1
+            end
+            [lines + blank, 2].min
+          end
+
+          # A newline. On a line that holds nothing else it is <br>: a
+          # newline there would be a blank line, which ends the paragraph
+          # and makes a list loose, while <br> keeps the empty line inside
+          # the paragraph. After a blank line the break is nothing, the
+          # paragraph has ended there already.
+          def hard_break_piece(blank_lines)
+            case blank_lines
+            when 0
+              "\n"
+            when 1
+              "<br>"
+            else
+              ""
+            end
           end
 
           # Writes a waiting bare URL now that +following+, the piece after
@@ -261,8 +336,6 @@ module Markbridge
           # nested delimiter pair, ends with one, and whether that is one
           # pair spanning the whole content.
           def nested_pairs(tokens, from, to)
-            return NO_PAIRS if from >= to
-
             first = tokens.fetch(from)
             last = tokens.fetch(to - 1)
             at_start = !first.instance_of?(String) && first.first == Tokens::OPEN
@@ -280,13 +353,13 @@ module Markbridge
           # its own. Its pieces are joined among themselves; what stands
           # outside the pair is not known here, as a tag that returned a
           # String would not know it either.
-          def run(tokens, from, to, html_mode)
-            single_string(tokens, from, to) || joined(tokens, from, to, html_mode)
+          def run(tokens, from, to, html_mode, blank)
+            single_string(tokens, from, to) || joined(tokens, from, to, html_mode, blank)
           end
 
-          def joined(tokens, from, to, html_mode)
+          def joined(tokens, from, to, html_mode, blank)
             buffer = +""
-            pending = write_tokens(buffer, tokens, from, to, html_mode, nil)
+            pending = write_tokens(buffer, tokens, from, to, html_mode, nil, blank:)
             Joins.append(buffer, bare_url_piece(pending, buffer, nil)) if pending
             buffer
           end
@@ -325,7 +398,7 @@ module Markbridge
           def delimiter_piece(name, content, html_mode, nested = NO_PAIRS)
             open, close, html_open, html_close, char, pair_edge_fine = DELIMITERS.fetch(name)
             return "#{html_open}#{content}#{html_close}" if html_mode
-            return content unless content.match?(VISIBLE)
+            return content if content.match?(NOTHING_TO_WRAP)
 
             if char && content.match?(EDGE_WHITESPACE)
               match = content.match(EDGES)

@@ -13,8 +13,14 @@ module Markbridge
         # the nesting depth is.
         class ListItemTag < Tag
           # Ends a nested list in front of more content of the item.
+          COMMENT = "<!---->"
           LIST_END = "\n<!---->"
-          private_constant :LIST_END
+          NEWLINE = 10
+          SPACE = 32
+          # Whitespace and the <br> the serializer writes for a line break
+          # on a line that holds nothing else.
+          TRAILING_BREAKS = /(?:[[:space:]]|<br>)+\z/
+          private_constant :COMMENT, :LIST_END, :NEWLINE, :SPACE, :TRAILING_BREAKS
 
           def initialize
             @builder = Builders::ListItemBuilder.new
@@ -70,7 +76,7 @@ module Markbridge
           # a newline brings the line break itself. +before+ is the child
           # that comes next.
           def end_list(buffer, before:)
-            buffer.rstrip!
+            buffer.sub!(TRAILING_BREAKS, "")
             buffer << LIST_END
             buffer << "\n" unless text_of(before)&.start_with?("\n")
           end
@@ -89,13 +95,29 @@ module Markbridge
             child.text if child.is_a?(AST::Text) || child.is_a?(AST::MarkdownText)
           end
 
-          # Drops the blank lines in front of a nested list, but keeps one
-          # when the line before it opens an HTML block (for example a
-          # `</table>`), because only a blank line ends such a block.
+          # Drops the blank lines in front of a nested list. A blank line
+          # is what ends an HTML block, so a line in front that opens one
+          # gets a different treatment: a line that starts a block of its
+          # own (the line in front of it is blank, as with the `</div>` of
+          # an aligned block) gets an empty comment in front, which makes
+          # the line a comment block that ends on the same line; a line
+          # inside a block an earlier line opened (the `</table>` of a
+          # table) keeps the blank line, and the outer list is loose.
           def tighten(buffer)
             buffer.rstrip!
-            last_line = buffer[(buffer.rindex("\n") || -1) + 1..]
-            buffer << "\n" if HtmlBlock.opens?(last_line)
+            # Byte offsets throughout: the content in front may hold
+            # multi-byte characters.
+            start = (buffer.byterindex("\n") || -1) + 1
+            return unless HtmlBlock.opens?(buffer.byteslice(start..))
+
+            if start.zero? || buffer.getbyte(start - 2) == NEWLINE
+              # After the indentation of the line: a nested list has
+              # indented its lines already.
+              start += 1 while buffer.getbyte(start) == SPACE
+              buffer.bytesplice(start, 0, COMMENT)
+            else
+              buffer << "\n"
+            end
           end
 
           # @param parent_list [AST::List, nil]

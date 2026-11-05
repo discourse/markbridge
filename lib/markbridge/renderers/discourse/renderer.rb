@@ -28,8 +28,7 @@ module Markbridge
         #   custom tag would otherwise surface as an inscrutable
         #   concatenation error deep inside render_children)
         def render(node, context: RenderContext.new)
-          root_call = @interface_cache.nil?
-          @interface_cache = {} if root_call
+          root_call = enter
 
           serialize(render_output(node, context), context)
         ensure
@@ -53,8 +52,7 @@ module Markbridge
         # @param context [RenderContext] rendering context with parent chain
         # @return [String]
         def render_default(node, context: RenderContext.new)
-          root_call = @interface_cache.nil?
-          @interface_cache = {} if root_call
+          root_call = enter
 
           tag = default_tag_library[node.class] || resolved_default_tag(node.class)
           output =
@@ -110,8 +108,7 @@ module Markbridge
         # @param context [RenderContext]
         # @return [Array<Array>]
         def render_tokens(node, context:)
-          root_call = @interface_cache.nil?
-          @interface_cache = {} if root_call
+          root_call = enter
           outer_parent = @child_parent
           outer_index = @child_index
           outer_list = @previous_list
@@ -153,8 +150,7 @@ module Markbridge
         #     buffer.rstrip! if child.is_a?(AST::List)
         #   end
         def render_children(node, context:, &block)
-          root_call = @interface_cache.nil?
-          @interface_cache = {} if root_call
+          root_call = enter
           outer_parent = @child_parent
           outer_index = @child_index
           outer_list = @previous_list
@@ -237,6 +233,14 @@ module Markbridge
         # Something other than whitespace.
         VISIBLE = /[^[:space:]]/
         private_constant :VISIBLE
+
+        # Sets up the caches for a top-level call and says whether this is
+        # one: a call from inside a tag finds them in place.
+        def enter
+          root_call = @interface_cache.nil?
+          @interface_cache = {} if root_call
+          root_call
+        end
 
         # The caches live for one top-level call: the tag library can
         # change between calls, and an interface is cached by the object

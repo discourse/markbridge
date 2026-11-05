@@ -91,8 +91,12 @@ module Markbridge
         # HTML tag pattern (we escape these, but NOT autolinks)
         # Handles quoted attributes which can contain > characters
         # Attribute patterns: name="value" | name='value' | name=value | name
-        HTML_ATTR = /(?:\s+[a-zA-Z_:][a-zA-Z0-9_.:-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)/
-        HTML_TAG = %r{\A</?[a-zA-Z][a-zA-Z0-9-]*#{HTML_ATTR}*\s*/?>}
+        # Whitespace as markdown-it's JavaScript regexes read it (\s): the
+        # no-break space and the other Unicode spaces count too, so a tag
+        # name followed by a no-break space starts an HTML block or tag.
+        HTML_ATTR =
+          /(?:[[:space:]]+[a-zA-Z_:][a-zA-Z0-9_.:-]*(?:[[:space:]]*=[[:space:]]*(?:"[^"]*"|'[^']*'|[^[:space:]"'=<>`]+))?)/
+        HTML_TAG = %r{\A</?[a-zA-Z][a-zA-Z0-9-]*#{HTML_ATTR}*[[:space:]]*/?>}
 
         # Autolink pattern - we pass these through entirely unchanged
         # Matches <http://...>, <https://...>, <mailto:...>, and email addresses
@@ -105,7 +109,7 @@ module Markbridge
         # - Incomplete/multi-line HTML tags: <div followed by attributes on next line
         # - Custom elements: <my-component>, <responsive-image>
         # The (?:[\s/]|$) ensures we don't match comparisons like "a < b"
-        HTML_TAG_START = %r{\A<(?:[?!]|/?\s*[a-zA-Z][a-zA-Z0-9-]*(?:[\s/]|$))}
+        HTML_TAG_START = %r{\A<(?:[?!]|/?[[:space:]]*[a-zA-Z][a-zA-Z0-9-]*(?:[[:space:]/]|$))}
 
         # Byte constants for inline processing
         BACKSLASH = 92 # \

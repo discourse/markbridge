@@ -4,7 +4,7 @@ require_relative "adjacency_generator"
 
 # The round-trip cases that fail today. A case on one of these lists is
 # expected to fail; the specs fail when a listed case starts to pass, so a
-# fix removes its entry in the same commit.
+# fix removes its entry in the same commit. The lists are empty right now.
 #
 # An entry names its reason and the cases it covers. A case in the
 # adjacency list is a case id (see AdjacencyGenerator) or a Regexp that
@@ -18,53 +18,9 @@ module RoundTripKnownBugs
     Entry.new(reason:, cases:)
   end
 
-  TWO_LISTS_IN_AN_ITEM_CASES =
-    AdjacencyGenerator::LISTS
-      .product(AdjacencyGenerator::BETWEEN.keys)
-      .map { |list, between| "blocks/item/#{list}+#{between}+#{list}" }
-      .freeze
+  ADJACENCY = [].freeze
 
-  ADJACENCY = [
-    entry(
-      "two lists of the same kind in one list item are kept apart by a comment between blank lines, " \
-        "which makes the item loose",
-      cases: TWO_LISTS_IN_AN_ITEM_CASES,
-    ),
-  ].freeze
-
-  STRUCTURE = [
-    entry(
-      "two line breaks in a row inside a list item (the first one may end an inline wrapper) " \
-        "become a blank line, which makes the list loose",
-      cases: [
-        524,
-        554,
-        1104,
-        1266,
-        1423,
-        1560,
-        1594,
-        1920,
-        1921,
-        1982,
-        2087,
-        2229,
-        2263,
-        2272,
-        2280,
-        2485,
-        2494,
-        2574,
-        2582,
-        2696,
-      ],
-    ),
-    entry(
-      "whitespace-only text after a block is written as leading spaces of the next line, " \
-        "which pulls the paragraph after it into the block",
-      cases: [1841],
-    ),
-  ].freeze
+  STRUCTURE = [].freeze
 
   LISTS = { adjacency: ADJACENCY, structure: STRUCTURE }.freeze
 
