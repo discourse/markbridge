@@ -75,14 +75,14 @@ module Markbridge
 
           def build_image_markdown(element, interface)
             alt = build_alt(element, interface)
-            url = build_upload_url(element)
+            url = destination(element)
 
             "![#{alt}](#{url})"
           end
 
           def build_attachment_markdown(element, interface)
             filename = label(element.filename || "attachment", element, interface)
-            url = build_upload_url(element)
+            url = destination(element)
             size_part = " (#{element.size})" if element.size
 
             "[#{filename}#{pipe(interface)}attachment](#{url})#{size_part}"
@@ -102,6 +102,12 @@ module Markbridge
           # text, so a `]` or Markdown in it is escaped.
           def label(text, element, interface)
             interface.render_node(AST::Text.new(text), context: interface.with_parent(element))
+          end
+
+          # The destination gets the same treatment as the one of a link:
+          # a file name with a space or a parenthesis would end it early.
+          def destination(element)
+            LinkDestination.escape(build_upload_url(element))
           end
 
           def build_upload_url(element)
