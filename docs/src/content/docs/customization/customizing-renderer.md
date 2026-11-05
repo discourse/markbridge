@@ -40,6 +40,8 @@ Markbridge.discourse_renderer(
   escape: true,                      # false swaps in IdentityEscaper (no escaping)
   postprocessor: nil,                # custom Postprocessor instance
   features: nil,                     # Hash{Symbol => Boolean} — the plugins of the target site
+  sizes: nil,                        # with bbcode: true — the source's size values to percent
+  colors: nil,                       # with bbcode: true — a mapping for the color values
 )
 ```
 
@@ -132,24 +134,37 @@ Some of what the renderer writes is BBCode that a Discourse plugin cooks. A site
 | `spoiler` | spoiler-alert, bundled (`spoiler_enabled`) | on | `[spoiler]…[/spoiler]` | the content, so the hidden text shows |
 | `poll` | poll, bundled (`poll_enabled`) | on | `[poll]…[/poll]` | the options as a bullet list |
 | `post_event` | discourse-events, bundled (`discourse_post_event_enabled`) | on | `[event …][/event]` | a paragraph with the name and the dates |
-| `bbcode` | [discourse-bbcode](https://github.com/discourse/discourse-bbcode), needs an install | off | `[color=…]…[/color]`, `[size=…]…[/size]` | the text |
+| `bbcode` | [discourse-bbcode](https://github.com/discourse/discourse-bbcode), needs an install | undecided | `[color=…]…[/color]`, `[size=…]…[/size]` | the text |
 
 ```ruby
-renderer = Markbridge.discourse_renderer(features: { post_event: false, bbcode: true })
-
-Markbridge.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:).markdown
-# => "[color=red]a[/color] [size=85]b[/size]"
+renderer = Markbridge.discourse_renderer(features: { post_event: false, bbcode: false })
 ```
 
 The bundled plugins are on by default even when a site has turned them off: Discourse keeps the raw Markdown and cooks it again when a setting changes, so the BBCode of a plugin that is off today becomes a details block or a poll as soon as the plugin is on. The plain form cannot be turned back. Turn a feature off for a site that will not use the plugin.
 
 An unknown feature raises `ArgumentError`. A tag in `tags:` wins over `features:`. Underline (`[u]`), quotes with an author (`[quote="…"]`) and aligned blocks (`<div align>`) need no plugin, Discourse core cooks them.
 
-Colors and sizes with `bbcode: true`:
+#### Colors and sizes
 
-- A color must be `#rgb`, `#rrggbb` or a name, a size a whole number from 1 to 999. The plugin reads the size as a percentage. Any other value renders as the text only.
+Discourse core removes the style of a `<span>`, so without the discourse-bbcode plugin a color or size is lost, and with it the BBCode only works with the values the plugin accepts. Markbridge does not decide this for you: with `bbcode` undecided, the first color or size in a post raises `Markbridge::UndecidedFeatureError` (through `raise_on_error:`, like every render error). A source without colors and sizes never sees the error.
+
+- `features: { bbcode: false }` writes the text only.
+- `features: { bbcode: true }` writes the BBCode and needs `sizes:`. The plugin reads `[size=…]` as a percentage, and every forum has its own scale, so `sizes:` maps the values of your source to a whole number from 1 to 999. A Hash is read with `fetch`, so a value it does not know raises `KeyError`; a lambda can do anything; `nil` drops the size on purpose. Any other result raises `ArgumentError`.
+- `colors:` is optional and works the same way. A value the plugin would strip (not `#rgb`, `#rrggbb` or a name) raises `ArgumentError`, with or without a mapping.
+
+phpBB 3.x already stores sizes in percent, so the identity is the mapping. vBulletin and XenForo use `[size=1]` to `[size=7]`, the scale of `<font size>`:
+
+```ruby
+FONT_SIZES = { "1" => 63, "2" => 81, "3" => 100, "4" => 113, "5" => 150, "6" => 200, "7" => 300 }
+
+renderer = Markbridge.discourse_renderer(features: { bbcode: true }, sizes: FONT_SIZES)
+
+Markbridge.bbcode_to_markdown("[color=red]a[/color] [size=5]b[/size]", renderer:).markdown
+# => "[color=red]a[/color] [size=150]b[/size]"
+```
+
 - Every paragraph gets its own tags, because the BBCode can't span a blank line.
-- Inside a link the text renders without BBCode, because Discourse doesn't parse BBCode in link text.
+- Inside a link the text renders without BBCode, because Discourse doesn't parse BBCode in link text. No decision is needed for that.
 - Inside an HTML block (for example a table with uneven rows) the output is `<span style="color:red">` or `<span style="font-size:85%">`, the form the plugin lets through.
 
 ### `postprocessor:` — clean up the final string
