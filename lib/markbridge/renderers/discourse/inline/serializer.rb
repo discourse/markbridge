@@ -37,8 +37,12 @@ module Markbridge
           # Whitespace and <br> only: nothing a marker could wrap.
           NOTHING_TO_WRAP = /\A(?:[[:space:]]|<br>)*\z/
           # Leading or trailing whitespace, Unicode-aware: CommonMark's
-          # flanking rules treat a no-break space as whitespace too.
-          EDGES = /\A([[:space:]]*)(.+?)([[:space:]]*)\z/m
+          # flanking rules treat a no-break space as whitespace too. A <br>
+          # at an edge is a line break the serializer wrote, and it moves
+          # out with the whitespace: `[<br>a](u)` shows the same as
+          # `<br>[a](u)`, which keeps the label to the text.
+          EDGES = /\A((?:[[:space:]]|<br>)*)(.+?)((?:[[:space:]]|<br>)*)\z/m
+          BR = "<br>"
 
           # Text after a bare URL glues to it, unless it starts with
           # whitespace or with sentence punctuation that is followed by
@@ -78,6 +82,7 @@ module Markbridge
           SPACE = 32
           TAB = 9
           LT = 60
+          GT = 62
           # Whitespace with a line break in it, see #flat_alt.
           ALT_LINE_BREAK = /[[:space:]]*\n[[:space:]]*/
           # The parts after a `|` in the alt text that Discourse reads as
@@ -98,6 +103,8 @@ module Markbridge
                            :PATH_LIKE,
                            :BACKTICKS,
                            :ASTERISK,
+                           :BR,
+                           :GT,
                            :LEADING_BLANKS,
                            :TRAILING_BREAKS,
                            :NEWLINE,
@@ -331,10 +338,14 @@ module Markbridge
             content.match?(NOTHING_TO_WRAP)
           end
 
-          # Whitespace at the start or at the end of the content, checked on
-          # the two characters alone.
+          # Whitespace or a <br> at the start or at the end of the content
+          # (see EDGES), checked on the two characters alone; the <br> only
+          # when the content starts with `<` or ends with `>`.
           def edge_whitespace?(content)
-            Joins.space_at?(content, 0) || Joins.space_at?(content, Joins.last_char_index(content))
+            Joins.space_at?(content, 0) ||
+              Joins.space_at?(content, Joins.last_char_index(content)) ||
+              (content.getbyte(0) == LT && content.start_with?(BR)) ||
+              (content.getbyte(-1) == GT && content.end_with?(BR))
           end
 
           # How many of the lines at the end of the buffer hold nothing but
