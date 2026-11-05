@@ -136,18 +136,20 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::DetailsTag do
     context "in html_mode" do
       let(:context) { html_context }
 
-      it "writes the title as a paragraph in bold, HTML-escaped and without edge whitespace" do
+      it "writes a div with the title as a paragraph in bold, HTML-escaped, and the content" do
         element = Markbridge::AST::Details.new(title: " A & B ")
         element << Markbridge::AST::Text.new("body")
 
-        expect(tag.render(element, interface)).to eq("<p><strong>A &amp; B</strong></p>body")
+        expect(tag.render(element, interface)).to eq(
+          "<div><p><strong>A &amp; B</strong></p>body</div>",
+        )
       end
 
-      it "writes only the content without a title" do
+      it "writes a div with only the content without a title" do
         element = Markbridge::AST::Details.new
         element << Markbridge::AST::Text.new("body")
 
-        expect(tag.render(element, interface)).to eq("body")
+        expect(tag.render(element, interface)).to eq("<div>body</div>")
       end
     end
   end
