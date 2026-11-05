@@ -14,17 +14,10 @@ module Markbridge
         # literally. Drop the wrapper when rendering under a link ancestor.
         class UnderlineTag < Tag
           def render(element, interface)
-            child_context = interface.with_parent(element)
-            content = interface.render_children(element, context: child_context)
-            return content unless content.match?(/[^[:space:]]/)
+            tokens = interface.render_tokens(element, context: interface.with_parent(element))
+            return tokens if inside_link?(interface)
 
-            if interface.html_mode?
-              %(<span class="bbcode-u">#{content}</span>)
-            elsif inside_link?(interface)
-              content
-            else
-              "[u]#{content}[/u]"
-            end
+            tokens.unshift(Inline::Tokens.open(:u)) << Inline::Tokens.close(:u)
           end
 
           private

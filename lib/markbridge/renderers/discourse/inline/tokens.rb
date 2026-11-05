@@ -6,16 +6,16 @@ module Markbridge
       module Inline
         # The tokens a tag gives the {Serializer} instead of finished
         # Markdown. A token is a plain Array with its kind first, so
-        # building one costs a single allocation; the constructors here
-        # are the only place that knows the layout.
-        #
-        # A tag that still returns a String is not wrong: the renderer
-        # wraps the String in a {.raw} token, and the serializer joins it
-        # with its neighbors by its first and last character.
+        # building one costs a single allocation, or none for the tokens
+        # that carry no value; the constructors here are the only place
+        # that knows the layout. Finished Markdown is a token too: a plain
+        # String among the tokens is written as it is, and the serializer
+        # joins it with its neighbors by its first and last character.
         module Tokens
           # Text the serializer escapes.
           TEXT = :text
-          # Finished Markdown from a tag, written as it is.
+          # Finished Markdown from a tag, written as it is. Such a token is
+          # the String itself, see {.raw}.
           RAW = :raw
           # The start of a delimiter pair, see {DELIMITERS}.
           OPEN = :open
@@ -54,21 +54,26 @@ module Markbridge
           end
 
           # @param markdown [String]
-          # @return [Array]
+          # @return [String] the Markdown itself
           def self.raw(markdown)
-            [RAW, markdown]
+            markdown
           end
 
+          OPEN_TOKENS = DELIMITERS.to_h { |delimiter| [delimiter, [OPEN, delimiter].freeze] }.freeze
+          CLOSE_TOKENS =
+            DELIMITERS.to_h { |delimiter| [delimiter, [CLOSE, delimiter].freeze] }.freeze
+          private_constant :OPEN_TOKENS, :CLOSE_TOKENS
+
           # @param delimiter [Symbol] one of {DELIMITERS}
-          # @return [Array]
+          # @return [Array] the same frozen token on every call
           def self.open(delimiter)
-            [OPEN, delimiter]
+            OPEN_TOKENS.fetch(delimiter)
           end
 
           # @param delimiter [Symbol] one of {DELIMITERS}
-          # @return [Array]
+          # @return [Array] the same frozen token on every call
           def self.close(delimiter)
-            [CLOSE, delimiter]
+            CLOSE_TOKENS.fetch(delimiter)
           end
 
           # @param content [String] the code, not escaped
@@ -118,6 +123,30 @@ module Markbridge
           # @return [Array]
           def self.html(string)
             [HTML, string]
+          end
+
+          VISIBLE = /[^[:space:]]/
+          private_constant :VISIBLE
+
+          # Whether the tokens put something on the page: text or Markdown
+          # with something other than whitespace in it, code, a link, a
+          # bare URL or an image. Delimiters and hard breaks alone do not.
+          #
+          # @param tokens [Array<Array>]
+          # @return [Boolean]
+          def self.visible?(tokens)
+            tokens.any? do |token|
+              next token.match?(VISIBLE) if token.instance_of?(String)
+
+              case token.first
+              when TEXT, HTML
+                token.fetch(1).match?(VISIBLE)
+              when CODE
+                !token.fetch(1).empty?
+              when LINK_OPEN, BARE_URL, IMAGE
+                true
+              end
+            end
           end
         end
       end

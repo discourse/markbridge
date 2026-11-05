@@ -9,10 +9,22 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Tokens do
     expect(described_class.text("a", described_class::LABEL)).to eq([:text, "a", :label])
   end
 
-  it "builds the tokens with one value" do
-    expect(described_class.raw("**a**")).to eq([:raw, "**a**"])
+  it "takes finished Markdown as it is" do
+    markdown = "**a**"
+
+    expect(described_class.raw(markdown)).to be(markdown)
+  end
+
+  it "shares one frozen token per delimiter for open and close" do
     expect(described_class.open(:strong)).to eq(%i[open strong])
+    expect(described_class.open(:strong)).to be(described_class.open(:strong))
+    expect(described_class.open(:strong)).to be_frozen
     expect(described_class.close(:strong)).to eq(%i[close strong])
+    expect(described_class.close(:em)).to be(described_class.close(:em))
+    expect(described_class.close(:em)).to be_frozen
+  end
+
+  it "builds the tokens with one value" do
     expect(described_class.code("x")).to eq([:code, "x"])
     expect(described_class.link_open("/a")).to eq([:link_open, "/a"])
     expect(described_class.bare_url("https://a")).to eq([:bare_url, "https://a"])
@@ -36,6 +48,37 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Tokens do
     expect(described_class.hard_break).to be(described_class.hard_break)
     expect(described_class.hard_break).to eq([:hard_break])
     expect(described_class.hard_break).to be_frozen
+  end
+
+  describe ".visible?" do
+    it "is true for text, Markdown or HTML with something other than whitespace" do
+      expect(described_class.visible?([described_class.text(" a")])).to be(true)
+      expect(described_class.visible?([described_class.raw("*")])).to be(true)
+      expect(described_class.visible?(["", described_class.text("a")])).to be(true)
+      expect(described_class.visible?([described_class.html("<sup>2</sup>")])).to be(true)
+    end
+
+    it "is true for code with content, a link, a bare URL and an image" do
+      expect(described_class.visible?([described_class.code("x")])).to be(true)
+      expect(described_class.visible?([described_class.link_open("/a")])).to be(true)
+      expect(described_class.visible?([described_class.bare_url("https://a")])).to be(true)
+      expect(described_class.visible?([described_class.image(src: "a.png")])).to be(true)
+    end
+
+    it "is false for whitespace, empty code, delimiters and hard breaks" do
+      tokens = [
+        described_class.text(" \n"),
+        described_class.raw(""),
+        described_class.code(""),
+        described_class.open(:em),
+        described_class.close(:em),
+        described_class.hard_break,
+        described_class.link_close,
+      ]
+
+      expect(described_class.visible?(tokens)).to be(false)
+      expect(described_class.visible?([])).to be(false)
+    end
   end
 
   it "names the delimiters the serializer knows" do

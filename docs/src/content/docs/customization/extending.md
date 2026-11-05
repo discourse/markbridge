@@ -115,7 +115,8 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 
 | Method | Purpose |
 |---|---|
-| `render_children(element)` | Render child nodes and concatenate their output |
+| `render_children(element)` | Render child nodes and write their output as Markdown |
+| `render_tokens(element)` | The output of the children as inline tokens (`Markbridge::Renderers::Discourse::Inline::Tokens`), for a tag that returns tokens and leaves the markers to the serializer, as the built-in emphasis tags do |
 | `render_default(node)` | Render `node` with its stock Tag, bypassing your override — intercept only some nodes and defer the rest |
 | `with_parent(element)` | Return a new context that treats `element` as a parent |
 | `find_parent(klass)` | Walk up the ancestor chain for a specific AST class |
@@ -123,9 +124,9 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 | `count_parents(klass)` | Depth of a specific ancestor type (useful for nested lists) |
 | `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset:)` | The neighbors of an element among the children of its parent (nil at the edges) |
 | `previous_list(element)` | The last list in front of the element with nothing visible between them (nil when there is none) |
-| `wrap_inline(content, markers)` | Wrap inline content, collapsing adjacent markers cleanly |
+| `wrap_inline(content, markers)` | Wrap inline content, with whitespace at the edges outside the markers |
 | `block_context?(element)` | True if the current position is a block context |
-| `html_mode?` | True inside a CommonMark HTML block — the Tag must emit raw HTML or wrap output as a Markdown island |
+| `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML or wrap output as a Markdown island; the serializer takes care of it for tokens |
 
 Use `find_parent` / `has_parent?` to render differently inside specific ancestors (e.g. a code span inside a table cell).
 

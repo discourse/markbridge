@@ -22,16 +22,16 @@ The renderer holds no state beyond the running output and the context. All decis
 
 ## Tags
 
-A `Tag` is any class (or block) that responds to `render(element, interface)`:
+A `Tag` is any class (or block) that responds to `render(element, interface)` and returns finished Markdown:
 
 ```ruby
-class BoldTag < Markbridge::Renderers::Discourse::Tag
+class SpoilerTag < Markbridge::Renderers::Discourse::Tag
   def render(element, interface)
     context = interface.with_parent(element)
     content = interface.render_children(element, context:)
-    return "<strong>#{content}</strong>" if interface.html_mode?
+    return "<details><summary>Spoiler</summary>#{content}</details>" if interface.html_mode?
 
-    interface.wrap_inline(content, "**")
+    "[spoiler]#{content}[/spoiler]"
   end
 end
 ```
@@ -41,14 +41,22 @@ For simple cases, the block constructor is often enough:
 ```ruby
 Markbridge::Renderers::Discourse::Tag.new do |element, interface|
   context = interface.with_parent(element)
-  content = interface.render_children(element, context:)
-  if interface.html_mode?
-    "<strong>#{content}</strong>"
-  else
-    interface.wrap_inline(content, "**")
+  "[spoiler]#{interface.render_children(element, context:)}[/spoiler]"
+end
+```
+
+Inline formatting works differently. Whether `**` or `*` means what it should depends on what stands next to it, so the built-in emphasis tags do not write the markers themselves. They return inline tokens, and the renderer's serializer (`Markbridge::Renderers::Discourse::Inline::Serializer`) writes them with the neighbors in view: it keeps whitespace at the edges outside the markers, falls back to `<strong>` where `**` would not work, and writes the HTML form inside an HTML block.
+
+```ruby
+class BoldTag < Markbridge::Renderers::Discourse::Tag
+  def render(element, interface)
+    tokens = interface.render_tokens(element, context: interface.with_parent(element))
+    tokens.unshift(Inline::Tokens.open(:strong)) << Inline::Tokens.close(:strong)
   end
 end
 ```
+
+A tag that returns a String next to a tag that returns tokens is fine: the serializer writes the String as it is and joins it with its neighbors by its first and last character.
 
 ## The rendering interface
 
@@ -56,16 +64,17 @@ end
 
 | Method | Use |
 |---|---|
-| `render_children(element)` | Recurse into children, concatenate output |
+| `render_children(element)` | Recurse into children, write their output as Markdown |
+| `render_tokens(element)` | The output of the children as inline tokens, for a tag that returns tokens |
 | `with_parent(element)` | Return a new context that treats `element` as parent |
 | `find_parent(klass)` | Walk ancestors for a specific class |
 | `has_parent?(klass)` | Boolean ancestor check |
 | `count_parents(klass)` | How deep a specific ancestor is (nested lists, quotes) |
 | `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset:)` | The neighbors of an element among the children of its parent |
 | `previous_list(element)` | The last list in front of the element with nothing visible between them |
-| `wrap_inline(content, markers)` | Wrap inline content with collapsing markers |
+| `wrap_inline(content, markers)` | Wrap inline content, with whitespace at the edges outside the markers |
 | `block_context?(element)` | Block vs. inline position |
-| `html_mode?` | True inside a CommonMark HTML block — Tag must emit raw HTML or wrap output as a Markdown island (`\n\n…\n\n`) |
+| `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML or wrap output as a Markdown island (`\n\n…\n\n`); the serializer takes care of it for tokens |
 
 The interface decouples tags from the renderer: you could write a second renderer (HTML, plain text, JSON) and reuse every tag by providing a compatible interface.
 

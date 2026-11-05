@@ -119,7 +119,7 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
 
       tag = default_library[Markbridge::AST::Bold]
       interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-      result = tag.render(bold, interface)
+      result = renderer.serialize(tag.render(bold, interface), context)
 
       expect(result).to eq("**text**")
     end
@@ -130,7 +130,7 @@ RSpec.describe Markbridge::Renderers::Discourse::TagLibrary do
 
       tag = default_library[Markbridge::AST::Italic]
       interface = Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context)
-      result = tag.render(italic, interface)
+      result = renderer.serialize(tag.render(italic, interface), context)
 
       expect(result).to eq("*text*")
     end

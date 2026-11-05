@@ -39,22 +39,10 @@ module RoundTripKnownBugs
       end
       .freeze
 
-  # The left emphasis may end in anything but whitespace or a star, the
-  # right one starts with punctuation or a symbol. A star at the edge
-  # takes the HTML fallback, which does not merge.
-  STRONG_WITH_TWO_EM_CASES =
-    (AdjacencyGenerator::EDGES.keys - %w[space dot-space *])
-      .product(AdjacencyGenerator::EDGES.keys - %w[a 1 space nbsp 漢 *])
-      .map { |left, right| "strong/italic(#{left})+italic(#{right})" }
-      .freeze
-
-  BREAK_IN_STRONG_CASES =
-    AdjacencyGenerator::EDGES.keys.map { |edge| "strong/break+bold(#{edge})" }.freeze
-
-  BBCODE_COLON_CASES =
+  SPOILER_COLON_CASES =
     %w[item quote]
-      .product(%w[break empty], %w[underline spoiler])
-      .map { |position, left, wrapper| "#{position}/#{left}+#{wrapper}(:)" }
+      .product(%w[break empty])
+      .map { |position, left| "#{position}/#{left}+spoiler(:)" }
       .freeze
 
   TWO_LISTS_IN_AN_ITEM_CASES =
@@ -75,19 +63,9 @@ module RoundTripKnownBugs
       cases: TWO_LISTS_IN_AN_ITEM_CASES,
     ),
     entry(
-      "strong emphasis whose content starts with emphasis and ends with emphasis that starts " \
-        "with punctuation runs the markers together, `***x*<!---->*.***` does not cook as strong",
-      cases: STRONG_WITH_TWO_EM_CASES,
-    ),
-    entry(
-      "a line break at the start of strong emphasis that falls back to <strong> leaves the tag " \
-        "alone on its line, which starts an HTML block",
-      cases: BREAK_IN_STRONG_CASES,
-    ),
-    entry(
-      "an underline or a spoiler whose content starts with `:`, at the start of a line with " \
-        "nothing after it, reads as a link reference definition and disappears",
-      cases: BBCODE_COLON_CASES,
+      "a spoiler whose content starts with `:`, at the start of a line with nothing after it, " \
+        "reads as a link reference definition and disappears",
+      cases: SPOILER_COLON_CASES,
     ),
   ].freeze
 
@@ -117,11 +95,6 @@ module RoundTripKnownBugs
         2582,
         2696,
       ],
-    ),
-    entry(
-      "a backslash in front of trailing whitespace inside emphasis ends up in front of the " \
-        "closing marker and escapes it",
-      cases: [1674],
     ),
     entry(
       "whitespace-only text after a block is written as leading spaces of the next line, " \

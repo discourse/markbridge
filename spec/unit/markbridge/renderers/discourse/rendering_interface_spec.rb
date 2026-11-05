@@ -424,41 +424,5 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
       # The leading capture must accept the empty string ([[:space:]]*).
       expect(interface.wrap_inline("text  ", "**")).to eq("**text**  ")
     end
-
-    context "when content already contains the open marker" do
-      it "falls back to <strong> for **" do
-        expect(interface.wrap_inline("a**b", "**")).to eq("<strong>a**b</strong>")
-      end
-
-      it "falls back to <em> for *" do
-        expect(interface.wrap_inline("a*b", "*")).to eq("<em>a*b</em>")
-      end
-
-      it "falls back to <s> for ~~" do
-        expect(interface.wrap_inline("a~~b", "~~")).to eq("<s>a~~b</s>")
-      end
-
-      it "still falls back when only the close_marker collides" do
-        expect(interface.wrap_inline("a**b", "**", "**")).to eq("<strong>a**b</strong>")
-      end
-
-      it "falls back when only the close_marker (different from open_marker) is present in content" do
-        expect(interface.wrap_inline("foo</closer>bar", "**", "</closer>")).to eq(
-          "<strong>foo</closer>bar</strong>",
-        )
-      end
-
-      it "falls back when only the open_marker (different from close_marker) is present in content" do
-        expect(interface.wrap_inline("foo**bar", "**", "</closer>")).to eq(
-          "<strong>foo**bar</strong>",
-        )
-      end
-
-      it "wraps as-is when no fallback is configured for the marker" do
-        # No HTML fallback for `~`; just wraps even though content contains the marker.
-        # Actually: the conflict check still runs, falls through to the sub() since no case matches.
-        expect(interface.wrap_inline("foo~bar", "~")).to eq("~foo~bar~")
-      end
-    end
   end
 end
