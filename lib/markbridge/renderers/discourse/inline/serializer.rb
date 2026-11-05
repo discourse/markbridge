@@ -28,10 +28,10 @@ module Markbridge
           # tildes are no marker at all. The BBCode underline has no such
           # character, Discourse reads it with its own rule.
           DELIMITERS = {
-            strong: ["**", "**", "<strong>", "</strong>", "*", true],
-            em: ["*", "*", "<em>", "</em>", "*", true],
-            s: ["~~", "~~", "<s>", "</s>", "~", false],
-            u: ["[u]", "[/u]", %(<span class="bbcode-u">), "</span>", nil, false],
+            strong: %w[** ** <strong> </strong> *],
+            em: %w[* * <em> </em> *],
+            s: %w[~~ ~~ <s> </s> ~],
+            u: ["[u]", "[/u]", %(<span class="bbcode-u">), "</span>", nil],
           }.freeze
 
           # Whitespace and <br> only: nothing a marker could wrap.
@@ -67,6 +67,9 @@ module Markbridge
           PATH_LIKE = %r{\A(?:[/#?]|\.{1,2}/)}
 
           BACKTICKS = /`+/
+          # Breaks written as <br> at the end of a group, after the newline
+          # of the break in front of them.
+          TRAILING_BREAKS = /\n<br>(?:\n|<br>)*\z/
           # Spaces and tabs at the start of a piece. Not a no-break space:
           # the escaper writes one where it wants indentation kept.
           LEADING_BLANKS = /\A[ \t]+/
@@ -94,6 +97,7 @@ module Markbridge
                            :PATH_LIKE,
                            :BACKTICKS,
                            :LEADING_BLANKS,
+                           :TRAILING_BREAKS,
                            :NEWLINE,
                            :SPACE,
                            :TAB,
@@ -125,7 +129,7 @@ module Markbridge
             buffer = +""
             pending = write_tokens(buffer, tokens, 0, tokens.size, html_mode, nil)
             Joins.append(buffer, bare_url_piece(pending, buffer, nil)) if pending
-            buffer
+            drop_trailing_breaks(buffer, html_mode)
           end
 
           # Writes the output of several children one after the other. The
@@ -152,12 +156,11 @@ module Markbridge
                 next if output.empty?
 
                 # The hook may take whitespace off the buffer, so the piece
-                # is fitted to the line after it ran. A piece after a
-                # waiting bare URL follows the URL, not the line.
-                after_url = !pending.nil?
+                # is fitted to the line after it ran, and after a waiting
+                # bare URL was written: it follows the URL, not the line.
                 pending = settle(buffer, pending, output)
                 before&.call(buffer, child)
-                output = start_of_line(buffer, output, 0) unless html_mode || after_url
+                output = start_of_line(buffer, output) unless html_mode
                 next if output.empty?
 
                 html_mode ? buffer << output : Joins.append(buffer, output)
@@ -167,10 +170,20 @@ module Markbridge
               end
             end
             Joins.append(buffer, bare_url_piece(pending, buffer, nil)) if pending
-            buffer
+            drop_trailing_breaks(buffer, html_mode)
           end
 
           private
+
+          # A break written as <br> protected the line it ended against the
+          # newline of the next piece. Nothing follows in this group, so at
+          # its end the <br> protects nothing and goes, like the whitespace
+          # a block tag takes off its content. In an HTML block a break is
+          # <br> on its own, and stays.
+          def drop_trailing_breaks(buffer, html_mode)
+            buffer.sub!(TRAILING_BREAKS, "\n") if !html_mode && buffer.include?("<br>")
+            buffer
+          end
 
           # Writes the tokens from +from+ up to +to+ into +buffer+, one piece
           # at a time, each joined with what stands in front of it. A
@@ -254,13 +267,12 @@ module Markbridge
               end
               next if piece.empty?
 
-              after_url = !pending.nil?
               pending = settle(buffer, pending, piece)
               if before
                 before.call(buffer, child)
                 before = nil
               end
-              piece = start_of_line(buffer, piece, blank) unless html_mode || after_url
+              piece = start_of_line(buffer, piece, blank) unless html_mode
               next if piece.empty?
 
               html_mode ? buffer << piece : Joins.append(buffer, piece)
@@ -282,7 +294,7 @@ module Markbridge
           # as the break itself would be on a line that holds nothing
           # else; two newlines are a blank line the text brings on
           # purpose. What is left may be nothing, which the caller skips.
-          def start_of_line(buffer, piece, blank)
+          def start_of_line(buffer, piece, blank = 0)
             first = piece.getbyte(0)
             if first == NEWLINE
               return piece unless after_break?(buffer) && piece.getbyte(1) != NEWLINE
@@ -450,7 +462,7 @@ module Markbridge
           # +nested+ says whether a nested pair stands at the start, at
           # the end, and whether that is one pair spanning the content.
           def delimiter_piece(name, content, html_mode, nested)
-            open, close, html_open, html_close, char, pair_edge_fine = DELIMITERS.fetch(name)
+            open, close, html_open, html_close, char = DELIMITERS.fetch(name)
             return "#{html_open}#{content}#{html_close}" if html_mode
             return content if nothing_to_wrap?(content)
 
@@ -464,7 +476,7 @@ module Markbridge
               core = content
             end
 
-            if char && breaks_marker?(core, open, char, nested, pair_edge_fine)
+            if char && breaks_marker?(core, open, char, nested)
               "#{lead}#{html_open}#{core}#{html_close}#{trail}"
             else
               core = escape_colon(core) if open.start_with?("[")
@@ -478,16 +490,14 @@ module Markbridge
           # pair may span the content (`***a* b**` and `***a***` are
           # strong), but two pairs at the two edges are not
           # (`***a*<!---->*.***` does not cook as strong). For
-          # strikethrough any tilde at an edge breaks the marker. An
-          # escaped character at the end does not count: `\\*` is text.
-          def breaks_marker?(core, marker, char, nested, pair_edge_fine)
+          # strikethrough any tilde at an edge breaks the marker: a nested
+          # strikethrough brings the `~~` marker itself into the content.
+          # An escaped character at the end does not count: `\\*` is text.
+          def breaks_marker?(core, marker, char, nested)
             return true if core.include?(marker)
 
             at_start = core.start_with?(char)
             at_end = core.end_with?(char) && !Joins.escaped_end?(core)
-            return false unless at_start || at_end
-            return true unless pair_edge_fine
-
             pair_start, pair_end, spanning = nested
             (at_start && !pair_start) || (at_end && !pair_end) || (at_start && at_end && !spanning)
           end

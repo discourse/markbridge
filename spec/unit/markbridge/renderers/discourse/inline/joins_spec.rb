@@ -173,13 +173,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
       expect(joined("*x😀**", "a")).to eq("*x😀**<!---->a")
     end
 
-    it "puts the boundary between a word character and a piece that starts with @" do
-      # The two would read as an email address with the text after them.
+    it "puts the boundary between anything but whitespace and a piece that starts with @" do
+      # The two would read as an email address with the text after them;
+      # linkify takes punctuation into the local part too.
       expect(joined("a", "@b")).to eq("a<!---->@b")
       expect(joined("é", "@b")).to eq("é<!---->@b")
       expect(joined("1", "@b")).to eq("1<!---->@b")
+      expect(joined("#", "@b")).to eq("#<!---->@b")
+      expect(joined(".", "@b")).to eq(".<!---->@b")
       expect(joined("a ", "@b")).to eq("a @b")
-      expect(joined(".", "@b")).to eq(".@b")
+      expect(joined("a\n", "@b")).to eq("a\n@b")
       expect(joined("a", "x@b")).to eq("ax@b")
     end
 
@@ -328,7 +331,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
         after == "_".ord ? :boundary : :check_after
       elsif flanking.include?(before) && blocking?(after)
         before == "_".ord ? :boundary : :check_before
-      elsif expected_class(before) == :word && after == "@".ord
+      elsif after == "@".ord && expected_class(before) != :other
         :boundary
       else
         :nothing

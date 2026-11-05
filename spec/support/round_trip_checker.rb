@@ -651,8 +651,13 @@ class RoundTripChecker
       item.is_a?(AST::Element) &&
         item.children.any? do |child|
           BLANK_LINE_NODES.any? { |klass| child.is_a?(klass) } ||
-            (child.is_a?(AST::Code) && block_code?(child))
+            (child.is_a?(AST::Code) && block_code?(child)) || blank_line_in?(child)
         end
     end
+  end
+
+  # A text with a blank line in it is a paragraph break the source wrote.
+  def blank_line_in?(node)
+    (node.is_a?(AST::Text) || node.is_a?(AST::MarkdownText)) && node.text.match?(/\n[ \t]*\n/)
   end
 end
