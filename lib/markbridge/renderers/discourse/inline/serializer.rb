@@ -18,16 +18,20 @@ module Markbridge
         # as it is.
         class Serializer
           # Per delimiter: the opening and closing marker, the HTML tags for
-          # an HTML block, and the character whose run makes the marker.
-          # Content with that character at its edge, or with the marker in
-          # it, cannot be wrapped in the marker and gets the HTML tags
-          # instead. The BBCode underline has no such character, Discourse
-          # reads it with its own rule.
+          # an HTML block, the character whose run makes the marker, and
+          # whether a nested pair of that character at one edge of the
+          # content is fine. Content with the marker in it, or with the
+          # character at an edge where it would join the marker into a
+          # longer run, cannot be wrapped and gets the HTML tags instead.
+          # For emphasis a nested pair at one edge still works (`***a* b**`
+          # is strong), at both edges it does not. For strikethrough three
+          # tildes are no marker at all. The BBCode underline has no such
+          # character, Discourse reads it with its own rule.
           DELIMITERS = {
-            strong: %w[** ** <strong> </strong> *],
-            em: %w[* * <em> </em> *],
-            s: %w[~~ ~~ <s> </s> ~],
-            u: ["[u]", "[/u]", %(<span class="bbcode-u">), "</span>", nil],
+            strong: ["**", "**", "<strong>", "</strong>", "*", true],
+            em: ["*", "*", "<em>", "</em>", "*", true],
+            s: ["~~", "~~", "<s>", "</s>", "~", false],
+            u: ["[u]", "[/u]", %(<span class="bbcode-u">), "</span>", nil, false],
           }.freeze
 
           VISIBLE = /[^[:space:]]/
@@ -153,18 +157,25 @@ module Markbridge
             index = from
             while index < to
               token = tokens.fetch(index)
+              if token.instance_of?(String)
+                result << token unless token.empty?
+                index += 1
+                next
+              end
+
               kind, value = token
               piece =
                 case kind
                 when Tokens::TEXT
                   text_piece(token, html_mode)
-                when Tokens::RAW, Tokens::HTML
+                when Tokens::HTML
                   value
                 when Tokens::OPEN
                   close = matching_close(tokens, index, to, Tokens::OPEN, Tokens::CLOSE, value)
                   content = run(tokens, index + 1, close, html_mode)
+                  nested = nested_pairs(tokens, index + 1, close)
                   index = close
-                  delimiter_piece(value, content, html_mode)
+                  delimiter_piece(value, content, html_mode, nested)
                 when Tokens::LINK_OPEN
                   close = matching_close(tokens, index, to, Tokens::LINK_OPEN, Tokens::LINK_CLOSE)
                   content = run(tokens, index + 1, close, html_mode)
@@ -211,14 +222,48 @@ module Markbridge
             raise ArgumentError, "#{open_kind} token without a #{close_kind} token after it"
           end
 
+          NO_PAIRS = [false, false, false].freeze
+          private_constant :NO_PAIRS
+
+          # Whether the content between +from+ and +to+ starts with a
+          # nested delimiter pair, ends with one, and whether that is one
+          # pair spanning the whole content.
+          def nested_pairs(tokens, from, to)
+            return NO_PAIRS if from >= to
+
+            first = tokens.fetch(from)
+            last = tokens.fetch(to - 1)
+            at_start = !first.instance_of?(String) && first.first == Tokens::OPEN
+            at_end = !last.instance_of?(String) && last.first == Tokens::CLOSE
+            return NO_PAIRS unless at_start || at_end
+
+            spanning =
+              at_start && at_end &&
+                matching_close(tokens, from, to, Tokens::OPEN, Tokens::CLOSE, first.fetch(1)) ==
+                  to - 1
+            [at_start, at_end, spanning]
+          end
+
           # The content between an open and a close token, written on
           # its own. Its pieces are joined among themselves; what stands
           # outside the pair is not known here, as a tag that returned a
           # String would not know it either.
           def run(tokens, from, to, html_mode)
+            single = single_string(tokens, from, to)
+            return single if single
+
             buffer = +""
             append(buffer, pieces(tokens, from, to, html_mode), html_mode)
             buffer
+          end
+
+          # One String between the tokens is the whole content, the common
+          # case: nothing to join, no buffer to fill. nil otherwise.
+          def single_string(tokens, from, to)
+            return unless to - from == 1
+
+            token = tokens.fetch(from)
+            token if token.instance_of?(String)
           end
 
           # Appends +pieces+ to +buffer+. A bare URL at the end sees no
@@ -247,38 +292,80 @@ module Markbridge
             end
           end
 
-          # Content with nothing visible in it keeps no markers. Content
-          # that would break the marker gets the HTML tags. Whitespace at
-          # the edges stays outside the markers: a marker next to
-          # whitespace does not open or close.
-          def delimiter_piece(name, content, html_mode)
-            open, close, html_open, html_close, char = DELIMITERS.fetch(name)
+          # Content with nothing visible in it keeps no markers. Whitespace
+          # at the edges stays outside the markers and outside the HTML
+          # tags: a marker next to whitespace does not open or close, and
+          # an HTML tag alone on its line opens an HTML block. A BBCode tag
+          # keeps the whitespace inside, Discourse has no such rule.
+          # Content that would break the marker gets the HTML tags.
+          # +nested+ says whether a nested pair stands at the start, at
+          # the end, and whether that is one pair spanning the content.
+          def delimiter_piece(name, content, html_mode, nested = NO_PAIRS)
+            open, close, html_open, html_close, char, pair_edge_fine = DELIMITERS.fetch(name)
             return "#{html_open}#{content}#{html_close}" if html_mode
             return content unless content.match?(VISIBLE)
-            if char && breaks_marker?(content, open, char)
-              return "#{html_open}#{content}#{html_close}"
+
+            if char && content.match?(EDGE_WHITESPACE)
+              match = content.match(EDGES)
+              lead = match[1]
+              core = match[2]
+              trail = match[3]
+            else
+              lead = trail = ""
+              core = content
             end
 
-            place_markers(content, open, close)
+            if char && breaks_marker?(core, open, char, nested, pair_edge_fine)
+              "#{lead}#{html_open}#{core}#{html_close}#{trail}"
+            else
+              core = escape_colon(core) if open.start_with?("[")
+              "#{lead}#{open}#{keep_backslash(core)}#{close}#{trail}"
+            end
           end
 
-          # The marker in the content, or its character at an edge of the
-          # content where it would join the marker into a longer run. An
-          # escaped character at the end does not count: `\*` is text.
-          def breaks_marker?(content, marker, char)
-            return true if content.include?(marker)
+          # The marker in the content, or its character at an edge where
+          # it would join the marker into a longer run. For emphasis the
+          # character may come from a nested pair at that edge, and one
+          # pair may span the content (`***a* b**` and `***a***` are
+          # strong), but two pairs at the two edges are not
+          # (`***a*<!---->*.***` does not cook as strong). For
+          # strikethrough any tilde at an edge breaks the marker. An
+          # escaped character at the end does not count: `\\*` is text.
+          def breaks_marker?(core, marker, char, nested, pair_edge_fine)
+            return true if core.include?(marker)
 
-            core = content.match(EDGES)[2]
-            core.start_with?(char) || (core.end_with?(char) && !Joins.escaped_end?(core))
+            at_start = core.start_with?(char)
+            at_end = core.end_with?(char) && !Joins.escaped_end?(core)
+            return false unless at_start || at_end
+            return true unless pair_edge_fine
+
+            pair_start, pair_end, spanning = nested
+            (at_start && !pair_start) || (at_end && !pair_end) || (at_start && at_end && !spanning)
+          end
+
+          # A BBCode tag at the start of a line with a `:` right after it
+          # reads as a link reference definition (`[u]:x`), the backslash
+          # keeps the colon text.
+          def escape_colon(core)
+            core.start_with?(":") ? "\\#{core}" : core
+          end
+
+          # An odd run of backslashes at the end of the content would
+          # escape the closing marker, one more backslash keeps the run
+          # even.
+          def keep_backslash(core)
+            core.end_with?("\\") && !Joins.escaped_end?(core) ? "#{core}\\" : core
           end
 
           # Content without whitespace at its edges, the common case, takes
-          # the plain interpolation; the sub costs a MatchData and three
-          # captures.
+          # the plain interpolation.
           def place_markers(content, open, close)
-            return "#{open}#{content}#{close}" unless content.match?(EDGE_WHITESPACE)
+            unless content.match?(EDGE_WHITESPACE)
+              return "#{open}#{keep_backslash(content)}#{close}"
+            end
 
-            content.sub(EDGES) { "#{$1}#{open}#{$2}#{close}#{$3}" }
+            match = content.match(EDGES)
+            "#{match[1]}#{open}#{keep_backslash(match[2])}#{close}#{match[3]}"
           end
 
           def link_piece(destination, content, html_mode)

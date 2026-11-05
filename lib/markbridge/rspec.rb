@@ -38,6 +38,7 @@ RSpec.shared_examples "an html_mode safe tag" do
 
   it "renders html_mode output that is safe inside an HTML block" do
     output = tag.render(element, markbridge_html_mode_interface)
+    output = markbridge_renderer.serialize(output, markbridge_html_mode_interface.context)
 
     expect(Markbridge::Renderers::Discourse::HtmlBlock.safe?(output)).to be(true),
     "Expected #{tag.class} to render raw HTML or a \\n\\n-wrapped " \

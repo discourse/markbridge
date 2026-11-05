@@ -107,7 +107,70 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
           "<strong>*a</strong>",
         )
         expect(write(tokens.open(:s), tokens.raw("a~"), tokens.close(:s))).to eq("<s>a~</s>")
-        expect(write(tokens.open(:s), tokens.raw(" ~a "), tokens.close(:s))).to eq("<s> ~a </s>")
+        expect(write(tokens.open(:s), tokens.raw(" ~a "), tokens.close(:s))).to eq(" <s>~a</s> ")
+      end
+
+      it "wraps emphasis with a nested pair at one edge and falls back with pairs at both edges" do
+        inner = ->(text) { [tokens.open(:em), tokens.text(text), tokens.close(:em)] }
+
+        expect(
+          write(tokens.open(:strong), *inner.call("a"), tokens.text(" b"), tokens.close(:strong)),
+        ).to eq("***a* b**")
+        expect(
+          write(tokens.open(:strong), tokens.text("a "), *inner.call("b"), tokens.close(:strong)),
+        ).to eq("**a *b***")
+        expect(
+          write(tokens.open(:strong), *inner.call("a"), *inner.call(".y"), tokens.close(:strong)),
+        ).to eq("<strong>*a*<!---->*.y*</strong>")
+      end
+
+      it "wraps emphasis with one nested pair spanning the content, not a bare marker character" do
+        inner = [tokens.open(:em), tokens.text("a"), tokens.close(:em)]
+
+        expect(write(tokens.open(:strong), *inner, tokens.close(:strong))).to eq("***a***")
+        expect(write(tokens.open(:strong), tokens.raw("*a"), tokens.close(:strong))).to eq(
+          "<strong>*a</strong>",
+        )
+        expect(write(tokens.open(:strong), *inner, tokens.raw(" b*"), tokens.close(:strong))).to eq(
+          "<strong>*a* b*</strong>",
+        )
+      end
+
+      it "keeps whitespace at the edges inside the BBCode underline" do
+        expect(write(tokens.open(:u), tokens.text(" a "), tokens.close(:u))).to eq("[u] a [/u]")
+      end
+
+      it "falls back to HTML for strikethrough with a nested tilde pair at an edge" do
+        inner = [tokens.open(:s), tokens.text("a"), tokens.close(:s)]
+
+        expect(write(tokens.open(:s), *inner, tokens.text(" b"), tokens.close(:s))).to eq(
+          "<s>~~a~~ b</s>",
+        )
+      end
+
+      it "keeps whitespace at the edges outside the HTML fallback too" do
+        strong = [tokens.open(:strong), tokens.text("a"), tokens.close(:strong)]
+
+        expect(
+          write(tokens.open(:strong), tokens.hard_break, *strong, tokens.close(:strong)),
+        ).to eq("\n<strong>**a**</strong>")
+      end
+
+      it "keeps a backslash in front of trailing whitespace from escaping the closing marker" do
+        expect(write(tokens.open(:strong), tokens.raw("a\\ "), tokens.close(:strong))).to eq(
+          "**a\\\\** ",
+        )
+        expect(write(tokens.open(:strong), tokens.raw("a\\\\ "), tokens.close(:strong))).to eq(
+          "**a\\\\** ",
+        )
+        expect(write(tokens.link_open("/a"), tokens.raw("x\\ "), tokens.link_close)).to eq(
+          "[x\\\\](/a) ",
+        )
+      end
+
+      it "escapes a colon right after a BBCode opening tag" do
+        expect(write(tokens.open(:u), tokens.text(":y"), tokens.close(:u))).to eq("[u]\\:y[/u]")
+        expect(write(*em(tokens.text(":y")))).to eq("*:y*")
       end
 
       it "wraps content whose last character is escaped" do
@@ -368,7 +431,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
           ArgumentError,
           'unknown inline token [:bold, "a"]',
         )
-        expect { write("a") }.to raise_error(ArgumentError, 'unknown inline token "a"')
+      end
+
+      it "writes a String among the tokens as it is" do
+        expect(write("**a**", tokens.text("*"), "")).to eq("**a**\\*")
       end
     end
 

@@ -4,14 +4,12 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Tag for rendering bold text
+        # Strong emphasis. The serializer writes the markers, or the HTML
+        # tags where the markers would not work.
         class BoldTag < Tag
           def render(element, interface)
-            child_context = interface.with_parent(element)
-            content = interface.render_children(element, context: child_context)
-            return "<strong>#{content}</strong>" if interface.html_mode?
-
-            interface.wrap_inline(content, "**")
+            tokens = interface.render_tokens(element, context: interface.with_parent(element))
+            tokens.unshift(Inline::Tokens.open(:strong)) << Inline::Tokens.close(:strong)
           end
         end
       end

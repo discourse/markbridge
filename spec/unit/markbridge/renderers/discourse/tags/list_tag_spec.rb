@@ -289,6 +289,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ListTag do
         expect(render_in_document(empty, list)).to eq("\n\n- b\n\n\n")
       end
 
+      it "does not separate a list from a list with emphasis between them" do
+        # Emphasis renders to tokens, not to a String; what is visible in
+        # them counts like text.
+        first = list_with_item(ordered: false, text: "a")
+        second = list_with_item(ordered: false, text: "b")
+        bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x")
+
+        expect(render_in_document(first, bold, second)).not_to include("<!---->")
+      end
+
       it "does not separate a list from a list with text between them" do
         first = list_with_item(ordered: false, text: "a")
         second = list_with_item(ordered: false, text: "b")

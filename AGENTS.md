@@ -72,8 +72,13 @@ Set via: `registry.closing_strategy = ClosingStrategies::Reordering.new`
 
 ### Visitor Pattern (Rendering)
 
-Tags receive `(element, interface)` where interface provides:
-- `render_children(element, context:)`
+Tags receive `(element, interface)` and return finished Markdown, or
+inline tokens (`Inline::Tokens`) that the renderer's
+`Inline::Serializer` writes with the neighbors in view: marker
+placement, HTML fallbacks, bare URLs, joins and the html_mode form
+live there. The interface provides:
+- `render_children(element, context:)` - the children as Markdown
+- `render_tokens(element, context:)` - the children as inline tokens
 - `render_default(node)` - stock rendering, bypassing tag overrides
   (lets a custom tag intercept only the nodes it cares about)
 - `with_parent(element)` - immutable context chaining
@@ -129,8 +134,9 @@ CommonMark HTML block (currently triggered by `TableTag`'s HTML fallback
 for uneven rows, multi-line cells, or nested tables). Per [CommonMark
 §4.6](https://spec.commonmark.org/0.31.2/#html-blocks), content inside
 the block is treated as raw HTML and is not re-parsed for Markdown
-except across blank lines. Every tag must pick one of two forms when
-`interface.html_mode?` is true:
+except across blank lines. A tag that returns inline tokens leaves
+html_mode to the serializer. Every tag that returns a String must pick
+one of two forms when `interface.html_mode?` is true:
 
 1. **Raw HTML** — emit an HTML equivalent (`<strong>` for `**`,
    `<ul><li>` for `- `, etc.). HTML-escape any user-controlled string

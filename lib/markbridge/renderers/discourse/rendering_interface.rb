@@ -32,6 +32,12 @@ module Markbridge
           @renderer.render_children(element, context:, &block)
         end
 
+        # The output of the children as inline tokens, for a tag that
+        # returns tokens itself — see Renderer#render_tokens.
+        def render_tokens(element, context: @context)
+          @renderer.render_tokens(element, context:)
+        end
+
         # Context operations
         def with_parent(element)
           @context.with_parent(element)
@@ -138,24 +144,12 @@ module Markbridge
         EDGE_WHITESPACE = /\A[[:space:]]|[[:space:]]\z/m
         private_constant :EDGE_WHITESPACE
 
-        # Helper: wrap inline content with markers
-        # Handles edge cases like existing markers and whitespace
+        # Wraps inline content in markers, with whitespace at the edges
+        # outside the markers. Content with nothing visible in it is
+        # returned as it is.
         def wrap_inline(content, open_marker, close_marker = nil)
           close_marker ||= open_marker
           return content unless content.match?(/[^[:space:]]/)
-
-          # Handle conflicts with existing markers
-          if content.include?(open_marker) || content.include?(close_marker)
-            # Use HTML fallback for common cases
-            case open_marker
-            when "**"
-              return "<strong>#{content}</strong>"
-            when "*"
-              return "<em>#{content}</em>"
-            when "~~"
-              return "<s>#{content}</s>"
-            end
-          end
 
           apply_markers(content, open_marker, close_marker)
         end
