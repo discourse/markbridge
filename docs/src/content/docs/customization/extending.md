@@ -129,6 +129,39 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 
 Use `find_parent` / `has_parent?` to render differently inside specific ancestors (e.g. a code span inside a table cell).
 
+## Tags that return inline tokens
+
+A tag that writes a block, a BBCode wrapper or a placeholder returns a String, as above. Inline formatting is different: whether `**`, `*` or `[text](url)` means what it should depends on the characters next to it (the flanking rules of emphasis, where a bare URL ends, a `!` in front of a `[`). The built-in emphasis, link and image tags therefore return tokens, and the renderer's serializer writes them with the neighbors in view. A custom tag can do the same:
+
+```ruby
+require "markbridge"
+
+Tokens = Markbridge::Renderers::Discourse::Inline::Tokens
+
+class HighlightTag < Markbridge::Renderers::Discourse::Tag
+  def render(element, interface)
+    tokens = interface.render_tokens(element, context: interface.with_parent(element))
+    tokens.unshift(Tokens.open(:strong)) << Tokens.close(:strong)
+  end
+end
+```
+
+`render_tokens` returns the children's output as an Array of tokens, where finished Markdown from a child is a plain String. The token kinds, all built by `Tokens`:
+
+| Token | Written as |
+|---|---|
+| a `String` | finished Markdown, as it is |
+| `Tokens.text(string)` | the string, escaped like text (`Tokens::LABEL` for a link label, `Tokens::VERBATIM` for none) |
+| `Tokens.open(name)` … `Tokens.close(name)` | `**`, `*`, `~~` or `[u]…[/u]` around the content (`:strong`, `:em`, `:s`, `:u`), with whitespace at the edges outside the markers and an HTML fallback where the markers would not work |
+| `Tokens.link_open(destination)` … `Tokens.link_close` | `[content](destination)` |
+| `Tokens.bare_url(href)` | the href alone where linkify links it, `[href](href)` where text is glued to it |
+| `Tokens.image(src:, alt:, width:, height:)` | `![alt\|WxH](src)` |
+| `Tokens.code(content)` | a code span with a backtick run longer than any run in the content |
+| `Tokens.hard_break` | a newline |
+| `Tokens.html(string)` | raw HTML, as it is |
+
+Inside a CommonMark HTML block (`interface.html_mode?`) the serializer writes the HTML form of every token (`<strong>`, `<a href>`, `<img>`, `<br>`, …), so a tag that returns tokens needs no html_mode branch of its own. A tag that returns a String still does (see below).
+
 A Tag must return a String — returning `nil` (or anything else) raises a `TypeError`. To handle only some nodes, defer the rest with `render_default(node)` instead of falling through to `nil`.
 
 ## Rendering inside HTML blocks

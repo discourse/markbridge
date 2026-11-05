@@ -18,12 +18,6 @@ module RoundTripKnownBugs
     Entry.new(reason:, cases:)
   end
 
-  SPOILER_COLON_CASES =
-    %w[item quote]
-      .product(%w[break empty])
-      .map { |position, left| "#{position}/#{left}+spoiler(:)" }
-      .freeze
-
   TWO_LISTS_IN_AN_ITEM_CASES =
     AdjacencyGenerator::LISTS
       .product(AdjacencyGenerator::BETWEEN.keys)
@@ -35,11 +29,6 @@ module RoundTripKnownBugs
       "two lists of the same kind in one list item are kept apart by a comment between blank lines, " \
         "which makes the item loose",
       cases: TWO_LISTS_IN_AN_ITEM_CASES,
-    ),
-    entry(
-      "a spoiler whose content starts with `:`, at the start of a line with nothing after it, " \
-        "reads as a link reference definition and disappears",
-      cases: SPOILER_COLON_CASES,
     ),
   ].freeze
 

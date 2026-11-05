@@ -17,6 +17,9 @@ module Markbridge
 
             return render_html(element.title, content) if interface.html_mode?
 
+            # `[spoiler]:x` at the start of a line reads as a link
+            # reference definition, the backslash keeps the colon text.
+            content = "\\#{content}" if content.start_with?(":")
             if element.title
               "[spoiler=#{element.title}]#{content}[/spoiler]"
             else

@@ -14,6 +14,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
       expect(tag.render(element, interface)).to eq("[spoiler]hidden[/spoiler]")
     end
 
+    it "escapes a colon at the start of the content" do
+      element = Markbridge::AST::Spoiler.new
+      element << Markbridge::AST::Text.new(":x")
+
+      expect(tag.render(element, interface)).to eq("[spoiler]\\:x[/spoiler]")
+    end
+
     it "renders an empty element to nothing" do
       element = Markbridge::AST::Spoiler.new(title: "Click me")
 

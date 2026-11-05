@@ -104,6 +104,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
     it "does not take the last character of the piece for the character after the run" do
       expect(joined("a", "*x#*")).to eq("a*x#*")
       expect(joined("a", "*x~")).to eq("a*x~")
+      expect(joined("a", "**x~")).to eq("a**x~")
+    end
+
+    it "looks past a run of two in front of the join" do
+      expect(joined("**x**", "a")).to eq("**x**a")
+      expect(joined("**x.**", "a")).to eq("**x.**<!---->a")
     end
 
     # Unicode punctuation and symbols count as punctuation next to the
@@ -123,6 +129,48 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
       it "treats #{char.inspect} in front of the run as #{punctuation ? "punctuation" : "no punctuation"}" do
         expect(joined("*x#{char}*", "a")).to eq(punctuation ? "*x#{char}*<!---->a" : "*x#{char}*a")
       end
+    end
+
+    # Every ASCII byte after the run and in front of it, at both ends of
+    # each range the punctuation check knows, with the byte next to each
+    # end.
+    {
+      "!" => true,
+      "/" => true,
+      "0" => false,
+      "9" => false,
+      ":" => true,
+      "@" => true,
+      "A" => false,
+      "Z" => false,
+      "[" => true,
+      "`" => true,
+      "a" => false,
+      "z" => false,
+      "{" => true,
+      "~" => true,
+      " " => false,
+      "\t" => false,
+    }.each do |char, punctuation|
+      it "treats #{char.inspect} after the run as #{punctuation ? "punctuation" : "no punctuation"}" do
+        expect(joined("a", "*#{char}x*")).to eq(punctuation ? "a<!---->*#{char}x*" : "a*#{char}x*")
+      end
+
+      it "treats #{char.inspect} in front of the run as #{punctuation ? "punctuation" : "no punctuation"}" do
+        expect(joined("*x#{char}*", "a")).to eq(punctuation ? "*x#{char}*<!---->a" : "*x#{char}*a")
+      end
+    end
+
+    it "reads one character after the run, also when more multi-byte characters follow" do
+      expect(joined("a", "*“漢x*")).to eq("a<!---->*“漢x*")
+      expect(joined("a", "*é漢x*")).to eq("a*é漢x*")
+      expect(joined("a", "*😀😀*")).to eq("a<!---->*😀😀*")
+    end
+
+    it "finds the character in front of the run inside a multi-byte character" do
+      expect(joined("*x“*", "a")).to eq("*x“*<!---->a")
+      expect(joined("*xé*", "a")).to eq("*xé*a")
+      expect(joined("*x😀**", "a")).to eq("*x😀**<!---->a")
     end
 
     it "escapes a ! at the end of the buffer when the next piece starts with [" do

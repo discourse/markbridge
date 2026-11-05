@@ -122,11 +122,7 @@ module Markbridge
           node.children.each do |child|
             @child_index = (index += 1)
             output = render_child(child, context)
-            if output.instance_of?(String)
-              tokens << output unless output.empty?
-            else
-              tokens.concat(output)
-            end
+            output.instance_of?(String) ? tokens << output : tokens.concat(output)
           end
           @child_parent = outer_parent
           @child_index = outer_index

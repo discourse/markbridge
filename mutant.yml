@@ -96,6 +96,16 @@ matcher:
     # only costs the MatchData. Bucket A.
     - Markbridge::Renderers::Discourse::Inline::Serializer#place_markers
 
+    # Inline::Joins.after_run, .before_run and .punctuation_at? walk
+    # bytes. Their bounds survive mutation: a count that starts on the
+    # run itself or one byte off lands on the same byte after the walk,
+    # a walk without its lower bound wraps around the buffer and stops
+    # at nil, and the byte 127 or 128 at a character start is not valid
+    # UTF-8 either way. Bucket A.
+    - Markbridge::Renderers::Discourse::Inline::Joins.after_run
+    - Markbridge::Renderers::Discourse::Inline::Joins.before_run
+    - Markbridge::Renderers::Discourse::Inline::Joins.punctuation_at?
+
     # Inline::Serializer#run and #single_string only keep a run that is
     # one String off the pieces array and the buffer; joined with
     # nothing, the String comes out the same. Bucket A.

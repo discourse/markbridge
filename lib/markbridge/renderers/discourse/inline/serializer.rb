@@ -106,7 +106,8 @@ module Markbridge
           # @return [String]
           def write(tokens, html_mode: false)
             buffer = +""
-            append(buffer, pieces(tokens, 0, tokens.size, html_mode), html_mode)
+            pending = write_tokens(buffer, tokens, 0, tokens.size, html_mode, nil)
+            Joins.append(buffer, bare_url_piece(pending, buffer, nil)) if pending
             buffer
           end
 
@@ -133,26 +134,12 @@ module Markbridge
               if output.instance_of?(String)
                 next if output.empty?
 
-                pieces = nil
-                first = output
-              else
-                pieces = pieces(output, 0, output.size, html_mode)
-                next if pieces.empty?
-
-                first = pieces.first
-              end
-
-              if pending
-                Joins.append(buffer, bare_url_piece(pending, buffer, first))
-                pending = nil
-              end
-              before&.call(buffer, child)
-
-              if pieces.nil?
+                pending = settle(buffer, pending, output)
+                before&.call(buffer, child)
                 html_mode ? buffer << output : Joins.append(buffer, output)
               else
-                pending = pieces.pop.fetch(1) if pieces.last.instance_of?(Array)
-                append(buffer, pieces, html_mode)
+                pending =
+                  write_tokens(buffer, output, 0, output.size, html_mode, pending, before, child)
               end
             end
             Joins.append(buffer, bare_url_piece(pending, buffer, nil)) if pending
@@ -161,56 +148,88 @@ module Markbridge
 
           private
 
-          # Turns the tokens from +from+ up to +to+ into pieces: Strings,
-          # and the bare URL tokens that are decided when they are
-          # appended and their neighbors are known. A delimiter pair or a
-          # link becomes one piece with its content written first.
-          def pieces(tokens, from, to, html_mode)
-            result = []
+          # Writes the tokens from +from+ up to +to+ into +buffer+, one piece
+          # at a time, each joined with what stands in front of it. A
+          # delimiter pair or a link is one piece with its content written
+          # first. A bare URL is not written at once: it waits for the next
+          # piece, which decides its form, and is returned as +pending+
+          # when the tokens end with it. +before+ runs with +child+ right
+          # before the first piece of these tokens is written.
+          #
+          # @return [String, nil] the href of a bare URL that still waits
+          def write_tokens(buffer, tokens, from, to, html_mode, pending, before = nil, child = nil)
             index = from
             while index < to
               token = tokens.fetch(index)
+              index += 1
               if token.instance_of?(String)
-                result << token unless token.empty?
-                index += 1
-                next
+                next if token.empty?
+
+                piece = token
+              else
+                kind, value = token
+                piece =
+                  case kind
+                  when Tokens::TEXT
+                    text_piece(token, html_mode)
+                  when Tokens::HTML
+                    value
+                  when Tokens::OPEN
+                    close =
+                      matching_close(tokens, index - 1, to, Tokens::OPEN, Tokens::CLOSE, value)
+                    content = run(tokens, index, close, html_mode)
+                    nested = nested_pairs(tokens, index, close)
+                    index = close + 1
+                    delimiter_piece(value, content, html_mode, nested)
+                  when Tokens::LINK_OPEN
+                    close =
+                      matching_close(tokens, index - 1, to, Tokens::LINK_OPEN, Tokens::LINK_CLOSE)
+                    content = run(tokens, index, close, html_mode)
+                    index = close + 1
+                    link_piece(value, content, html_mode)
+                  when Tokens::CODE
+                    code_piece(value, html_mode)
+                  when Tokens::BARE_URL
+                    if html_mode
+                      html_link(value, @html_escaper.escape(value))
+                    else
+                      # Settled with the piece after it, or with nothing.
+                      pending = settle(buffer, pending, token)
+                      if before
+                        before.call(buffer, child)
+                        before = nil
+                      end
+                      pending = value
+                      next
+                    end
+                  when Tokens::IMAGE
+                    image_piece(token, html_mode)
+                  when Tokens::HARD_BREAK
+                    html_mode ? "<br>" : "\n"
+                  when Tokens::CLOSE, Tokens::LINK_CLOSE
+                    raise ArgumentError, "#{kind} token without an open token in front of it"
+                  else
+                    raise ArgumentError, "unknown inline token #{token.inspect}"
+                  end
+                next if piece.empty?
               end
 
-              kind, value = token
-              piece =
-                case kind
-                when Tokens::TEXT
-                  text_piece(token, html_mode)
-                when Tokens::HTML
-                  value
-                when Tokens::OPEN
-                  close = matching_close(tokens, index, to, Tokens::OPEN, Tokens::CLOSE, value)
-                  content = run(tokens, index + 1, close, html_mode)
-                  nested = nested_pairs(tokens, index + 1, close)
-                  index = close
-                  delimiter_piece(value, content, html_mode, nested)
-                when Tokens::LINK_OPEN
-                  close = matching_close(tokens, index, to, Tokens::LINK_OPEN, Tokens::LINK_CLOSE)
-                  content = run(tokens, index + 1, close, html_mode)
-                  index = close
-                  link_piece(value, content, html_mode)
-                when Tokens::CODE
-                  code_piece(value, html_mode)
-                when Tokens::BARE_URL
-                  html_mode ? html_link(value, @html_escaper.escape(value)) : token
-                when Tokens::IMAGE
-                  image_piece(token, html_mode)
-                when Tokens::HARD_BREAK
-                  html_mode ? "<br>" : "\n"
-                when Tokens::CLOSE, Tokens::LINK_CLOSE
-                  raise ArgumentError, "#{kind} token without an open token in front of it"
-                else
-                  raise ArgumentError, "unknown inline token #{token.inspect}"
-                end
-              result << piece unless piece == ""
-              index += 1
+              pending = settle(buffer, pending, piece)
+              if before
+                before.call(buffer, child)
+                before = nil
+              end
+              html_mode ? buffer << piece : Joins.append(buffer, piece)
             end
-            result
+            pending
+          end
+
+          # Writes a waiting bare URL now that +following+, the piece after
+          # it, is known. Another bare URL as +following+ glues like text.
+          # @return [nil]
+          def settle(buffer, pending, following)
+            Joins.append(buffer, bare_url_piece(pending, buffer, following)) if pending
+            nil
           end
 
           # The index of the +close_kind+ token that ends the +open_kind+
@@ -267,7 +286,8 @@ module Markbridge
 
           def joined(tokens, from, to, html_mode)
             buffer = +""
-            append(buffer, pieces(tokens, from, to, html_mode), html_mode)
+            pending = write_tokens(buffer, tokens, from, to, html_mode, nil)
+            Joins.append(buffer, bare_url_piece(pending, buffer, nil)) if pending
             buffer
           end
 
@@ -278,18 +298,6 @@ module Markbridge
 
             token = tokens.fetch(from)
             token if token.instance_of?(String)
-          end
-
-          # Appends +pieces+ to +buffer+. A bare URL at the end sees no
-          # piece after it; {#write_groups} takes that one out first.
-          def append(buffer, pieces, html_mode)
-            pieces.each_with_index do |piece, index|
-              if piece.instance_of?(Array)
-                _, href = piece
-                piece = bare_url_piece(href, buffer, pieces.at(index + 1))
-              end
-              html_mode ? buffer << piece : Joins.append(buffer, piece)
-            end
           end
 
           def text_piece(token, html_mode)
