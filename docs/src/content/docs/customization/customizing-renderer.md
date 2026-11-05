@@ -25,7 +25,7 @@ posts.each do |post|
 end
 ```
 
-The renderer is safe to reuse across thousands of posts. It holds no per-post state, so nothing leaks between posts — you collect any side data per call by walking `result.ast`.
+The renderer is safe to reuse across thousands of posts. Nothing leaks from one post to the next — you collect any side data per call by walking `result.ast`. A render call keeps its state on the renderer until it returns, so use one renderer per thread.
 
 ## The factory
 
@@ -185,7 +185,7 @@ Pass the bare base class (`Postprocessor.new`) to keep the default cleanup; pass
 
 ## Build once, reuse everywhere
 
-The renderer carries no per-post state: every top-level `*_to_markdown` call produces its own `Conversion`. Constructing a renderer is cheap; constructing thousands is wasteful. The build-once pattern is the recommended shape:
+The renderer keeps nothing between posts: every top-level `*_to_markdown` call produces its own `Conversion`. Constructing a renderer is cheap; constructing thousands is wasteful. The build-once pattern is the recommended shape:
 
 ```ruby
 class ForumImporter

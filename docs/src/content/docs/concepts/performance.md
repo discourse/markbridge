@@ -23,7 +23,7 @@ posts.each do |post|
 end
 ```
 
-The renderer stores no per-document state. Your custom handlers and tags should follow the same rule if you share them across calls or threads.
+The renderer keeps nothing from one document to the next, so one instance serves any number of conversions in a row. It does keep state for the render call in progress, so use one renderer per thread. Custom handlers and tags should keep no state between calls either.
 
 ## Process one document at a time
 
