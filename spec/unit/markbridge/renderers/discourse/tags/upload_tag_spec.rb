@@ -10,6 +10,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
       expect(tag.render(element, interface)).to eq("![](upload://original.png)")
     end
 
+    it "leaves the pipes of the raw Markdown alone outside a table cell" do
+      element = Markbridge::AST::Upload.new(sha1: "abc", raw: "![a|10x20](upload://a.png)")
+
+      expect(tag.render(element, interface)).to eq("![a|10x20](upload://a.png)")
+    end
+
     it "renders an image upload as ![alt](upload://filename) when type is image" do
       element =
         Markbridge::AST::Upload.new(
@@ -130,10 +136,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
         expect(tag.render(element, interface)).to eq("[a.pdf\\|attachment](upload://a.pdf) (1 KB)")
       end
 
-      it "escapes the pipes of the raw Markdown" do
-        element = Markbridge::AST::Upload.new(sha1: "abc", raw: "![a|10x20](upload://a.png)")
+      it "escapes every pipe of the raw Markdown" do
+        element = Markbridge::AST::Upload.new(sha1: "abc", raw: "![a|b|10x20](upload://a.png)")
 
-        expect(tag.render(element, interface)).to eq("![a\\|10x20](upload://a.png)")
+        expect(tag.render(element, interface)).to eq("![a\\|b\\|10x20](upload://a.png)")
       end
 
       it "leaves a pipe of the raw Markdown alone that is escaped already" do

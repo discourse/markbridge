@@ -105,6 +105,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
       expect(tag.render(element, interface)).to eq("\n\n- A\n- \\*B\\*\n\n")
     end
 
+    it "HTML-escapes the options in html_mode" do
+      element = Markbridge::AST::Poll.new(options: %w[<b> &])
+
+      expect(tag.render(element, interface_for(html_mode: true))).to eq(
+        "<ul><li>&lt;b&gt;</li><li>&amp;</li></ul>",
+      )
+    end
+
     it "writes a bullet list in html_mode" do
       element = Markbridge::AST::Poll.new(options: %w[A B])
 

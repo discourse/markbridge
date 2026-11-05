@@ -529,7 +529,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       wrapper = Markbridge::AST::Quote.new << inner
       document = Markbridge::AST::Document.new << outer << wrapper
 
-      expect(renderer.render(document)).not_to include("<!---->")
+      # The quote line in front keeps the lists apart, the inner list
+      # keeps the first marker.
+      expect(renderer.render(document)).to include("> - b")
     end
 
     it "knows no previous list for a list that a tag renders on its own" do
@@ -836,6 +838,55 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.leading_list(quote, context, children: true)).to be(first)
       expect(renderer.trailing_list(quote, context, children: true)).to be(last)
     end
+
+    it "resets its caches after a call outside a render" do
+      list =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        )
+
+      renderer.leading_list(first, context)
+      renderer.render(Markbridge::AST::Document.new << list)
+      expect(renderer.list_marker(list)).to be_nil
+
+      renderer.trailing_list(first, context)
+      renderer.render(Markbridge::AST::Document.new << list)
+      expect(renderer.list_marker(list)).to be_nil
+    end
+
+    context "with a tag that looks at the interface it gets" do
+      let(:seen) { [] }
+      let(:renderer) do
+        hooks = seen
+        tag =
+          Class.new(Markbridge::Renderers::Discourse::Tag) do
+            define_method(:render) { |element, interface| interface.render_children(element) }
+            define_method(:leading_list) { |_element, interface| hooks << interface and nil }
+            define_method(:trailing_list) { |_element, interface| hooks << interface and nil }
+          end
+        library = Markbridge::Renderers::Discourse::TagLibrary.default
+        library.register(Markbridge::AST::Quote, tag.new)
+        described_class.new(tag_library: library)
+      end
+
+      it "hands the hook the interface of the context" do
+        quote = Markbridge::AST::Quote.new
+
+        renderer.leading_list(quote, context)
+        renderer.trailing_list(quote, context)
+
+        expect(seen.map(&:context)).to eq([context, context])
+      end
+
+      it "hands the hook of a nested node the same context" do
+        element = untagged.new << (Markbridge::AST::Quote.new << first)
+
+        renderer.leading_list(element, context)
+        renderer.trailing_list(element, context)
+
+        expect(seen.map(&:context)).to eq([context, context])
+      end
+    end
   end
 
   describe "#choose_list_marker and #list_marker" do
@@ -878,6 +929,17 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       expect(renderer.list_marker(list)).to be_nil
     end
 
+    it "resets its caches after a call outside a render" do
+      renderer.choose_list_marker(first, ordered: false)
+      list =
+        Markbridge::AST::List.new << (
+          Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("a")
+        )
+      renderer.render(Markbridge::AST::Document.new << list)
+
+      expect(renderer.list_marker(list)).to be_nil
+    end
+
     it "picks the marker the list in front did not use, by identity of the node" do
       a =
         Markbridge::AST::List.new << (
@@ -910,7 +972,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
     # The blocks of the raw output are squeezed together, as the
     # postprocessor does it.
-    def markdown(document)
+    def markdown(document, renderer = self.renderer)
       renderer.render(document).gsub(/\n{3,}/, "\n\n").strip
     end
 
@@ -961,6 +1023,63 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
       document << (untagged.new << Markbridge::AST::List.new) << list("b")
 
       expect(markdown(document)).to eq("- b")
+    end
+
+    context "with a tag that opens with its first child" do
+      # The hook answers only for the context the tag renders its
+      # children in, with the element on top of the chain.
+      let(:opener) { Class.new(Markbridge::AST::Element) }
+      let(:tag_class) do
+        Class.new(Markbridge::Renderers::Discourse::Tag) do
+          def leading_list(element, interface)
+            if interface.context.element.equal?(element)
+              interface.leading_list(element, children: true)
+            end
+          end
+        end
+      end
+
+      def renderer_with(tag)
+        library = Markbridge::Renderers::Discourse::TagLibrary.default
+        library.register(opener, tag)
+        described_class.new(tag_library: library)
+      end
+
+      it "asks the hook with the context of the children" do
+        tag =
+          Class.new(tag_class) do
+            def render(element, interface)
+              interface.render_children(element, context: interface.with_parent(element))
+            end
+          end
+        document = Markbridge::AST::Document.new << list("a") << (opener.new << list("b"))
+
+        expect(markdown(document, renderer_with(tag.new))).to eq("- a\n\n* b")
+      end
+
+      it "keeps the list in front out of view when the hook says nil for the tokens context" do
+        tag =
+          Class.new(tag_class) do
+            def render(element, interface)
+              interface.render_tokens(element)
+            end
+          end
+        document = Markbridge::AST::Document.new << list("a") << (opener.new << list("b"))
+
+        expect(markdown(document, renderer_with(tag.new))).to eq("- a\n\n- b")
+      end
+
+      it "asks the hook with the context of the children rendered as tokens" do
+        tag =
+          Class.new(tag_class) do
+            def render(element, interface)
+              interface.render_tokens(element, context: interface.with_parent(element))
+            end
+          end
+        document = Markbridge::AST::Document.new << list("a") << (opener.new << list("b"))
+
+        expect(markdown(document, renderer_with(tag.new))).to eq("- a\n\n* b")
+      end
     end
   end
 end
