@@ -67,6 +67,7 @@ module Markbridge
           PATH_LIKE = %r{\A(?:[/#?]|\.{1,2}/)}
 
           BACKTICKS = /`+/
+          ASTERISK = "*"
           # Breaks written as <br> at the end of a group, after the newline
           # of the break in front of them.
           TRAILING_BREAKS = /\n<br>(?:\n|<br>)*\z/
@@ -96,6 +97,7 @@ module Markbridge
                            :AUTOLINKABLE,
                            :PATH_LIKE,
                            :BACKTICKS,
+                           :ASTERISK,
                            :LEADING_BLANKS,
                            :TRAILING_BREAKS,
                            :NEWLINE,
@@ -459,19 +461,50 @@ module Markbridge
             end
           end
 
+          # A blank line ends the paragraph, and markers around it would
+          # stay visible as text, so every paragraph of the content gets
+          # its own markers (see {Paragraphs}). A nested pair at the start
+          # of the content stands at the start of the first paragraph, one
+          # at the end at the end of the last. The escaper escapes a `*` in
+          # text, so a `*` at the other edges of a paragraph comes from a
+          # nested pair that was split there. A `~` in text is not escaped,
+          # and a nested strikethrough brings its marker into the content
+          # anyway. A nested pair that spans the content was split the same
+          # way and spans every paragraph. +nested+ says whether a nested
+          # pair stands at the start, at the end, and whether that is one
+          # pair spanning the content.
+          def delimiter_piece(name, content, html_mode, nested)
+            return content if nothing_to_wrap?(content)
+
+            delimiter = DELIMITERS.fetch(name)
+            _, _, html_open, html_close, char = delimiter
+            return "#{html_open}#{content}#{html_close}" if html_mode
+
+            pair_start, pair_end, spanning = nested
+            split_pair = char == ASTERISK
+            Paragraphs.map(content) do |paragraph, first, last|
+              paragraph_piece(
+                delimiter,
+                paragraph,
+                first ? pair_start : split_pair,
+                last ? pair_end : split_pair,
+                spanning,
+              )
+            end
+          end
+
           # Content with nothing visible in it keeps no markers. Whitespace
           # at the edges stays outside the markers and outside the HTML
           # tags: a marker next to whitespace does not open or close, and
           # an HTML tag alone on its line opens an HTML block. A BBCode tag
           # keeps the whitespace inside, Discourse has no such rule.
           # Content that would break the marker gets the HTML tags.
-          # +nested+ says whether a nested pair stands at the start, at
-          # the end, and whether that is one pair spanning the content.
-          def delimiter_piece(name, content, html_mode, nested)
+          # +pair_start+, +pair_end+ and +spanning+ say whether a nested
+          # pair stands at the start, at the end, and whether that is one
+          # pair spanning the content.
+          def paragraph_piece(delimiter, content, pair_start, pair_end, spanning)
+            open, close, html_open, html_close, char = delimiter
             return content if nothing_to_wrap?(content)
-
-            open, close, html_open, html_close, char = DELIMITERS.fetch(name)
-            return "#{html_open}#{content}#{html_close}" if html_mode
 
             if char && edge_whitespace?(content)
               match = content.match(EDGES)
@@ -483,7 +516,7 @@ module Markbridge
               core = content
             end
 
-            if char && breaks_marker?(core, open, char, nested)
+            if char && breaks_marker?(core, delimiter, pair_start, pair_end, spanning)
               "#{lead}#{html_open}#{core}#{html_close}#{trail}"
             else
               core = escape_colon(core) if open.start_with?("[")
@@ -500,12 +533,12 @@ module Markbridge
           # strikethrough any tilde at an edge breaks the marker: a nested
           # strikethrough brings the `~~` marker itself into the content.
           # An escaped character at the end does not count: `\\*` is text.
-          def breaks_marker?(core, marker, char, nested)
+          def breaks_marker?(core, delimiter, pair_start, pair_end, spanning)
+            marker, _, _, _, char = delimiter
             return true if core.include?(marker)
 
             at_start = core.start_with?(char)
             at_end = core.end_with?(char) && !Joins.escaped_end?(core)
-            pair_start, pair_end, spanning = nested
             (at_start && !pair_start) || (at_end && !pair_end) || (at_start && at_end && !spanning)
           end
 

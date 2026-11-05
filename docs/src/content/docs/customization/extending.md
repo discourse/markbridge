@@ -152,7 +152,7 @@ end
 |---|---|
 | a `String` | finished Markdown, as it is |
 | `Tokens.text(string)` | the string, escaped like text (`Tokens::LABEL` for a link label, `Tokens::VERBATIM` for none) |
-| `Tokens.open(name)` … `Tokens.close(name)` | `**`, `*`, `~~` or `[u]…[/u]` around the content (`:strong`, `:em`, `:s`, `:u`), with whitespace at the edges outside the markers and an HTML fallback where the markers would not work |
+| `Tokens.open(name)` … `Tokens.close(name)` | `**`, `*`, `~~` or `[u]…[/u]` around the content (`:strong`, `:em`, `:s`, `:u`), with whitespace at the edges outside the markers and an HTML fallback where the markers would not work. Every paragraph of the content gets its own markers |
 | `Tokens.link_open(destination)` … `Tokens.link_close` | `[content](destination)` |
 | `Tokens.bare_url(href)` | the href alone where linkify links it, `[href](href)` where text is glued to it |
 | `Tokens.image(src:, alt:, width:, height:)` | `![alt\|WxH](src)` |
@@ -161,6 +161,8 @@ end
 | `Tokens.html(string)` | raw HTML, as it is; a newline right after it becomes `<br>`, so an opening tag is never alone on its line, where it would open an HTML block |
 
 Inside a CommonMark HTML block (`interface.html_mode?`) the serializer writes the HTML form of every token (`<strong>`, `<a href>`, `<img>`, `<br>`, …), so a tag that returns tokens needs no html_mode branch of its own. A tag that returns a String still does (see below).
+
+Inline markup can't span a blank line: the blank line ends the paragraph, and the markers stay visible as text. A tag that writes its own markers into a String can close them before every blank line and open them again after it with `Markbridge::Renderers::Discourse::Paragraphs.map(content) { |paragraph| "[x]#{paragraph}[/x]" }`. Content with a code fence is yielded as a whole.
 
 A Tag must return a String — returning `nil` (or anything else) raises a `TypeError`. To handle only some nodes, defer the rest with `render_default(node)` instead of falling through to `nil`.
 
