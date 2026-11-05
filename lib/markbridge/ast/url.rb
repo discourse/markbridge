@@ -12,6 +12,10 @@ module Markbridge
     #   url = AST::Url.new(href: "https://example.com")
     #   url << AST::Text.new("https://example.com")
     class Url < Element
+      # Whitespace at the start or at the end of the text.
+      EDGE_SPACE = /\A[[:space:]]+|[[:space:]]+\z/
+      private_constant :EDGE_SPACE
+
       # @return [String, nil] the URL/href for this link
       attr_reader :href
 
@@ -24,18 +28,39 @@ module Markbridge
       end
 
       # Whether this link is "bare" — it has no link text of its own:
-      # either no children, or a single Text child whose content is
-      # exactly the href (how parsers model a URL that stands for
-      # itself). Consumers that record or rewrite links need this
+      # either no children, or a single Text child whose content is the
+      # href (how parsers model a URL that stands for itself).
+      # Whitespace at the edges of the text and line breaks in front of
+      # it or after it don't count: forum posts often have
+      # `[url] https://example.com [/url]` or a line break right after
+      # `[url]`. Consumers that record or rewrite links need this
       # judgment too (a bare URL must stay bare to keep autolinking
       # and oneboxing working), so it lives on the node rather than
       # in the renderer.
       #
       # @return [Boolean]
+      # @example
+      #   url = AST::Url.new(href: "https://example.com")
+      #   url << AST::LineBreak.new << AST::Text.new(" https://example.com ")
+      #   url.bare? # => true
       def bare?
         return true if children.empty?
 
-        children.size == 1 && children.first.instance_of?(Text) && children.first.text == href
+        bare_text = nil
+        children.each do |child|
+          if child.instance_of?(Text)
+            return false if bare_text
+
+            bare_text = child.text
+          elsif !child.instance_of?(LineBreak)
+            return false
+          end
+        end
+        return false if bare_text.nil?
+        # Most bare links have no whitespace to take off.
+        return true if bare_text == href
+
+        bare_text.gsub(EDGE_SPACE, "") == href
       end
     end
   end

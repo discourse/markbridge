@@ -321,6 +321,15 @@ matcher:
 
 mutation:
   ignore_patterns:
+    # AST::Url#bare? and UrlTag#bare_tokens compare the text with the
+    # href before they take whitespace off it. The comparison only saves
+    # the gsub or the regex match for the common link without
+    # whitespace; without it the slow path gives the same answer. The
+    # render corpus was 3% slower without the two checks. The locals
+    # `bare_text` and `label_text` are used only there.
+    - "if{condition=send{receiver=lvar{value=bare_text} selector=(==)}}"
+    - "if{condition=send{receiver=lvar{value=label_text} selector=(==)}}"
+
     # BBCode UrlHandler#content_href peeks at the two tokens after
     # [url]. `peek_ahead(3)` or `peek_ahead(167)` only buffer more
     # tokens, the first two stay the same and the buffer is read in

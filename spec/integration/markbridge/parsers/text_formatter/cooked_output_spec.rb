@@ -22,6 +22,15 @@ RSpec.describe "TextFormatter cooked output", skip: CookedOutput::SKIP_REASON do
     expect(html).to eq(%(<p>see<br>\n<br><a href="https://e.com/a">label</a> ok</p>\n))
   end
 
+  it "cooks a link whose text is the href after a line break into the link" do
+    html =
+      cook_text_formatter(
+        %(<r>see<br/>\n<URL url="https://e.com/a"><s>[url]</s><br/>\nhttps://e.com/a<e>[/url]</e></URL> ok</r>),
+      )
+
+    expect(html).to eq(%(<p>see<br>\n<br><a href="https://e.com/a">https://e.com/a</a> ok</p>\n))
+  end
+
   it "cooks bold across a line break" do
     html = cook_text_formatter("<r><B><s>[b]</s>a<br/>\nb<e>[/b]</e></B></r>")
 
