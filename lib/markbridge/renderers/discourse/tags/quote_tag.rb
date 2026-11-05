@@ -10,7 +10,7 @@ module Markbridge
           def render(element, interface)
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
-
+            return "" if content.empty?
             return "<blockquote>#{content}</blockquote>" if interface.html_mode?
 
             # Build Discourse quote BBCode

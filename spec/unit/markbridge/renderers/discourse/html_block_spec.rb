@@ -89,6 +89,19 @@ RSpec.describe Markbridge::Renderers::Discourse::HtmlBlock do
     end
   end
 
+  describe ".without_blank_lines" do
+    it "writes the newline in front of a blank line as an entity" do
+      expect(described_class.without_blank_lines("a\n\nb")).to eq("a&#10;\nb")
+      expect(described_class.without_blank_lines("a\n \t\nb")).to eq("a&#10; \t\nb")
+      expect(described_class.without_blank_lines("a\n\n\nb")).to eq("a&#10;&#10;\nb")
+    end
+
+    it "leaves text without a blank line alone" do
+      expect(described_class.without_blank_lines("a\nb")).to eq("a\nb")
+      expect(described_class.without_blank_lines("ab")).to eq("ab")
+    end
+  end
+
   describe ".safe?" do
     it "accepts an empty string" do
       expect(described_class.safe?("")).to be(true)

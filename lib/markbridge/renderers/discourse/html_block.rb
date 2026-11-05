@@ -94,6 +94,10 @@ module Markbridge
         # are item content that the list builder has not indented yet.
         OPENER = %r{\A[ \t]*</?(?:#{Regexp.union(BLOCK_TAGS).source})(?:[ \t>]|/>|\z)}i
 
+        # The newline in front of a line that holds nothing but spaces and
+        # tabs: with the line it makes a blank line.
+        BLANK_LINE_NEWLINE = /\n(?=[ \t]*\n)/
+
         # Markdown sigils that would surface as literal text inside an
         # HTML block: emphasis (`*`, `_`, `~`) and link middles (`](`).
         MARKDOWN_SIGILS = /[*_~]|\]\(/
@@ -102,7 +106,7 @@ module Markbridge
         # content line keeps its own indentation, e.g. a nested `  - a`.
         BLANK_EDGES = /\A(?:[ \t]*\n)+|(?:\n[ \t]*)+\z/
 
-        private_constant :BLOCK_TAGS, :OPENER, :MARKDOWN_SIGILS, :BLANK_EDGES
+        private_constant :BLOCK_TAGS, :OPENER, :BLANK_LINE_NEWLINE, :MARKDOWN_SIGILS, :BLANK_EDGES
 
         # Whether +line+ starts an HTML block. A closing tag such as
         # `</div>` starts one too. The block runs until the next blank
@@ -122,6 +126,20 @@ module Markbridge
         #   HtmlBlock.island("- a\n") # => "\n\n- a\n\n"
         def self.island(markdown)
           "\n\n#{markdown.gsub(BLANK_EDGES, "")}\n\n"
+        end
+
+        # Text for the inside of an HTML block, with no blank line in it:
+        # a blank line ends the block, and what follows is Markdown
+        # again. The newline that would start a blank line is written as
+        # the entity, which the HTML parser reads back as a newline.
+        # @param text [String] text or HTML, already escaped
+        # @return [String]
+        # @example
+        #   HtmlBlock.without_blank_lines("a\n\nb") # => "a&#10;\nb"
+        def self.without_blank_lines(text)
+          return text unless text.include?("\n")
+
+          text.gsub(BLANK_LINE_NEWLINE, "&#10;")
         end
 
         # Whether a fragment can be spliced into an HTML block: raw HTML

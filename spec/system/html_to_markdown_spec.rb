@@ -509,17 +509,14 @@ RSpec.describe "HTML to Markdown Conversion" do
       expect(result.markdown).to include("<table>")
     end
 
-    it "drops the spurious <p> wrapper when a single paragraph fills a cell" do
-      # Newline content forces the html_mode fallback. The cell contains
-      # one <p>; the surrounding <td> already provides block context, so
-      # the <p> wrapper would just add vertical margin and (in the
-      # block-content case) would emit invalid HTML5.
+    it "keeps the <p> of a paragraph in a cell" do
+      # The line break makes the table HTML. A paragraph keeps its <p>
+      # there as well, without it two paragraphs would run together.
       html = "<table><tr><td><p>line one<br>line two</p></td></tr></table>"
 
       result = Markbridge.html_to_markdown(html)
 
-      expect(result.markdown).to include("<td>line one<br>line two</td>")
-      expect(result.markdown).not_to include("<td><p>")
+      expect(result.markdown).to include("<td><p>line one<br>line two</p></td>")
     end
   end
 end
