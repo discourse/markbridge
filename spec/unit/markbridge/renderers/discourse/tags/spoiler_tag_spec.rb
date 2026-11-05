@@ -1,10 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
-  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
+  include_context "with a renderer tag"
 
   describe "#render" do
     it "wraps content in [spoiler]...[/spoiler] when no title is set" do
@@ -38,7 +35,7 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
     it_behaves_like "a tag that propagates parent context"
 
     context "in html_mode" do
-      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+      let(:context) { html_context }
 
       it "renders <details> with default summary" do
         element = Markbridge::AST::Spoiler.new

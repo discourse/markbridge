@@ -1,16 +1,10 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
-  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
+  include_context "with a renderer tag"
 
-  # The tag returns tokens, the renderer writes them.
-  def rendered(element)
-    renderer.serialize(tag.render(element, interface), context)
-  end
-
+  # The serializer writes the image and its spec has the forms; these
+  # examples check what the tag hands over.
   describe "#render" do
     it "returns an image token with the attributes of the element" do
       element = Markbridge::AST::Image.new(src: "a.png", alt: "x", width: 10, height: 5)
@@ -31,12 +25,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
       element = Markbridge::AST::Image.new(src: "my image.png")
 
       expect(rendered(element)).to eq("![](<my image.png>)")
-    end
-
-    it "puts the words of an alt text with line breaks on one line" do
-      element = Markbridge::AST::Image.new(src: "a.png", alt: "first\n\n  second\nthird")
-
-      expect(rendered(element)).to eq("![first second third](a.png)")
     end
 
     context "when the alt text ends in a part that Discourse reads as an option" do
@@ -91,27 +79,6 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
       expect(rendered(element)).to eq("![800x600|5](a.png)")
     end
 
-    it "renders image with src only" do
-      element = Markbridge::AST::Image.new(src: "https://example.com/image.png")
-
-      result = rendered(element)
-      expect(result).to eq("![](https://example.com/image.png)")
-    end
-
-    it "renders the alt text as the image description" do
-      element = Markbridge::AST::Image.new(src: "https://example.com/image.png", alt: "a cat")
-
-      expect(rendered(element)).to eq("![a cat](https://example.com/image.png)")
-    end
-
-    it "escapes parentheses in the image destination" do
-      opening = Markbridge::AST::Image.new(src: "https://example.com/a(b.png", alt: "opening")
-      closing = Markbridge::AST::Image.new(src: "https://example.com/a)b.png", alt: "closing")
-
-      expect(rendered(opening)).to eq("![opening](https://example.com/a\\(b.png)")
-      expect(rendered(closing)).to eq("![closing](https://example.com/a\\)b.png)")
-    end
-
     it "doubles a backslash in the image destination" do
       trailing = Markbridge::AST::Image.new(src: "https://example.com/a\\", alt: "trailing")
       before_paren = Markbridge::AST::Image.new(src: "https://example.com/a\\)b.png", alt: "paren")
@@ -120,67 +87,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
       expect(rendered(before_paren)).to eq("![paren](https://example.com/a\\\\\\)b.png)")
     end
 
-    it "puts the alt text in front of the dimensions" do
-      element =
-        Markbridge::AST::Image.new(
-          src: "https://example.com/image.png",
-          width: 100,
-          height: 200,
-          alt: "a cat",
-        )
-
-      expect(rendered(element)).to eq("![a cat|100x200](https://example.com/image.png)")
-    end
-
-    it "escapes the alt text like a link label" do
-      element = Markbridge::AST::Image.new(src: "https://example.com/image.png", alt: "a [cat] *")
-
-      expect(rendered(element)).to eq("![a \\[cat\\] \\*](https://example.com/image.png)")
-    end
-
-    it "renders an empty alt text like a missing one" do
-      element = Markbridge::AST::Image.new(src: "https://example.com/image.png", alt: "")
-
-      expect(rendered(element)).to eq("![](https://example.com/image.png)")
-    end
-
-    it "renders image with src and width" do
-      element = Markbridge::AST::Image.new(src: "https://example.com/image.png", width: 100)
-
-      result = rendered(element)
-      expect(result).to eq("![|100](https://example.com/image.png)")
-    end
-
-    it "renders image with src, width, and height" do
-      element =
-        Markbridge::AST::Image.new(src: "https://example.com/image.png", width: 100, height: 200)
-
-      result = rendered(element)
-      expect(result).to eq("![|100x200](https://example.com/image.png)")
-    end
-
-    it "renders image with empty src when src is nil" do
-      element = Markbridge::AST::Image.new
-
-      result = rendered(element)
-      expect(result).to eq("![]()")
-    end
-
-    it "renders image with width and height when src is empty" do
-      element = Markbridge::AST::Image.new(src: "", width: 150, height: 250)
-
-      result = rendered(element)
-      expect(result).to eq("![|150x250]()")
-    end
-
-    it "renders without dimensions when only height is provided (height alone is meaningless)" do
-      element = Markbridge::AST::Image.new(src: "x.png", height: 200)
-
-      expect(rendered(element)).to eq("![](x.png)")
+    it "renders an image without a src to an empty destination" do
+      expect(rendered(Markbridge::AST::Image.new)).to eq("![]()")
     end
 
     context "in html_mode" do
-      let(:context) { Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true) }
+      let(:context) { html_context }
 
       it "renders <img> with src and empty alt" do
         element = Markbridge::AST::Image.new(src: "https://example.com/image.png")

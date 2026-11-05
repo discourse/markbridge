@@ -1,10 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
-  let(:tag) { described_class.new }
-  let(:renderer) { Markbridge::Renderers::Discourse::Renderer.new }
-  let(:context) { Markbridge::Renderers::Discourse::RenderContext.new }
-  let(:interface) { Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, context) }
+  include_context "with a renderer tag"
 
   def build_table(rows)
     table = Markbridge::AST::Table.new

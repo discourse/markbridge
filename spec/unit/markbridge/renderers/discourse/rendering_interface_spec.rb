@@ -11,109 +11,38 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
-  describe "#render_node" do
-    it "delegates to the renderer with the supplied node and current context" do
-      allow(renderer).to receive(:render).and_return("rendered")
+  # The four render methods hand the node and the context on to the
+  # renderer, its own context when none is given.
+  describe "the render methods" do
+    let(:other_context) { Markbridge::Renderers::Discourse::RenderContext.new }
+    let(:element) { Markbridge::AST::Bold.new }
 
-      result = interface.render_node(:node)
+    {
+      render_node: :render,
+      render_default: :render_default,
+      render_children: :render_children,
+      render_tokens: :render_tokens,
+    }.each do |method, renderer_method|
+      it "##{method} delegates to the renderer with the current context, or the one given" do
+        allow(renderer).to receive(renderer_method).and_return("rendered")
 
-      expect(renderer).to have_received(:render).with(:node, context:)
-      expect(result).to eq("rendered")
+        expect(interface.public_send(method, element)).to eq("rendered")
+        expect(renderer).to have_received(renderer_method).with(element, context:)
+
+        interface.public_send(method, element, context: other_context)
+
+        expect(renderer).to have_received(renderer_method).with(element, context: other_context)
+      end
     end
 
-    it "uses an explicit context when one is passed" do
-      other_context = Markbridge::Renderers::Discourse::RenderContext.new
-      allow(renderer).to receive(:render).and_return("rendered")
-
-      interface.render_node(:node, context: other_context)
-
-      expect(renderer).to have_received(:render).with(:node, context: other_context)
-    end
-  end
-
-  describe "#render_default" do
-    it "delegates to the renderer with the supplied node and current context" do
-      allow(renderer).to receive(:render_default).and_return("stock")
-
-      result = interface.render_default(:node)
-
-      expect(renderer).to have_received(:render_default).with(:node, context:)
-      expect(result).to eq("stock")
-    end
-
-    it "uses an explicit context when one is passed" do
-      other_context = Markbridge::Renderers::Discourse::RenderContext.new
-      allow(renderer).to receive(:render_default).and_return("stock")
-
-      interface.render_default(:node, context: other_context)
-
-      expect(renderer).to have_received(:render_default).with(:node, context: other_context)
-    end
-  end
-
-  describe "#render_children" do
-    it "delegates to renderer.render_children with the element and current context" do
-      allow(renderer).to receive(:render_children).and_return("children")
-      element = Markbridge::AST::Bold.new
-
-      result = interface.render_children(element)
-
-      expect(renderer).to have_received(:render_children).with(element, context:)
-      expect(result).to eq("children")
-    end
-
-    it "uses an explicit context when one is passed" do
-      other_context = Markbridge::Renderers::Discourse::RenderContext.new
-      allow(renderer).to receive(:render_children).and_return("children")
-      element = Markbridge::AST::Bold.new
-
-      interface.render_children(element, context: other_context)
-
-      expect(renderer).to have_received(:render_children).with(element, context: other_context)
-    end
-
-    it "passes an optional block on to the renderer" do
-      element = Markbridge::AST::Bold.new
-      element << Markbridge::AST::MarkdownText.new("a")
-      element << Markbridge::AST::MarkdownText.new("b")
-
+    it "#render_children passes the block on to the renderer" do
+      element << Markbridge::AST::MarkdownText.new("a") << Markbridge::AST::MarkdownText.new("b")
       seen = []
+
       result = interface.render_children(element) { |buffer, child| seen << [buffer.dup, child] }
 
       expect(seen).to eq([["", element.children[0]], ["a", element.children[1]]])
       expect(result).to eq("ab")
-    end
-
-    it "keeps what the block wrote to the buffer" do
-      element = Markbridge::AST::Bold.new
-      element << Markbridge::AST::MarkdownText.new("a")
-      element << Markbridge::AST::MarkdownText.new("b")
-
-      result = interface.render_children(element) { |buffer, _child| buffer << "|" }
-
-      expect(result).to eq("|a|b")
-    end
-  end
-
-  describe "#render_tokens" do
-    it "delegates to renderer.render_tokens with the element and current context" do
-      allow(renderer).to receive(:render_tokens).and_return(["tokens"])
-      element = Markbridge::AST::Bold.new
-
-      result = interface.render_tokens(element)
-
-      expect(renderer).to have_received(:render_tokens).with(element, context:)
-      expect(result).to eq(["tokens"])
-    end
-
-    it "uses an explicit context when one is passed" do
-      other_context = Markbridge::Renderers::Discourse::RenderContext.new
-      allow(renderer).to receive(:render_tokens).and_return(["tokens"])
-      element = Markbridge::AST::Bold.new
-
-      interface.render_tokens(element, context: other_context)
-
-      expect(renderer).to have_received(:render_tokens).with(element, context: other_context)
     end
   end
 
