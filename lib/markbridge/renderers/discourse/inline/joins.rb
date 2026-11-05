@@ -47,7 +47,9 @@ module Markbridge
           # emphasis count as punctuation. The five bytes the rules name
           # get a class of their own, so a class tells them apart without
           # a second comparison; they stay punctuation, which is why they
-          # sit above PUNCTUATION.
+          # sit above PUNCTUATION. AT is the `@` of a mention: after a word
+          # character it would read as an email address with the text
+          # after it.
           OTHER = 0
           WORD = 1
           PUNCTUATION = 2
@@ -57,7 +59,8 @@ module Markbridge
           STAR = 6
           UNDERSCORE = 7
           TILDE = 8
-          CLASS_COUNT = 9
+          AT = 9
+          CLASS_COUNT = 10
           # A 256-byte string read with getbyte, so classifying a byte is
           # one read instead of a chain of comparisons.
           BYTE_CLASSES =
@@ -68,6 +71,8 @@ module Markbridge
                   BANG
                 when 42
                   STAR
+                when 64
+                  AT
                 when 91
                   BRACKET
                 when 95
@@ -133,6 +138,8 @@ module Markbridge
                   after == UNDERSCORE ? BOUNDARY : CHECK_AFTER
                 elsif FLANKING_CLASSES.include?(before) && (after == WORD || after == TILDE)
                   before == UNDERSCORE ? BOUNDARY : CHECK_BEFORE
+                elsif before == WORD && after == AT
+                  BOUNDARY
                 else
                   NOTHING
                 end
@@ -154,6 +161,7 @@ module Markbridge
                            :STAR,
                            :UNDERSCORE,
                            :TILDE,
+                           :AT,
                            :CLASS_COUNT,
                            :BYTE_CLASSES,
                            :NOTHING,
