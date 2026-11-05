@@ -61,7 +61,10 @@ module Markbridge
       def convert(format:, input:)
         parser = parser_for(format)
         ast = parser.parse(input.to_s)
-        renderer = Markbridge::Renderers::Discourse::Renderer.new
+        # The output for a site with the discourse-bbcode plugin, with the
+        # size values as they are (percent, as phpBB writes them).
+        renderer =
+          Markbridge.discourse_renderer(features: { bbcode: true }, sizes: ->(size) { size })
         presenter = ASTPresenter.new(ast)
         markdown = cleanup_markdown(renderer.render(ast))
         unknown_tags = normalize_unknown_tags(parser)

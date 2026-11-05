@@ -65,10 +65,10 @@ For the exact list, see [`HandlerRegistry.default`](https://github.com/discourse
 
 ## Colors and sizes
 
-`<COLOR>` and `<SIZE>` render as their text by default, because Discourse core removes the style of a `<span>`. If the Discourse site uses the discourse-bbcode plugin, build the renderer with `features: { bbcode: true }` to keep them as `[color=…]` and `[size=…]` BBCode. phpBB 3.x stores `[size]` as a percentage, and the plugin reads it the same way:
+Discourse core removes the style of a `<span>`, so what to do with `<COLOR>` and `<SIZE>` depends on the site: build the renderer with `features: { bbcode: false }` to write their text, or with `features: { bbcode: true }` for a site with the discourse-bbcode plugin, which keeps them as `[color=…]` and `[size=…]` BBCode. Until you decide, a color or size raises `Markbridge::UndecidedFeatureError`. phpBB 3.x stores `[size]` as a percentage, and the plugin reads it the same way, so the size value passes as it is:
 
 ```ruby
-renderer = Markbridge.discourse_renderer(features: { bbcode: true })
+renderer = Markbridge.discourse_renderer(features: { bbcode: true }, sizes: ->(size) { size })
 
 xml = '<r><SIZE size="85"><s>[size=85]</s>small<e>[/size]</e></SIZE></r>'
 Markbridge.text_formatter_xml_to_markdown(xml, renderer:).markdown
@@ -79,13 +79,13 @@ See [Customizing the renderer](/customization/customizing-renderer/#features--th
 
 ## Using the parser directly
 
-<!-- spec:continue -->
 ```ruby
 parser = Markbridge::Parsers::TextFormatter::Parser.new
-ast = parser.parse(xml)
+ast = parser.parse('<r><B><s>[b]</s>bold<e>[/b]</e></B></r>')
 
 renderer = Markbridge::Renderers::Discourse::Renderer.new
 renderer.render(ast)
+# => "**bold**"
 ```
 
 ## Behavior notes

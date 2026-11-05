@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "../errors"
 require_relative "discourse/tag"
 require_relative "discourse/tag_library"
 require_relative "discourse/render_context"
