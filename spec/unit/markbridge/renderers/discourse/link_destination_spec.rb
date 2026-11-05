@@ -25,6 +25,14 @@ RSpec.describe Markbridge::Renderers::Discourse::LinkDestination do
       expect(described_class.escape("Main (Page)")).to eq("<Main \\(Page\\)>")
     end
 
+    it "escapes angle brackets inside the wrapped destination, which would end it" do
+      expect(described_class.escape("a b>c<d")).to eq("<a b\\>c\\<d>")
+    end
+
+    it "leaves angle brackets alone in a destination without whitespace" do
+      expect(described_class.escape("a>b")).to eq("a>b")
+    end
+
     it "returns nil for nil" do
       expect(described_class.escape(nil)).to be_nil
     end
