@@ -206,6 +206,7 @@ module Markbridge
             blank: 0
           )
             index = from
+            after_html = false
             while index < to
               token = tokens.fetch(index)
               index += 1
@@ -272,10 +273,14 @@ module Markbridge
                 before.call(buffer, child)
                 before = nil
               end
-              piece = start_of_line(buffer, piece, blank) unless html_mode
+              piece = start_of_line(buffer, piece, blank, after_html) unless html_mode
               next if piece.empty?
 
               html_mode ? buffer << piece : Joins.append(buffer, piece)
+              # An HTML tag alone on its line opens an HTML block, so the
+              # piece after it must not start with a newline; start_of_line
+              # writes <br> for the newline of a break too.
+              after_html = kind == Tokens::HTML
               # A break written as a newline, or one that left a run at
               # its end, is where a newline at the start of the next piece
               # would make a blank line.
@@ -290,14 +295,15 @@ module Markbridge
           # A piece that starts a line. Spaces at its start after a blank
           # line go: a block ended there, and spaces at the start of the
           # next line would pull the paragraph after them into that block.
-          # A newline at its start right after a hard break becomes <br>,
-          # as the break itself would be on a line that holds nothing
-          # else; two newlines are a blank line the text brings on
+          # A newline at its start right after a hard break or an HTML tag
+          # becomes <br>: the break would be on a line that holds nothing
+          # else, and the tag would be alone on its line, which opens an
+          # HTML block; two newlines are a blank line the text brings on
           # purpose. What is left may be nothing, which the caller skips.
-          def start_of_line(buffer, piece, blank = 0)
+          def start_of_line(buffer, piece, blank = 0, after_html = false)
             first = piece.getbyte(0)
             if first == NEWLINE
-              return piece unless after_break?(buffer) && piece.getbyte(1) != NEWLINE
+              return piece if piece.getbyte(1) == NEWLINE || !(after_html || after_break?(buffer))
 
               "<br>#{piece.byteslice(1, piece.bytesize - 1)}"
             else

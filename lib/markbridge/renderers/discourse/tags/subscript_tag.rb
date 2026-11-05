@@ -4,13 +4,19 @@ module Markbridge
   module Renderers
     module Discourse
       module Tags
-        # Tag for rendering subscript text
-        # Renders to HTML <sub> tag
+        # Tag for rendering subscript text as the HTML tag, which Markdown
+        # has no form for. The tags are inline tokens so that the
+        # serializer sees them as neighbors: a newline right after the
+        # opening tag would leave it alone on its line, where it opens an
+        # HTML block.
         class SubscriptTag < Tag
+          OPEN = Inline::Tokens.html("<sub>")
+          CLOSE = Inline::Tokens.html("</sub>")
+          private_constant :OPEN, :CLOSE
+
           def render(element, interface)
-            child_context = interface.with_parent(element)
-            content = interface.render_children(element, context: child_context)
-            "<sub>#{content}</sub>"
+            tokens = interface.render_tokens(element, context: interface.with_parent(element))
+            tokens.unshift(OPEN) << CLOSE
           end
         end
       end
