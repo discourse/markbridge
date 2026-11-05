@@ -107,6 +107,70 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
       expect(tag.render(element, interface)).to eq("![x](upload://a\\(1\\).png)")
     end
 
+    # A link cannot hold a link: Markdown reads the inner one and leaves
+    # the brackets of the outer one as text.
+    context "in a link label" do
+      let(:link) { Markbridge::AST::Url.new(href: "https://example.com") }
+
+      it "writes a file attachment as its name and size" do
+        element =
+          Markbridge::AST::Upload.new(
+            sha1: "abc",
+            filename: "report.pdf",
+            type: :attachment,
+            size: "1 KB",
+          )
+
+        expect(tag.render(element, interface_for(link))).to eq("report.pdf (1 KB)")
+      end
+
+      it "writes the name without a size, and the word attachment without a name" do
+        named = Markbridge::AST::Upload.new(sha1: "abc", filename: "a.pdf", type: :attachment)
+        unnamed = Markbridge::AST::Upload.new(sha1: "abc", filename: nil, type: :attachment)
+
+        expect(tag.render(named, interface_for(link))).to eq("a.pdf")
+        expect(tag.render(unnamed, interface_for(link))).to eq("attachment")
+      end
+
+      it "escapes the name like a link label" do
+        element = Markbridge::AST::Upload.new(sha1: "abc", filename: "a]b*.pdf", type: :attachment)
+
+        expect(tag.render(element, interface_for(link))).to eq("a\\]b\\*.pdf")
+      end
+
+      it "does the same inside a mail link" do
+        element = Markbridge::AST::Upload.new(sha1: "abc", filename: "a.pdf", type: :attachment)
+        mail = Markbridge::AST::Email.new(address: "alice@example.com")
+
+        expect(tag.render(element, interface_for(mail))).to eq("a.pdf")
+      end
+
+      it "writes the name as HTML text in html_mode, no island" do
+        element = Markbridge::AST::Upload.new(sha1: "abc", filename: "a<b.pdf", type: :attachment)
+
+        expect(tag.render(element, interface_for(link, html_mode: true))).to eq("a&lt;b.pdf")
+      end
+
+      it "keeps the form of an image, a link label can hold an image" do
+        element =
+          Markbridge::AST::Upload.new(sha1: "abc", filename: "pic.png", type: :image, alt: "a")
+
+        expect(tag.render(element, interface_for(link))).to eq("![a](upload://pic.png)")
+      end
+
+      it "keeps raw Markdown as it is" do
+        element =
+          Markbridge::AST::Upload.new(
+            sha1: "abc",
+            filename: "a.pdf",
+            type: :attachment,
+            raw: "[a.pdf|attachment](upload://a.pdf)",
+          )
+
+        expect(tag.render(element, interface_for(link))).to eq("[a.pdf|attachment](upload://a.pdf)")
+      end
+    end
+
     context "in a table cell" do
       let(:context) do
         Markbridge::Renderers::Discourse::RenderContext.new([Markbridge::AST::TableCell.new])
