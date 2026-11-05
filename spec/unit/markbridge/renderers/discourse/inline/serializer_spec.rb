@@ -349,6 +349,26 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
         )
       end
 
+      it "becomes a link whatever the neighbors when linkify would not link the href" do
+        expect(write(tokens.text("a "), tokens.bare_url("/t/5"), tokens.text(" b"))).to eq(
+          "a [/t/5](/t/5) b",
+        )
+        expect(write(tokens.bare_url("#top"))).to eq("[#top](#top)")
+        expect(write(tokens.bare_url("//example.com/x"))).to eq(
+          "[//example.com/x](//example.com/x)",
+        )
+        expect(write(tokens.bare_url("mailto:a@example.com"))).to eq("mailto:a@example.com")
+        expect(write(tokens.bare_url("ftp://example.com"))).to eq("ftp://example.com")
+      end
+
+      it "becomes a link for a query and a relative path, and stays text for a target that is neither" do
+        expect(write(tokens.bare_url("?page=2"))).to eq("[?page=2](?page=2)")
+        expect(write(tokens.bare_url("../up"))).to eq("[../up](../up)")
+        expect(write(tokens.text("see"), tokens.bare_url("Page Name"), tokens.text("now"))).to eq(
+          "seePage Namenow",
+        )
+      end
+
       it "stays bare after a hard break" do
         expect(write(tokens.text("a"), tokens.hard_break, tokens.bare_url(href))).to eq(
           "a\n#{href}",
