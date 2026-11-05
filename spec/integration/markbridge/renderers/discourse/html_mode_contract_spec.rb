@@ -22,7 +22,22 @@
 require "markbridge/rspec"
 
 RSpec.describe "html_mode rendering contract" do
-  let(:library) { Markbridge::Renderers::Discourse::TagLibrary.default }
+  # The tags of the plugin features write one form with the plugin and
+  # another without it, so every tag runs in both libraries.
+  LIBRARIES = {
+    "with the default features" => -> { Markbridge::Renderers::Discourse::TagLibrary.default },
+    "with every feature off" => -> do
+      Markbridge.discourse_renderer(
+        features: {
+          details: false,
+          spoiler: false,
+          poll: false,
+          post_event: false,
+          bbcode: false,
+        },
+      ).tag_library
+    end,
+  }.freeze
 
   ELEMENT_FACTORIES = {
     Markbridge::AST::Heading => -> { Markbridge::AST::Heading.new(level: 1) },
@@ -52,14 +67,21 @@ RSpec.describe "html_mode rendering contract" do
     element
   end
 
-  Markbridge::Renderers::Discourse::Tags.constants.each do |tag_constant|
-    element_class = Markbridge::Renderers::Discourse::TagLibrary.default.ast_class_for(tag_constant)
-    next unless element_class
+  LIBRARIES.each do |name, build_library|
+    context name do
+      let(:library) { build_library.call }
 
-    describe tag_constant.to_s do
-      it_behaves_like "an html_mode safe tag" do
-        let(:tag) { library[element_class] }
-        let(:element) { build_element(element_class) }
+      Markbridge::Renderers::Discourse::Tags.constants.each do |tag_constant|
+        element_class =
+          Markbridge::Renderers::Discourse::TagLibrary.default.ast_class_for(tag_constant)
+        next unless element_class
+
+        describe tag_constant.to_s do
+          it_behaves_like "an html_mode safe tag" do
+            let(:tag) { library[element_class] }
+            let(:element) { build_element(element_class) }
+          end
+        end
       end
     end
   end

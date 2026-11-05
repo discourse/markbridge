@@ -238,8 +238,10 @@ expect(token).to match_tag_end("b")
   the visible text, the link and image destinations, and tight lists
   (an item with inline content only must not cook with a `<p>`). For a
   table the renderer writes as HTML it expects the html_mode forms
-  inside, reading the renderer's decision off the table tag. It
-  cooks with markdown-it (see below). On a failure `explain` shrinks the
+  inside, reading the renderer's decision off the table tag.
+  `RoundTripChecker.new(features:)` renders with the plugin features of
+  `Markbridge.discourse_renderer` and expects the plain forms for the
+  features that are off. It cooks with markdown-it (see below). On a failure `explain` shrinks the
   AST with `AstShrinker` as long as the same check fails and prints the
   AST, the Markdown and the cooked HTML. The two specs below use it.
 - `spec/integration/markbridge/renderers/discourse/structure_roundtrip_spec.rb`

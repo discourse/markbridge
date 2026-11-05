@@ -65,9 +65,9 @@ All tag names are case-insensitive. Aliases in the same row use the same handler
 | Tags | Renders as | AST node |
 |---|---|---|
 | `[quote]` | `[quote="name"]…[/quote]`; without attribution `> …`, or `[quote]…[/quote]` around a quote with attribution | `AST::Quote` |
-| `[spoiler]`, `[hide]` | `[spoiler]…[/spoiler]` | `AST::Spoiler` |
-| `[color]` | The text; `[color=…]…[/color]` with `styling_bbcode: true` | `AST::Color` |
-| `[size]` | The text; `[size=…]…[/size]` with `styling_bbcode: true` | `AST::Size` |
+| `[spoiler]`, `[hide]` | `[spoiler]…[/spoiler]`, a title as text in front | `AST::Spoiler` |
+| `[color]` | The text; `[color=…]…[/color]` with `features: { bbcode: true }` | `AST::Color` |
+| `[size]` | The text; `[size=…]…[/size]` with `features: { bbcode: true }` | `AST::Size` |
 | `[center]`, `[left]`, `[right]`, `[justify]` | `<div align="…">` | `AST::Align` |
 
 ### Lists

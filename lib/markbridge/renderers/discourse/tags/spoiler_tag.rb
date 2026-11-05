@@ -8,7 +8,15 @@ module Markbridge
         # spoiler-alert plugin. Discourse never reads an attribute of the
         # tag, so a title is written as text in front of the spoiler:
         # `title: [spoiler]…[/spoiler]`.
+        #
+        # With +bbcode: false+, for a site without the plugin, the content
+        # is written as it is, so the hidden text shows.
         class SpoilerTag < Tag
+          # @param bbcode [Boolean] write the BBCode of the plugin
+          def initialize(bbcode: true)
+            @bbcode = bbcode
+          end
+
           def render(element, interface)
             child_context = interface.with_parent(element)
             content = interface.render_children(element, context: child_context)
@@ -19,6 +27,7 @@ module Markbridge
             return content unless content.match?(/[^[:space:]]/)
 
             title = title_text(element, interface)
+            return "#{title}#{content}" unless @bbcode
             return "#{title}#{render_html(content)}" if interface.html_mode?
 
             # `[spoiler]:x` at the start of a line reads as a link

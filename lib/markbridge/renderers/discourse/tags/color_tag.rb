@@ -11,7 +11,7 @@ module Markbridge
         # renders only the text, as inline tokens that the serializer joins
         # with the neighbors. With +bbcode: true+ it writes
         # +[color=…]…[/color]+ for the plugin (see
-        # +Markbridge.discourse_renderer(styling_bbcode: true)+).
+        # +Markbridge.discourse_renderer(features: { bbcode: true })+).
         class ColorTag < Tag
           # #rgb, #rrggbb or a color name. Anything else (and anything that
           # could end the BBCode tag early) renders only the text.

@@ -39,7 +39,7 @@ Markbridge.discourse_renderer(
   allow: nil,                        # Symbol/Array<Symbol> — markers to leave unescaped
   escape: true,                      # false swaps in IdentityEscaper (no escaping)
   postprocessor: nil,                # custom Postprocessor instance
-  styling_bbcode: false,             # true writes [color] and [size] BBCode
+  features: nil,                     # Hash{Symbol => Boolean} — the plugins of the target site
 )
 ```
 
@@ -122,23 +122,35 @@ Markbridge.discourse_renderer(escape: false)
 
 This swaps in `Markbridge::Renderers::Discourse::IdentityEscaper`, which returns text unchanged. `escape: false` can't be combined with `escape_hard_line_breaks:` or `allow:` (those configure the normal escaper, which `escape: false` replaces); an explicit `escaper:` always wins. To skip escaping for a single node rather than the whole document, use `AST::MarkdownText`.
 
-### `styling_bbcode:` — colors and sizes
+### `features:` — the plugins of the target site
 
-Discourse core removes the style of a `<span>`, so by default colors and sizes render as their text only. Discourse shows them with the [discourse-bbcode](https://github.com/discourse/discourse-bbcode) plugin. With `styling_bbcode: true` the renderer writes the BBCode that plugin reads:
+Some of what the renderer writes is BBCode that a Discourse plugin cooks. A site without the plugin shows that BBCode as text. `features:` says which plugins the site has, and the renderer writes a plain form where it has none:
+
+| Feature | Plugin | Default | With the plugin | Without it |
+|---|---|---|---|---|
+| `details` | discourse-details, bundled with Discourse (`details_enabled`) | on | `[details="title"]…[/details]` | the title as a paragraph in bold, then the content |
+| `spoiler` | spoiler-alert, bundled (`spoiler_enabled`) | on | `[spoiler]…[/spoiler]` | the content, so the hidden text shows |
+| `poll` | poll, bundled (`poll_enabled`) | on | `[poll]…[/poll]` | the options as a bullet list |
+| `post_event` | discourse-events, bundled (`discourse_post_event_enabled`) | on | `[event …][/event]` | a paragraph with the name and the dates |
+| `bbcode` | [discourse-bbcode](https://github.com/discourse/discourse-bbcode), needs an install | off | `[color=…]…[/color]`, `[size=…]…[/size]` | the text |
 
 ```ruby
-renderer = Markbridge.discourse_renderer(styling_bbcode: true)
+renderer = Markbridge.discourse_renderer(features: { post_event: false, bbcode: true })
 
 Markbridge.bbcode_to_markdown("[color=red]a[/color] [size=85]b[/size]", renderer:).markdown
 # => "[color=red]a[/color] [size=85]b[/size]"
 ```
 
+The bundled plugins are on by default even when a site has turned them off: Discourse keeps the raw Markdown and cooks it again when a setting changes, so the BBCode of a plugin that is off today becomes a details block or a poll as soon as the plugin is on. The plain form cannot be turned back. Turn a feature off for a site that will not use the plugin.
+
+An unknown feature raises `ArgumentError`. A tag in `tags:` wins over `features:`. Underline (`[u]`), quotes with an author (`[quote="…"]`) and aligned blocks (`<div align>`) need no plugin, Discourse core cooks them.
+
+Colors and sizes with `bbcode: true`:
+
 - A color must be `#rgb`, `#rrggbb` or a name, a size a whole number from 1 to 999. The plugin reads the size as a percentage. Any other value renders as the text only.
 - Every paragraph gets its own tags, because the BBCode can't span a blank line.
 - Inside a link the text renders without BBCode, because Discourse doesn't parse BBCode in link text.
 - Inside an HTML block (for example a table with uneven rows) the output is `<span style="color:red">` or `<span style="font-size:85%">`, the form the plugin lets through.
-
-A tag in `tags:` for `AST::Color` or `AST::Size` wins over this option.
 
 ### `postprocessor:` — clean up the final string
 

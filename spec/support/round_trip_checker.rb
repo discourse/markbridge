@@ -159,11 +159,19 @@ class RoundTripChecker
     end
   end
 
-  def initialize
+  # The plugin features the checker renders with when none are given.
+  DEFAULT_FEATURES = { details: true, spoiler: true }.freeze
+
+  # @param features [Hash{Symbol => Boolean}, nil] the plugin features of
+  #   the target site, see +Markbridge.discourse_renderer+. The expected
+  #   text follows them: the BBCode of a plugin is text to plain
+  #   markdown-it, the plain form without the plugin cooks.
+  def initialize(features: nil)
+    @features = DEFAULT_FEATURES.merge(features || {})
     @table_tag = RecordingTableTag.new
     library = Markbridge::Renderers::Discourse::TagLibrary.default
     library.register(AST::Table, @table_tag)
-    @renderer = Markbridge::Renderers::Discourse::Renderer.new(tag_library: library)
+    @renderer = Markbridge.discourse_renderer(tag_library: library, features:)
   end
 
   # @param document [Markbridge::AST::Document]
@@ -414,6 +422,10 @@ class RoundTripChecker
       [skeleton("s", children: expected_children(node, html:))]
     when AST::HorizontalRule
       [skeleton("hr")]
+    when AST::Details
+      # Without the plugin the title is a paragraph in bold in front.
+      title = !@features[:details] && details_title(node) ? [skeleton("strong")] : []
+      title + expected_children(node, html:)
     when AST::Element
       expected_children(node, html:)
     else
@@ -596,10 +608,16 @@ class RoundTripChecker
       bbcode_text(node, out, in_link:, html:, open: "[u]", close: "[/u]", plain:)
     when AST::Spoiler
       out << "#{node.title.strip}: " if node.title.to_s.match?(/[^[:space:]]/) && visible?(node)
-      plain = html || !visible?(node)
+      plain = html || !visible?(node) || !@features[:spoiler]
       bbcode_text(node, out, in_link:, html:, open: "[spoiler]", close: "[/spoiler]", plain:)
     when AST::Details
-      if html
+      if !@features[:details]
+        separated(out) do
+          title = details_title(node)
+          separated(out) { out << title } if title && visible?(node)
+          expected_children_text(node, out, in_link:, html:)
+        end
+      elsif html
         summary_text(node.title || "Summary", node, out, in_link:) if visible?(node)
       else
         separated(out) do
@@ -641,6 +659,13 @@ class RoundTripChecker
     out << open unless plain
     expected_children_text(node, out, in_link:, html:)
     out << close unless plain
+  end
+
+  # @return [String, nil] the title of a details block, nil when it is
+  #   empty or whitespace
+  def details_title(node)
+    title = node.title.to_s.strip
+    title.empty? ? nil : title
   end
 
   # A <details> element: the summary on a line of its own, then the
