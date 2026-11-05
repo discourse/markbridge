@@ -53,11 +53,49 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
         expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]<!---->")
       end
 
-      it "writes no comment after text between the two" do
+      it "writes the comment also with text between the two" do
         second = spoiler("y")
-        parent = paragraph_with(spoiler("x"), Markbridge::AST::Text.new(" a "), second)
+        parent = paragraph_with(spoiler("x"), Markbridge::AST::Text.new(" and "), second)
+
+        expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]<!---->")
+      end
+
+      it "writes the comment also with an inline element between the two" do
+        second = spoiler("y")
+        bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("b")
+        parent = paragraph_with(spoiler("x"), bold, second)
+
+        expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]<!---->")
+      end
+
+      it "writes the comment when only whitespace follows the newline of the text between" do
+        second = spoiler("y")
+        parent = paragraph_with(spoiler("x"), Markbridge::AST::Text.new("a \n "), second)
+
+        expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]<!---->")
+      end
+
+      it "writes no comment when the text between starts the line of the second" do
+        second = spoiler("y")
+        parent = paragraph_with(spoiler("x"), Markbridge::AST::Text.new(" a\n b "), second)
 
         expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]")
+      end
+
+      it "writes no comment after a spoiler with a title, which starts its line with the title" do
+        second = spoiler("y")
+        first = Markbridge::AST::Spoiler.new(title: "Reveal") << Markbridge::AST::Text.new("x")
+        parent = paragraph_with(first, Markbridge::AST::Text.new(" "), second)
+
+        expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]")
+      end
+
+      it "looks over a spoiler with a title to the spoiler in front of it" do
+        second = spoiler("y")
+        titled = Markbridge::AST::Spoiler.new(title: "Reveal") << Markbridge::AST::Text.new("x")
+        parent = paragraph_with(spoiler("w"), Markbridge::AST::Text.new(" "), titled, second)
+
+        expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]<!---->")
       end
 
       it "writes no comment after the first spoiler" do
@@ -80,6 +118,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
         parent = paragraph_with(spoiler("x"), Markbridge::AST::Text.new(""), second)
 
         expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]<!---->")
+      end
+
+      it "counts a subclass of Text that starts the line like the class" do
+        text_class = Class.new(Markbridge::AST::Text)
+        second = spoiler("y")
+        parent = paragraph_with(spoiler("x"), text_class.new(" a\n b "), second)
+
+        expect(tag.render(second, interface_for(parent))).to eq("[spoiler]y[/spoiler]")
       end
 
       it "counts subclasses of Spoiler and Text like the classes" do

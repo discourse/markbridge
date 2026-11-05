@@ -76,6 +76,13 @@ RSpec.describe "cooked output of the Discourse engine", :discourse_engine do
       expect(cooked.at_css("div.spoiler > p").text).to eq("hidden")
     end
 
+    it "cooks two spoilers on one line with text between as two inline spoilers" do
+      cooked = cook_all(spoiler("a"), text(" and "), spoiler("b"))
+
+      expect(cooked.css("div.spoiler")).to be_empty
+      expect(cooked.css("p > span.spoiler").map(&:text)).to eq(%w[a b])
+    end
+
     it "cooks a poll with its options" do
       cooked = cook_all(Markbridge::AST::Poll.new(options: %w[Yes No]))
 

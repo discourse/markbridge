@@ -45,26 +45,37 @@ module Markbridge
 
           private
 
-          # Whether a spoiler stands in front of +element+, with nothing but
-          # whitespace between.
+          # Whether a spoiler stands in front of +element+ on the same line,
+          # with anything inline between. A text that has something visible
+          # after its last newline starts the line, so the search ends
+          # there. A spoiler with a title starts its line with the title,
+          # not with `[spoiler]`, and is looked over like text.
           def after_spoiler?(element, interface)
             offset = -1
             loop do
               node = interface.sibling(element, offset:)
-              return true if node.is_a?(AST::Spoiler)
-              return false unless node.is_a?(AST::Text) && node.text.match?(/\A[[:space:]]*\z/)
+              return false if node.nil?
+              return true if node.is_a?(AST::Spoiler) && !titled?(node)
+              return false if node.is_a?(AST::Text) && starts_line?(node.text)
 
               offset -= 1
             end
           end
 
+          def starts_line?(text)
+            text.include?("\n") && text.rpartition("\n").last.match?(/[^[:space:]]/)
+          end
+
+          def titled?(element)
+            element.title.to_s.match?(/[^[:space:]]/)
+          end
+
           # The title with a colon and a space after it, escaped like any
           # text, or nil without a title.
           def title_text(element, interface)
-            title = element.title.to_s
-            return unless title.match?(/[^[:space:]]/)
+            return unless titled?(element)
 
-            "#{interface.render_node(AST::Text.new(title.strip))}: "
+            "#{interface.render_node(AST::Text.new(element.title.strip))}: "
           end
 
           # The inline form Discourse cooks the BBCode to. A <details>
