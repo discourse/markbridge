@@ -10,11 +10,14 @@ module Markbridge
         # Applications using Markbridge should provide their own custom tag
         # to render polls as placeholders or convert them to another format.
         #
+        # A poll is a block, so a placeholder for it keeps the blank lines
+        # around it (see "Placeholders" in the migration guide).
+        #
         # @example Custom renderer with placeholder
         #   class MyPollTag < Markbridge::Renderers::Discourse::Tags::PollTag
         #     def render(element, interface)
         #       id = register_poll(element)
-        #       "<<POLL:#{id}>>"
+        #       "\n\n<<POLL:#{id}>>\n\n"
         #     end
         #   end
         class PollTag < Tag

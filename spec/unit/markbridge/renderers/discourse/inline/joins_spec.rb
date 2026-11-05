@@ -216,6 +216,46 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
     end
   end
 
+  describe ".append_like" do
+    def append_like(buffer, piece, like, before = nil)
+      described_class.append_like(+buffer, piece, like, before)
+    end
+
+    it "joins the piece as if like stood in its place" do
+      expect(append_like("**a.**", "[l|1]", "https://e.com")).to eq("**a.**<!---->[l|1]")
+      expect(append_like("**a.**", "[l|1]", "(x)")).to eq("**a.**[l|1]")
+      expect(append_like("v", "[m|1]", "@alice")).to eq("v<!---->[m|1]")
+      expect(append_like("x", "[l|1]", "**.a**")).to eq("x<!---->[l|1]")
+    end
+
+    it "escapes a ! in front of it when like starts with [" do
+      expect(append_like("Look!", "u1", "[a](u)")).to eq("Look\\!u1")
+      expect(append_like("Look!", "[l|1]", "https://e.com")).to eq("Look![l|1]")
+    end
+
+    it "joins with before in place of the end of the buffer" do
+      expect(append_like("[l|1]", "**.a**", nil, "https://e.com/t")).to eq("[l|1]<!---->**.a**")
+      expect(append_like("[l|1]", "**.a**", nil, "https://e.com/")).to eq("[l|1]**.a**")
+      expect(append_like("[l|1]", "a", nil, "x **")).to eq("[l|1]a")
+      expect(append_like("[l|1]", "a", nil, "x.**")).to eq("[l|1]<!---->a")
+      expect(append_like("[l|1]", "[m|2]", "@bob", "https://e.com/")).to eq("[l|1]<!---->[m|2]")
+    end
+
+    it "keeps a ! at the end of before from making an image with a comment, a backslash can't go there" do
+      expect(append_like("[l|1]", "[a](u)", nil, "wow!")).to eq("[l|1]<!---->[a](u)")
+    end
+
+    it "writes the first piece without a join" do
+      expect(append_like("", "[l|1]", "@alice")).to eq("[l|1]")
+    end
+
+    it "returns the buffer" do
+      buffer = +"a"
+
+      expect(described_class.append_like(buffer, "b", "c")).to be(buffer)
+    end
+  end
+
   describe ".escaped_end?" do
     it "is true for an odd run of backslashes in front of the last character" do
       expect(described_class.escaped_end?("\\!")).to be(true)

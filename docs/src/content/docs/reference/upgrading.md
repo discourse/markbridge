@@ -65,6 +65,7 @@ The round-trip specs (see the Testing section of AGENTS.md) found a number of ou
 - A line break written as `<br>` at the start or the end of a link label or of emphasis moves out of the brackets or the markers, like whitespace does: `see\n<br>[label](url)` instead of `see\n[<br>label](url)`. It shows the same.
 - `AST::Url#bare?` is also true when the text is the href with whitespace at its edges, or with line breaks in front of it or after it: `[url] https://example.com [/url]`, or `[url]` followed by a line break. Such a link is written as the bare URL, with the whitespace and the line breaks outside it, so it can onebox like a link whose text is exactly the href. It was written as `[https://example.com](https://example.com)`. A custom Url tag that relies on `bare?` sees the same.
 - A bare URL right after a `<br>` stays bare: markdown-it reads the `<br>` as an HTML tag of its own and links the URL after it.
+- `Markbridge::Renderers::Discourse::Inline::Tokens.placeholder(text, like:)` is a new token for a placeholder that a later step replaces, like an importer that swaps `[link|17]` for a URL. The serializer writes `text` as it is and joins it with its neighbors as if `like` stood there, so `<!---->` goes in where the replacement needs it. [Placeholders](/migrating/placeholders/#tell-markbridge-what-replaces-the-placeholder) explains when to use it and how to pick `like:`.
 
 ## Upgrading to 0.4.2
 

@@ -189,13 +189,188 @@ Markbridge escapes only `AST::Text` nodes — the textual content from the sourc
 
 This is what makes placeholders safe. `"[upload|u_screenshot_png_3a7c2]"`, `"@@MENTION:alice@@"`, `"<<TOPIC:7>>"` all reach the output untouched. Pick whatever sigil pattern your importer parses cleanly downstream.
 
-The one thing that can stand between a placeholder and its neighbor is what the renderer puts at a join: a `!` right in front of a placeholder that starts with `[` gets a backslash (otherwise it would read as an image), and an empty HTML comment (`<!---->`) goes between two runs of emphasis markers. A placeholder with a letter or a digit at both ends never sees either.
+What the renderer can add is something *between* a placeholder and its neighbor: a backslash in front of a `!`, or an empty HTML comment (`<!---->`) next to emphasis markers or a mention. It decides that from the characters on both sides of the join, and for a String placeholder those are the placeholder's own characters. The next section shows how to tell it what will stand there instead.
 
-The one twist is HTML mode (next section).
+## Tell Markbridge what replaces the placeholder
+
+Whether `**` opens or closes, whether `@alice` is a mention and whether a bare URL is linked depends on the characters right next to it. The renderer knows these rules and puts an invisible `<!---->` where a join needs one. With a String placeholder it sees the placeholder, not the text the importer puts there later:
+
+| The renderer writes | The importer replaces `[link\|17]` | Cooked by Discourse |
+|---|---|---|
+| `**See:**[link\|17]` | `**See:**https://forum.example.com/t/17` | the `**` stay visible: a closing `**` after `:` and in front of a letter doesn't close |
+| `**See:**<!---->[link\|17]` | `**See:**<!---->https://forum.example.com/t/17` | **See:** and the link |
+
+`]` is punctuation, and a closing `**` in front of punctuation closes, so the renderer sees no reason for the comment. The URL that comes later starts with a letter.
+
+### Inline placeholders: `Tokens.placeholder`
+
+A tag for a placeholder that ends up inline (a link, a mention, an inline image) returns a placeholder token instead of a String. It names the placeholder text and what will most likely replace it:
+
+```ruby
+Tokens = Markbridge::Renderers::Discourse::Inline::Tokens
+
+class TopicLinkTag < Markbridge::Renderers::Discourse::Tag
+  def initialize(topics:)
+    @topics = topics # source URL => Discourse topic id
+  end
+
+  def render(element, _interface)
+    topic_id = @topics.fetch(element.href)
+    [Tokens.placeholder("[link|#{topic_id}]", like: "https://forum.example.com/t/#{topic_id}")]
+  end
+end
+
+topics = { "http://old.example.com/viewtopic.php?t=17" => 17 }
+renderer = Markbridge.discourse_renderer(tags: { Markbridge::AST::Url => TopicLinkTag.new(topics:) })
+
+Markbridge.bbcode_to_markdown(
+  "[b]See:[/b][url]http://old.example.com/viewtopic.php?t=17[/url]",
+  renderer:,
+).markdown
+# => "**See:**<!---->[link|17]"
+```
+
+The tag returns an Array with one token, like the built-in link tags do (see [Tags that return inline tokens](/customization/extending/#tags-that-return-inline-tokens)). The renderer writes `[link|17]` exactly as it is, but it joins it with the text around it as if `https://forum.example.com/t/17` stood there. The importer replaces `[link|17]` and gets Markdown in which every join is right.
+
+What `like:` changes, with `[link|17]` standing for a URL and `[mention|3]` for `@alice`:
+
+| Next to the placeholder | Without `like:` | With `like:` | Why |
+|---|---|---|---|
+| a closing marker in front: `**See:**` | `**See:**[link\|17]` | `**See:**<!---->[link\|17]` | a closing `**` after punctuation must not have a letter after it |
+| an opening marker after it: `*.txt*` | `[link\|17]*.txt*` | `[link\|17]<!---->*.txt*` | an opening `*` with punctuation after it must not have a letter in front |
+| a word in front of a mention: `Thanks` | `Thanks[mention\|3]!` | `Thanks<!---->[mention\|3]!` | Discourse renders `@alice` as a mention only when a space or punctuation stands in front of it in the same text; `Thanks@alice` is no mention, the comment starts a new text |
+| a `!` in front: `Look!` | `Look\![link\|17]` | `Look![link\|17]` | the backslash is for `![`, which starts an image; the URL doesn't start with `[` |
+| a bare URL in front | depends on `[` | depends on the first character of `like:` | text glued to a bare URL turns it into `[url](url)` |
+| a bare URL after it | depends on `]` | depends on the last character of `like:` | the same, the other way |
+
+<!-- spec:continue -->
+```ruby
+Markbridge.bbcode_to_markdown(
+  "[url]http://old.example.com/viewtopic.php?t=17[/url][i].txt[/i] and Look![url]http://old.example.com/viewtopic.php?t=17[/url]",
+  renderer:,
+).markdown
+# => "[link|17]<!---->*.txt* and Look![link|17]"
+```
+
+The comment is invisible in the cooked post, and it is only there where the join needs it: `See: [link|17]` with a space gets none.
+
+### Choosing `like:`
+
+Only the first and the last character of `like:` decide anything, so it doesn't have to be the real value. It has to start and end the way the replacement will:
+
+| The importer writes | Pass as `like:` | First and last character |
+|---|---|---|
+| a URL, bare (an internal link, a onebox) | `"https://forum.example.com/t/17"` | a letter, a letter or digit |
+| a URL that ends with `/` | `"https://forum.example.com/"` | a letter, punctuation |
+| a link with text | `"[text](https://forum.example.com/t/17)"` | `[`, `)` |
+| a mention | `"@alice"` | `@`, a letter |
+| an image upload | `"![photo\|690x460](upload://a.png)"` | `!`, `)` |
+| an attachment | `"[report.pdf\|attachment](upload://b.pdf)"` | `[`, `)` |
+| an emoji | `":smile:"` | `:`, `:` |
+
+When the replacement can take more than one form, use the one the importer writes most often. When the importer knows the value already at render time (the username of a mention, the URL of a topic), pass the value itself. `like:` must be a non-empty String; a Symbol or `nil` raises an `ArgumentError`.
+
+### Pick a placeholder with punctuation at both ends
+
+`like:` decides the joins of the placeholder with its neighbors. Inside emphasis or a link label, the renderer also checks the edges of the content, for example whether `**` can open in front of it, and there the content is finished text already: it reads the placeholder's own characters. A placeholder that starts and ends with punctuation gives the safe answer there, at worst an extra `<!---->` that changes nothing:
+
+<!-- spec:continue -->
+```ruby
+serializer = Markbridge::Renderers::Discourse::Inline::Serializer.new(
+  escaper: Markbridge::Renderers::Discourse::MarkdownEscaper.new,
+)
+bold = ->(*content) { [Tokens.open(:strong), *content, Tokens.close(:strong)] }
+
+serializer.write([Tokens.text("x"), *bold.(Tokens.placeholder("[mention|3]", like: "@alice"))])
+# => "x<!---->**[mention|3]**"
+serializer.write([Tokens.text("x"), *bold.(Tokens.placeholder("MENTION3", like: "@alice"))])
+# => "x**MENTION3**"
+```
+
+The second one breaks once the importer puts `@alice` there: `x**@alice**` doesn't open. So use brackets or other punctuation at both ends (`[link|17]`, `[mention|3]`, `<<upload:9>>`), and keep the placeholder on one line, without blank lines and without `*`, `_`, `~` or `` ` `` at its edges.
+
+### Block placeholders: polls, events and anything on its own line
+
+A poll or an event ends up as a block of its own, so nothing stands next to it on its line and `like:` has nothing to decide. What matters is that the renderer treats it as a block:
+
+- The tag returns the placeholder with a blank line on both sides, like the built-in `PollTag` and `EventTag` do: `"\n\n[poll|3]\n\n"`. Inside a quote or a list item, the quote and the list item tags put `> ` in front of it or indent it like any block.
+- The normalizer moves blocks out of bold, italic, links and headings before the renderer runs. It decides that by the AST class: `AST::Poll` and `AST::Event` are blocks. For your own AST class, tell it:
+
+<!-- spec:before
+Tokens = Markbridge::Renderers::Discourse::Inline::Tokens
+-->
+```ruby
+module ForumMigration
+  class PollPlaceholder < Markbridge::AST::Node
+    attr_reader :poll_id
+
+    def initialize(poll_id:)
+      @poll_id = poll_id
+    end
+  end
+
+  class PollPlaceholderTag < Markbridge::Renderers::Discourse::Tag
+    def render(element, _interface)
+      "\n\n[poll|#{element.poll_id}]\n\n"
+    end
+  end
+end
+
+renderer =
+  Markbridge.discourse_renderer(
+    tags: { ForumMigration::PollPlaceholder => ForumMigration::PollPlaceholderTag.new },
+  )
+
+# A poll inside bold, as a forum post can have it.
+document = Markbridge::AST::Document.new
+bold = Markbridge::AST::Bold.new
+bold << Markbridge::AST::Text.new("Vote:") << ForumMigration::PollPlaceholder.new(poll_id: 3)
+document << bold
+
+Markbridge.render(document, renderer:).markdown
+# => "**Vote:**\n\n**[poll|3]**"
+
+# Tell the normalizer that the placeholder is a block.
+normalizer = Markbridge::Normalizer.default
+Markbridge::Normalizer::INLINE_CONTAINERS.each do |container|
+  normalizer.rule(parent: container, child: ForumMigration::PollPlaceholder, strategy: :hoist_after)
+end
+
+Markbridge.render(document, renderer:, normalize: normalizer).markdown
+# => "**Vote:**\n\n[poll|3]"
+```
+
+Without the rule the placeholder stays inside the bold. Its blank lines split the bold into paragraphs, and every paragraph gets its own markers, so the importer would find `**[poll|3]**`. Pass the same normalizer to every conversion (`normalize:` works on `bbcode_to_markdown` and the other `*_to_markdown` methods too). The same applies to an upload or a link that the importer turns into a block, for example a onebox on its own line: return the block form from the tag and add the rules for its AST class.
+
+### Checklist for a new converter
+
+For every kind of placeholder, whether you write the converter yourself or a coding agent does:
+
+1. **Inline or block?** Decide from what the importer puts there, not from the source tag.
+2. **Inline:** return `[Tokens.placeholder(text, like:)]` from the tag. Set `like:` to what the importer will most likely write, or to something that starts and ends with the same kind of character (see the table above).
+3. **Block:** return `"\n\n#{text}\n\n"` from the tag, and make sure the normalizer knows the AST class is a block: a built-in block class, or the rules above.
+4. **The placeholder text:** punctuation at both ends, one line, no blank lines, and unique enough that the importer finds every one and nothing else.
+5. **html_mode:** decide what the placeholder becomes inside an HTML table, see [HTML mode and placeholders](#html-mode-and-placeholders). A placeholder token is written as it is there.
+6. **Check it:** convert a few real posts, replace every placeholder with its `like:` value, cook the result and look at it next to the source post. Replacing is all the importer does later, so what you see is what the forum will show.
+
+<!-- spec:continue -->
+```ruby
+markdown = Markbridge.bbcode_to_markdown(
+  "[b]See:[/b][url]http://old.example.com/viewtopic.php?t=17[/url]",
+  renderer: Markbridge.discourse_renderer(tags: { Markbridge::AST::Url => TopicLinkTag.new(topics:) }),
+).markdown
+
+markdown.gsub("[link|17]", "https://forum.example.com/t/17")
+# => "**See:**<!---->https://forum.example.com/t/17"
+```
+
+That's the Markdown the importer hands to Discourse.
 
 ## HTML mode and placeholders
 
 When a parent renders an HTML block — currently only `TableTag` doing its HTML-fallback path for uneven rows or nested tables — children render with `interface.html_mode?` true. Per [CommonMark §4.6](https://spec.commonmark.org/0.31.2/#html-blocks), content inside an HTML block is treated as raw HTML, not Markdown, until the next blank line. Your placeholder Tag has two valid choices:
+
+A placeholder token (`Tokens.placeholder`) is written as it is in html_mode too, so these choices apply to it as well.
 
 **Raw HTML.** If your placeholder has a natural HTML form, emit it directly:
 

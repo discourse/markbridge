@@ -17,6 +17,18 @@ module Markbridge
         #     end
         #   end
         #
+        # @example Custom renderer with placeholder
+        #   # The importer replaces the placeholder with the mention, so the
+        #   # renderer joins it with its neighbors like a mention (see
+        #   # "Placeholders" in the migration guide).
+        #   Tokens = Markbridge::Renderers::Discourse::Inline::Tokens
+        #
+        #   class MyMentionTag < Markbridge::Renderers::Discourse::Tags::MentionTag
+        #     def render(element, interface)
+        #       [Tokens.placeholder("[mention|#{element.name}]", like: "@#{element.name}")]
+        #     end
+        #   end
+        #
         # @example Custom renderer that links to user
         #   class MyMentionTag < Markbridge::Renderers::Discourse::Tags::MentionTag
         #     def render(element, interface)
