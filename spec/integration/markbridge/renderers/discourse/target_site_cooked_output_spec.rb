@@ -68,6 +68,42 @@ RSpec.describe "cooked output per target site", skip: CookedOutput::SKIP_REASON 
     expect(cooked.css("p").map(&:text)).to eq(["Meetup, 2026-01-01 to 2026-01-02", "after"])
   end
 
+  describe "a list next to a plain form that starts or ends with a list" do
+    def list(*items)
+      list = Markbridge::AST::List.new
+      items.each { |item| list << (Markbridge::AST::ListItem.new << text(item)) }
+      list
+    end
+
+    def poll(*options)
+      Markbridge::AST::Poll.new(options:)
+    end
+
+    def item_lists(nodes)
+      cook_without_plugins(document(*nodes)).css("ul").map { |ul| ul.css("li").map(&:text) }
+    end
+
+    it "keeps a list apart from the details block in front of it that ends with a list" do
+      details = Markbridge::AST::Details.new(title: "More") << list("a")
+
+      expect(item_lists([details, list("b")])).to eq([["a"], ["b"]])
+    end
+
+    it "keeps a list apart from the details block after it that starts with a list" do
+      details = Markbridge::AST::Details.new << list("b")
+
+      expect(item_lists([list("a"), details])).to eq([["a"], ["b"]])
+    end
+
+    it "keeps the options of a poll apart from the lists around it" do
+      expect(item_lists([list("a"), poll("x", "y"), list("b")])).to eq([["a"], %w[x y], ["b"]])
+    end
+
+    it "keeps the options of two polls apart" do
+      expect(item_lists([poll("x"), poll("y")])).to eq([["x"], ["y"]])
+    end
+  end
+
   it "keeps the BBCode of a bundled plugin by default, as text to plain markdown-it" do
     details = Markbridge::AST::Details.new(title: "Show more") << text("hidden body")
 

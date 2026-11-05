@@ -37,15 +37,57 @@ module Markbridge
           end
         end
 
+        # The list the output of this tag starts with, when it starts with
+        # one. Two lists of the same kind with only whitespace between
+        # them cook as one list, so the renderer keeps track of the last
+        # list it wrote (see RenderingInterface#previous_list) and ListTag
+        # puts a separator in front of a list that would continue it. A
+        # tag whose output starts with the output of a child, like the
+        # plain form of DetailsTag, answers with that child's list:
+        # +interface.leading_list(element, children: true)+. ListTag
+        # answers with the list itself. The default is nil: the output
+        # starts with something of its own, or with nothing.
+        #
+        # @param element [AST::Node]
+        # @param interface [RenderingInterface]
+        # @return [AST::List, nil]
+        def leading_list(_element, _interface)
+        end
+
+        # The list the output of this tag ends with, when it ends with
+        # one, see #leading_list. +interface.trailing_list(element,
+        # children: true)+ is the answer of the last child with something
+        # in it.
+        #
+        # @param element [AST::Node]
+        # @param interface [RenderingInterface]
+        # @return [AST::List, nil]
+        def trailing_list(_element, _interface)
+        end
+
         # A tag that renders only the element's children, with the element
         # pushed on the parent chain. Tag dispatch matches by ancestry, so
         # a subclass normally inherits its base class tag; register
         # PASSTHROUGH for the subclass to opt out — the exact-class hit
         # wins and the base tag is not used.
         PASSTHROUGH =
-          new do |element, interface|
-            interface.render_children(element, context: interface.with_parent(element))
-          end.freeze
+          Class
+            .new(self) do
+              def render(element, interface)
+                interface.render_children(element, context: interface.with_parent(element))
+              end
+
+              # The output is the children's, so its edges are theirs.
+              def leading_list(element, interface)
+                interface.leading_list(element, children: true)
+              end
+
+              def trailing_list(element, interface)
+                interface.trailing_list(element, children: true)
+              end
+            end
+            .new
+            .freeze
       end
     end
   end

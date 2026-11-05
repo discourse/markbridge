@@ -387,6 +387,21 @@ mutation:
     # local only in this method, so the pattern hits nothing else.
     - "if{condition=send{receiver=lvar{value=candidates} selector=empty?}}"
 
+    # Renderer#continued_list asks the tag for its leading list only
+    # when a list is in front (`outer_list && leading_list(...)`).
+    # Without the `outer_list` check the answer is the same, nil comes
+    # out either way, the check only saves a tag lookup on every
+    # element. `outer_list` is a local of that method and of the two
+    # callers, which do not compare it.
+    - "and{left=lvar{value=outer_list}}"
+
+    # DetailsTag#leading_list asks whether the title is whitespace only,
+    # `element.title.to_s.strip.empty?`. A string of whitespace is empty
+    # after `lstrip` or `rstrip` as well, and any other string is not,
+    # so the three are the same there. `element.title.to_s.strip` with
+    # a value used for more than `empty?` is written to a local first.
+    - "send{receiver=send{receiver=send{receiver=lvar{value=element} selector=title} selector=to_s} selector=strip}"
+
     # process_table's `i = start_index + 1` initial offset. The `+ 0`
     # / `start_index` variants leave the loop pointing at the `{|`
     # line, which never matches any of the four `start_with?` branches

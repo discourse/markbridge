@@ -102,7 +102,15 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
     it "writes the options as a bullet list" do
       element = Markbridge::AST::Poll.new(name: "fav", options: %w[A *B*])
 
-      expect(tag.render(element, interface)).to eq("\n\n- A\n- \\*B\\*\n\n\n")
+      expect(tag.render(element, interface)).to eq("\n\n- A\n- \\*B\\*\n\n")
+    end
+
+    it "HTML-escapes the options in html_mode" do
+      element = Markbridge::AST::Poll.new(options: %w[<b> &])
+
+      expect(tag.render(element, interface_for(html_mode: true))).to eq(
+        "<ul><li>&lt;b&gt;</li><li>&amp;</li></ul>",
+      )
     end
 
     it "writes a bullet list in html_mode" do
@@ -117,6 +125,37 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
       element = Markbridge::AST::Poll.new(raw: "[poll]ORIGINAL[/poll]")
 
       expect(tag.render(element, interface)).to eq("")
+    end
+
+    it "stands for the bullet list its output is, at both edges" do
+      element = Markbridge::AST::Poll.new(options: %w[A])
+
+      expect(tag.leading_list(element, interface)).to be(element)
+      expect(tag.trailing_list(element, interface)).to be(element)
+    end
+
+    it "writes the bullet the renderer picks for the poll against the list in front" do
+      element = Markbridge::AST::Poll.new(options: %w[A B])
+      allow(renderer).to receive(:choose_list_marker).with(element, ordered: false).and_return("* ")
+
+      expect(tag.render(element, interface)).to eq("\n\n* A\n* B\n\n")
+    end
+
+    it "picks no marker for a poll without options" do
+      element = Markbridge::AST::Poll.new
+      allow(renderer).to receive(:choose_list_marker)
+
+      expect(tag.render(element, interface)).to eq("")
+      expect(renderer).not_to have_received(:choose_list_marker)
+    end
+  end
+
+  describe "#leading_list and #trailing_list" do
+    it "are nil with the plugin, the BBCode lines are the edges" do
+      element = Markbridge::AST::Poll.new(options: %w[A])
+
+      expect(tag.leading_list(element, interface)).to be_nil
+      expect(tag.trailing_list(element, interface)).to be_nil
     end
   end
 end
