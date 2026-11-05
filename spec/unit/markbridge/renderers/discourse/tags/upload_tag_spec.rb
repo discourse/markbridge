@@ -152,42 +152,25 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
     context "in html_mode" do
       let(:context) { html_context }
 
-      it "renders an image upload as <img> with upload:// src and alt text" do
+      # Discourse reads the dimensions and the attachment marker only
+      # from its Markdown forms, and its sanitizer drops the upload://
+      # href of a raw HTML link, so the upload is a Markdown island in a div.
+      it "writes an image upload as a Markdown island" do
         element =
           Markbridge::AST::Upload.new(
             sha1: "abc",
             filename: "pic.png",
             type: :image,
             alt: "A picture",
+            dimensions: "64x64",
           )
 
         expect(tag.render(element, interface)).to eq(
-          %(<img src="upload://pic.png" alt="A picture">),
+          "<div>\n\n![A picture|64x64](upload://pic.png)\n\n</div>",
         )
       end
 
-      it "uses sha1 as URL filename and empty alt when both are missing" do
-        element = Markbridge::AST::Upload.new(sha1: "abc123", type: :image)
-
-        expect(tag.render(element, interface)).to eq(%(<img src="upload://abc123" alt="">))
-      end
-
-      it "HTML-escapes alt and src so the output is safe to splice into raw HTML" do
-        element =
-          Markbridge::AST::Upload.new(sha1: "abc", filename: %(bad"&.png), type: :image, alt: "<x>")
-
-        expect(tag.render(element, interface)).to eq(
-          %(<img src="upload://bad&quot;&amp;.png" alt="&lt;x&gt;">),
-        )
-      end
-
-      it "renders an attachment upload as <a href> with filename as link text" do
-        element = Markbridge::AST::Upload.new(sha1: "abc", filename: "doc.pdf", type: :attachment)
-
-        expect(tag.render(element, interface)).to eq(%(<a href="upload://doc.pdf">doc.pdf</a>))
-      end
-
-      it "appends the size in parentheses after attachment links" do
+      it "writes an attachment upload as a Markdown island with its size" do
         element =
           Markbridge::AST::Upload.new(
             sha1: "abc",
@@ -197,41 +180,46 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UploadTag do
           )
 
         expect(tag.render(element, interface)).to eq(
-          %(<a href="upload://doc.pdf">doc.pdf</a> (1.2 MB)),
+          "<div>\n\n[doc.pdf|attachment](upload://doc.pdf) (1.2 MB)\n\n</div>",
         )
       end
 
-      it "uses 'attachment' as filename fallback for attachment links" do
-        element = Markbridge::AST::Upload.new(sha1: "abc123", type: :attachment)
+      it "writes the raw Markdown as an island" do
+        element = Markbridge::AST::Upload.new(sha1: "abc", raw: "![](upload://other.png)")
 
-        expect(tag.render(element, interface)).to eq(%(<a href="upload://abc123">attachment</a>))
+        expect(tag.render(element, interface)).to eq("<div>\n\n![](upload://other.png)\n\n</div>")
       end
 
-      it "HTML-escapes attachment href, filename label, and size" do
-        element =
-          Markbridge::AST::Upload.new(
-            sha1: "abc",
-            filename: %(weird"&.pdf),
-            type: :attachment,
-            size: %(1.2 MB " <evil>),
-          )
+      it "escapes the alt text and the filename like a link label, not like HTML" do
+        image = Markbridge::AST::Upload.new(sha1: "abc", filename: "pic.png", alt: "a]b *c*")
+        file = Markbridge::AST::Upload.new(sha1: "abc", filename: "a]b_c.txt", type: :attachment)
 
-        expect(tag.render(element, interface)).to eq(
-          %(<a href="upload://weird&quot;&amp;.pdf">weird&quot;&amp;.pdf</a> ) +
-            "(1.2 MB &quot; &lt;evil&gt;)",
+        expect(tag.render(image, interface)).to eq(
+          "<div>\n\n![a\\]b \\*c\\*](upload://pic.png)\n\n</div>",
+        )
+        expect(tag.render(file, interface)).to eq(
+          "<div>\n\n[a\\]b\\_c.txt|attachment](upload://a]b_c.txt)\n\n</div>",
         )
       end
 
-      it "ignores element.raw and reconstructs HTML from the AST fields" do
-        element =
+      it "leaves the pipes alone inside the cell of a table written as HTML" do
+        # The island is a paragraph of its own, no cell ends at a pipe.
+        cell_interface = interface_for(Markbridge::AST::TableCell.new, html_mode: true)
+        image =
           Markbridge::AST::Upload.new(
             sha1: "abc",
             filename: "pic.png",
-            type: :image,
-            raw: "![](upload://other.png)",
+            alt: "A",
+            dimensions: "10x20",
           )
+        raw = Markbridge::AST::Upload.new(sha1: "abc", raw: "![a|10x20](upload://a.png)")
 
-        expect(tag.render(element, interface)).to eq(%(<img src="upload://pic.png" alt="">))
+        expect(tag.render(image, cell_interface)).to eq(
+          "<div>\n\n![A|10x20](upload://pic.png)\n\n</div>",
+        )
+        expect(tag.render(raw, cell_interface)).to eq(
+          "<div>\n\n![a|10x20](upload://a.png)\n\n</div>",
+        )
       end
     end
   end

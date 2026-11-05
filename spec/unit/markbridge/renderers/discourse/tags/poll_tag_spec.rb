@@ -83,16 +83,26 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::PollTag do
       expect(tag.render(element, interface)).to eq("\n\n[poll]\n* A\n* B\n[/poll]\n\n")
     end
 
-    # The stub is mode-agnostic: the same blank-line-bracketed island serves
-    # both a standalone block in Markdown and the html_mode contract (which
-    # is enforced by html_mode_contract_spec).
-    it "emits the same island form in html_mode" do
+    # The BBCode has no HTML form: inside an HTML block it is a Markdown
+    # island in a div, so the rest of the cell stays HTML.
+    it "writes the BBCode as an island in a div in html_mode" do
       html_context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
       html_interface =
         Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, html_context)
       element = Markbridge::AST::Poll.new(options: %w[A B])
 
-      expect(tag.render(element, html_interface)).to eq("\n\n[poll]\n* A\n* B\n[/poll]\n\n")
+      expect(tag.render(element, html_interface)).to eq(
+        "<div>\n\n[poll]\n* A\n* B\n[/poll]\n\n</div>",
+      )
+    end
+
+    it "writes the raw BBCode as an island in a div in html_mode" do
+      html_context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+      html_interface =
+        Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, html_context)
+      element = Markbridge::AST::Poll.new(raw: "[poll]\n* A\n[/poll]")
+
+      expect(tag.render(element, html_interface)).to eq("<div>\n\n[poll]\n* A\n[/poll]\n\n</div>")
     end
   end
 

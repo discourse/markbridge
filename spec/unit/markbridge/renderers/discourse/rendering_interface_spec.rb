@@ -260,6 +260,42 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     end
   end
 
+  describe "#markdown_island" do
+    let(:html_interface) do
+      described_class.new(
+        renderer,
+        Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true),
+      )
+    end
+
+    it "writes inline Markdown as it is outside an HTML block" do
+      expect(interface.markdown_island("![a](upload://a.png)", block: false)).to eq(
+        "![a](upload://a.png)",
+      )
+    end
+
+    it "writes a block with a blank line on both sides outside an HTML block" do
+      expect(interface.markdown_island("[poll]\n* a\n[/poll]", block: true)).to eq(
+        "\n\n[poll]\n* a\n[/poll]\n\n",
+      )
+    end
+
+    it "writes an island in a div inside an HTML block, block or not" do
+      expect(html_interface.markdown_island("[poll]\n* a\n[/poll]", block: true)).to eq(
+        "<div>\n\n[poll]\n* a\n[/poll]\n\n</div>",
+      )
+      expect(html_interface.markdown_island("![a](upload://a.png)", block: false)).to eq(
+        "<div>\n\n![a](upload://a.png)\n\n</div>",
+      )
+    end
+
+    it "passes the html_mode contract check inside an HTML block" do
+      output = html_interface.markdown_island("[poll]\n* a\n[/poll]", block: true)
+
+      expect(Markbridge::Renderers::Discourse::HtmlBlock.safe?(output)).to be(true)
+    end
+  end
+
   describe "#html_mode?" do
     it "delegates to context" do
       context = instance_double(Markbridge::Renderers::Discourse::RenderContext, html_mode?: true)

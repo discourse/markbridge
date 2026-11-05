@@ -127,7 +127,8 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 | `choose_list_marker(node, ordered:)`, `list_marker(node)` | The marker for the items of a list, or of a node that writes a list of its own: the one the list in front did not use, `- ` or `* `, `1. ` or `1) `. `list_marker` returns the marker chosen for a node in this render call, `ListItemTag` and `HorizontalRuleTag` read it |
 | `leading_list(node, children: false)`, `trailing_list(node, children: false)` | The list the output of `node` starts or ends with, as its tag says through `Tag#leading_list` and `Tag#trailing_list` (nil when it starts or ends with something else). With `children: true` the answer for the first or last child with something in it, for a tag whose output starts or ends with the children's, like the plain form of `DetailsTag` |
 | `block_context?(element)` | True if the current position is a block context |
-| `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML or wrap output as a Markdown island; the serializer takes care of it for tokens |
+| `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML without a blank line, or write its Markdown through `markdown_island`; the serializer takes care of it for tokens |
+| `markdown_island(markdown, block:)` | Markdown that Discourse has to read as Markdown (the BBCode of a plugin, an upload, a placeholder for one), in the form of the place: as it is, with blank lines around a block, or an island in a `<div>` inside an HTML block |
 
 Use `find_parent` / `has_parent?` to render differently inside specific ancestors (e.g. a code span inside a table cell).
 
@@ -173,8 +174,8 @@ A Tag must return a String — returning `nil` (or anything else) raises a `Type
 
 Tables with uneven rows, multiline cells, or nested tables use HTML output. Inside these tables, `interface.html_mode?` is `true`. Each custom tag must return either:
 
-- An HTML equivalent, with user-controlled text and attributes escaped using `Markbridge::Renderers::Discourse::HtmlEscaper`.
-- Its Markdown wrapped with `Markbridge::Renderers::Discourse::HtmlBlock.island(markdown)`. This adds blank lines so CommonMark can parse the Markdown. It also adds paragraph spacing, so prefer HTML when a suitable element exists.
+- An HTML equivalent, with user-controlled text and attributes escaped using `Markbridge::Renderers::Discourse::HtmlEscaper`, and no blank line in it: a blank line ends the HTML block.
+- Its Markdown through `interface.markdown_island(markdown, block:)`, for Markdown that has no HTML form, like the BBCode of a plugin or an upload. Inside an HTML block it puts the Markdown between blank lines inside a `<div>`, so CommonMark parses the Markdown and the `</div>` line opens the block again for the rest of the cell; outside one it is the Markdown itself, with blank lines around it when `block: true`. The island adds paragraph spacing, so prefer HTML when a suitable element exists.
 
 The callout example above uses `<aside>` in HTML mode. Child tags receive the same HTML mode through the context.
 

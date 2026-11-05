@@ -343,6 +343,13 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
 
         expect(renderer.render(code.children.first, context:)).to eq("a &lt; b")
       end
+
+      it "writes a blank line in text as the entity, it would end the HTML block" do
+        text = Markbridge::AST::Text.new("a\n\nb\n \nc")
+        context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+
+        expect(renderer.render(text, context:)).to eq("a&#10;\nb&#10; \nc")
+      end
     end
 
     context "when dispatching to a tag in html_mode" do
@@ -363,12 +370,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
         expect(result).to eq("**already bold**")
       end
 
-      it "wraps in blank lines in html_mode so CommonMark re-enters Markdown parsing" do
+      it "writes an island in a div in html_mode, so CommonMark parses it as Markdown" do
         node = Markbridge::AST::MarkdownText.new("**already bold**")
         context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
 
         result = renderer.render(node, context:)
-        expect(result).to eq("\n\n**already bold**\n\n")
+        expect(result).to eq("<div>\n\n**already bold**\n\n</div>")
       end
     end
   end

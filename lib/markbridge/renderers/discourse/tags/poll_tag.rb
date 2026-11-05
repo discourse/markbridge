@@ -11,14 +11,17 @@ module Markbridge
         # With +bbcode: false+, for a site without the plugin, the options
         # are written as a bullet list. The raw BBCode is of no use there.
         #
-        # A poll is a block, so a placeholder for it keeps the blank lines
-        # around it (see "Placeholders" in the migration guide).
+        # The BBCode has no HTML form, so it goes through
+        # RenderingInterface#markdown_island: a block with blank lines
+        # around it, and a Markdown island in a `<div>` inside an HTML
+        # table. A placeholder for a poll is written the same way (see
+        # "Placeholders" in the migration guide).
         #
         # @example A placeholder for the importer
         #   class MyPollTag < Markbridge::Renderers::Discourse::Tags::PollTag
         #     def render(element, interface)
         #       id = register_poll(element)
-        #       "\n\n<<POLL:#{id}>>\n\n"
+        #       interface.markdown_island("<<POLL:#{id}>>", block: true)
         #     end
         #   end
         class PollTag < Tag
@@ -30,8 +33,7 @@ module Markbridge
           def render(element, interface)
             return without_plugin(element, interface) unless @bbcode
 
-            body = element.raw || build_poll_bbcode(element)
-            "\n\n#{body}\n\n"
+            interface.markdown_island(element.raw || build_poll_bbcode(element), block: true)
           end
 
           # The plain form is a bullet list, so a bullet list next to the

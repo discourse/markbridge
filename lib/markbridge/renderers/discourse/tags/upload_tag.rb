@@ -35,19 +35,31 @@ module Markbridge
         #     end
         #   end
         class UploadTag < Tag
+          # An upload is always written in one of Discourse's Markdown
+          # forms, through RenderingInterface#markdown_island: Discourse
+          # reads the dimensions and the `attachment` marker only from the
+          # Markdown, and its sanitizer drops the `upload://` href of a
+          # raw HTML link.
           def render(element, interface)
-            return build_upload_html(element) if interface.html_mode?
-            return raw(element, interface) if element.raw
-
-            build_upload_markdown(element, interface)
+            interface.markdown_island(build_upload_markdown(element, interface), block: false)
           end
 
           private
 
+          def build_upload_markdown(element, interface)
+            return raw(element, interface) if element.raw
+
+            if element.type == :image
+              build_image_markdown(element, interface)
+            else
+              build_attachment_markdown(element, interface)
+            end
+          end
+
           # The raw Markdown of the source, with the pipes escaped in a
           # table cell. One that is escaped already stays as it is.
           def raw(element, interface)
-            return element.raw unless table_cell?(interface)
+            return element.raw unless markdown_cell?(interface)
 
             element.raw.gsub(/(?<!\\)\|/, "\\\\|")
           end
@@ -58,19 +70,14 @@ module Markbridge
           # in all of them: Discourse reads the dimensions and the attachment
           # marker all the same.
           def pipe(interface)
-            table_cell?(interface) ? "\\|" : "|"
+            markdown_cell?(interface) ? "\\|" : "|"
           end
 
-          def table_cell?(interface)
-            interface.has_parent?(AST::TableCell)
-          end
-
-          def build_upload_markdown(element, interface)
-            if element.type == :image
-              build_image_markdown(element, interface)
-            else
-              build_attachment_markdown(element, interface)
-            end
+          # The cell of a table written in Markdown. Inside a table written
+          # as HTML the island is a paragraph of its own, where a pipe ends
+          # nothing.
+          def markdown_cell?(interface)
+            interface.has_parent?(AST::TableCell) && !interface.html_mode?
           end
 
           def build_image_markdown(element, interface)
@@ -99,9 +106,12 @@ module Markbridge
           end
 
           # Text inside the brackets goes through the renderer like any
-          # text, so a `]` or Markdown in it is escaped.
+          # text, so a `]` or Markdown in it is escaped. The label is
+          # Markdown inside an HTML table as well, so html_mode is off for
+          # it there.
           def label(text, element, interface)
-            interface.render_node(AST::Text.new(text), context: interface.with_parent(element))
+            context = interface.with_html_mode(false).with_parent(element)
+            interface.render_node(AST::Text.new(text), context:)
           end
 
           # The destination gets the same treatment as the one of a link:
@@ -113,31 +123,6 @@ module Markbridge
           def build_upload_url(element)
             filename = element.filename || element.sha1
             "upload://#{filename}"
-          end
-
-          # html_mode reconstructs from the AST fields rather than reusing
-          # element.raw — raw is Markdown, which CommonMark passes through
-          # unchanged inside an HTML block (so the user would see the
-          # literal "![…](upload://…)" string instead of an image).
-          def build_upload_html(element)
-            if element.type == :image
-              build_image_html(element)
-            else
-              build_attachment_html(element)
-            end
-          end
-
-          def build_image_html(element)
-            src = HtmlEscaper.escape(build_upload_url(element))
-            alt = HtmlEscaper.escape(element.alt)
-            %(<img src="#{src}" alt="#{alt}">)
-          end
-
-          def build_attachment_html(element)
-            href = HtmlEscaper.escape(build_upload_url(element))
-            filename = HtmlEscaper.escape(element.filename || "attachment")
-            size_part = " (#{HtmlEscaper.escape(element.size)})" if element.size
-            %(<a href="#{href}">#{filename}</a>#{size_part})
           end
         end
       end

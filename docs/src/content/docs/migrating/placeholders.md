@@ -89,15 +89,15 @@ module ForumMigration
       @attachments = attachments # ordered list, indexed by position
     end
 
-    def render(element, _interface)
+    def render(element, interface)
       attachment = @attachments[element.position]
-      "[upload|#{attachment.upload_id}]"
+      interface.markdown_island("[upload|#{attachment.upload_id}]", block: false)
     end
   end
 end
 ```
 
-`[upload|<id>]` is the upload-marker shape Discourse importers recognize — they substitute a real `upload://...` URL once the file has been ingested.
+`[upload|<id>]` is the upload-marker shape Discourse importers recognize — they substitute a real `upload://...` URL once the file has been ingested. What they put there is Markdown that Discourse has to cook, so the placeholder goes through `interface.markdown_island`: outside a table that is the placeholder as it is, inside a table the renderer writes as HTML it is a Markdown island (see [HTML mode and placeholders](#html-mode-and-placeholders)).
 
 ### 4. Wire it up
 
@@ -293,7 +293,7 @@ The second one breaks once the importer puts `@alice` there: `x**@alice**` doesn
 
 A poll or an event ends up as a block of its own, so nothing stands next to it on its line and `like:` has nothing to decide. What matters is that the renderer treats it as a block:
 
-- The tag returns the placeholder with a blank line on both sides, like the built-in `PollTag` and `EventTag` do: `"\n\n[poll|3]\n\n"`. Inside a quote or a list item, the quote and the list item tags put `> ` in front of it or indent it like any block.
+- The tag returns the placeholder through `interface.markdown_island(text, block: true)`, like the built-in `PollTag` and `EventTag` do. That is the placeholder with a blank line on both sides, `"\n\n[poll|3]\n\n"`, and inside a table the renderer writes as HTML the island form from [HTML mode and placeholders](#html-mode-and-placeholders). Inside a quote or a list item, the quote and the list item tags put `> ` in front of it or indent it like any block.
 - The normalizer moves blocks out of bold, italic, links and headings before the renderer runs. It decides that by the AST class: `AST::Poll` and `AST::Event` are blocks. For your own AST class, tell it:
 
 <!-- spec:before
@@ -310,8 +310,8 @@ module ForumMigration
   end
 
   class PollPlaceholderTag < Markbridge::Renderers::Discourse::Tag
-    def render(element, _interface)
-      "\n\n[poll|#{element.poll_id}]\n\n"
+    def render(element, interface)
+      interface.markdown_island("[poll|#{element.poll_id}]", block: true)
     end
   end
 end
@@ -348,7 +348,7 @@ For every kind of placeholder, whether you write the converter yourself or a cod
 
 1. **Inline or block?** Decide from what the importer puts there, not from the source tag.
 2. **Inline:** return `[Tokens.placeholder(text, like:)]` from the tag. Set `like:` to what the importer will most likely write, or to something that starts and ends with the same kind of character (see the table above).
-3. **Block:** return `"\n\n#{text}\n\n"` from the tag, and make sure the normalizer knows the AST class is a block: a built-in block class, or the rules above.
+3. **Block:** return `interface.markdown_island(text, block: true)` from the tag, and make sure the normalizer knows the AST class is a block: a built-in block class, or the rules above.
 4. **The placeholder text:** punctuation at both ends, one line, no blank lines, and unique enough that the importer finds every one and nothing else.
 5. **html_mode:** decide what the placeholder becomes inside an HTML table, see [HTML mode and placeholders](#html-mode-and-placeholders). A placeholder token is written as it is there.
 6. **Check it:** convert a few real posts, replace every placeholder with its `like:` value, cook the result and look at it next to the source post. Replacing is all the importer does later, so what you see is what the forum will show.
@@ -372,33 +372,38 @@ When a parent renders an HTML block — currently only `TableTag` doing its HTML
 
 A placeholder token (`Tokens.placeholder`) is written as it is in html_mode too, so these choices apply to it as well.
 
-**Raw HTML.** If your placeholder has a natural HTML form, emit it directly:
+**Raw HTML.** If what the importer puts there has an HTML form, write that form with the placeholder inside. A link to a profile the importer resolves, for example:
 
-<!-- spec:continue -->
 ```ruby
 module ForumMigration
-  class AttachmentPlaceholderTag < Markbridge::Renderers::Discourse::Tag
+  class ProfileLinkTag < Markbridge::Renderers::Discourse::Tag
     def render(element, interface)
-      attachment = @attachments[element.position]
+      placeholder = "[profile|#{element.user_id}]"
+      return placeholder unless interface.html_mode?
 
-      if interface.html_mode?
-        %(<a href="upload://#{attachment.upload_id}">attachment</a>)
-      else
-        "[upload|#{attachment.upload_id}]"
-      end
+      # The importer puts a URL there. Inside an HTML block a bare URL
+      # is not linked, so the HTML form writes the link.
+      %(<a href="#{placeholder}">#{placeholder}</a>)
     end
   end
 end
 ```
 
-**Markdown island.** If your placeholder is an opaque sigil that downstream tooling parses regardless of context, wrap it in blank lines so CommonMark closes the HTML block, parses your placeholder as Markdown, and re-opens it:
+**Markdown island.** If what the importer puts there is Markdown without an HTML form, return it through `interface.markdown_island(text, block:)`. Outside an HTML block that is the text itself, with a blank line on both sides when `block: true`. Inside an HTML block it is the text between blank lines inside a `<div>`:
 
-```ruby
-upload_id = "u_screenshot_png_3a7c2"
-"\n\n[upload|#{upload_id}]\n\n"
+```text
+<td><div>
+
+[upload|9]
+
+</div></td>
 ```
 
-The blank lines force a paragraph break around the placeholder, which is fine for block-level placeholders (uploads in tables tend to want their own row anyway) but unsightly for inline ones (mentions, links). Prefer the raw-HTML form for inline placeholders that can land inside tables.
+The blank lines close the HTML block, CommonMark parses the placeholder as Markdown, and the `</div>` line opens the block again for the rest of the cell. Bare blank lines are not enough: after them the rest of the cell is Markdown too, until a line opens an HTML block again, and a `~~~` in the text after the placeholder would open a code fence. The shared RSpec example from [Rendering inside HTML blocks](/customization/extending/#rendering-inside-html-blocks) fails a tag that writes a blank line without the `<div>`.
+
+Discourse's upload Markdown is such a case: Discourse reads the dimensions and the `attachment` marker from the Markdown only, and its sanitizer drops the `upload://` href of a raw HTML link. The built-in `UploadTag` writes the island for that reason, the built-in `PollTag` and `EventTag` do it for their BBCode, and the attachment placeholder from above does it already.
+
+The blank lines force a paragraph break around the placeholder, which is fine for block-level placeholders (uploads in tables tend to want their own row anyway) but unsightly for inline ones (mentions, links). Prefer the raw HTML form for inline placeholders that can land inside tables, when there is one.
 
 ## Collecting more than one kind of placeholder
 

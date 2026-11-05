@@ -12,14 +12,17 @@ module Markbridge
         # a paragraph with the name and the dates, so the reader still sees
         # it.
         #
-        # An event is a block, so a placeholder for it keeps the blank
-        # lines around it (see "Placeholders" in the migration guide).
+        # The BBCode has no HTML form, so it goes through
+        # RenderingInterface#markdown_island: a block with blank lines
+        # around it, and a Markdown island in a `<div>` inside an HTML
+        # table. A placeholder for an event is written the same way (see
+        # "Placeholders" in the migration guide).
         #
         # @example A placeholder for the importer
         #   class MyEventTag < Markbridge::Renderers::Discourse::Tags::EventTag
         #     def render(element, interface)
         #       id = register_event(element)
-        #       "\n\n<<EVENT:#{id}>>\n\n"
+        #       interface.markdown_island("<<EVENT:#{id}>>", block: true)
         #     end
         #   end
         class EventTag < Tag
@@ -31,8 +34,7 @@ module Markbridge
           def render(element, interface)
             return without_plugin(element, interface) unless @bbcode
 
-            body = element.raw || build_event_bbcode(element)
-            "\n\n#{body}\n\n"
+            interface.markdown_island(element.raw || build_event_bbcode(element), block: true)
           end
 
           private

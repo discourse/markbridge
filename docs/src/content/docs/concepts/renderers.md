@@ -75,7 +75,8 @@ A tag that returns a String next to a tag that returns tokens is fine: the seria
 | `choose_list_marker(node, ordered:)`, `list_marker(node)` | The marker for the items of a list, the one the list in front did not use; and the marker chosen for a node in this render call |
 | `leading_list(node, children: false)`, `trailing_list(node, children: false)` | The list the output of `node` starts or ends with, as its tag says (`Tag#leading_list`, `Tag#trailing_list`); with `children: true` the answer for the first or last child with something in it |
 | `block_context?(element)` | Block vs. inline position |
-| `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML or wrap output as a Markdown island (`\n\n…\n\n`); the serializer takes care of it for tokens |
+| `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML without a blank line, or write its Markdown through `markdown_island`; the serializer takes care of it for tokens |
+| `markdown_island(markdown, block:)` | Markdown that Discourse has to read as Markdown (the BBCode of a plugin, an upload, a placeholder for one): as it is, with blank lines around a block; inside an HTML block an island in a `<div>`, `<div>\n\n…\n\n</div>` |
 
 The interface decouples tags from the renderer: you could write a second renderer (HTML, plain text, JSON) and reuse every tag by providing a compatible interface.
 

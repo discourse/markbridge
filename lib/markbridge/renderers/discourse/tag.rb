@@ -19,12 +19,14 @@ module Markbridge
         # and is not re-parsed for Markdown except across blank lines.
         # Every tag must pick one of two contracts:
         #
-        # 1. Emit raw HTML (e.g. `<strong>` for `**`).
-        # 2. Wrap Markdown output in `\n\n…\n\n` so the blank lines close
-        #    the HTML block, CommonMark parses the content as a Markdown
-        #    island, then re-opens. Visible: blank-line wrapping forces a
-        #    `<p>` margin around inline content, so prefer (1) when the
-        #    tag has an HTML form.
+        # 1. Emit raw HTML (e.g. `<strong>` for `**`), with no blank line
+        #    in it.
+        # 2. Write the Markdown through `interface.markdown_island`, which
+        #    puts it between blank lines inside a `<div>`: the blank lines
+        #    close the HTML block, CommonMark parses the content as a
+        #    Markdown island, and the `</div>` line re-opens the block.
+        #    Visible: blank-line wrapping forces a `<p>` margin around
+        #    inline content, so prefer (1) when the tag has an HTML form.
         #
         # @param element [AST::Node] the node to render
         # @param interface [RenderingInterface] the rendering interface

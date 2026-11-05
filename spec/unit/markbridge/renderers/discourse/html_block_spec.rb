@@ -89,6 +89,16 @@ RSpec.describe Markbridge::Renderers::Discourse::HtmlBlock do
     end
   end
 
+  describe ".enclosed_island" do
+    it "puts the island in a div" do
+      expect(described_class.enclosed_island("![a](b)")).to eq("<div>\n\n![a](b)\n\n</div>")
+    end
+
+    it "folds blank lines at the edges into the island" do
+      expect(described_class.enclosed_island("\n\n- a\n\n")).to eq("<div>\n\n- a\n\n</div>")
+    end
+  end
+
   describe ".without_blank_lines" do
     it "writes the newline in front of a blank line as an entity" do
       expect(described_class.without_blank_lines("a\n\nb")).to eq("a&#10;\nb")
@@ -105,6 +115,16 @@ RSpec.describe Markbridge::Renderers::Discourse::HtmlBlock do
   describe ".safe?" do
     it "accepts an empty string" do
       expect(described_class.safe?("")).to be(true)
+    end
+
+    it "accepts an island in a div" do
+      expect(described_class.safe?("<div>\n\n![a](b)\n\n</div>")).to be(true)
+    end
+
+    it "rejects a div whose Markdown is not between blank lines" do
+      expect(described_class.safe?("<div>\n\n![a](b)</div>")).to be(false)
+      expect(described_class.safe?("<div>![a](b)\n\n</div>")).to be(false)
+      expect(described_class.safe?("<div>\n![a](b)\n</div>")).to be(false)
     end
 
     it "accepts plain text without Markdown sigils" do
@@ -139,8 +159,20 @@ RSpec.describe Markbridge::Renderers::Discourse::HtmlBlock do
       expect(described_class.safe?("a (b)")).to be(true)
     end
 
-    it "accepts Markdown inside a blank-line wrapped island" do
-      expect(described_class.safe?("\n\n**x**\n\n")).to be(true)
+    # After a bare island the rest of the cell is Markdown until a line
+    # opens an HTML block again.
+    it "rejects a bare island, with blank lines but without the div" do
+      expect(described_class.safe?("\n\n**x**\n\n")).to be(false)
+      expect(described_class.safe?("\n\n[poll]\n[/poll]\n\n")).to be(false)
+    end
+
+    it "rejects a blank line inside raw HTML, it would end the block" do
+      expect(described_class.safe?("<p>a</p>\n\n<p>b</p>")).to be(false)
+      expect(described_class.safe?("<p>a</p>\n \t\n<p>b</p>")).to be(false)
+    end
+
+    it "accepts raw HTML with single newlines" do
+      expect(described_class.safe?("<p>a</p>\n<p>b</p>\n")).to be(true)
     end
 
     it "rejects Markdown when only the leading blank line is present" do
@@ -149,14 +181,6 @@ RSpec.describe Markbridge::Renderers::Discourse::HtmlBlock do
 
     it "rejects Markdown when only the trailing blank line is present" do
       expect(described_class.safe?("**x**\n\n")).to be(false)
-    end
-
-    it "rejects Markdown when the island starts with a single newline" do
-      expect(described_class.safe?("\n**x**\n\n")).to be(false)
-    end
-
-    it "rejects Markdown when the island ends with a single newline" do
-      expect(described_class.safe?("\n\n**x**\n")).to be(false)
     end
   end
 end

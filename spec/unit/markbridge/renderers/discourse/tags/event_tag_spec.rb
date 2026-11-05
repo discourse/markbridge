@@ -83,17 +83,32 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::EventTag do
       expect(tag.render(element, interface)).to end_with("[/event]\n\n")
     end
 
-    # The stub is mode-agnostic: the same blank-line-bracketed island serves
-    # both a standalone block in Markdown and the html_mode contract (which
-    # is enforced by html_mode_contract_spec).
-    it "emits the same island form in html_mode" do
+    # The BBCode has no HTML form: inside an HTML block it is a Markdown
+    # island in a div, so the rest of the cell stays HTML.
+    it "writes the BBCode as an island in a div in html_mode" do
       html_context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
       html_interface =
         Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, html_context)
       element = Markbridge::AST::Event.new(name: "Meeting", starts_at: "2026-01-01")
 
       expect(tag.render(element, html_interface)).to eq(
-        %(\n\n[event name="Meeting" start="2026-01-01"]\n[/event]\n\n),
+        %(<div>\n\n[event name="Meeting" start="2026-01-01"]\n[/event]\n\n</div>),
+      )
+    end
+
+    it "writes the raw BBCode as an island in a div in html_mode" do
+      html_context = Markbridge::Renderers::Discourse::RenderContext.new([], html_mode: true)
+      html_interface =
+        Markbridge::Renderers::Discourse::RenderingInterface.new(renderer, html_context)
+      element =
+        Markbridge::AST::Event.new(
+          name: "x",
+          starts_at: "2026-01-01",
+          raw: "[event name=\"x\" start=\"2026-01-01\" status=\"public\"]\n[/event]",
+        )
+
+      expect(tag.render(element, html_interface)).to eq(
+        %(<div>\n\n[event name="x" start="2026-01-01" status="public"]\n[/event]\n\n</div>),
       )
     end
   end
