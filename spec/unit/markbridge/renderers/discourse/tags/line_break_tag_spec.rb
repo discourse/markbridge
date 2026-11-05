@@ -22,6 +22,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::LineBreakTag do
       expect(renderer.render(document)).to eq("a\n \t<br>b")
     end
 
+    it "keeps a text that starts with a newline on the line after it" do
+      item =
+        Markbridge::AST::ListItem.new << Markbridge::AST::Text.new("x") <<
+          Markbridge::AST::LineBreak.new
+      item << Markbridge::AST::Text.new("\ny")
+      document = Markbridge::AST::Document.new << (Markbridge::AST::List.new << item)
+
+      expect(renderer.render(document)).to eq("\n\n- x\n  <br>y\n\n\n")
+    end
+
     it "renders as nothing after a blank line" do
       document = Markbridge::AST::Document.new
       document << Markbridge::AST::Text.new("a\n\n") << Markbridge::AST::LineBreak.new <<
