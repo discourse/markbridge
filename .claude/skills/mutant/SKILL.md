@@ -104,6 +104,15 @@ Ask, in this order:
   unique names (`span_end`) so a pattern cannot hit unrelated code.
 - **Line coverage must not regress**: compare `COVERAGE=1 bin/rspec`
   before and after.
+- **CI runs mutant without Node.** The `mutation` job installs no
+  Node, so every spec that cooks with markdown-it (the cooked-output
+  specs, the three round-trip specs) is pending there and kills
+  nothing. A local run with markdown-it installed selects those specs
+  as killers and shows 100% where CI shows survivors. To see what CI
+  sees: `mv spec/support/markdown_it/node_modules/markdown-it{,.off}`,
+  `COVERAGE=1 bundle exec rspec`, `bin/mutant run --since origin/main`,
+  then move it back. The unit specs have to kill every mutation on
+  their own.
 
 ## Commits
 

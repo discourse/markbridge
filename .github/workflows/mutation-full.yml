@@ -14,6 +14,7 @@ jobs:
   mutation-full:
     runs-on: ubuntu-latest
 
+    # No Node here on purpose, see the mutation job in main.yml.
     # The run takes roughly 6 minutes on a 20-core machine; a GitHub
     # runner has fewer cores, so leave room.
     timeout-minutes: 60

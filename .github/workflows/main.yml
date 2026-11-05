@@ -77,6 +77,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
 
+    # No Node here on purpose: the specs that cook with markdown-it are
+    # pending, so the unit specs have to kill every mutation on their
+    # own. With markdown-it present the coverage map selects thousands
+    # of round-trip examples for a renderer subject, a mutation they do
+    # not kill runs into the timeout, and mutant counts a timeout as a
+    # kill.
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7

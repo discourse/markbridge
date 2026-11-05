@@ -152,6 +152,10 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       expect(write("a\n\n", "\u00A0b")).to eq("a\n\n\u00A0b")
       expect(write("a\n", "   ", "b")).to eq("a\n   b")
       expect(write("a\n\n", *em(tokens.text(" b")))).to eq("a\n\n*b*")
+      # The blank lines of the outer buffer count inside a nested run too.
+      expect(write("a\n", *em(tokens.text(" \n"), tokens.hard_break, tokens.text(" b")))).to eq(
+        "a\n \n*b*",
+      )
     end
 
     describe "delimiters" do
