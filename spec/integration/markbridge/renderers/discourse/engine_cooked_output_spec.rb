@@ -173,6 +173,17 @@ RSpec.describe "cooked output of the Discourse engine", :discourse_engine do
       expect(cooked.css("pre")).to be_empty
     end
 
+    it "keeps a colon right after a color or size tag at the start of a line" do
+      # `[color=red]:x` is a link reference definition otherwise.
+      item = Markbridge::AST::ListItem.new << colored("red", ":x")
+      list = Markbridge::AST::List.new << item
+
+      cooked = cook_all(list, sized("150", ":y"))
+
+      expect(cooked.at_css("li span[style]").text).to eq(":x")
+      expect(cooked.css("p span[style]").map(&:text)).to eq([":y"])
+    end
+
     it "writes a size inside a link as text, Discourse does not cook BBCode there" do
       link = Markbridge::AST::Url.new(href: "https://example.com") << sized("150", "x")
 
