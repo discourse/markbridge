@@ -190,7 +190,11 @@ module Markbridge
         end
 
         def visible?(output)
-          output.instance_of?(String) ? output.match?(VISIBLE) : Inline::Tokens.visible?(output)
+          if output.instance_of?(String)
+            Inline::Joins.visible?(output)
+          else
+            Inline::Tokens.visible?(output)
+          end
         end
 
         # The element whose children #render_children is rendering right
@@ -231,8 +235,6 @@ module Markbridge
         private
 
         # Something other than whitespace.
-        VISIBLE = /[^[:space:]]/
-        private_constant :VISIBLE
 
         # Sets up the caches for a top-level call and says whether this is
         # one: a call from inside a tag finds them in place.

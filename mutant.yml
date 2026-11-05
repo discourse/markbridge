@@ -97,9 +97,11 @@ matcher:
     - Markbridge::Renderers::Discourse::Inline::Serializer#place_markers
 
     # Inline::Serializer#after_blank_line and Tags::ParagraphTag#render
-    # ask match? before sub: sub without a match returns a copy, and
-    # that is one String per paragraph and per piece after a blank line
-    # saved. Bucket A.
+    # look at the first byte before sub: sub without a match returns a
+    # copy, and that is one String per paragraph and per piece after a
+    # blank line saved. Postprocessor#whitespace_line? is the same kind
+    # of guard in front of a gsub. Bucket A.
+    - Markbridge::Renderers::Discourse::Postprocessor#whitespace_line?
     - Markbridge::Renderers::Discourse::Inline::Serializer#after_blank_line
     - Markbridge::Renderers::Discourse::Tags::ParagraphTag#render
 
@@ -112,6 +114,15 @@ matcher:
     - Markbridge::Renderers::Discourse::Inline::Joins.after_run
     - Markbridge::Renderers::Discourse::Inline::Joins.before_run
     - Markbridge::Renderers::Discourse::Inline::Joins.punctuation_at?
+    # The same for .space_at?, .last_char_index, .visible? and
+    # .char_length: a slice one byte longer still starts with the same
+    # character and the regexes are anchored, the byte 127 is no space
+    # either way, and a walk without its lower bound stops at the lead
+    # byte of a valid string. Bucket A.
+    - Markbridge::Renderers::Discourse::Inline::Joins.space_at?
+    - Markbridge::Renderers::Discourse::Inline::Joins.last_char_index
+    - Markbridge::Renderers::Discourse::Inline::Joins.visible?
+    - Markbridge::Renderers::Discourse::Inline::Joins.char_length
 
     # Inline::Serializer#run and #single_string only keep a run that is
     # one String off the pieces array and the buffer; joined with

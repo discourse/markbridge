@@ -17,6 +17,12 @@ RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
       expect(postprocessor.call("a\n   \nb\n\t\nc")).to eq("a\n\nb\n\nc")
     end
 
+    it "removes a whitespace-only line at the start and at the end of the text" do
+      expect(postprocessor.call("   \na")).to eq("a")
+      expect(postprocessor.call("a\n   ")).to eq("a")
+      expect(postprocessor.call("a\n \tb\n  c")).to eq("a\n \tb\n  c")
+    end
+
     it "collapses the blank lines that whitespace-only lines leave" do
       expect(postprocessor.call("a\n\n \n\t\n\nb")).to eq("a\n\nb")
     end
