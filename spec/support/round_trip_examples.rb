@@ -8,12 +8,11 @@ require_relative "round_trip_known_bugs"
 # every other case has to round-trip, and one that does not explains
 # itself with the shrunk AST, its Markdown and the cooked HTML.
 #
-# +list+ is the known-bug list (:structure or :adjacency), +cases+ the
-# ids the spec runs (seeds or case ids), +label+ turns an id into the
-# name of its example and +build+ into its document.
-RSpec.shared_examples "round-trip cases" do |list, cases, label:, build:|
-  checker = RoundTripChecker.new
-
+# +list+ is the known-bug list (see RoundTripKnownBugs::LISTS), +cases+
+# the ids the spec runs (seeds or case ids), +label+ turns an id into the
+# name of its example and +build+ into its document. +checker+ is the
+# RoundTripChecker to run, with the cooker and the features of the spec.
+RSpec.shared_examples "round-trip cases" do |list, cases, label:, build:, checker: RoundTripChecker.new|
   it "lists only known bugs that cover a case this spec runs" do
     unused = RoundTripKnownBugs.unused(list, cases)
 

@@ -49,6 +49,16 @@ module MarkdownItCooker
       missing
     end
 
+  # Plain markdown-it reads no BBCode: what the renderer writes for a
+  # plugin, or for Discourse core's `[u]`, is text to it. See
+  # DiscourseEngineCooker#cooks? for the other answer.
+  #
+  # @param _feature [Symbol]
+  # @return [false]
+  def self.cooks?(_feature)
+    false
+  end
+
   @process = nil
   @next_id = 0
 
