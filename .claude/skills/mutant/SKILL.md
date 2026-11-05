@@ -112,7 +112,13 @@ Ask, in this order:
   sees: `mv spec/support/markdown_it/node_modules/markdown-it{,.off}`,
   `COVERAGE=1 bundle exec rspec`, `bin/mutant run --since origin/main`,
   then move it back. The unit specs have to kill every mutation on
-  their own.
+  their own. Do not install Node in that job to make the two agree:
+  with markdown-it present the coverage map selects thousands of
+  round-trip examples for a serializer subject (3870 for
+  `Serializer#write_tokens`), a mutation they do not kill runs into
+  the 5 second timeout, and mutant counts a timeout as a kill. The
+  run with markdown-it showed 100% and 68 timeouts where the run
+  without it showed one real survivor and 26 timeouts (PR #124).
 
 ## Commits
 
