@@ -1,0 +1,60 @@
+name: Cook with the Discourse engine
+
+on:
+  schedule:
+    # Every night at 04:00 UTC.
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+# The specs cook with plain markdown-it. This job builds Discourse's own
+# engine (bin/discourse-engine fetches the parts of Discourse it is built
+# from, which takes a few minutes) and runs the examples that cook with
+# it, so the BBCode of the plugins is checked the way Discourse cooks it.
+jobs:
+  discourse-engine:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            spec/support/markdown_it/package-lock.json
+            spec/support/discourse_engine/package-lock.json
+
+      - name: Install markdown-it and the engine builder
+        run: |
+          npm ci --prefix spec/support/markdown_it
+          npm ci --prefix spec/support/discourse_engine
+
+      # The checkout of Discourse and the built bundle, keyed by the commits
+      # in discourse.json and the builder itself.
+      - name: Cache the engine
+        uses: actions/cache@v4
+        with:
+          path: tmp/discourse_engine
+          key: discourse-engine-${{ hashFiles('spec/support/markdown_it/discourse.json', 'spec/support/discourse_engine/build.mjs') }}
+
+      - name: Build the engine
+        run: bin/discourse-engine
+
+      - name: Run the engine examples
+        env:
+          MARKDOWN_IT_REQUIRED: '1'
+          DISCOURSE_ENGINE_REQUIRED: '1'
+        run: bundle exec rspec --tag discourse_engine

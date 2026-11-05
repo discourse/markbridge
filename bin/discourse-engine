@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Builds Discourse's own Markdown engine for the specs that cook with it
+# (see DiscourseEngineCooker). Fetches the parts of Discourse the engine
+# is built from into tmp/discourse_engine, so it needs network and a
+# few minutes the first time; a second run with the same commits does
+# nothing. Pass --force to build again.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if [ ! -d spec/support/discourse_engine/node_modules ]; then
+  npm ci --prefix spec/support/discourse_engine
+fi
+
+exec node spec/support/discourse_engine/build.mjs "$@"

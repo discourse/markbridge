@@ -315,10 +315,41 @@ expect(token).to match_tag_end("b")
   update `cook.mjs` if needed. `--check` only reports, the weekly
   `discourse-sync.yml` workflow runs it. Dependabot does not watch this
   package on purpose: the version has to follow Discourse.
+- The `discourse_engine` package next to it builds Discourse's own
+  engine, see below.
 - Plain markdown-it is not all of Discourse: BBCode, mentions, emoji,
   `upload://`, image options and the sanitizer are missing, and
   Discourse's own typographer replacements are not copied (GPL), so
   markdown-it's `replacements` rule is off.
+
+**Cooking with the Discourse engine** (`bin/discourse-engine` builds it,
+which fetches parts of Discourse into `tmp/discourse_engine` and takes a
+few minutes the first time):
+- `DiscourseEngineCooker` (`spec/support/discourse_engine_cooker.rb`)
+  cooks with Discourse's own pretty-text bundle, the markdown features of
+  the plugins bundled with Discourse (details, spoiler-alert, poll,
+  discourse-events) and of discourse-bbcode, and the site setting
+  defaults. `spec/support/discourse_engine/build.mjs` builds all of it
+  from the commits in `discourse.json`, the way Discourse does
+  (`pnpm install`, `frontend/pretty-text-processor/build.mjs`, Babel's
+  AMD transform for the plugin files); `cook.mjs` runs it with the Ruby
+  callbacks stubbed (no users, no uploads, emoji off).
+- It cooks per profile, and a profile names the plugins that are on,
+  because Discourse loads a plugin's markdown features only then:
+  `:stock` (details, spoiler-alert and poll; discourse-events is off in
+  a stock install), `:all` (plus discourse-events and discourse-bbcode)
+  and `:none` (no plugin). `DiscourseEngineCooker.renderer(profile)` is
+  the renderer whose `features:` fit the profile, so a spec writes the
+  Markdown for the site it cooks on.
+- Tag an example group with `:discourse_engine` and guard it with
+  `DiscourseEngineCooker::SKIP_REASON`. Without the engine the examples
+  skip; `DISCOURSE_ENGINE_REQUIRED=1` makes that a failure. The nightly
+  `discourse-engine.yml` workflow builds the engine and runs
+  `rspec --tag discourse_engine`. The normal test job does not build it,
+  the build needs network and minutes.
+- `sync.mjs` records the discourse-bbcode commit and hashes the files the
+  engine is built from, next to the markdown-it ones, so the weekly check
+  reports when Discourse changes them.
 
 ## Mutation Testing
 

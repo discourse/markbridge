@@ -1,5 +1,5 @@
 {
-  "commit": "7ce00125d1ac96ea48f7cb702e9418ab38d1c964",
+  "commit": "f4da27dd1ca906c1a7ac7eb853a8a53346fe4482",
   "packages": {
     "linkify-it": "6.1.0",
     "markdown-it": "15.0.3"
@@ -16,6 +16,21 @@
     "frontend/discourse-markdown-it/src/engine.js": "b0f99477271ac3b0f8e0bd5eedc25e9c3b4d86ef1f0dcb2a6fcff85f72f57f00",
     "frontend/discourse-markdown-it/src/features/newline.js": "395daf8b21dd7ae7bf0bb0c6022bf5df53d9a033ed79d9e486fb8af97eef4f74",
     "frontend/discourse-markdown-it/src/features/paragraph.js": "90f25e079b7417f64cef64f1b60e54e546fa2e2c1a2e47506f5d85ae828f22c4",
-    "frontend/discourse-markdown-it/src/features/custom-typographer-replacements.js": "c4f51afab19ff27d93f42350d635b2d2682ac1ad9ea9e7223d62f6484358babb"
+    "frontend/discourse-markdown-it/src/features/custom-typographer-replacements.js": "c4f51afab19ff27d93f42350d635b2d2682ac1ad9ea9e7223d62f6484358babb",
+    "lib/pretty_text/core_bundle.rb": "aa67ffc1b420c1823a78bf3fcebf5ce92e25c0d5fee2bc9599de4d40a15a9aaa",
+    "frontend/pretty-text-processor/build.mjs": "cc7e3ec381601db431e8dcc88643a59a77e51c571a22663124eda1af73ce1993",
+    "frontend/pretty-text-processor/pretty-text-ruby-interface.js": "8a84c2cf32b9f71cda14a715d924c834b2e514a7c2ff519e4c1c0abc85a1ef72",
+    "frontend/pretty-text-processor/shims/i18n.js": "4978f9d1d7d80d2351df8dd6c4f077003bf127476b7571944b54a35bb4708973",
+    "plugins/discourse-details/assets/javascripts/lib/discourse-markdown/details.js": "6b4eefc15eda4d7d3a3b17c137bc1240e77672029049b5d5b16aeed13aa0977b",
+    "plugins/spoiler-alert/assets/javascripts/lib/discourse-markdown/spoiler-alert.js": "ff60240fed180297ab7e1cef10efbc0619bf38ca975e9f3f55c168dbd265f378",
+    "plugins/poll/assets/javascripts/lib/discourse-markdown/poll.js": "35e119043e8cf87da16c199bc00325f58784ef453a6bcf8a9f53d4cb1619bca2",
+    "plugins/discourse-events/assets/javascripts/discourse/lib/discourse-markdown/discourse-post-event-block.js": "5197af23c126ea1d1229bb0fb1ad894f6092218f41547d55913d721ce13e534d"
+  },
+  "discourse_bbcode": {
+    "commit": "a34d3ab3dfff8764a803498c19913d6d291a6284",
+    "sources": {
+      "assets/javascripts/lib/discourse-markdown/bbcode.js": "64eb8c890871bf3254ea80be66dc4a77152d1c8b81501a958f8bbda62f56bd23",
+      "assets/javascripts/lib/discourse-markdown/bbcode-values.js": "5628469d4a98443e46bf10ae524c5c82573ceece4924a098d988188e711085cb"
+    }
   }
 }
