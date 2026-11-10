@@ -11,7 +11,8 @@ module Markbridge
           # space: the escaper writes one where it wants indentation kept.
           LEADING_BLANKS = /\A[ \t]+/
           VISIBLE = /[^[:space:]]/
-          private_constant :LEADING_BLANKS, :VISIBLE
+          ISLAND = "\n\n"
+          private_constant :LEADING_BLANKS, :VISIBLE, :ISLAND
 
           def render(element, interface)
             child_context = interface.with_parent(element)
@@ -24,7 +25,13 @@ module Markbridge
               # is what the Markdown form does as well. A paragraph with
               # nothing visible is nothing, like in Markdown: an empty <p>
               # would keep a list item or a list around it alive.
-              return content.match?(VISIBLE) ? "<p>#{content}</p>" : ""
+              return "" unless content.match?(VISIBLE)
+
+              # A blank line in the content is a Markdown island, an
+              # upload for example, and an island is a <div>. A <p> ends
+              # at a <div>, and an inline element around the island would
+              # stay behind in the <p>, empty. A <div> can hold both.
+              return content.include?(ISLAND) ? "<div>#{content}</div>" : "<p>#{content}</p>"
             end
 
             # Bracket with leading and trailing blank lines so adjacent

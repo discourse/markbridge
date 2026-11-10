@@ -24,6 +24,7 @@ Output and AST changes to check:
 - **The line break right after a code tag** is not a first, empty line of the code anymore: `[code]`, `[pre]`, HTML `<pre>` and `<pre>` in wikitext drop one line break after the tag. HTML itself says so for `<pre>`. A second line break stays, and so does one after `[tt]` or `<code>`.
 - **An image with only a width** is written without a size, `![alt](src)`. Discourse reads a size only as `WIDTHxHEIGHT`, so the `100` of `![alt|100](src)` stayed in the alt text.
 - **The space after a code span at the start of a line** in s9e XML is kept.
+- **A paragraph with an upload in a table written as HTML** is a `<div>`, not a `<p>`. A `<p>` ends at the `<div>` of the upload, and an inline element around the upload, a `<del>` for example, stayed behind empty.
 - **An empty paragraph in a table written as HTML** is nothing. It was an empty `<p></p>`, which kept a list item around it alive.
 - **The normalizer report** names a node of a class without a name (from `Class.new`) after its nearest named ancestor. It raised `NoMethodError`.
 - **Unquoted BBCode options with spaces.** `[quote=John Doe]` quotes "John Doe", not "John"; `[url=https://example.com/a b]` keeps the whole address; `[spoiler=What went wrong]` is a spoiler with that title and no longer text. The option ends at the `]` or at the first `name=`.

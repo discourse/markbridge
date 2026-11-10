@@ -29,6 +29,21 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ParagraphTag do
     context "in html_mode" do
       let(:context) { html_context }
 
+      it "is a <div> around a Markdown island, which a <p> cannot hold" do
+        upload = Markbridge::AST::Upload.new(sha1: "abc", filename: "a.png", type: :image)
+        paragraph = Markbridge::AST::Paragraph.new << (Markbridge::AST::Deletion.new << upload)
+
+        expect(tag.render(paragraph, interface)).to eq(
+          "<div><del><div>\n\n![](upload://a.png)\n\n</div></del></div>",
+        )
+      end
+
+      it "stays a <p> around content with a single line break" do
+        paragraph = Markbridge::AST::Paragraph.new << Markbridge::AST::Text.new("a\nb")
+
+        expect(tag.render(paragraph, interface)).to eq("<p>a\nb</p>")
+      end
+
       it "renders a paragraph with nothing visible to nothing" do
         empty = Markbridge::AST::Paragraph.new
         blank = Markbridge::AST::Paragraph.new << Markbridge::AST::Text.new(" \n")
