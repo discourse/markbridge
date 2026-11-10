@@ -69,8 +69,6 @@ module Markbridge
         # @param lines [Array<String>]
         # @return [Array<String>]
         def join_nowiki_lines(lines)
-          return lines unless lines.any? { |line| open_nowiki?(line) }
-
           joined = []
           index = 0
           while index < lines.length

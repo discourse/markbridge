@@ -130,6 +130,18 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ListHandler do
       expect(context.auto_closed_count).to eq(1)
     end
 
+    it "closes everything that is open directly in the list" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      handler.on_close(token: tag_end, context:, registry:)
+
+      expect(context.current).to eq(document)
+      expect(context.auto_closed_count).to eq(2)
+    end
+
     it "closes only the inner list of two" do
       outer = Markbridge::AST::List.new
       context.push(outer)
