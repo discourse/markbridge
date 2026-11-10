@@ -177,6 +177,79 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
       expect(tag.render(element, interface)).to eq("[spoiler]hidden[/spoiler]")
     end
 
+    context "with a block spoiler" do
+      def block_spoiler(content, title: nil)
+        Markbridge::AST::Spoiler.new(title:, block: true) << Markbridge::AST::Text.new(content)
+      end
+
+      it "writes the tags on lines of their own, as a block" do
+        expect(tag.render(block_spoiler("hidden"), interface)).to eq(
+          "\n\n[spoiler]\nhidden\n[/spoiler]\n\n",
+        )
+      end
+
+      it "has no blank lines at the start and the end of the content" do
+        expect(tag.render(block_spoiler("\n\na\n\nb\n\n"), interface)).to eq(
+          "\n\n[spoiler]\na\n\nb\n[/spoiler]\n\n",
+        )
+      end
+
+      it "writes the title as a paragraph in front, without the space after the colon" do
+        expect(tag.render(block_spoiler("hidden", title: " *Season 3* "), interface)).to eq(
+          "\n\n\\*Season 3\\*:\n\n[spoiler]\nhidden\n[/spoiler]\n\n",
+        )
+      end
+
+      it "leaves a colon at the start of the content alone, the tag has a line of its own" do
+        expect(tag.render(block_spoiler(":x"), interface)).to eq(
+          "\n\n[spoiler]\n:x\n[/spoiler]\n\n",
+        )
+      end
+
+      it "writes no comment after a spoiler in front, it is not on its line" do
+        second = block_spoiler("y")
+        parent = Markbridge::AST::Document.new << block_spoiler("x") << second
+
+        expect(tag.render(second, interface_for(parent))).to eq("\n\n[spoiler]\ny\n[/spoiler]\n\n")
+      end
+
+      it "renders an empty one to nothing" do
+        expect(tag.render(Markbridge::AST::Spoiler.new(title: "T", block: true), interface)).to eq(
+          "",
+        )
+      end
+
+      it "writes the content like an inline spoiler inside a link" do
+        link = Markbridge::AST::Url.new(href: "https://example.com")
+        email = Markbridge::AST::Email.new(address: "a@example.com")
+
+        expect(tag.render(block_spoiler("hidden", title: "T"), interface_for(link))).to eq(
+          "T: hidden",
+        )
+        expect(tag.render(block_spoiler("hidden"), interface_for(email))).to eq("hidden")
+      end
+
+      it "writes a div in html_mode, with the title in front" do
+        interface = interface_for(html_mode: true)
+
+        expect(tag.render(block_spoiler("hidden"), interface)).to eq(
+          %(<div class="spoiler">hidden</div>),
+        )
+        expect(tag.render(block_spoiler("hidden", title: "A & B"), interface)).to eq(
+          %(A &amp; B:<div class="spoiler">hidden</div>),
+        )
+      end
+
+      it "writes the content as a block of its own without the plugin" do
+        tag = described_class.new(bbcode: false)
+
+        expect(tag.render(block_spoiler("\nhidden\n"), interface)).to eq("\n\nhidden\n\n")
+        expect(tag.render(block_spoiler("hidden", title: "T"), interface)).to eq(
+          "\n\nT:\n\nhidden\n\n",
+        )
+      end
+    end
+
     let(:element_class) { Markbridge::AST::Spoiler }
     it_behaves_like "a tag that propagates parent context"
 

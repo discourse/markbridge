@@ -13,19 +13,26 @@ module Markbridge
         #   # For <COLOR color="red">text</COLOR>
         #   handler = AttributeHandler.new(AST::Color, attribute: :color, param: :color)
         #   registry.register("COLOR", handler)
+        #
+        # @example With a fixed keyword for every node
+        #   # <SPOILER title="..."> is a block in phpBB
+        #   AttributeHandler.new(AST::Spoiler, attribute: :title, fixed: { block: true })
         class AttributeHandler < BaseHandler
           # @param element_class [Class] the AST node class to instantiate
           # @param attribute [Symbol] the XML attribute name to extract
           # @param param [Symbol] the parameter name to pass to the AST node constructor
-          def initialize(element_class, attribute:, param: nil)
+          # @param fixed [Hash{Symbol => Object}] keywords every node gets,
+          #   next to the one from the attribute
+          def initialize(element_class, attribute:, param: nil, fixed: {})
             @element_class = element_class
             @attribute = attribute
             @param = param || attribute
+            @fixed = fixed
           end
 
           def process(element:, parent:, processor: nil)
             attrs = extract_attributes(element)
-            node = @element_class.new(@param => attrs[@attribute])
+            node = @element_class.new(**@fixed, @param => attrs[@attribute])
             parent << node
 
             # Return node to signal: process children into this node

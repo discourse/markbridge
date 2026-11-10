@@ -137,7 +137,13 @@ module Markbridge
             "ALIGN",
             Handlers::AttributeHandler.new(AST::Align, attribute: :align, param: :alignment),
           )
-          register("SPOILER", Handlers::AttributeHandler.new(AST::Spoiler, attribute: :title))
+          # phpBB shows a [spoiler] as a block. ISPOILER is the inline
+          # spoiler of Litedown.
+          register(
+            "SPOILER",
+            Handlers::AttributeHandler.new(AST::Spoiler, attribute: :title, fixed: { block: true }),
+          )
+          register("ISPOILER", Handlers::SimpleHandler.new(AST::Spoiler))
           register("ATTACHMENT", Handlers::AttachmentHandler.new)
           register("ATTACH", Handlers::AttachmentHandler.new)
 

@@ -342,6 +342,12 @@ RSpec.describe Markbridge::Normalizer::Walker do
       expect(texts_after_normalizing(text("a"), list, text("b"))).to eq(["a b"])
     end
 
+    it "gets a space for a hoisted block spoiler" do
+      spoiler = el(Markbridge::AST::Spoiler, text("s"), block: true)
+
+      expect(texts_after_normalizing(text("a"), spoiler, text("b"))).to eq(["a b"])
+    end
+
     it "gets no space when the text in front ends with whitespace" do
       expect(texts_after_normalizing(text("Run\n"), code, text("and"))).to eq(["Run\nand"])
     end

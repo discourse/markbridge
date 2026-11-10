@@ -9,6 +9,9 @@ module Markbridge
         # tag, so a title is written as text in front of the spoiler:
         # `title: [spoiler]…[/spoiler]`.
         #
+        # A spoiler with +block+ set is written with the tags on lines of
+        # their own, which Discourse reads as a block spoiler.
+        #
         # With +bbcode: false+, for a site without the plugin, the content
         # is written as it is, so the hidden text shows.
         class SpoilerTag < Tag
@@ -25,6 +28,8 @@ module Markbridge
             # serializer's markers: an empty [spoiler] shell would only
             # add noise to the output.
             return content unless content.match?(/[^[:space:]]/)
+
+            return render_block(element, interface, content) if block?(element, interface)
 
             title = title_text(element, interface)
             # Discourse doesn't cook BBCode in the text of a link.
@@ -44,6 +49,26 @@ module Markbridge
           end
 
           private
+
+          # A block spoiler in the text of a link is written like an
+          # inline one, as its content. The normalizer moves a block out of
+          # a link, so this is for a tree that was not normalized.
+          def block?(element, interface)
+            element.block && !inside_link?(interface)
+          end
+
+          # `[spoiler]` and `[/spoiler]` on lines of their own are a block
+          # spoiler to Discourse, with blocks inside. The title is a
+          # paragraph in front of it. Without the plugin the content is a
+          # block of its own too.
+          def render_block(element, interface, content)
+            title = title_text(element, interface)&.rstrip
+            return "#{title}<div class=\"spoiler\">#{content}</div>" if interface.html_mode?
+
+            content = content.gsub(/\A\n+|\n+\z/, "")
+            content = "[spoiler]\n#{content}\n[/spoiler]" if @bbcode
+            title ? "\n\n#{title}\n\n#{content}\n\n" : "\n\n#{content}\n\n"
+          end
 
           # Whether a spoiler stands in front of +element+ on the same line,
           # with anything inline between. A text that has something visible

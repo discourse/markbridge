@@ -80,6 +80,11 @@ module Markbridge
         block ? :hoist_after : :keep
       end
 
+    # A spoiler inside a line of text may stay in an inline container. One
+    # with its +block+ flag set is written on lines of its own and is
+    # moved out.
+    KEEP_INLINE_SPOILER = ->(_boundary, node) { node.block ? :hoist_after : :keep }
+
     class << self
       # A fresh, customizable normalizer with the default rules. Add more with
       # {#rule}.
@@ -107,6 +112,7 @@ module Markbridge
 
         INLINE_CONTAINERS.each do |container|
           rules.add(parent: container, child: AST::Code, strategy: KEEP_INLINE_CODE)
+          rules.add(parent: container, child: AST::Spoiler, strategy: KEEP_INLINE_SPOILER)
 
           BLOCK_NODES.each do |block|
             next if container == block

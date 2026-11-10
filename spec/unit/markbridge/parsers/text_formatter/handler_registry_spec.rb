@@ -116,6 +116,13 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
         node = process_and_get_node('<SPOILER title="hi">hidden</SPOILER>')
         expect(node).to be_a(Markbridge::AST::Spoiler)
         expect(node.title).to eq("hi")
+        expect(node.block).to be(true)
+      end
+
+      it "dispatches ISPOILER to an inline Spoiler" do
+        node = process_and_get_node("<ISPOILER>hidden</ISPOILER>")
+        expect(node).to be_a(Markbridge::AST::Spoiler)
+        expect(node.block).to be_nil
       end
 
       it "dispatches ATTACHMENT to an Attachment-producing handler" do
@@ -232,6 +239,10 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       "HR" => [
         Markbridge::Parsers::TextFormatter::Handlers::SelfClosingHandler,
         Markbridge::AST::HorizontalRule,
+      ],
+      "ISPOILER" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Spoiler,
       ],
       "P" => [
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,

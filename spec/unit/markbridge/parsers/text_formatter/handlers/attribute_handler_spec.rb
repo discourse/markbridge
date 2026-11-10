@@ -26,6 +26,16 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::AttributeHandler do
       expect(parent.children[0].title).to eq("surprise")
     end
 
+    it "passes the fixed keywords next to the attribute" do
+      handler =
+        described_class.new(Markbridge::AST::Spoiler, attribute: :title, fixed: { block: true })
+
+      handler.process(element: build_element('<SPOILER title="surprise"/>'), parent:)
+
+      expect(parent.children[0].title).to eq("surprise")
+      expect(parent.children[0].block).to be(true)
+    end
+
     it "passes nil when the attribute is missing" do
       handler = described_class.new(Markbridge::AST::Color, attribute: :color)
 
