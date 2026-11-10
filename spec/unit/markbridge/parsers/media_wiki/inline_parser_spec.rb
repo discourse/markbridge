@@ -361,6 +361,31 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.first.children.first.text).to eq("underlined")
     end
 
+    it "reads the tags in any case" do
+      doc = parse("<S>a</s> <Code>'''b'''</CODE> <NOWIKI>''c''</NoWiki> <U>d</U> x<BR>y")
+
+      expect(doc.children.map(&:class)).to eq(
+        [
+          Markbridge::AST::Strikethrough,
+          Markbridge::AST::Text,
+          Markbridge::AST::Code,
+          Markbridge::AST::Text,
+          Markbridge::AST::Underline,
+          Markbridge::AST::Text,
+          Markbridge::AST::LineBreak,
+          Markbridge::AST::Text,
+        ],
+      )
+      expect(doc.children[2].children.first.text).to eq("'''b'''")
+      expect(doc.children[3].text).to eq(" ''c'' ")
+    end
+
+    it "goes on behind an end tag in another case" do
+      doc = parse("<s>a</S>b")
+
+      expect(doc.children.last.text).to eq("b")
+    end
+
     it "parses <ins>...</ins> as an insertion" do
       doc = parse("<ins>inserted</ins>")
       expect(doc.children.first).to be_a(Markbridge::AST::Insertion)
@@ -388,19 +413,12 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.first.text).to eq("<span>text</span>")
     end
 
-    # Kills `.downcase` drop on `tag_match[2].downcase`. The opening
-    # regex has the `/i` flag so <CODE> matches it and dispatches to
-    # handle_paired_raw_tag. That helper builds the closing tag as
-    # "</" + tag_name + ">" — with downcase the lookup is case-sensitive
-    # against "</code>" which doesn't match "</CODE>", so the whole
-    # region falls through to literal text. Without downcase, tag_name
-    # stays "CODE" and the closing tag DOES match, producing an
-    # AST::Code node. Asserting the literal-text outcome pins the
-    # downcase behaviour.
-    it "treats uppercase <CODE>...</CODE> as literal text" do
+    # The registry has its names in lower case, so the name of the tag
+    # is downcased for the lookup.
+    it "reads an upper-case <CODE>...</CODE> as code" do
       doc = parse("<CODE>X</CODE>")
-      expect(doc.children.first).to be_a(Markbridge::AST::Text)
-      expect(doc.children.first.text).to eq("<CODE>X</CODE>")
+      expect(doc.children.first).to be_a(Markbridge::AST::Code)
+      expect(doc.children.first.children.first.text).to eq("X")
     end
 
     # Kills mutations on `!tag_match[1].empty?` (closing-slash detection).

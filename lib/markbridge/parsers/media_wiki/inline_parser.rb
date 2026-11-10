@@ -336,11 +336,11 @@ module Markbridge
         # Handle <nowiki>...</nowiki> - preserves content as literal text.
         def handle_nowiki_tag(full_match)
           @pos += full_match.bytesize
-          close_pos = @input.byteindex("</nowiki>", @pos)
+          close_pos, close_size = find_close("nowiki")
 
           if close_pos
             @text_buffer << @input.byteslice(@pos, close_pos - @pos)
-            @pos = close_pos + "</nowiki>".bytesize
+            @pos = close_pos + close_size
           else
             @text_buffer << full_match
           end
@@ -350,14 +350,13 @@ module Markbridge
         # Content inside is not parsed for wiki markup.
         def handle_paired_raw_tag(tag_name, full_match, element_class)
           @pos += full_match.bytesize
-          close_tag = "</#{tag_name}>"
-          close_pos = @input.byteindex(close_tag, @pos)
+          close_pos, close_size = find_close(tag_name)
 
           if close_pos
             element = element_class.new
             element << AST::Text.new(@input.byteslice(@pos, close_pos - @pos))
             @parent << element
-            @pos = close_pos + close_tag.bytesize
+            @pos = close_pos + close_size
           else
             @text_buffer << full_match
           end
@@ -367,17 +366,26 @@ module Markbridge
         # Content inside IS parsed for wiki markup.
         def handle_paired_tag(tag_name, full_match, element_class)
           @pos += full_match.bytesize
-          close_tag = "</#{tag_name}>"
-          close_pos = @input.byteindex(close_tag, @pos)
+          close_pos, close_size = find_close(tag_name)
 
           if close_pos
             element = element_class.new
             parse_inner_content(@input.byteslice(@pos, close_pos - @pos), parent: element)
             @parent << element
-            @pos = close_pos + close_tag.bytesize
+            @pos = close_pos + close_size
           else
             @text_buffer << full_match
           end
+        end
+
+        # The end tag of +tag_name+ behind the cursor, in any case:
+        # MediaWiki reads `</S>` like `</s>`.
+        #
+        # @param tag_name [String] letters only, see HTML_TAG_AT_CURSOR
+        # @return [Array(Integer, Integer), nil] its position and size
+        def find_close(tag_name)
+          position = @input.byteindex(%r{</#{tag_name}>}i, @pos)
+          [position, Regexp.last_match(0).bytesize] if position
         end
 
         # Flush accumulated text buffer to the parent as a Text node.
