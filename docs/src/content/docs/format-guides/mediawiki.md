@@ -31,6 +31,8 @@ Like the other parsers, the convenience method returns a [`Markbridge::Conversio
 | `[[Page title]]` | `[Page title](./Page_title)` | `AST::Url` |
 | `[[Page title\|display]]` | `[display](./Page_title)` | `AST::Url` |
 | `[https://example.com text]` | `[text](href)` | `AST::Url` |
+| `[[File:Name.jpg\|thumb\|Caption]]` | `![Caption](./Special:FilePath/Name.jpg)` | `AST::Image` |
+| `[[Category:Name]]` | Nothing | — |
 
 ### Block syntax
 
@@ -105,7 +107,8 @@ The parser targets the bulk of content you'll see in wiki exports, not the full 
 
 - **No templates** (`{{Template}}`). They're passed through as literal text.
 - **No magic words or parser functions** (`__NOTOC__`, `{{#if:}}`, etc.).
-- **Categories and file embeds** are not translated to Discourse equivalents.
+- **Files** keep their address on the wiki. An image is an image at `Special:FilePath`, the page a wiki answers with the file itself, so it needs `base_url:` to show. The caption is its alternative text, the frame and alignment options are dropped. Any other file is a link to its page.
+- **Categories** show nothing, like on the wiki. They are not turned into tags or categories of Discourse.
 - **Reference footnotes** (`<ref>`) are not special-cased.
 
 If your export relies on these, pre-process before handing it to Markbridge, or post-process the AST.

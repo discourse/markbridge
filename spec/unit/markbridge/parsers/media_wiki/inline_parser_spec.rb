@@ -111,6 +111,122 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
     end
   end
 
+  describe "files and categories" do
+    # +parse+ fills one document per example, so the node of the last
+    # call is the last one.
+    def image(input)
+      parse(input).children.last
+    end
+
+    it "reads an image file as an image at Special:FilePath" do
+      node = image("[[File:Sunrise over ridge.jpg]]")
+
+      expect(node).to be_a(Markbridge::AST::Image)
+      expect(node.src).to eq("./Special:FilePath/Sunrise_over_ridge.jpg")
+      expect([node.alt, node.width, node.height]).to eq([nil, nil, nil])
+    end
+
+    it "takes the Image namespace and any case of the name and its ending" do
+      expect(image("[[image:Old.PNG]]").src).to eq("./Special:FilePath/Old.PNG")
+      expect(image("[[FILE:a.JpEg]]")).to be_a(Markbridge::AST::Image)
+      expect(image("[[File: a.svg ]]").src).to eq("./Special:FilePath/a.svg")
+    end
+
+    it "takes the caption as the alternative text and looks over the options" do
+      node = image("[[File:a.png|thumb|right|upright=1.5|link=Main Page| A sunrise ]]")
+
+      expect(node.alt).to eq("A sunrise")
+    end
+
+    it "prefers alt= over the caption" do
+      expect(image("[[File:a.png|alt=Alt text|Caption]]").alt).to eq("Alt text")
+      expect(image("[[File:a.png|Caption|ALT=Alt text]]").alt).to eq("Alt text")
+    end
+
+    it "takes the last parameter that is no option as the caption" do
+      expect(image("[[File:a.png|first|second]]").alt).to eq("second")
+    end
+
+    it "reads the size" do
+      both = image("[[File:a.png|200x100px]]")
+      wide = image("[[File:a.png|200PX]]")
+      high = image("[[File:a.png|x100px]]")
+
+      expect([both.width, both.height]).to eq([200, 100])
+      expect([wide.width, wide.height]).to eq([200, nil])
+      expect([high.width, high.height]).to eq([nil, 100])
+    end
+
+    it "takes a parameter that only looks like a size or an option as the caption" do
+      expect(image("[[File:a.png|200 px wide]]").alt).to eq("200 px wide")
+      expect(image("[[File:a.png|thumbs up]]").alt).to eq("thumbs up")
+      expect(image("[[File:a.png|a border]]").alt).to eq("a border")
+    end
+
+    it "keeps the text of a link and drops the quotes in the caption" do
+      node =
+        image("[[File:a.png|thumb|Over the [[Alta Via|ridge]] and [[Hut]], ''early'' '''on''']]")
+
+      expect(node.alt).to eq("Over the ridge and Hut, early on")
+    end
+
+    it "goes on behind the file, also with a link in its caption" do
+      doc = parse("[[File:a.png|x [[b]] y]] after")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Image, Markbridge::AST::Text])
+      expect(doc.children.last.text).to eq(" after")
+    end
+
+    it "finds the end of a file behind a link that is followed by a bracket" do
+      doc = parse("[[File:a.png|x [[b]]] y]] z")
+
+      expect(doc.children.last.text).to eq(" z")
+    end
+
+    it "finds the end of a file behind two links that touch" do
+      doc = parse("[[File:a.png|[[b]][[c]] end]] z")
+
+      expect(doc.children.first.alt).to eq("bc end")
+      expect(doc.children.last.text).to eq(" z")
+    end
+
+    it "links to the page of a file that is no image" do
+      doc = parse("[[File:Map 1.pdf|the map]] [[File:Track.gpx]] [[File:notes.png.txt|thumb]]")
+      links = doc.children.grep(Markbridge::AST::Url)
+
+      expect(links.map(&:href)).to eq(%w[./File:Map_1.pdf ./File:Track.gpx ./File:notes.png.txt])
+      expect(links.map { |link| link.children.first.text }).to eq(
+        ["the map", "Track.gpx", "notes.png.txt"],
+      )
+    end
+
+    it "shows nothing for a category, with or without a sort key" do
+      doc = parse("a [[Category:Hiking]][[category:Alps|Dolomites]] b")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Text])
+      expect(doc.children.first.text).to eq("a  b")
+    end
+
+    it "keeps a link to a category or to a file page, written with a colon in front" do
+      doc = parse("[[:Category:Hiking|hikes]] [[:File:a.png|the file]]")
+      links = doc.children.grep(Markbridge::AST::Url)
+
+      expect(links.map(&:href)).to eq(%w[./Category:Hiking ./File:a.png])
+    end
+
+    it "takes a page whose name only starts like a namespace as a page" do
+      doc = parse("[[Files]] [[Categorya:x]]")
+
+      expect(doc.children.grep(Markbridge::AST::Url).map(&:href)).to eq(%w[./Files ./Categorya:x])
+    end
+
+    it "is text when a link inside is closed but the file is not" do
+      doc = parse("[[File:a.png|x [[b]] y")
+
+      expect(doc.children.first.text).to eq("[[File:a.png|x ")
+    end
+  end
+
   describe "bold inside italic" do
     def shape(node)
       return node.text if node.instance_of?(Markbridge::AST::Text)
