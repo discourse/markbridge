@@ -527,7 +527,7 @@ RSpec.describe "BBCode to Markdown Conversion" do
 
     it "converts spoiler with title" do
       result = Markbridge.bbcode_to_markdown("[spoiler=Click to reveal]secret[/spoiler]")
-      expect(result.markdown).to eq("\\[spoiler=Click to reveal]secret\\[/spoiler]")
+      expect(result.markdown).to eq("Click to reveal: [spoiler]secret[/spoiler]")
     end
 
     it "converts hide alias" do
