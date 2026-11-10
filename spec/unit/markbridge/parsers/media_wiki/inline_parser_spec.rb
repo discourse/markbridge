@@ -155,6 +155,14 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.first.text).to eq("[[unclosed link")
     end
 
+    it "treats [[]] as text and goes on after it" do
+      doc = parse("a [[]] b [[Page]]")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Text, Markbridge::AST::Url])
+      expect(doc.children.first.text).to eq("a [[]] b ")
+      expect(doc.children.last.href).to eq("Page")
+    end
+
     it "flushes preceding text before an internal link (preserves order)" do
       doc = parse("before [[Page]]")
 
