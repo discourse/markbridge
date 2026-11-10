@@ -9,12 +9,16 @@ module Markbridge
       # `whitespace_preserving_tags` configure parser whitespace behavior by
       # tag name, independent of whether a handler is registered — so unknown
       # tags like <div> or <section> still trigger boundary collapsing and
-      # <pre>/<code> still pass through verbatim. Both sets are mutable, so
-      # downstream consumers can add or remove tags freely:
+      # <pre>/<code> still pass through verbatim. `transparent_tags` names the
+      # tags without a handler that are expected: the parser passes their
+      # children through like for any unknown tag, but does not count them
+      # in `unknown_tags`. The sets are mutable, so downstream consumers can
+      # add or remove tags freely:
       #
       #     registry = HandlerRegistry.default
       #     registry.block_level_tags << "my-block"
       #     registry.whitespace_preserving_tags.delete("tt")
+      #     registry.transparent_tags.merge(%w[div section font])
       class HandlerRegistry
         include Enumerable
 
@@ -72,6 +76,10 @@ module Markbridge
         # verbatim; outside, `\s+` runs collapse to a single space.
         DEFAULT_WHITESPACE_PRESERVING_TAGS = %w[pre code textarea tt].freeze
 
+        # Tags that are expected without a handler. The sections of a
+        # table only group its rows.
+        DEFAULT_TRANSPARENT_TAGS = %w[thead tbody tfoot].freeze
+
         # @return [Set<String>] mutable set of tag names treated as block-level.
         attr_reader :block_level_tags
 
@@ -79,8 +87,14 @@ module Markbridge
         #   preserve source whitespace.
         attr_reader :whitespace_preserving_tags
 
+        # @return [Set<String>] mutable set of tag names that are not
+        #   counted as unknown when they have no handler. A handler
+        #   registered for one of them is used as usual.
+        attr_reader :transparent_tags
+
         def initialize
           @handlers = {}
+          @transparent_tags = Set.new(DEFAULT_TRANSPARENT_TAGS)
           @block_level_tags = Set.new(DEFAULT_BLOCK_LEVEL_TAGS)
           @whitespace_preserving_tags = Set.new(DEFAULT_WHITESPACE_PRESERVING_TAGS)
         end
@@ -185,6 +199,7 @@ module Markbridge
           @handlers.freeze
           @block_level_tags.freeze
           @whitespace_preserving_tags.freeze
+          @transparent_tags.freeze
           super
         end
       end
