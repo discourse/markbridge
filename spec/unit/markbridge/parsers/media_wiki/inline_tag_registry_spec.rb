@@ -66,6 +66,40 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineTagRegistry do
     end
   end
 
+  describe "#each" do
+    it "yields the (tag_name, entry) pairs in the order of registration" do
+      registry = described_class.new
+      registry.register("u", :formatting, Markbridge::AST::Underline)
+      registry.register("br", :self_closing, Markbridge::AST::LineBreak)
+
+      expect(registry.each.to_a).to eq(
+        [
+          [
+            "u",
+            described_class::Entry.new(
+              type: :formatting,
+              element_class: Markbridge::AST::Underline,
+            ),
+          ],
+          [
+            "br",
+            described_class::Entry.new(
+              type: :self_closing,
+              element_class: Markbridge::AST::LineBreak,
+            ),
+          ],
+        ],
+      )
+    end
+
+    it "returns an Enumerator without a block and is Enumerable" do
+      registry = described_class.new.register("u", :formatting, Markbridge::AST::Underline)
+
+      expect(registry.each).to be_a(Enumerator)
+      expect(registry.map(&:first)).to eq(["u"])
+    end
+  end
+
   describe "#known?" do
     it "returns true for registered tags" do
       registry = described_class.new

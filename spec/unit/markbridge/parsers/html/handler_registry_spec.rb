@@ -87,6 +87,23 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
     end
   end
 
+  describe "#each" do
+    it "yields the (tag_name, handler) pairs in the order of registration" do
+      other = instance_double(Markbridge::Parsers::HTML::Handlers::BaseHandler)
+      registry.register("z", handler)
+      registry.register("a", other)
+
+      expect(registry.each.to_a).to eq([["z", handler], ["a", other]])
+    end
+
+    it "returns an Enumerator without a block and is Enumerable" do
+      registry.register("b", handler)
+
+      expect(registry.each).to be_a(Enumerator)
+      expect(registry.map(&:first)).to eq(["b"])
+    end
+  end
+
   describe "#[]" do
     it "returns nil for unregistered tag" do
       expect(registry["unknown"]).to be_nil

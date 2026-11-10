@@ -21,10 +21,21 @@ module Markbridge
       #     r.register("mark", :formatting, AST::Bold)
       #   end
       class InlineTagRegistry
+        include Enumerable
+
         Entry = Data.define(:type, :element_class)
 
         def initialize
           @entries = {}
+        end
+
+        # Iterate over the registered (tag_name, entry) pairs, in the
+        # order of registration.
+        # @yieldparam tag_name [String]
+        # @yieldparam entry [Entry]
+        # @return [Enumerator] when no block is given
+        def each(&block)
+          @entries.each(&block)
         end
 
         # Register a handler for an inline HTML-like tag.

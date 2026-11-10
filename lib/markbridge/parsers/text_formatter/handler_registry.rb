@@ -19,6 +19,8 @@ module Markbridge
       #     r.register("B", SimpleHandler.new(AST::Bold))  # Override default
       #   end
       class HandlerRegistry
+        include Enumerable
+
         # Create a new registry with default mappings
         # @return [HandlerRegistry]
         def self.default
@@ -53,6 +55,15 @@ module Markbridge
 
         def initialize
           @mappings = {}
+        end
+
+        # Iterate over the registered (element_name, handler) pairs, in
+        # the order of registration.
+        # @yieldparam element_name [String]
+        # @yieldparam handler [#process]
+        # @return [Enumerator] when no block is given
+        def each(&block)
+          @mappings.each(&block)
         end
 
         # Register a handler for an element
