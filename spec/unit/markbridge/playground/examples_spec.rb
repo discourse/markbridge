@@ -71,11 +71,9 @@ RSpec.describe Markbridge::Playground::Examples do
     it "uses every tag name of the BBCode parser" do
       input = described_class.everything("bbcode").fetch(:input)
       registry = Markbridge::Parsers::BBCode::HandlerRegistry.default
-      # The scanner reads a tag name that starts with a letter or a star,
-      # so no input reaches the handler of [.].
-      names = registry.map(&:first) - ["."]
 
-      missing = names.reject { |name| input.match?(/\[#{Regexp.escape(name)}[\]=\s]/i) }
+      missing =
+        registry.map(&:first).reject { |name| input.match?(/\[#{Regexp.escape(name)}[\]=\s]/i) }
 
       expect(missing).to be_empty, "missing in everything.bbcode: #{missing.join(", ")}"
       expect(node_classes("bbcode")).to include(*element_classes(registry))
@@ -94,11 +92,8 @@ RSpec.describe Markbridge::Playground::Examples do
     it "uses every element name of the TextFormatter parser" do
       input = described_class.everything("text_formatter").fetch(:input)
       registry = Markbridge::Parsers::TextFormatter::HandlerRegistry.default
-      # <*> is not a name XML allows, the handler is there for a tree
-      # that a converter builds.
-      names = registry.map(&:first) - ["*"]
 
-      missing = names.reject { |name| input.match?(%r{<#{name}[\s>/]}) }
+      missing = registry.map(&:first).reject { |name| input.match?(%r{<#{name}[\s>/]}) }
 
       expect(missing).to be_empty, "missing in everything.xml: #{missing.join(", ")}"
       expect(node_classes("text_formatter")).to include(*element_classes(registry))

@@ -371,11 +371,6 @@ RSpec.describe Markbridge::Parsers::BBCode::HandlerRegistry do
         Markbridge::AST::ListItem,
         false,
       ],
-      "." => [
-        Markbridge::Parsers::BBCode::Handlers::ListItemHandler,
-        Markbridge::AST::ListItem,
-        false,
-      ],
       "table" => [
         Markbridge::Parsers::BBCode::Handlers::TableHandler,
         Markbridge::AST::Table,

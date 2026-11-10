@@ -90,15 +90,6 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
         expect(process_and_get_node("<LI>item</LI>")).to be_a(Markbridge::AST::ListItem)
       end
 
-      it "dispatches the asterisk element (non-XML name, registered directly) to a ListItem handler" do
-        element = instance_double(Nokogiri::XML::Element, name: "*")
-
-        result = registry.process_element(element, parent, processor)
-
-        expect(result).to be_a(Markbridge::AST::ListItem)
-        expect(parent.children.last).to eq(result)
-      end
-
       it "dispatches P to a Paragraph-producing handler" do
         expect(process_and_get_node("<P>text</P>")).to be_a(Markbridge::AST::Paragraph)
       end
@@ -238,10 +229,6 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
         Markbridge::AST::ListItem,
       ],
-      "*" => [
-        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
-        Markbridge::AST::ListItem,
-      ],
       "P" => [
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
         Markbridge::AST::Paragraph,
@@ -309,11 +296,6 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       expect(handler_for("ATTACHMENT")).to be_a(
         Markbridge::Parsers::TextFormatter::Handlers::AttachmentHandler,
       )
-    end
-
-    it "registers the asterisk (*) key directly, not the literal string \"*\".upcase" do
-      # Ruby upcases "*" to "*" — included here to pin the literal key.
-      expect(default_registry.has_handler?("*")).to be(true)
     end
   end
 

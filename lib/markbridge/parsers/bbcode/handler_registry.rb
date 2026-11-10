@@ -172,7 +172,7 @@ module Markbridge
 
           # List handlers
           registry.register(%w[list ul ol ulist olist], Handlers::ListHandler.new)
-          registry.register(%w[* li .], Handlers::ListItemHandler.new)
+          registry.register(%w[* li], Handlers::ListItemHandler.new)
 
           # Table handlers
           registry.register("table", Handlers::TableHandler.new)
