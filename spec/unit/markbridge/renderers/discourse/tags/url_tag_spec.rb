@@ -15,6 +15,32 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::UrlTag do
   end
 
   describe "#render" do
+    context "with a base URL" do
+      let(:tag) do
+        base_url = Markbridge::Renderers::Discourse::BaseUrl.new("https://example.com/wiki/")
+        described_class.new(base_url:)
+      end
+
+      it "makes the href of a link absolute" do
+        element = Markbridge::AST::Url.new(href: "./Page") << Markbridge::AST::Text.new("a page")
+
+        expect(rendered(element)).to eq("[a page](https://example.com/wiki/Page)")
+      end
+
+      it "writes a link whose text is its relative href as the absolute URL" do
+        element =
+          Markbridge::AST::Url.new(href: "page.html") << Markbridge::AST::Text.new("page.html")
+
+        expect(rendered(element)).to eq("https://example.com/wiki/page.html")
+      end
+
+      it "leaves a link without an href as it is" do
+        element = Markbridge::AST::Url.new << Markbridge::AST::Text.new("text")
+
+        expect(rendered(element)).to eq("text")
+      end
+    end
+
     it "returns a link token pair around the children" do
       expect(tag.render(link("https://example.com"), interface)).to eq(
         [tokens.link_open("https://example.com"), "Example", tokens.link_close],

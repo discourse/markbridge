@@ -59,30 +59,17 @@ Inside `<nowiki>`, wiki syntax is preserved as literal text. The tag can go over
 
 A link to a page, `[[Main Page]]`, has an href relative to the wiki, in the form MediaWiki's own HTML has: `./Main_Page`, with underscores for the spaces of the title. A namespace and a section stay in it (`[[Help:Contents#Hiking]]` is `./Help:Contents#Hiking`), and a link to a section of the same page keeps its target (`[[#History]]` is `#History`).
 
-The Markdown link works when the page is served next to the wiki. For any other target, put the address of the wiki in front. Every page link starts with `./`, so they are easy to find on the AST:
+Discourse drops the address of a link that has no scheme and no leading slash, so such a link shows as text there. Give the renderer the address of the wiki as `base_url:`, and the page links point to it:
 
 ```ruby
-def link_pages(element, wiki)
-  element.children.each do |child|
-    next unless child.is_a?(Markbridge::AST::Element)
+renderer = Markbridge.discourse_renderer(base_url: "https://wiki.example.com/wiki/")
 
-    link_pages(child, wiki)
-    next unless child.is_a?(Markbridge::AST::Url) && child.href.to_s.start_with?("./")
-
-    url = Markbridge::AST::Url.new(href: wiki + child.href.delete_prefix("./"))
-    child.children.each { |node| url << node }
-    element.replace_child(child, url)
-  end
-end
-
-conversion =
-  Markbridge.mediawiki_to_markdown("See the [[Main Page]] and [[Help:Contents|the help]].") do |ast|
-    link_pages(ast, "https://wiki.example.com/wiki/")
-  end
-
-conversion.markdown
+wikitext = "See the [[Main Page]] and [[Help:Contents|the help]]."
+Markbridge.mediawiki_to_markdown(wikitext, renderer:).markdown
 # => "See the [Main Page](https://wiki.example.com/wiki/Main_Page) and [the help](https://wiki.example.com/wiki/Help:Contents)."
 ```
+
+To send some pages somewhere else, to a topic in Discourse for example, change the links on the AST before rendering. Every page link starts with `./`, so they are easy to find. See [Customizing the renderer](/customization/customizing-renderer/#base_url--where-relative-addresses-point-to) for `base_url:`.
 
 ## Using the parser directly
 

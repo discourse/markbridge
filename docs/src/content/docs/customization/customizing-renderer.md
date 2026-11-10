@@ -42,6 +42,7 @@ Markbridge.discourse_renderer(
   features: nil,                     # Hash{Symbol => Boolean} — the plugins of the target site
   sizes: nil,                        # with bbcode: true — the source's size values to percent
   colors: nil,                       # with bbcode: true — a mapping for the color values
+  base_url: nil,                     # String — makes relative links and images absolute
 )
 ```
 
@@ -166,6 +167,24 @@ Markbridge.bbcode_to_markdown("[color=red]a[/color] [size=5]b[/size]", renderer:
 - Every paragraph gets its own tags, because the BBCode can't span a blank line.
 - Inside a link the text renders without BBCode, because Discourse doesn't parse BBCode in link text. No decision is needed for that.
 - Inside an HTML block (for example a table with uneven rows) the output is `<span style="color:red">` or `<span style="font-size:85%">`, the form the plugin lets through.
+
+### `base_url:` — where relative addresses point to
+
+A post can link to `page.html`, `../files/a.pdf` or `/images/a.png`. On the source site a browser reads these next to the page they are on. In Discourse they point nowhere: it drops the address of a link or an image that has no scheme and no leading slash, and an address with a leading slash points to the Discourse site itself.
+
+With `base_url:` the renderer makes them absolute, like a browser does on a page at that URL:
+
+```ruby
+renderer = Markbridge.discourse_renderer(base_url: "https://old.example.com/forum/")
+
+html = '<a href="viewtopic.php?t=34">an older topic</a> <img src="/images/a.png" alt="a">'
+Markbridge.html_to_markdown(html, renderer:).markdown
+# => "[an older topic](https://old.example.com/forum/viewtopic.php?t=34) ![a](https://old.example.com/images/a.png)"
+```
+
+The last segment of the base URL is a page, so relative addresses are read next to it. End the URL with a slash when it is a directory. An address with a scheme, a `//` at the start, or only a fragment (`#top`) stays as it is.
+
+Without `base_url:` a relative address is written as it is. A link whose target is no URL and no path, and whose text is the same as the target, is written as its text.
 
 ### `postprocessor:` — clean up the final string
 

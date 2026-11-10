@@ -6,6 +6,23 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
   # The serializer writes the image and its spec has the forms; these
   # examples check what the tag hands over.
   describe "#render" do
+    it "makes the src absolute with a base URL" do
+      base_url = Markbridge::Renderers::Discourse::BaseUrl.new("https://example.com/forum/")
+      tag = described_class.new(base_url:)
+      element = Markbridge::AST::Image.new(src: "/files/a.png", alt: "x")
+
+      expect(tag.render(element, interface)).to eq(
+        [
+          Markbridge::Renderers::Discourse::Inline::Tokens.image(
+            src: "https://example.com/files/a.png",
+            alt: "x",
+            width: nil,
+            height: nil,
+          ),
+        ],
+      )
+    end
+
     it "returns an image token with the attributes of the element" do
       element = Markbridge::AST::Image.new(src: "a.png", alt: "x", width: 10, height: 5)
 
