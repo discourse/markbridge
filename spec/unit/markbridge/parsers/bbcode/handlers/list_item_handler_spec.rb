@@ -43,6 +43,65 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ListItemHandler do
       expect(first.children).not_to include(context.current)
     end
 
+    it "closes what is still open in the item in front, and counts it" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+      first = Markbridge::AST::ListItem.new
+      context.push(first)
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(list.children).to eq([first, context.current])
+      expect(context.auto_closed_count).to eq(2)
+    end
+
+    it "counts nothing as auto-closed for an item that follows an item" do
+      context.push(Markbridge::AST::List.new)
+      context.push(Markbridge::AST::ListItem.new)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "leaves the item around a nested list open" do
+      context.push(Markbridge::AST::List.new)
+      outer_item = Markbridge::AST::ListItem.new
+      context.push(outer_item)
+      nested = Markbridge::AST::List.new
+      context.push(nested)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(nested.children).to eq([context.current])
+      expect(outer_item.children).to eq([nested])
+    end
+
+    it "stops at a list of a subclass too" do
+      context.push(Markbridge::AST::List.new)
+      outer_item = Markbridge::AST::ListItem.new
+      context.push(outer_item)
+      nested = Class.new(Markbridge::AST::List).new
+      context.push(nested)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(nested.children).to eq([context.current])
+      expect(outer_item.children).to eq([nested])
+    end
+
+    it "stays inside an element that is open outside of any item" do
+      bold = Markbridge::AST::Bold.new
+      context.push(bold)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(bold.children).to eq([context.current])
+      expect(context.auto_closed_count).to eq(0)
+    end
+
     it "nests inside a List when current is a List (does not pop the List)" do
       list = Markbridge::AST::List.new
       context.push(list)

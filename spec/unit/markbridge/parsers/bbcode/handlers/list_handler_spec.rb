@@ -106,17 +106,53 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ListHandler do
       expect(list.children).to include(item)
     end
 
-    it "does not pop non-ListItem current elements" do
+    it "closes what is still open in the last item, and counts it" do
       list = Markbridge::AST::List.new
       context.push(list)
+      context.push(Markbridge::AST::ListItem.new)
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      handler.on_close(token: tag_end, context:, registry:)
+
+      expect(context.current).to eq(document)
+      expect(context.auto_closed_count).to eq(2)
+    end
+
+    it "closes what is still open directly in the list, and counts it" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+      context.push(Markbridge::AST::Bold.new)
+
+      handler.on_close(token: tag_end, context:, registry:)
+
+      expect(context.current).to eq(document)
+      expect(context.auto_closed_count).to eq(1)
+    end
+
+    it "closes only the inner list of two" do
+      outer = Markbridge::AST::List.new
+      context.push(outer)
+      outer_item = Markbridge::AST::ListItem.new
+      context.push(outer_item)
+      context.push(Markbridge::AST::List.new)
+      context.push(Markbridge::AST::ListItem.new)
+
+      handler.on_close(token: tag_end, context:, registry:)
+
+      expect(context.current).to eq(outer_item)
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "closes nothing without a list, the tag becomes text" do
       bold = Markbridge::AST::Bold.new
       context.push(bold)
 
       handler.on_close(token: tag_end, context:, registry:)
 
-      # Bold stays current; close_element couldn't match list since Bold
-      # blocks; the [/list] becomes text inside Bold.
       expect(context.current).to eq(bold)
+      expect(context.auto_closed_count).to eq(0)
+      expect(bold.children.map(&:text)).to eq([tag_end.source])
     end
   end
 end

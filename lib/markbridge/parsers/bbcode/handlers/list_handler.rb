@@ -6,6 +6,8 @@ module Markbridge
       module Handlers
         # Handler for list tags (list, ul, ol, etc.)
         class ListHandler < BaseHandler
+          include OpenItem
+
           def initialize
             @element_class = AST::List
           end
@@ -20,7 +22,8 @@ module Markbridge
           end
 
           def on_close(token:, context:, registry:, tokens: nil)
-            context.pop if context.current.instance_of?(AST::ListItem)
+            close_open_item(context)
+            close_to_list(context)
             super
           end
 
