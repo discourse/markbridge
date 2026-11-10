@@ -32,9 +32,9 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
       expect(result.markdown).to eq("[u]underlined[/u]")
     end
 
-    it "converts underline with <ins>" do
-      result = Markbridge.mediawiki_to_markdown("<ins>inserted</ins>")
-      expect(result.markdown).to eq("[u]inserted[/u]")
+    it "keeps <ins> and <mark> as the HTML tags" do
+      result = Markbridge.mediawiki_to_markdown("<ins>inserted</ins> and <mark>marked</mark>")
+      expect(result.markdown).to eq("<ins>inserted</ins> and <mark>marked</mark>")
     end
 
     it "converts superscript" do

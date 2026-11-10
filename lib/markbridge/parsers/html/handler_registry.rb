@@ -153,6 +153,8 @@ module Markbridge
             registry.register("u", Handlers::SimpleHandler.new(AST::Underline))
             registry.register("sup", Handlers::SimpleHandler.new(AST::Superscript))
             registry.register("sub", Handlers::SimpleHandler.new(AST::Subscript))
+            registry.register("ins", Handlers::SimpleHandler.new(AST::Insertion))
+            registry.register("mark", Handlers::SimpleHandler.new(AST::Highlight))
             registry.register(%w[code pre tt], Handlers::RawHandler.new(AST::Code))
             registry.register("a", Handlers::UrlHandler.new)
             registry.register("img", Handlers::ImageHandler.new)

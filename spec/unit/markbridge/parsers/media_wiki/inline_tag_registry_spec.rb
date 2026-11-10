@@ -163,7 +163,13 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineTagRegistry do
     it "includes ins as formatting" do
       entry = registry["ins"]
       expect(entry.type).to eq(:formatting)
-      expect(entry.element_class).to eq(Markbridge::AST::Underline)
+      expect(entry.element_class).to eq(Markbridge::AST::Insertion)
+    end
+
+    it "includes mark as formatting" do
+      entry = registry["mark"]
+      expect(entry.type).to eq(:formatting)
+      expect(entry.element_class).to eq(Markbridge::AST::Highlight)
     end
 
     it "includes sup as formatting" do

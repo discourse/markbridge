@@ -27,7 +27,9 @@ AST::Node (base)
     │   ├── AST::Underline
     │   ├── AST::Strikethrough
     │   ├── AST::Superscript
-    │   └── AST::Subscript
+    │   ├── AST::Subscript
+    │   ├── AST::Insertion         — added text, <ins>
+    │   └── AST::Highlight         — highlighted text, <mark>
     ├── Block-level
     │   ├── AST::Paragraph
     │   ├── AST::Heading           — level

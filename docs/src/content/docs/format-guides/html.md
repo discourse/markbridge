@@ -44,6 +44,8 @@ parse.ast
 | `<s>`, `<strike>`, `<del>` | `~~strike~~` | `AST::Strikethrough` |
 | `<u>` | `<u>underline</u>` | `AST::Underline` |
 | `<sup>`, `<sub>` | `<sup>…</sup>` / `<sub>…</sub>` | `AST::Superscript`, `AST::Subscript` |
+| `<ins>` | `<ins>…</ins>` | `AST::Insertion` |
+| `<mark>` | `<mark>…</mark>` | `AST::Highlight` |
 | `<code>`, `<tt>` | Code span; fenced block for multiline content | `AST::Code` |
 | `<pre>` | Fenced code block, including single-line content | `AST::Code` |
 | `<h1>`–`<h6>` | `#` through `######` headings | `AST::Heading` |
