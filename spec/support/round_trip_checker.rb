@@ -185,6 +185,7 @@ class RoundTripChecker
     @features = DEFAULT_FEATURES.merge(features || {})
     @cooker = cooker
     @link_depth = 0
+    @islands = 0
     @table_tag = RecordingTableTag.new
     library = Markbridge::Renderers::Discourse::TagLibrary.default
     library.register(AST::Table, @table_tag)
@@ -458,7 +459,16 @@ class RoundTripChecker
     when AST::MarkdownText
       # In a table the renderer writes as HTML, pre-formatted Markdown is
       # an island inside a <div>, see Renderer#render_markdown_text.
-      html ? [skeleton("div")] : []
+      return [] unless html
+
+      @islands += 1
+      [skeleton("div")]
+    when AST::Paragraph
+      # In html_mode a paragraph with a Markdown island in it is a <div>,
+      # because a <p> cannot hold the <div> of the island.
+      before = @islands
+      children = expected_children(node, html:)
+      html && @islands > before ? [skeleton("div", children:)] : children
     when AST::Bold
       [skeleton("strong", children: expected_children(node, html:))]
     when AST::Italic
@@ -559,7 +569,10 @@ class RoundTripChecker
       else
         skeleton("a", href: destination)
       end
-    html ? [skeleton("div", children: [upload])] : [upload]
+    return [upload] unless html
+
+    @islands += 1
+    [skeleton("div", children: [upload])]
   end
 
   # Whether the renderer writes +node+ as its file name: a file
