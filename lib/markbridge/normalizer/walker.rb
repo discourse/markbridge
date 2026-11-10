@@ -39,6 +39,8 @@ module Markbridge
         AST::Strikethrough,
         AST::Superscript,
         AST::Subscript,
+        AST::Insertion,
+        AST::Highlight,
         AST::Color,
         AST::Size,
         AST::Align,

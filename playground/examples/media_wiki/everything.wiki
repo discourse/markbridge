@@ -5,7 +5,7 @@ Did the ''Alta Via'' hold up to the hype? It did. Here is the short version, wit
 ----
 
 == Inline formatting ==
-'''bold''', ''italic'', '''''bold and italic''''', <u>underline</u>, <ins>inserted</ins>, <s>strike</s>, <del>deleted</del>, H<sub>2</sub>O at 2<sup>3</sup> bar.<br>A line after a break.
+'''bold''', ''italic'', '''''bold and italic''''', <u>underline</u>, <ins>inserted</ins>, <mark>highlighted</mark>, <s>strike</s>, <del>deleted</del>, H<sub>2</sub>O at 2<sup>3</sup> bar.<br>A line after a break.
 
 === Links ===
 [[Alta Via]], [[Alta Via 1|the first one]], [[Help:Contents#Hiking|a section]], [https://example.com/map the map], [https://example.com/gpx] and https://example.com/alta-via as it is.

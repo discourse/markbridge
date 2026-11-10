@@ -315,9 +315,14 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.first.children.first.text).to eq("underlined")
     end
 
-    it "parses <ins>...</ins> as underline" do
+    it "parses <ins>...</ins> as an insertion" do
       doc = parse("<ins>inserted</ins>")
-      expect(doc.children.first).to be_a(Markbridge::AST::Underline)
+      expect(doc.children.first).to be_a(Markbridge::AST::Insertion)
+    end
+
+    it "parses <mark>...</mark> as a highlight" do
+      doc = parse("<mark>important</mark>")
+      expect(doc.children.first).to be_a(Markbridge::AST::Highlight)
     end
 
     it "parses <sup>...</sup> as superscript" do

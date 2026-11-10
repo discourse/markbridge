@@ -74,6 +74,8 @@ class RoundTripChecker
     s
     sup
     sub
+    ins
+    mark
     table
     tr
     th
@@ -133,7 +135,14 @@ class RoundTripChecker
 
   # Containers the renderer writes also when nothing visible is in them:
   # an empty div, heading, sup or sub.
-  ALWAYS_WRITTEN = [AST::Align, AST::Heading, AST::Superscript, AST::Subscript].freeze
+  ALWAYS_WRITTEN = [
+    AST::Align,
+    AST::Heading,
+    AST::Superscript,
+    AST::Subscript,
+    AST::Insertion,
+    AST::Highlight,
+  ].freeze
 
   # Schemes the renderer links (see UrlTag). Anything else that looks like
   # a scheme is dropped, a scheme-less href passes.
@@ -434,6 +443,10 @@ class RoundTripChecker
       [skeleton("sup", children: expected_children(node, html:))]
     when AST::Subscript
       [skeleton("sub", children: expected_children(node, html:))]
+    when AST::Insertion
+      [skeleton("ins", children: expected_children(node, html:))]
+    when AST::Highlight
+      [skeleton("mark", children: expected_children(node, html:))]
     when AST::Table
       [expected_table(node)]
     when AST::Upload

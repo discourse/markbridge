@@ -49,7 +49,9 @@ Like the other parsers, the convenience method returns a [`Markbridge::Conversio
 
 MediaWiki accepts a small set of inline HTML. Markbridge honors:
 
-`<nowiki>`, `<code>`, `<pre>`, `<br>`, `<s>`, `<del>`, `<u>`, `<ins>`, `<sup>`, `<sub>`.
+`<nowiki>`, `<code>`, `<pre>`, `<br>`, `<s>`, `<del>`, `<u>`, `<ins>`, `<mark>`, `<sup>`, `<sub>`.
+
+`<ins>` and `<mark>` are written as the same HTML tags, which Discourse keeps. `<del>` is strikethrough like `<s>`.
 
 Inside `<nowiki>`, wiki syntax is preserved as literal text. Indented code and `<pre>` content render as fenced code blocks, even for a single line. `<code>` stays inline unless its content contains a newline.
 

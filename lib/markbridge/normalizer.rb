@@ -43,6 +43,8 @@ module Markbridge
       AST::Underline,
       AST::Superscript,
       AST::Subscript,
+      AST::Insertion,
+      AST::Highlight,
       AST::Heading,
     ].freeze
 

@@ -162,6 +162,8 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       "u" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Underline],
       "sup" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Superscript],
       "sub" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Subscript],
+      "ins" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Insertion],
+      "mark" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Highlight],
       "code" => [Markbridge::Parsers::HTML::Handlers::RawHandler, Markbridge::AST::Code],
       "pre" => [Markbridge::Parsers::HTML::Handlers::RawHandler, Markbridge::AST::Code],
       "tt" => [Markbridge::Parsers::HTML::Handlers::RawHandler, Markbridge::AST::Code],

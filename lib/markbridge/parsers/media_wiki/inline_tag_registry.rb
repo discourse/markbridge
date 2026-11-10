@@ -85,7 +85,8 @@ module Markbridge
           registry.register("s", :formatting, AST::Strikethrough)
           registry.register("del", :formatting, AST::Strikethrough)
           registry.register("u", :formatting, AST::Underline)
-          registry.register("ins", :formatting, AST::Underline)
+          registry.register("ins", :formatting, AST::Insertion)
+          registry.register("mark", :formatting, AST::Highlight)
           registry.register("sup", :formatting, AST::Superscript)
           registry.register("sub", :formatting, AST::Subscript)
 
