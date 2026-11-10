@@ -44,6 +44,8 @@
             <button id="share-button" class="link-button" type="button" title="Copy a link to this input">Copy link</button>
             <input id="file-input" type="file" hidden>
           </div>
+          <div class="editor">
+            <pre id="source-highlight" class="source-highlight" aria-hidden="true"></pre>
           <textarea
             id="source-input"
             class="source-input"
@@ -53,6 +55,7 @@
             aria-label="Markup to convert"
             placeholder="Paste or type markup here, drop a file, or pick an example."
           ></textarea>
+          </div>
         </section>
 
         <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize the panes" tabindex="0"></div>
