@@ -55,7 +55,7 @@ A line break is stored as `<br/>` followed by a newline in the next text node (`
 | `<LI>` | List item | `AST::ListItem` |
 | `<TABLE>`, `<TR>`, `<TD>`, `<TH>` | GFM table | `AST::Table` |
 | `<COLOR>`, `<SIZE>` | See [Colors and sizes](#colors-and-sizes) | `AST::Color`, `AST::Size` |
-| `<ALIGN>`, `<CENTER>` | `<div align="…">` | `AST::Align` |
+| `<ALIGN>`, `<CENTER>`, `<LEFT>`, `<RIGHT>`, `<JUSTIFY>` | `<div align="…">` | `AST::Align` |
 | `<SPOILER>` | Block spoiler: `[spoiler]` and `[/spoiler]` on lines of their own, a title as a paragraph in front | `AST::Spoiler` with `block: true` |
 | `<ISPOILER>` | `[spoiler]…[/spoiler]` inside the line | `AST::Spoiler` |
 | `<HR>` | `---` | `AST::HorizontalRule` |
@@ -81,6 +81,8 @@ Litedown is the Markdown plugin of s9e. Flarum stores its posts with it, and it 
 | `<p>` | A paragraph | Paragraph spacing | `AST::Paragraph` |
 
 `<QUOTE>`, `<LIST>`, `<LI>`, `<URL>`, `<EMAIL>`, `<IMG>` and `<HR>` are the same elements as for BBCode. The markers of the Markdown source sit in `<s>`, `<e>` and `<i>` elements, which the parser skips like the BBCode tags there.
+
+`<ESC>` (a character that a backslash made literal), `<E>` (an emoticon) and `<EMOJI>` have no handler either, but they are expected: their text is passed through and they are not counted in `unknown_tags`. The set is `HandlerRegistry#transparent_tags`, like in the HTML parser.
 
 Flarum's own elements, for example the mentions of users and posts, have no handler. Register one for the ones your forum uses, see [Extending Markbridge](/customization/extending/).
 

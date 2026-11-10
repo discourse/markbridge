@@ -40,6 +40,8 @@ end<i>
 
 <CENTER><s>[center]</s>Flarum has some BBCode too, like this centered line.<e>[/center]</e></CENTER>
 
+<p>A backslash makes a character literal: <ESC><s>\</s>*</ESC>not italic<ESC><s>\</s>*</ESC> <E>:)</E></p>
+
 <H6><s>###### </s>The smallest heading</H6>
 
 <H2>A heading that is underlined<e>

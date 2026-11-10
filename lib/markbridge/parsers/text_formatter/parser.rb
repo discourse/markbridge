@@ -165,7 +165,7 @@ module Markbridge
             @line_start = block?(ast_parent.children.last)
           else
             # No handler found - track as unknown and process children directly
-            @unknown_tags[tag_name] += 1
+            @unknown_tags[tag_name] += 1 unless @handlers.transparent_tags.include?(tag_name)
             process_children(element, ast_parent)
           end
         end
