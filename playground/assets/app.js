@@ -449,6 +449,10 @@
 
   // --- Output: preview ---
 
+  function colorScheme() {
+    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
   function previewDocument(html) {
     const style = getComputedStyle(document.documentElement);
     const color = (name) => style.getPropertyValue(name).trim();
@@ -487,7 +491,7 @@
       details { padding: 8px 12px; border: 1px solid ${color("--line-strong")}; border-radius: 4px; }
       summary { cursor: pointer; }
       .mention, .hashtag { padding: 0 3px; border-radius: 3px; background: ${color("--sunken")}; }
-    </style></head><body>${html}</body></html>`;
+    </style></head><body data-preview="${colorScheme()}">${html}</body></html>`;
   }
 
   function renderPreview(result) {
@@ -505,10 +509,24 @@
     if (state.previewSource) {
       previewHtml.innerHTML = codeLines(preview.html, escapeHtml);
     } else if (previewFrame.dataset.html !== preview.html) {
-      // Setting srcdoc again reloads the frame and loses the scroll
-      // position, so only when the HTML changed.
       previewFrame.dataset.html = preview.html;
-      previewFrame.srcdoc = previewDocument(preview.html);
+      showInPreview(preview.html);
+    }
+  }
+
+  // A new srcdoc loads a new document, which starts at the top. So the
+  // frame gets its document once, and after that only the body changes:
+  // the scroll position stays, and the browser keeps what is on the
+  // screen in place when the content above it grows or shrinks. The
+  // frame runs no scripts, the sandbox only lets this page reach into it.
+  // The document has the colors of the scheme it was made for, so
+  // another scheme needs a new one.
+  function showInPreview(html) {
+    const body = previewFrame.contentDocument?.body;
+    if (body?.dataset.preview === colorScheme()) {
+      body.innerHTML = html;
+    } else {
+      previewFrame.srcdoc = previewDocument(html);
     }
   }
 

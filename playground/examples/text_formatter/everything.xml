@@ -53,7 +53,7 @@ end<e>[/code]</e></CODE>
 <U><s>[u]</s>Alignment<e>[/u]</e></U>
 <LEFT><s>[left]</s>Left, like everything else.<e>[/left]</e></LEFT>
 <RIGHT><s>[right]</s>Right.<e>[/right]</e></RIGHT>
-<JUSTIFY><s>[justify]</s>Justified text needs a few more words before anybody can see what it does to a line.<e>[/justify]</e></JUSTIFY>
+<JUSTIFY><s>[justify]</s>Justified text needs more than one line before anybody can see what it does: every line but the last one is stretched to both edges of the block. So here are some more words about boots, water bottles and huts, enough to fill three or four lines in a pane of this width, and a few more to be on the safe side.<e>[/justify]</e></JUSTIFY>
 
 <U><s>[u]</s>Spoilers<e>[/u]</e></U><br/>
 The best hut was <ISPOILER><s>||</s>Nuvolau<e>||</e></ISPOILER>, an inline spoiler as Litedown writes it.
