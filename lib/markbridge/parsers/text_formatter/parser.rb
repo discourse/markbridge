@@ -110,7 +110,6 @@ module Markbridge
           AST::ListItem,
           AST::Paragraph,
           AST::Quote,
-          AST::Spoiler,
           AST::Table,
           AST::TableCell,
           AST::TableRow,
@@ -164,7 +163,7 @@ module Markbridge
             # or an attachment, whose content is only fallback text. It is
             # visible, so the text after it is no longer at the line start,
             # unless the leaf is a block like a horizontal rule.
-            @line_start = @block_classes[ast_parent.children.last.class]
+            @line_start = block?(ast_parent.children.last)
           else
             # No handler found - track as unknown and process children directly
             @unknown_tags[tag_name] += 1
@@ -197,10 +196,18 @@ module Markbridge
           @pending_break = nil
         end
 
+        # Whether phpBB shows +node+ as a block: one of the BLOCK_NODES, or
+        # a spoiler that says so. An inline spoiler is part of its line.
+        #
+        # @param node [AST::Node, nil]
+        def block?(node)
+          node.is_a?(AST::Spoiler) ? node.block : @block_classes[node.class]
+        end
+
         # @param element [Nokogiri::XML::Element]
         # @param ast_element [AST::Element]
         def process_handled_children(element, ast_element)
-          if @block_classes[ast_element.class]
+          if block?(ast_element)
             @line_start = true
             process_children(element, ast_element)
             @line_start = true

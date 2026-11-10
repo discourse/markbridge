@@ -56,7 +56,8 @@ end<e>[/code]</e></CODE>
 <ALIGN align="justify"><s>[align=justify]</s>Justified text needs a few more words before anybody can see what it does to a line.<e>[/align]</e></ALIGN>
 
 <U><s>[u]</s>Spoilers<e>[/u]</e></U><br/>
-<SPOILER><s>[spoiler]</s>The best hut was Nuvolau.<e>[/spoiler]</e></SPOILER>
+The best hut was <ISPOILER><s>||</s>Nuvolau<e>||</e></ISPOILER>, an inline spoiler as Litedown writes it.
+<SPOILER><s>[spoiler]</s>A [spoiler] is a block in phpBB.<e>[/spoiler]</e></SPOILER>
 <SPOILER title="What went wrong"><s>[spoiler=What went wrong]</s>We forgot the <B><s>[b]</s>sunscreen<e>[/b]</e></B>.<e>[/spoiler]</e></SPOILER>
 
 <P>A paragraph element, as other s9e plugins write it.</P>

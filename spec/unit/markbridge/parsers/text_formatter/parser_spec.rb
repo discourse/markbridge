@@ -165,6 +165,20 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
       expect(parser.unknown_tags).to be_empty
     end
 
+    it "starts a line in and after a block spoiler" do
+      doc = parser.parse("<r><SPOILER><s>[spoiler]</s> a<e>[/spoiler]</e></SPOILER>\n b</r>")
+
+      expect(doc.children.first.children.first.text).to eq("a")
+      expect(doc.children.last.text).to eq("b")
+    end
+
+    it "keeps the whitespace in and after an inline spoiler" do
+      doc = parser.parse("<r>x<ISPOILER><s>||</s> a<e>||</e></ISPOILER> b</r>")
+
+      expect(doc.children[1].children.first.text).to eq(" a")
+      expect(doc.children.last.text).to eq(" b")
+    end
+
     it "keeps the whitespace after a leaf that is not a block" do
       doc = parser.parse(%(<r><IMG src="https://example.com/a.png"/> b</r>))
 

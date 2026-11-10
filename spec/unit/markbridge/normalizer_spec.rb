@@ -121,6 +121,20 @@ RSpec.describe Markbridge::Normalizer do
       end
     end
 
+    it "keeps an inline spoiler but flags a block spoiler, in any inline container" do
+      described_class::INLINE_CONTAINERS.each do |container|
+        inline = el(Markbridge::AST::Spoiler, text("x"))
+        block = el(Markbridge::AST::Spoiler, text("x"), block: true)
+
+        expect(described_class.default.violations(doc(wrap(container, inline)))).to eq([]),
+        "inline spoiler in #{container}"
+        expect(described_class.default.violations(doc(wrap(container, block)))).to contain_exactly(
+          { parent: short(container), child: "Spoiler", strategy: :hoist_after },
+        ),
+        "block spoiler in #{container}"
+      end
+    end
+
     it "flags a single-line code span with the block flag set, in any inline container" do
       described_class::INLINE_CONTAINERS.each do |container|
         forced = el(Markbridge::AST::Code, text("x"), block: true)

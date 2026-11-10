@@ -19,6 +19,14 @@ RSpec.describe Markbridge::AST::Spoiler do
     expect(element.title).to be_nil
   end
 
+  it "is no block by default" do
+    expect(described_class.new.block).to be_nil
+  end
+
+  it "stores the block flag" do
+    expect(described_class.new(block: true).block).to be(true)
+  end
+
   it "can have children" do
     element = described_class.new(title: "Click to reveal")
     text = Markbridge::AST::Text.new("Hidden content")

@@ -76,6 +76,23 @@ RSpec.describe "cooked output of the Discourse engine", :discourse_engine do
       expect(cooked.at_css("div.spoiler > p").text).to eq("hidden")
     end
 
+    it "cooks a block spoiler after text as a block, with the blocks inside" do
+      list = Markbridge::AST::List.new << (Markbridge::AST::ListItem.new << text("item"))
+      block = Markbridge::AST::Spoiler.new(title: "Reveal", block: true) << text("hidden") << list
+      cooked = cook_all(text("see"), block, text("after"))
+
+      expect(cooked.css("body > p, p").map(&:text)).to eq(%w[see Reveal: hidden after])
+      expect(cooked.at_css("div.spoiler > ul > li").text).to eq("item")
+    end
+
+    it "cooks two block spoilers after each other as two blocks" do
+      first = Markbridge::AST::Spoiler.new(block: true) << text("a")
+      second = Markbridge::AST::Spoiler.new(block: true) << text("b")
+      cooked = cook_all(first, second)
+
+      expect(cooked.css("div.spoiler > p").map(&:text)).to eq(%w[a b])
+    end
+
     it "cooks two spoilers on one line with text between as two inline spoilers" do
       cooked = cook_all(spoiler("a"), text(" and "), spoiler("b"))
 

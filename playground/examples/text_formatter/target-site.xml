@@ -6,5 +6,5 @@
 <br/>
 <B><s>[b]</s>spoiler-alert<e>[/b]</e></B> (bundled with Discourse) blurs a spoiler. Without it the content is written as it is:<br/>
 <br/>
-The winner is <SPOILER><s>[spoiler]</s>the tortoise<e>[/spoiler]</e></SPOILER>.
+The winner is <ISPOILER><s>||</s>the tortoise<e>||</e></ISPOILER>.
 <SPOILER title="The ending"><s>[spoiler=The ending]</s>Everybody goes home, and <B><s>[b]</s>nobody<e>[/b]</e></B> is surprised.<e>[/spoiler]</e></SPOILER></r>

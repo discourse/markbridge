@@ -275,10 +275,12 @@ module Markbridge
         end
       end
 
-      # A block starts a line and ends one. Code that is hoisted is a
-      # code block, a code span stays where it is.
+      # A block starts a line and ends one. Code or a spoiler that is
+      # hoisted is a block, a code span or an inline spoiler stays where
+      # it is.
       def block?(node)
-        node.is_a?(AST::Code) || BLOCK_NODES.any? { |klass| node.is_a?(klass) }
+        node.is_a?(AST::Code) || node.is_a?(AST::Spoiler) ||
+          BLOCK_NODES.any? { |klass| node.is_a?(klass) }
       end
 
       # Whether +left+ and +right+ stand next to each other without
