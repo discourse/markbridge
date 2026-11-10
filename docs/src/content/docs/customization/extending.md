@@ -115,7 +115,7 @@ Custom tags receive `(element, interface)`. The interface exposes context-aware 
 
 | Method | Purpose |
 |---|---|
-| `render_children(element)` | Render child nodes and write their output as Markdown |
+| `render_children(element)` | Render child nodes and write their output as Markdown. A tag that writes a closing BBCode tag right after them passes it as `following: "[/mytag]"`: a link at the end that would be a bare URL is written as `[url](url)` then, because Discourse takes the closing tag into a bare URL |
 | `render_tokens(element)` | The output of the children as inline tokens (`Markbridge::Renderers::Discourse::Inline::Tokens`), for a tag that returns tokens and leaves the markers to the serializer, as the built-in emphasis tags do |
 | `render_default(node)` | Render `node` with its stock Tag, bypassing your override — intercept only some nodes and defer the rest |
 | `with_parent(element)` | Return a new context that treats `element` as a parent |

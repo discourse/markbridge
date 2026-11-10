@@ -27,9 +27,11 @@ module Markbridge
         end
 
         # An optional block runs at every join point, before a non-empty
-        # child output is appended — see Renderer#render_children.
-        def render_children(element, context: @context, &block)
-          @renderer.render_children(element, context:, &block)
+        # child output is appended. +following+ is what the tag writes
+        # right after the result, when that is a closing BBCode tag — see
+        # Renderer#render_children.
+        def render_children(element, context: @context, following: nil, &block)
+          @renderer.render_children(element, context:, following:, &block)
         end
 
         # The output of the children as inline tokens, for a tag that

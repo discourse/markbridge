@@ -49,7 +49,7 @@ module Markbridge
             percent = bbcode_percent(element.size, interface)
             return interface.render_tokens(element, context:) if percent.nil?
 
-            content = interface.render_children(element, context:)
+            content = interface.render_children(element, context:, following: "[/size]")
             # The style that the discourse-bbcode plugin lets through.
             return %(<span style="font-size:#{percent}%">#{content}</span>) if interface.html_mode?
 

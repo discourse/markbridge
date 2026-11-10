@@ -247,6 +247,47 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Joins do
     end
   end
 
+  describe ".close_url" do
+    let(:comment) { "<!---->" }
+
+    it "puts the comment after a URL with a scheme at the end" do
+      expect(described_class.close_url("see http://e.com/a")).to eq("see http://e.com/a#{comment}")
+      expect(described_class.close_url("HTTPS://e.com")).to eq("HTTPS://e.com#{comment}")
+      expect(described_class.close_url("ftp://e.com/x")).to eq("ftp://e.com/x#{comment}")
+      expect(described_class.close_url("ftps://e.com/x")).to eq("ftps://e.com/x#{comment}")
+    end
+
+    it "takes emphasis markers after the URL as part of its end" do
+      expect(described_class.close_url("**http://e.com/a**")).to eq("**http://e.com/a**#{comment}")
+    end
+
+    it "leaves content alone that does not end in such a URL" do
+      [
+        "",
+        "plain",
+        "http://e.com/a and more",
+        "http://e.com/a\n",
+        "www.e.com",
+        "e.com/a",
+        "a@e.com",
+        "mailto:a@e.com",
+        "<http://e.com/a>",
+        "xhttp:/e.com",
+      ].each { |content| expect(described_class.close_url(content)).to eq(content) }
+    end
+
+    it "leaves a Markdown link at the end alone" do
+      link = "[http://e.com/a](http://e.com/a)"
+
+      expect(described_class.close_url(link)).to eq(link)
+      expect(described_class.close_url("x [y](http://e.com/a)")).to eq("x [y](http://e.com/a)")
+    end
+
+    it "takes a URL that only ends in a parenthesis as a URL" do
+      expect(described_class.close_url("http://e.com/a_(b)")).to eq("http://e.com/a_(b)#{comment}")
+    end
+  end
+
   describe ".append_like" do
     def append_like(buffer, piece, like, before = nil)
       described_class.append_like(+buffer, piece, like, before)

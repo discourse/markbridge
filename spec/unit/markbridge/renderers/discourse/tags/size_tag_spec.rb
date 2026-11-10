@@ -65,6 +65,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SizeTag do
         expect(rendered(size("85", text("hi")))).to eq("[size=85]hi[/size]")
       end
 
+      # The closing tag would become part of the URL in front of it.
+      it "writes a bare URL at the end as a link, and a comment after a URL in text" do
+        url = Markbridge::AST::Url.new(href: "https://e.com/a")
+
+        expect(rendered(size("85", text("see "), url))).to eq(
+          "[size=85]see [https://e.com/a](https://e.com/a)[/size]",
+        )
+        expect(rendered(size("85", text("https://e.com/a")))).to eq(
+          "[size=85]https://e.com/a<!---->[/size]",
+        )
+      end
+
       it "accepts whole numbers from 1 to 999, also as Integer" do
         %w[1 9 10 200 999].each do |value|
           expect(rendered(size(value, text("a")))).to eq("[size=#{value}]a[/size]")

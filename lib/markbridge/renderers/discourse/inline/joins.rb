@@ -206,6 +206,28 @@ module Markbridge
                            :HTML_START_BYTES,
                            :JOIN_ACTIONS
 
+          # A URL with its scheme at the very end of a text. A Markdown
+          # link that ends there is no such text.
+          URL_AT_END = %r{(?:https?|ftps?)://[^\s<>]*\z}i
+          LINK_AT_END = /\]\([^\s]*\)\z/
+          private_constant :URL_AT_END, :LINK_AT_END
+
+          # For content that a closing `~~` or a closing BBCode tag follows.
+          # markdown-it's linkify takes such a marker into a URL that
+          # stands right in front of it, so the comment goes between the
+          # two. A link, an address without scheme and a mail address end
+          # where they should.
+          #
+          # @param content [String]
+          # @return [String] the content, with the comment after a URL at
+          #   its end
+          def self.close_url(content)
+            return content unless URL_AT_END.match?(content)
+            return content if LINK_AT_END.match?(content)
+
+            "#{content}#{BOUNDARY_COMMENT}"
+          end
+
           # Appends +piece+ to +buffer+ with what the join between them
           # needs. On an empty buffer getbyte returns nil and there is no
           # byte in front of the join, so the first piece needs no guard

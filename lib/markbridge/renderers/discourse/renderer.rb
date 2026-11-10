@@ -144,6 +144,10 @@ module Markbridge
         #
         # @param node [AST::Element]
         # @param context [RenderContext] rendering context
+        # @param following [String, nil] what the tag writes right after
+        #   the result, like a closing BBCode tag. A bare URL at the end
+        #   of the children is written as a link then: left bare, the
+        #   Markdown parser would take the tag into the URL.
         # @yieldparam result [String] the buffer built so far
         # @yieldparam child [AST::Node] the child about to be appended
         # @return [String]
@@ -151,7 +155,7 @@ module Markbridge
         #   interface.render_children(item, context:) do |buffer, child|
         #     buffer.rstrip! if child.is_a?(AST::List)
         #   end
-        def render_children(node, context:, &block)
+        def render_children(node, context:, following: nil, &block)
           root_call = enter
           outer_parent = @child_parent
           outer_index = @child_index
@@ -164,6 +168,7 @@ module Markbridge
               node.children,
               html_mode: context.html_mode?,
               before: block,
+              following:,
             ) do |child|
               @child_index = (index += 1)
               render_child(child, context)

@@ -727,7 +727,7 @@ class RoundTripChecker
       end
     when AST::Underline
       plain = in_link || html || !visible?(node) || @cooker.cooks?(:underline)
-      bbcode_text(node, out, in_link:, html:, open: "[u]", close: "[/u]", plain:)
+      underline_text(node, out, in_link:, html:, plain:)
     when AST::Color, AST::Size
       # The BBCode of discourse-bbcode is text to a cooker without the
       # plugin; in html_mode and in a link the tag writes no BBCode.
@@ -815,6 +815,19 @@ class RoundTripChecker
     out << open unless plain
     expected_children_text(node, out, in_link:, html:)
     out << close unless plain
+  end
+
+  # The serializer moves a line break at the start of an underline out
+  # of the tag, with the whitespace at both edges, so `[u]` as text
+  # stands after it.
+  def underline_text(node, out, in_link:, html:, plain:)
+    inner = +""
+    expected_children_text(node, inner, in_link:, html:)
+    return out << inner if plain
+    return out << "[u]" << inner << "[/u]" unless inner.match?(/\A[[:blank:]]*\n/)
+
+    lead, core, trail = inner.match(/\A([[:space:]]*)(.*?)([[:space:]]*)\z/m).captures
+    out << lead << "[u]" << core << "[/u]" << trail
   end
 
   # @return [String, nil] the title of a details block, nil when it is

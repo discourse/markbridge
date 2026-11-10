@@ -30,10 +30,6 @@ module S9eReference
       "in the spoiler"
   S9E_SELF_CLOSING = "s9e writes a self-closing BBCode back with other quotes than it stores"
 
-  AUTOLINK_BRACKET =
-    "a `<` in front of mailto: and a mail link is not escaped, so the two cook as one autolink"
-  URL_IN_STRIKETHROUGH = "a bare URL at the end of strikethrough takes the closing ~~ into the link"
-
   # Turn {reason => [keys]} into {key => reason}.
   def self.by_case(groups)
     groups
@@ -104,11 +100,7 @@ module S9eReference
     )
 
   # Cases that differ because of a defect. Fixing one must remove its entry.
-  KNOWN_BUGS =
-    by_case(
-      AUTOLINK_BRACKET => ["flarum: <mailto:user@example.org>"],
-      URL_IN_STRIKETHROUGH => ["flarum: ~~http://example.com/~foo~~"],
-    )
+  KNOWN_BUGS = by_case({})
 
   # Truncated input for the description of an example.
   def self.preview(kase)

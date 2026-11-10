@@ -93,6 +93,26 @@ RSpec.describe "cooked output of the Discourse engine", :discourse_engine do
       expect(cooked.css("div.spoiler > p").map(&:text)).to eq(%w[a b])
     end
 
+    it "keeps a closing tag out of a URL that stands right in front of it" do
+      href = "https://example.com/a"
+      url = Markbridge::AST::Url.new(href:)
+      cooked =
+        cook_all(
+          Markbridge::AST::Strikethrough.new << url,
+          text(" "),
+          Markbridge::AST::Underline.new << text(href),
+          text(" "),
+          colored("red", href),
+          text(" "),
+          spoiler(href),
+          text(" end"),
+        )
+
+      expect(cooked.css("a").map { |link| link["href"] }).to eq([href] * 4)
+      expect(cooked.css("a").map(&:text)).to eq([href] * 4)
+      expect(cooked.at_css("s > a, span.bbcode-u > a")).not_to be_nil
+    end
+
     it "cooks two spoilers on one line with text between as two inline spoilers" do
       cooked = cook_all(spoiler("a"), text(" and "), spoiler("b"))
 

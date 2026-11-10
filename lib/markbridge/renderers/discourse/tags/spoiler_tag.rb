@@ -22,7 +22,12 @@ module Markbridge
 
           def render(element, interface)
             child_context = interface.with_parent(element)
-            content = interface.render_children(element, context: child_context)
+            content =
+              interface.render_children(
+                element,
+                context: child_context,
+                following: inline_close(element, interface),
+              )
 
             # A spoiler with nothing to hide gets no tags, like the
             # serializer's markers: an empty [spoiler] shell would only
@@ -39,7 +44,7 @@ module Markbridge
             # `[spoiler]:x` at the start of a line reads as a link
             # reference definition, the backslash keeps the colon text.
             content = "\\#{content}" if content.start_with?(":")
-            output = "#{title}[spoiler]#{content}[/spoiler]"
+            output = "#{title}[spoiler]#{Inline::Joins.close_url(content)}#{INLINE_CLOSE}"
             # A line that starts with `[spoiler]` and ends with `[/spoiler]`
             # is one block spoiler to Discourse, whatever stands between, so
             # two spoilers on it show their inner tags as text. A comment
@@ -49,6 +54,17 @@ module Markbridge
           end
 
           private
+
+          INLINE_CLOSE = "[/spoiler]"
+          private_constant :INLINE_CLOSE
+
+          # The closing tag when it follows the content on the same line.
+          # A bare URL in front of it would take it into the link.
+          def inline_close(element, interface)
+            return if !@bbcode || element.block || interface.html_mode? || inside_link?(interface)
+
+            INLINE_CLOSE
+          end
 
           # A block spoiler in the text of a link is written like an
           # inline one, as its content. The normalizer moves a block out of

@@ -508,6 +508,17 @@ RSpec.describe Markbridge::Renderers::Discourse::Renderer do
   end
 
   describe "#render_children" do
+    it "writes a bare URL at the end as a link when a closing tag follows" do
+      url = Markbridge::AST::Url.new(href: "https://e.com/a")
+      element = Markbridge::AST::Document.new([Markbridge::AST::Text.new("see "), url])
+      context = Markbridge::Renderers::Discourse::RenderContext.new
+
+      expect(renderer.render_children(element, context:)).to eq("see https://e.com/a")
+      expect(renderer.render_children(element, context:, following: "[/x]")).to eq(
+        "see [https://e.com/a](https://e.com/a)",
+      )
+    end
+
     it "forgets the resolved tags after a top-level call" do
       library = Markbridge::Renderers::Discourse::TagLibrary.default
       renderer_with_library = described_class.new(tag_library: library)
