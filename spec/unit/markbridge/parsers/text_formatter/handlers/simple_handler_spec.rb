@@ -26,6 +26,16 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler do
     end
   end
 
+  describe "#process with keywords" do
+    it "passes them to every node" do
+      handler = described_class.new(Markbridge::AST::Align, alignment: "center")
+
+      handler.process(element: build_element("<CENTER/>"), parent:)
+
+      expect(parent.children[0].alignment).to eq("center")
+    end
+  end
+
   describe "#element_class" do
     it "returns the configured element class" do
       expect(handler.element_class).to eq(Markbridge::AST::Bold)

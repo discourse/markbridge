@@ -38,6 +38,8 @@ end<i>
 
 <HR>* * *</HR>
 
+<CENTER><s>[center]</s>Flarum has some BBCode too, like this centered line.<e>[/center]</e></CENTER>
+
 <H6><s>###### </s>The smallest heading</H6>
 
 <H2>A heading that is underlined<e>
