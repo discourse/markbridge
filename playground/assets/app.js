@@ -37,6 +37,7 @@
   const examplesDialog = $("#examples-dialog");
   const examplesSearch = $("#examples-search");
   const examplesList = $("#examples-list");
+  const examplesFormats = $("#examples-formats");
   const issuesButton = $("#issues-button");
   const issuesPopover = $("#issues-popover");
   const sitePopover = $("#site-popover");
@@ -728,6 +729,8 @@
 
   let pickerIndex = 0;
   let pickerItems = [];
+  // The format whose examples the picker shows, or "all".
+  let pickerFormat = "all";
 
   function snippet(input, terms) {
     const lower = input.toLowerCase();
@@ -769,11 +772,35 @@
       .sort((a, b) => a.rank - b.rank);
   }
 
+  // The tabs say which format the examples are for, with the number of
+  // matches in each, so a search shows at once where its hits are.
+  function renderPickerFormats(matches) {
+    const tabs = [{ id: "all", label: "All formats", count: matches.length }].concat(
+      FORMATS.map((format) => ({
+        id: format.id,
+        label: format.label,
+        count: matches.filter((match) => match.example.format === format.id).length
+      }))
+    );
+    examplesFormats.innerHTML = tabs
+      .map(
+        (tab) => `
+          <button type="button" role="tab" class="picker-format" data-picker-format="${tab.id}"
+            aria-selected="${tab.id === pickerFormat}"${tab.count === 0 ? " disabled" : ""}>
+            ${tab.label} <span class="picker-count">${tab.count}</span>
+          </button>`
+      )
+      .join("");
+  }
+
   function renderPicker() {
     const matches = searchExamples(examplesSearch.value);
+    renderPickerFormats(matches);
     // The format in use comes first, the others in their usual order.
     const order = [state.format, ...FORMATS.map((format) => format.id).filter((id) => id !== state.format)];
-    pickerItems = order.flatMap((format) => matches.filter((match) => match.example.format === format));
+    pickerItems = order
+      .filter((format) => pickerFormat === "all" || pickerFormat === format)
+      .flatMap((format) => matches.filter((match) => match.example.format === format));
     pickerIndex = Math.min(pickerIndex, Math.max(pickerItems.length - 1, 0));
 
     if (pickerItems.length === 0) {
@@ -787,13 +814,18 @@
       const { example } = item;
       if (example.format !== group) {
         group = example.format;
-        html += `<div class="picker-group">${formatLabel(group)}</div>`;
+        const count = pickerItems.filter((other) => other.example.format === group).length;
+        html += `<div class="picker-group" data-format="${group}">
+          <span class="picker-group-name">${formatLabel(group)}</span>
+          <span class="picker-group-count">${plural(count, "example", "examples")}</span>
+        </div>`;
       }
       html += `
-        <button type="button" role="option" class="picker-item" data-index="${index}"
+        <button type="button" role="option" class="picker-item" data-index="${index}" data-format="${example.format}"
           aria-selected="${index === pickerIndex}"${example.id === state.exampleId ? ' data-current="true"' : ""}>
           <span class="picker-title">${escapeHtml(example.title)}</span>
           <span class="picker-description">${escapeHtml(example.description)}</span>
+          <span class="picker-badge">${formatLabel(example.format)}</span>
           ${item.snippet ? `<code class="picker-snippet">${item.snippet}</code>` : ""}
         </button>`;
     });
@@ -801,8 +833,16 @@
     examplesList.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
   }
 
+  function selectPickerFormat(format) {
+    pickerFormat = format;
+    pickerIndex = 0;
+    renderPicker();
+    examplesList.scrollTop = 0;
+  }
+
   function openPicker() {
     examplesSearch.value = "";
+    pickerFormat = "all";
     pickerIndex = 0;
     examplesDialog.showModal();
     renderPicker();
@@ -983,6 +1023,10 @@
   examplesSearch.addEventListener("input", () => {
     pickerIndex = 0;
     renderPicker();
+    // A search can leave the chosen format without a match.
+    if (pickerItems.length === 0 && pickerFormat !== "all") {
+      selectPickerFormat("all");
+    }
   });
   examplesSearch.addEventListener("keydown", (event) => {
     const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
@@ -993,6 +1037,21 @@
     } else if (event.key === "Enter") {
       event.preventDefault();
       pickExample(pickerIndex);
+    } else if (event.key === "Tab") {
+      // Tab goes through the formats that have a match, Shift+Tab back.
+      event.preventDefault();
+      const tabs = [...examplesFormats.querySelectorAll("[data-picker-format]:not([disabled])")].map(
+        (tab) => tab.dataset.pickerFormat
+      );
+      const next = tabs.indexOf(pickerFormat) + (event.shiftKey ? -1 : 1);
+      selectPickerFormat(tabs[(next + tabs.length) % tabs.length]);
+    }
+  });
+  examplesFormats.addEventListener("click", (event) => {
+    const tab = event.target.closest("[data-picker-format]");
+    if (tab) {
+      selectPickerFormat(tab.dataset.pickerFormat);
+      examplesSearch.focus();
     }
   });
   examplesList.addEventListener("click", (event) => {
