@@ -796,23 +796,115 @@ details[open] > summary.node-row::before {
 .picker-list {
   flex: 1 1 auto;
   min-height: 0;
-  padding: 4px 6px 8px;
+  padding: 0 6px 8px;
   overflow: auto;
 }
 
-.picker-group {
-  padding: 12px 10px 4px;
+.picker-formats {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.picker-format {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
   color: var(--muted);
-  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.picker-format:hover {
+  color: var(--ink);
+}
+
+.picker-format[aria-selected="true"] {
+  border-color: var(--line-strong);
+  background: var(--sunken);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.picker-format:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.picker-count {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The heading of a format stays at the top while its examples scroll,
+ * so it is always on the screen which format the examples are for. */
+.picker-group {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 6px -6px 2px;
+  padding: 8px 16px 6px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.picker-group:first-child {
+  margin-top: 0;
+}
+
+.picker-group-name {
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+}
+
+.picker-group-name::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: var(--format-color, var(--accent));
+}
+
+.picker-group-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+[data-format="bbcode"] {
+  --format-color: var(--cat-block);
+}
+
+[data-format="html"] {
+  --format-color: var(--cat-link);
+}
+
+[data-format="text_formatter"] {
+  --format-color: var(--cat-formatting);
+}
+
+[data-format="media_wiki"] {
+  --format-color: var(--cat-text);
 }
 
 .picker-item {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-columns: 140px minmax(0, 1fr) auto;
   gap: 2px 12px;
+  align-items: baseline;
   width: 100%;
   padding: 6px 10px;
   border: 0;
@@ -820,6 +912,16 @@ details[open] > summary.node-row::before {
   background: none;
   text-align: left;
   cursor: pointer;
+}
+
+.picker-badge {
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--format-color) 45%, transparent);
+  border-radius: 999px;
+  color: var(--format-color);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .picker-item:hover {
