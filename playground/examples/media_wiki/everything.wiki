@@ -10,6 +10,10 @@ Did the ''Alta Via'' hold up to the hype? It did. Here is the short version, wit
 === Links ===
 [[Alta Via]], [[Alta Via 1|the first one]], [[Help:Contents#Hiking|a section]], [https://example.com/map the map], [https://example.com/gpx] and https://example.com/alta-via as it is.
 
+[[File:Sunrise over the ridge.jpg|thumb|640x360px|Sunrise over the [[Alta Via|ridge]]]] and the track as [[File:Track.gpx|a file]]. Set a base URL under "Site" to see where they point to.
+
+[[Category:Hiking]]
+
 ==== Code ====
 The hut runs on <code>cron</code>. Their booking script:
 

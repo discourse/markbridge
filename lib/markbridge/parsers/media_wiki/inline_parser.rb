@@ -220,7 +220,7 @@ module Markbridge
           @pos += 2 # skip [[
           start = @pos
 
-          close_pos = @input.byteindex("]]", @pos)
+          close_pos = link_close(@pos)
           unless close_pos
             @text_buffer << "[["
             return
@@ -238,11 +238,91 @@ module Markbridge
 
           target, display = content.split("|", 2)
           target = target.strip
+          # A category puts the page into it and shows nothing in the text.
+          return if target.match?(CATEGORY)
+          return file_embed(target, display) if target.match?(FILE)
+
           display = (display || target).strip
 
           url = AST::Url.new(href: page_href(target))
           url << AST::Text.new(display)
           @parent << url
+        end
+
+        CATEGORY = /\Acategory:/i
+        FILE = /\A(?:file|image):/i
+        IMAGE_NAME = /\.(?:png|jpe?g|gif|svg|webp|bmp|tiff?)\z/i
+        # `200px`, `200x100px` or `x100px`.
+        FILE_SIZE = /\A(\d+)?(?:x(\d+))?px\z/i
+        FILE_ALT = /\Aalt=/i
+        # What says how MediaWiki shows the file, which Markdown has no
+        # form for: the frame, the alignment and the named options.
+        FILE_OPTION =
+          /\A(?:thumb|thumbnail|frame|framed|frameless|border|left|right|center|none|baseline|sub|super|top|text-top|middle|bottom|text-bottom|upright|(?:upright|link|class|lang|page|thumb|thumbnail)=.*)\z/i
+        # The parameters are apart by pipes, but not by the pipe of a link
+        # in the caption.
+        FILE_PARAMETER = /(?:\[\[[^\]]*\]\]|[^|])+/
+        WIKI_MARKUP = /\[\[(?:[^\]|]*\|)?([^\]]*)\]\]|'{2,}/
+        private_constant :CATEGORY,
+                         :FILE,
+                         :IMAGE_NAME,
+                         :FILE_SIZE,
+                         :FILE_ALT,
+                         :FILE_OPTION,
+                         :FILE_PARAMETER,
+                         :WIKI_MARKUP
+
+        # The `]]` that closes the link whose content starts at +from+. A
+        # link inside, in the caption of a file for example, has its own.
+        #
+        # @return [Integer, nil]
+        def link_close(from)
+          depth = 0
+          while (index = @input.byteindex(/\[\[|\]\]/, from))
+            if @input.getbyte(index) == BRACKET_OPEN
+              depth += 1
+            elsif depth.zero?
+              return index
+            else
+              depth -= 1
+            end
+            from = index + 2
+          end
+        end
+
+        # `[[File:Name.jpg|thumb|200x100px|alt=...|Caption]]`. An image is
+        # an image with the caption as its alternative text. Its address
+        # is the page that MediaWiki answers with the file itself,
+        # Special:FilePath. Any other file is a link to its page.
+        #
+        # @param target [String] the name with its namespace
+        # @param parameters [String, nil] what follows the first pipe
+        def file_embed(target, parameters)
+          name = target.sub(FILE, "").lstrip
+          alt = caption = width = height = nil
+          parameters
+            .to_s
+            .scan(FILE_PARAMETER) do |parameter|
+              parameter = parameter.strip
+              if (size = FILE_SIZE.match(parameter))
+                width = size[1]&.to_i
+                height = size[2]&.to_i
+              elsif parameter.match?(FILE_ALT)
+                alt = parameter.sub(FILE_ALT, "")
+              elsif !parameter.match?(FILE_OPTION)
+                caption = parameter
+              end
+            end
+          text = (alt || caption)&.gsub(WIKI_MARKUP, "\\1")
+
+          if name.match?(IMAGE_NAME)
+            src = page_href("Special:FilePath/#{name}")
+            @parent << AST::Image.new(src:, alt: text, width:, height:)
+          else
+            @parent << (
+              AST::Url.new(href: page_href("File:#{name}")) << AST::Text.new(text || name)
+            )
+          end
         end
 
         # The href of a wiki page, in the form MediaWiki's Parsoid writes

@@ -6,8 +6,6 @@ References: The hut opened in 1965.<ref>Hut guide, 2020, p. 12</ref><ref name="g
 
 <references />
 
-Files and categories: [[File:Sunrise.jpg|thumb|200px|A sunrise]], [[Image:Old.png]], [[Category:Hiking]], [[:Category:Hiking|a link to the category]].
-
 HTML that is not on the list: <b>bold</b>, <i>italic</i>, <span style="color:red">red</span>, <div class="note">a note</div>, <small>small</small>, <big>big</big>, <center>centered</center>, <blockquote>a quote</blockquote>, <!-- a comment -->.
 
 Extension tags: <syntaxhighlight lang="ruby">puts "hello"</syntaxhighlight>, <math>E = mc^2</math>, <gallery>
