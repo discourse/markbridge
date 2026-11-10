@@ -63,6 +63,29 @@ A line break is stored as `<br/>` followed by a newline in the next text node (`
 
 </div>
 
+### Litedown
+
+Litedown is the Markdown plugin of s9e. Flarum stores its posts with it, and it has elements of its own next to the BBCode ones:
+
+| Element | Markdown source | Renders as | AST node |
+|---|---|---|---|
+| `<STRONG>` | `**bold**` | `**bold**` | `AST::Bold` |
+| `<EM>` | `*italic*` | `*italic*` | `AST::Italic` |
+| `<DEL>` | `~~strike~~` | `~~strike~~` | `AST::Strikethrough` |
+| `<SUP>`, `<SUB>` | `x^2^`, `H~2~O` | `<sup>…</sup>` / `<sub>…</sub>` | `AST::Superscript`, `AST::Subscript` |
+| `<C>` | `` `code` `` | Code span | `AST::Code` |
+| `<CODE>` | Fenced or indented code | Fenced code block | `AST::Code` with `block: true` |
+| `<H1>`–`<H6>` | `# Heading` or an underlined one | `#` through `######` headings | `AST::Heading` |
+| `<ISPOILER>` | `\|\|spoiler\|\|` | `[spoiler]…[/spoiler]` inside the line | `AST::Spoiler` |
+| `<SPOILER>` | `>! spoiler` | Block spoiler | `AST::Spoiler` with `block: true` |
+| `<p>` | A paragraph | Paragraph spacing | `AST::Paragraph` |
+
+`<QUOTE>`, `<LIST>`, `<LI>`, `<URL>`, `<EMAIL>`, `<IMG>` and `<HR>` are the same elements as for BBCode. The markers of the Markdown source sit in `<s>`, `<e>` and `<i>` elements, which the parser skips like the BBCode tags there.
+
+Flarum's own elements, for example the mentions of users and posts, have no handler. Register one for the ones your forum uses, see [Extending Markbridge](/customization/extending/).
+
+### Notes on the elements
+
 phpBB shows a `[spoiler]` as a block, so `<SPOILER>` is a block spoiler and the text after it starts a new line. `<ISPOILER>` is the inline spoiler of the Litedown plugin. `<HR>` comes from the `[hr]` BBCode of the s9e repository and from Litedown.
 
 Several elements carry attributes Markbridge reads: `<CODE>` (`lang`), `<URL>` (`url`), `<EMAIL>` (`email`), `<IMG>` (`src`), `<LIST>` (`type` — `bullet` or `decimal`), and `<QUOTE>` (attribution).

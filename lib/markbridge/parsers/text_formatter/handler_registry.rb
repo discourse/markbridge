@@ -152,6 +152,18 @@ module Markbridge
           # The [hr] BBCode of the s9e repository and a rule in Litedown
           register("HR", Handlers::SelfClosingHandler.new(AST::HorizontalRule))
 
+          # Litedown, the Markdown plugin of s9e that Flarum uses. It has
+          # its own elements for what BBCode has too: <STRONG> next to <B>.
+          register("STRONG", Handlers::SimpleHandler.new(AST::Bold))
+          register("EM", Handlers::SimpleHandler.new(AST::Italic))
+          register("DEL", Handlers::SimpleHandler.new(AST::Strikethrough))
+          register("SUP", Handlers::SimpleHandler.new(AST::Superscript))
+          register("SUB", Handlers::SimpleHandler.new(AST::Subscript))
+          # <C> is a code span, <CODE> a fenced block.
+          register("C", Handlers::SimpleHandler.new(AST::Code))
+          heading = Handlers::HeadingHandler.new
+          %w[H1 H2 H3 H4 H5 H6].each { |name| register(name, heading) }
+
           # Paragraphs
           register("P", Handlers::SimpleHandler.new(AST::Paragraph))
 
