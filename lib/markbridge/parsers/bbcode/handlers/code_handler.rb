@@ -22,11 +22,16 @@ module Markbridge
 
           private
 
+          # A line break right after [code] or [pre] is where the author
+          # started the code on a line of its own. It is not a first, empty
+          # line of the code.
           def create_element(token:, content:)
+            block = BLOCK_TAGS.include?(token.tag)
+            content = content.delete_prefix("\n") if block
             element =
               AST::Code.new(
                 language: token.attrs[:lang] || token.attrs[:option],
-                block: (true if BLOCK_TAGS.include?(token.tag)),
+                block: (true if block),
               )
             element << AST::Text.new(content) unless content.empty?
             element

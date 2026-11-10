@@ -370,7 +370,9 @@ module Markbridge
           consumed << lines.fetch(start_index + consumed.length) if terminated
 
           combined = consumed.join("\n")
-          content = combined.sub(PRE_TAG_OPEN, "").sub(PRE_TAG_CLOSE_TRAILING, "")
+          # A line break right after <pre> is not content, like in HTML.
+          content =
+            combined.sub(PRE_TAG_OPEN, "").sub(PRE_TAG_CLOSE_TRAILING, "").delete_prefix("\n")
 
           code = AST::Code.new(block: true)
           code << AST::Text.new(content)

@@ -295,11 +295,17 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(code.children.first.text).to eq("code here")
     end
 
+    it "drops only one line break after <pre>" do
+      doc = parse("<pre>\n\nline 1</pre>")
+
+      expect(doc.children.first.children.first.text).to eq("\nline 1")
+    end
+
     it "parses multi-line <pre> block" do
       doc = parse("<pre>\nline 1\nline 2\n</pre>")
       code = doc.children.first
       expect(code).to be_a(Markbridge::AST::Code)
-      expect(code.children.first.text).to eq("\nline 1\nline 2\n")
+      expect(code.children.first.text).to eq("line 1\nline 2\n")
     end
 
     it "recognises <pre> even when preceded by whitespace" do

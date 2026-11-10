@@ -17,6 +17,41 @@ RSpec.describe Markbridge::Parsers::HTML::Handlers::RawHandler do
       expect(parent.children[0].children[0].text).to eq("code content")
     end
 
+    context "with a line break right after the tag" do
+      def text_of(element)
+        handler.process(element:, parent:)
+        parent.children.last.children.first&.text
+      end
+
+      it "drops one after <pre>, like HTML does" do
+        expect(text_of(build_element("<pre>\n\na\n</pre>"))).to eq("\na\n")
+      end
+
+      it "keeps it after <code> and <tt>" do
+        expect(text_of(build_element("<code>\na</code>"))).to eq("\na")
+        expect(text_of(build_element("<tt>\na</tt>"))).to eq("\na")
+      end
+
+      it "keeps it inside a <code> in the <pre>, where it is content" do
+        expect(text_of(build_element("<pre><code>\na</code></pre>"))).to eq("\na")
+      end
+
+      it "has no text for a <pre> with only that line break" do
+        expect(text_of(build_element("<pre>\n</pre>"))).to be_nil
+      end
+
+      it "takes an empty <pre> as it is" do
+        expect(text_of(build_element("<pre></pre>"))).to be_nil
+      end
+
+      it "keeps it in a tree of the HTML5 parser, which has dropped one already",
+         skip: (defined?(Nokogiri::HTML5) ? false : "Nokogiri::HTML5 not available") do
+        element = Nokogiri::HTML5.fragment("<pre>\n\na</pre>").children.first
+
+        expect(text_of(element)).to eq("\na")
+      end
+    end
+
     it "extracts language from a language-* class" do
       handler.process(element: build_element('<code class="language-ruby">code</code>'), parent:)
 

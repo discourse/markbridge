@@ -23,7 +23,8 @@ The elevation profile: [attachment=0]profile.png[/attachment] and the track: [at
 
 [u]Code[/u]
 The hut runs on [tt]cron[/tt]. Their booking script:
-[code=ruby]def beds_left(hut)
+[code=ruby]
+def beds_left(hut)
   hut.beds - hut.bookings.count # [b]not bold[/b] in here
 end
 [/code]
