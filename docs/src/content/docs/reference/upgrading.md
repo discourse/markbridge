@@ -3,9 +3,7 @@ title: Upgrading
 description: Breaking-change notes between Markbridge releases.
 ---
 
-## Upgrading to the next release
-
-These changes are on `main` and not released yet.
+## Upgrading to 0.5.1
 
 Output and AST changes to check:
 
