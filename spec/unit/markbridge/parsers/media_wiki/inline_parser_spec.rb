@@ -118,7 +118,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
 
       url = doc.children.first
       expect(url).to be_a(Markbridge::AST::Url)
-      expect(url.href).to eq("Page Name")
+      expect(url.href).to eq("./Page_Name")
       expect(url.children.first.text).to eq("Page Name")
     end
 
@@ -126,7 +126,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       doc = parse("[[Page Name|display text]]")
       url = doc.children.first
       expect(url).to be_a(Markbridge::AST::Url)
-      expect(url.href).to eq("Page Name")
+      expect(url.href).to eq("./Page_Name")
       expect(url.children.first.text).to eq("display text")
     end
 
@@ -134,14 +134,40 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       doc = parse("[[Page|a|b]]")
 
       url = doc.children.first
-      expect(url.href).to eq("Page")
+      expect(url.href).to eq("./Page")
       expect(url.children.first.text).to eq("a|b")
+    end
+
+    it "writes the href relative to the wiki, with underscores for spaces" do
+      expect(parse("[[Alta Via 1|the first]]").children.first.href).to eq("./Alta_Via_1")
+    end
+
+    it "keeps the namespace and the section in the href" do
+      expect(parse("[[Help:Contents#Hiking tips]]").children.first.href).to eq(
+        "./Help:Contents#Hiking_tips",
+      )
+    end
+
+    it "keeps the title with its spaces as the text of the link" do
+      expect(parse("[[Alta Via 1]]").children.first.children.first.text).to eq("Alta Via 1")
+    end
+
+    it "drops the colon in front of a link to a category or a file" do
+      expect(parse("[[:Category:Hiking|hikes]]").children.first.href).to eq("./Category:Hiking")
+    end
+
+    it "keeps a link to a section of the same page as it is" do
+      expect(parse("[[#Early history|history]]").children.first.href).to eq("#Early history")
+    end
+
+    it "keeps an empty target empty" do
+      expect(parse("[[|text]]").children.first.href).to eq("")
     end
 
     it "strips whitespace around the target" do
       doc = parse("[[  Page  ]]")
 
-      expect(doc.children.first.href).to eq("Page")
+      expect(doc.children.first.href).to eq("./Page")
     end
 
     it "strips whitespace around the display text" do
@@ -160,7 +186,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
 
       expect(doc.children.map(&:class)).to eq([Markbridge::AST::Text, Markbridge::AST::Url])
       expect(doc.children.first.text).to eq("a [[]] b ")
-      expect(doc.children.last.href).to eq("Page")
+      expect(doc.children.last.href).to eq("./Page")
     end
 
     it "flushes preceding text before an internal link (preserves order)" do
@@ -184,7 +210,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
 
       url = doc.children.find { |c| c.is_a?(Markbridge::AST::Url) }
       expect(url).not_to be_nil
-      expect(url.href).to eq("Page")
+      expect(url.href).to eq("./Page")
     end
 
     it "dispatches on the character at `@pos + 1`, not at index 1" do
@@ -196,7 +222,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.map(&:class)).to include(Markbridge::AST::Url)
       internal = doc.children.last
       expect(internal).to be_a(Markbridge::AST::Url)
-      expect(internal.href).to eq("Page")
+      expect(internal.href).to eq("./Page")
     end
   end
 
@@ -601,7 +627,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
 
       url = doc.children[1]
       expect(url).to be_a(Markbridge::AST::Url)
-      expect(url.href).to eq("ターゲット")
+      expect(url.href).to eq("./ターゲット")
       expect(url.children.first.text).to eq("表示テキスト")
       expect(doc.children[2].text).to eq(" テスト")
     end

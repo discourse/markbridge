@@ -551,7 +551,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       # First cell contains the full Url target with "Home" display
       url = row.children.first.children.first
       expect(url).to be_a(Markbridge::AST::Url)
-      expect(url.href).to eq("Page")
+      expect(url.href).to eq("./Page")
       expect(url.children.first.text).to eq("Home")
       expect(row.children[1].children.first.text).to eq("trailing")
     end
@@ -750,7 +750,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(row.children[0].children.size).to eq(1)
       url = row.children[0].children.first
       expect(url).to be_a(Markbridge::AST::Url)
-      expect(url.href).to eq("x")
+      expect(url.href).to eq("./x")
       expect(row.children[1].children.first.text).to eq("y")
     end
   end

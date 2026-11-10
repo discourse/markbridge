@@ -28,8 +28,8 @@ Like the other parsers, the convenience method returns a [`Markbridge::Conversio
 | `'''bold'''` | `**bold**` | `AST::Bold` |
 | `''italic''` | `*italic*` | `AST::Italic` |
 | `'''''both'''''` | `***both***` | `AST::Bold` + `AST::Italic` |
-| `[[target]]` | `[target](target)` | `AST::Url` |
-| `[[target\|display]]` | `[display](target)` | `AST::Url` |
+| `[[Page title]]` | `[Page title](./Page_title)` | `AST::Url` |
+| `[[Page title\|display]]` | `[display](./Page_title)` | `AST::Url` |
 | `[https://example.com text]` | `[text](href)` | `AST::Url` |
 
 ### Block syntax
@@ -52,6 +52,35 @@ MediaWiki accepts a small set of inline HTML. Markbridge honors:
 `<nowiki>`, `<code>`, `<pre>`, `<br>`, `<s>`, `<del>`, `<u>`, `<ins>`, `<sup>`, `<sub>`.
 
 Inside `<nowiki>`, wiki syntax is preserved as literal text. Indented code and `<pre>` content render as fenced code blocks, even for a single line. `<code>` stays inline unless its content contains a newline.
+
+## Links to wiki pages
+
+A link to a page, `[[Main Page]]`, has an href relative to the wiki, in the form MediaWiki's own HTML has: `./Main_Page`, with underscores for the spaces of the title. A namespace and a section stay in it (`[[Help:Contents#Hiking]]` is `./Help:Contents#Hiking`), and a link to a section of the same page keeps its target (`[[#History]]` is `#History`).
+
+The Markdown link works when the page is served next to the wiki. For any other target, put the address of the wiki in front. Every page link starts with `./`, so they are easy to find on the AST:
+
+```ruby
+def link_pages(element, wiki)
+  element.children.each do |child|
+    next unless child.is_a?(Markbridge::AST::Element)
+
+    link_pages(child, wiki)
+    next unless child.is_a?(Markbridge::AST::Url) && child.href.to_s.start_with?("./")
+
+    url = Markbridge::AST::Url.new(href: wiki + child.href.delete_prefix("./"))
+    child.children.each { |node| url << node }
+    element.replace_child(child, url)
+  end
+end
+
+conversion =
+  Markbridge.mediawiki_to_markdown("See the [[Main Page]] and [[Help:Contents|the help]].") do |ast|
+    link_pages(ast, "https://wiki.example.com/wiki/")
+  end
+
+conversion.markdown
+# => "See the [Main Page](https://wiki.example.com/wiki/Main_Page) and [the help](https://wiki.example.com/wiki/Help:Contents)."
+```
 
 ## Using the parser directly
 

@@ -212,9 +212,22 @@ module Markbridge
           target = target.strip
           display = (display || target).strip
 
-          url = AST::Url.new(href: target)
+          url = AST::Url.new(href: page_href(target))
           url << AST::Text.new(display)
           @parent << url
+        end
+
+        # The href of a wiki page, in the form MediaWiki's Parsoid writes
+        # it: relative to the wiki, with underscores for the spaces of the
+        # title, `./Main_Page`. The renderer reads it as a path, so the
+        # link stays a link, and a consumer finds every page link by the
+        # `./` and can put the address of the wiki in front. A link to a
+        # section of the same page, `#History`, and an empty target stay
+        # as they are.
+        def page_href(target)
+          return target if target.empty? || target.start_with?("#")
+
+          "./#{target.delete_prefix(":").tr(" ", "_")}"
         end
 
         # Parse [url display text] external link.
