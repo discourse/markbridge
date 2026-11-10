@@ -201,6 +201,13 @@ module Markbridge
           content = @input.byteslice(start, close_pos - start)
           @pos = close_pos + 2
 
+          # Nothing between the brackets is not a link, MediaWiki shows
+          # the brackets.
+          if content.empty?
+            @text_buffer << "[[]]"
+            return
+          end
+
           target, display = content.split("|", 2)
           target = target.strip
           display = (display || target).strip
