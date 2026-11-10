@@ -19,11 +19,11 @@ module Markbridge
             open = context.elements_from_current
             depth =
               open.index do |element|
-                element.instance_of?(AST::ListItem) || element.is_a?(AST::List)
+                element.instance_of?(AST::ListItem) || element.instance_of?(AST::List)
               end
             return unless depth && open.fetch(depth).instance_of?(AST::ListItem)
 
-            context.auto_close!(depth) if depth.positive?
+            context.auto_close!(depth)
             (depth + 1).times { context.pop }
           end
 
@@ -33,8 +33,9 @@ module Markbridge
           #
           # @param context [ParserState]
           def close_to_list(context)
-            depth = context.elements_from_current.index { |element| element.is_a?(AST::List) }
-            return unless depth&.positive?
+            depth =
+              context.elements_from_current.index { |element| element.instance_of?(AST::List) }
+            return unless depth
 
             context.auto_close!(depth)
             depth.times { context.pop }

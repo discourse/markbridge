@@ -79,19 +79,6 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ListItemHandler do
       expect(outer_item.children).to eq([nested])
     end
 
-    it "stops at a list of a subclass too" do
-      context.push(Markbridge::AST::List.new)
-      outer_item = Markbridge::AST::ListItem.new
-      context.push(outer_item)
-      nested = Class.new(Markbridge::AST::List).new
-      context.push(nested)
-
-      handler.on_open(token: tag_start, context:, registry:)
-
-      expect(nested.children).to eq([context.current])
-      expect(outer_item.children).to eq([nested])
-    end
-
     it "stays inside an element that is open outside of any item" do
       bold = Markbridge::AST::Bold.new
       context.push(bold)

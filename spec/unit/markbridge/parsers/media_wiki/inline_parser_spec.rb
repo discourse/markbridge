@@ -148,6 +148,10 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(shapes("''a '''b''' c")).to eq(["''a ", %w[Bold b], " c"])
     end
 
+    it "ends the italic at two apostrophes when bold follows later" do
+      expect(shapes("''a'' and '''b'''")).to eq([%w[Italic a], " and ", %w[Bold b]])
+    end
+
     it "still ends the italic at four apostrophes" do
       expect(shapes("''a''''")).to eq([%w[Italic a], "''"])
     end
