@@ -3,6 +3,18 @@
 RSpec.describe Markbridge::Normalizer::Report do
   subject(:report) { described_class.new }
 
+  describe ".short_name" do
+    it "is the name of the class without its modules" do
+      expect(described_class.short_name(Markbridge::AST::Url)).to eq("Url")
+    end
+
+    it "is the name of the nearest named ancestor for a class without a name" do
+      anonymous = Class.new(Class.new(Markbridge::AST::Code))
+
+      expect(described_class.short_name(anonymous)).to eq("Code")
+    end
+  end
+
   describe "#empty?" do
     it "is true for a fresh report" do
       expect(report.empty?).to be(true)
@@ -23,6 +35,15 @@ RSpec.describe Markbridge::Normalizer::Report do
       report.record(Markbridge::AST::Url, Markbridge::AST::Image, :hoist_after)
       expect(report.to_a).to eq(
         [{ parent: "Url", child: "Image", strategy: :hoist_after, count: 1 }],
+      )
+    end
+
+    it "names a class without a name after its nearest named ancestor" do
+      anonymous = Class.new(Class.new(Markbridge::AST::Code))
+      report.record(Class.new(Markbridge::AST::Bold), anonymous, :hoist_after)
+
+      expect(report.to_a).to eq(
+        [{ parent: "Bold", child: "Code", strategy: :hoist_after, count: 1 }],
       )
     end
 
