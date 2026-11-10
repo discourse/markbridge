@@ -45,6 +45,13 @@ module Markbridge
         AST::Email,
       ].freeze
 
+      # Stands in the child list where a block was hoisted out, until
+      # {#coalesce} decides whether the two neighbors need a space.
+      GAP = Object.new.freeze
+      EDGE_SPACE_BEFORE = /[[:space:]]\z/
+      EDGE_SPACE_AFTER = /\A[[:space:]]/
+      private_constant :GAP, :EDGE_SPACE_BEFORE, :EDGE_SPACE_AFTER
+
       # @param rule_set [RuleSet]
       # @param report [Report]
       def initialize(rule_set, report)
@@ -115,7 +122,10 @@ module Markbridge
         end
 
         stack.pop
-        element.replace_children(coalesce(out)) if out
+        if out
+          out = coalesce(out)
+          element.replace_children(out)
+        end
 
         raised = bubble || EMPTY
         return nil, raised if prune?(element, out, children)
@@ -158,6 +168,7 @@ module Markbridge
       def emit(child, strategy, boundary, stack, out, bubble)
         case strategy
         when :hoist_after
+          out << GAP if block?(child)
           hoist(child, boundary, stack, bubble)
         when :unwrap
           unwrap(child, boundary, stack, out, bubble)
@@ -231,19 +242,54 @@ module Markbridge
         stack.first(index)
       end
 
-      # Coalesce adjacent text (textify can create neighbours that +#<<+
-      # would have merged) just before committing a changed child list.
+      # Finish a changed child list just before it is committed: adjacent
+      # text is merged (textify can create neighbors that +#<<+ would have
+      # merged), and the place a block was hoisted from gets a space when
+      # its two neighbors would touch. With the block between them they
+      # were on two lines, and an HTML parser has trimmed the whitespace
+      # at such a line edge.
       def coalesce(nodes)
-        nodes.each_with_object([]) do |node, acc|
-          last = acc.last
-          # mergeable? is false when +last+ is nil (the first node), so no
-          # separate nil-guard is needed.
-          if mergeable?(last, node)
-            last.merge(node)
-          else
-            acc << node
+        acc = []
+        gap = false
+        nodes.each do |node|
+          if node.equal?(GAP)
+            gap = true
+            next
           end
+
+          append(acc, AST::Text.new(" ")) if gap && touching?(acc.last, node)
+          gap = false
+          append(acc, node)
         end
+        acc
+      end
+
+      def append(acc, node)
+        last = acc.last
+        # mergeable? is false when +last+ is nil (the first node), so no
+        # separate nil-guard is needed.
+        if mergeable?(last, node)
+          last.merge(node)
+        else
+          acc << node
+        end
+      end
+
+      # A block starts a line and ends one. Code that is hoisted is a
+      # code block, a code span stays where it is.
+      def block?(node)
+        node.is_a?(AST::Code) || BLOCK_NODES.any? { |klass| node.is_a?(klass) }
+      end
+
+      # Whether +left+ and +right+ stand next to each other without
+      # whitespace or a line break between them. Only text is looked into,
+      # an element counts as something visible.
+      def touching?(left, right)
+        return false if left.nil? || left.instance_of?(AST::LineBreak)
+        return false if right.instance_of?(AST::LineBreak)
+        return false if left.instance_of?(AST::Text) && left.text.match?(EDGE_SPACE_BEFORE)
+
+        !(right.instance_of?(AST::Text) && right.text.match?(EDGE_SPACE_AFTER))
       end
 
       def mergeable?(left, right)

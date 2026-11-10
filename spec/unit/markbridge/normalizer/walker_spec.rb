@@ -318,6 +318,89 @@ RSpec.describe Markbridge::Normalizer::Walker do
     end
   end
 
+  # A block ends the line in front of it and starts one after it. An HTML
+  # parser trims the whitespace at these line edges, so without the block
+  # the two neighbors would touch.
+  describe "the place a block was hoisted from" do
+    def bold(*children) = el(Markbridge::AST::Bold, *children)
+    def list = el(Markbridge::AST::List, el(Markbridge::AST::ListItem, text("x")))
+    def code = el(Markbridge::AST::Code, text("a\nb"))
+
+    def texts_after_normalizing(*children)
+      tree = doc(bold(*children))
+      Markbridge::Normalizer.default.normalize(tree)
+      tree.children.first.children.map do |child|
+        child.instance_of?(Markbridge::AST::Text) ? child.text : child.class
+      end
+    end
+
+    it "gets a space when two texts would touch" do
+      expect(texts_after_normalizing(text("Run"), code, text("and wait"))).to eq(["Run and wait"])
+    end
+
+    it "gets a space for a hoisted list too" do
+      expect(texts_after_normalizing(text("a"), list, text("b"))).to eq(["a b"])
+    end
+
+    it "gets no space when the text in front ends with whitespace" do
+      expect(texts_after_normalizing(text("Run\n"), code, text("and"))).to eq(["Run\nand"])
+    end
+
+    it "gets no space when the text after it starts with whitespace" do
+      expect(texts_after_normalizing(text("Run"), code, text("\u00A0and"))).to eq(["Run\u00A0and"])
+    end
+
+    it "gets no space at the start or at the end of the container" do
+      expect(texts_after_normalizing(code, text("b"))).to eq(["b"])
+      expect(texts_after_normalizing(text("a"), code)).to eq(["a"])
+    end
+
+    it "gets one space for two blocks in a row" do
+      expect(texts_after_normalizing(text("a"), code, list, text("b"))).to eq(["a b"])
+    end
+
+    it "gets a space between two elements, which count as visible" do
+      italic = Markbridge::AST::Italic
+      result = texts_after_normalizing(el(italic, text("a ")), code, el(italic, text(" b")))
+
+      expect(result).to eq([italic, " ", italic])
+    end
+
+    it "gets a space between an element and text without whitespace" do
+      italic = Markbridge::AST::Italic
+
+      expect(texts_after_normalizing(el(italic, text("a")), code, text("b"))).to eq([italic, " b"])
+      expect(texts_after_normalizing(text("a"), code, el(italic, text("b")))).to eq(["a ", italic])
+    end
+
+    it "gets no space next to a line break" do
+      line_break = Markbridge::AST::LineBreak
+
+      expect(texts_after_normalizing(text("a"), line_break.new, code, text("b"))).to eq(
+        ["a", line_break, "b"],
+      )
+      expect(texts_after_normalizing(text("a"), code, line_break.new, text("b"))).to eq(
+        ["a", line_break, "b"],
+      )
+    end
+
+    it "gets no space when the next block is kept and only the one after is text" do
+      custom = Markbridge::Normalizer.default
+      custom.rule(parent: Markbridge::AST::Bold, child: Markbridge::AST::List, strategy: :drop)
+      tree = doc(bold(text("a"), code, list, text("b")))
+      custom.normalize(tree)
+
+      expect(tree.children.first.children.map(&:text)).to eq(["a b"])
+    end
+
+    it "gets no space for a node that is no block" do
+      tree = doc(url(text("a"), image, text("b")))
+      normalizer.normalize(tree)
+
+      expect(tree.children.first.children.map(&:text)).to eq(["ab"])
+    end
+  end
+
   describe "copy-on-write" do
     it "leaves unchanged children as the same objects and only rewrites what moved" do
       keep_a = el(Markbridge::AST::Bold, text("a"))
