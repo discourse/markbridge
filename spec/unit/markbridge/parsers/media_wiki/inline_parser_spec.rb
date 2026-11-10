@@ -111,6 +111,48 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
     end
   end
 
+  describe "bold inside italic" do
+    def shape(node)
+      return node.text if node.instance_of?(Markbridge::AST::Text)
+
+      [node.class.name.split("::").last, *node.children.map { |child| shape(child) }]
+    end
+
+    def shapes(input)
+      parse(input).children.map { |child| shape(child) }
+    end
+
+    it "keeps the italic open over the bold" do
+      expect(shapes("''a '''b''' c''")).to eq([["Italic", "a ", %w[Bold b], " c"]])
+    end
+
+    it "ends the bold and the italic with five apostrophes" do
+      expect(shapes("''a '''b'''''")).to eq([["Italic", "a ", %w[Bold b]]])
+    end
+
+    it "keeps the italic open over two bolds" do
+      expect(shapes("''a '''b''' c '''d''' e'' f")).to eq(
+        [["Italic", "a ", %w[Bold b], " c ", %w[Bold d], " e"], " f"],
+      )
+    end
+
+    it "looks over single apostrophes inside the bold" do
+      expect(shapes("''a '''it's b''' c''")).to eq([["Italic", "a ", ["Bold", "it's b"], " c"]])
+    end
+
+    it "ends the italic at three apostrophes when no bold closes after them" do
+      expect(shapes("''a '''b''")).to eq([["Italic", "a "], "'b''"])
+    end
+
+    it "is no italic when nothing closes it after the bold" do
+      expect(shapes("''a '''b''' c")).to eq(["''a ", %w[Bold b], " c"])
+    end
+
+    it "still ends the italic at four apostrophes" do
+      expect(shapes("''a''''")).to eq([%w[Italic a], "''"])
+    end
+  end
+
   describe "internal links" do
     it "parses [[Page Name]]" do
       doc = parse("[[Page Name]]")

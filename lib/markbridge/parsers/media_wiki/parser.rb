@@ -50,11 +50,55 @@ module Markbridge
           @inline_parser = InlineParser.new(handlers: @handlers, unknown_tags: @unknown_tags)
           @list_stack = []
 
-          process_lines(lines)
+          process_lines(join_nowiki_lines(lines))
           @document
         end
 
         private
+
+        # Lower case only, like the inline parser reads the tag.
+        NOWIKI_OPEN = "<nowiki>"
+        NOWIKI_CLOSE = "</nowiki>"
+        private_constant :NOWIKI_OPEN, :NOWIKI_CLOSE
+
+        # The parser works line by line, but <nowiki> can go over several
+        # lines. Such lines become one line with the line breaks in it,
+        # which the inline parser reads as the text of the tag. A
+        # <nowiki> that is never closed is left as it is.
+        #
+        # @param lines [Array<String>]
+        # @return [Array<String>]
+        def join_nowiki_lines(lines)
+          return lines unless lines.any? { |line| open_nowiki?(line) }
+
+          joined = []
+          index = 0
+          while index < lines.length
+            line = lines.fetch(index)
+            while open_nowiki?(line) && (close = closing_line(lines, index + 1))
+              line = "#{line}\n#{lines[(index + 1)..close].join("\n")}"
+              index = close
+            end
+            joined << line
+            index += 1
+          end
+          joined
+        end
+
+        # Whether the last <nowiki> of the line has no end on the line.
+        def open_nowiki?(line)
+          open = line.rindex(NOWIKI_OPEN)
+          return false unless open
+
+          close = line.rindex(NOWIKI_CLOSE)
+          close.nil? || close < open
+        end
+
+        # @return [Integer, nil] the first line from +from+ on that closes
+        #   a <nowiki>
+        def closing_line(lines, from)
+          (from...lines.length).find { |index| lines.fetch(index).include?(NOWIKI_CLOSE) }
+        end
 
         LINE_ENDING_RE = /\r\n?|[\u2028\u2029]+/
         private_constant :LINE_ENDING_RE

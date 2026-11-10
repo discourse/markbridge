@@ -160,6 +160,11 @@ module Markbridge
         # position. Returns the collected content string, or nil (the
         # exhausted while loop) if no closing run exists.
         #
+        # Three apostrophes inside italic open bold, they do not end the
+        # italic: the search goes on behind the end of that bold. Five
+        # apostrophes there end the bold with three and the italic with
+        # the two that are left.
+        #
         # @param count [Integer] number of consecutive apostrophes to match
         # @return [String, nil]
         def collect_until_apostrophes(count)
@@ -168,11 +173,34 @@ module Markbridge
           while (index = @input.byteindex("'", probe))
             run = consecutive_apostrophes_at(index)
             if run >= count
+              bold_end = (bold_end_after(index + BOLD) if count == ITALIC && run == BOLD)
+              if bold_end
+                probe = bold_end
+                next
+              end
+
               content = @input.byteslice(start, index - start)
               @pos = index + count
               return content
             end
             probe = index + run
+          end
+        end
+
+        ITALIC = 2
+        BOLD = 3
+        private_constant :ITALIC, :BOLD
+
+        # @param from [Integer] the position behind three apostrophes that
+        #   open bold
+        # @return [Integer, nil] the position behind the three apostrophes
+        #   that close it, nil when nothing closes it
+        def bold_end_after(from)
+          while (index = @input.byteindex("'", from))
+            run = consecutive_apostrophes_at(index)
+            return index + BOLD if run >= BOLD
+
+            from = index + run
           end
         end
 
