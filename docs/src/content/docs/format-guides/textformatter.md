@@ -53,11 +53,17 @@ A line break is stored as `<br/>` followed by a newline in the next text node (`
 | `<QUOTE>` | `[quote="name"]…[/quote]`; without attribution `> …`, or `[quote]…[/quote]` around a quote with attribution | `AST::Quote` |
 | `<LIST>` | `- item` / `1. item` | `AST::List` |
 | `<LI>` | List item | `AST::ListItem` |
-| `<TABLE>`, `<TR>`, `<TD>` | GFM table | `AST::Table` |
+| `<TABLE>`, `<TR>`, `<TD>`, `<TH>` | GFM table | `AST::Table` |
+| `<COLOR>`, `<SIZE>` | See [Colors and sizes](#colors-and-sizes) | `AST::Color`, `AST::Size` |
+| `<ALIGN>` | `<div align="…">` | `AST::Align` |
+| `<SPOILER>` | Block spoiler: `[spoiler]` and `[/spoiler]` on lines of their own, a title as a paragraph in front | `AST::Spoiler` with `block: true` |
+| `<ISPOILER>` | `[spoiler]…[/spoiler]` inside the line | `AST::Spoiler` |
 | `<HR>` | `---` | `AST::HorizontalRule` |
 | `<br/>` | Hard line break | `AST::LineBreak` |
 
 </div>
+
+phpBB shows a `[spoiler]` as a block, so `<SPOILER>` is a block spoiler and the text after it starts a new line. `<ISPOILER>` is the inline spoiler of the Litedown plugin. `<HR>` comes from the `[hr]` BBCode of the s9e repository and from Litedown.
 
 Several elements carry attributes Markbridge reads: `<CODE>` (`lang`), `<URL>` (`url`), `<EMAIL>` (`email`), `<IMG>` (`src`), `<LIST>` (`type` — `bullet` or `decimal`), and `<QUOTE>` (attribution).
 

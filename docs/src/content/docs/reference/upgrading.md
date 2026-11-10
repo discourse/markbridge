@@ -3,6 +3,26 @@ title: Upgrading
 description: Breaking-change notes between Markbridge releases.
 ---
 
+## Upgrading to the next release
+
+These changes are on `main` and not released yet.
+
+Output and AST changes to check:
+
+- **MediaWiki page links.** The href of `[[Page title]]` is `./Page_title` now, relative to the wiki and with underscores for spaces, like MediaWiki's own HTML has it. It was the title as written. `[[Alta Via]]` renders as `[Alta Via](./Alta_Via)`, before it was plain text; `[[Help:Contents|help]]` keeps its link. If you map page titles to URLs on the AST, look for hrefs that start with `./`. See the [MediaWiki guide](/format-guides/mediawiki/#links-to-wiki-pages).
+- **`<ins>`, `<del>` and `<mark>`.** The HTML and MediaWiki parsers read them into the new nodes `AST::Insertion`, `AST::Deletion` and `AST::Highlight`, and the renderer writes the HTML tags, which Discourse keeps. Before, `<del>` was strikethrough (`~~…~~`), `<ins>` in wikitext was underline (`[u]…[/u]`), and HTML dropped `<ins>` and `<mark>`. `[del]` in BBCode is still strikethrough.
+- **Spoilers in s9e XML.** `<SPOILER>` is a block spoiler now: `AST::Spoiler` has a `block:` keyword, and the renderer writes `[spoiler]` and `[/spoiler]` on lines of their own, with a title as a paragraph in front (`Title:`). Before, the spoiler was written inside the line and the text after it was glued to it. `<ISPOILER>` is read as an inline spoiler. A block spoiler inside bold or a link is moved out by the normalizer.
+- **`<HR>` in s9e XML** is a horizontal rule. It was counted as an unknown tag and dropped.
+- **Unquoted BBCode options with spaces.** `[quote=John Doe]` quotes "John Doe", not "John"; `[url=https://example.com/a b]` keeps the whole address; `[spoiler=What went wrong]` is a spoiler with that title and no longer text. The option ends at the `]` or at the first `name=`.
+- **Blockquotes.** Two blocks in a `>` quote have one `>` line between them, not three.
+- **Text around a hoisted block.** When the normalizer moves a block out of bold, a link or another inline container, the texts on its two sides get a space between them when they would touch.
+- **`thead`, `tbody` and `tfoot`** are no longer in `unknown_tags` of the HTML parser. The set is `HandlerRegistry#transparent_tags`, add the wrappers you expect.
+- **`[[]]` in wikitext** is text. The MediaWiki parser raised `NoMethodError` for it.
+
+Removed:
+
+- The BBCode list item alias `[.]` and the TextFormatter element `*`. No input reached either of them.
+
 ## Upgrading to 0.5.0
 
 The round-trip specs (see the Testing section of AGENTS.md) found a number of output defects. The fixes change the Markdown for the cases below, so check output assertions that cover them:

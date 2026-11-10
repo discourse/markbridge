@@ -98,6 +98,7 @@ A few tags take variants:
 - **Code language** — `[code=ruby]` or `[code lang=ruby]`.
 - **Ordered list** — `[list=1]` (same as `[ol]`).
 - **Quote attribution** — `[quote="author, post:1, topic:2"]`.
+- **Options with spaces** — an option without quotes goes on up to the `]`: `[quote=John Doe]` quotes "John Doe". It ends at the first `name=` of a named attribute, so `[quote=John Doe post_id=4]` has the option and one attribute. A line break ends it too.
 - **Link forms** — `[url]` also accepts `[url=href]text[/url]` and `[url]href[/url]`; `[email=addr]text[/email]` and `[img=src]alt[/img]` follow the same shape.
 - **Bare links** — a `[url]` whose text equals the href (or has no text) renders as the plain link, not `[href](href)`, so Discourse autolinks and oneboxes it.
 

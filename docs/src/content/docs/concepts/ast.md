@@ -35,7 +35,7 @@ AST::Node (base)
     │   ├── AST::Paragraph
     │   ├── AST::Heading           — level
     │   ├── AST::Quote
-    │   ├── AST::Spoiler
+    │   ├── AST::Spoiler           — title, block (inline unless block is set)
     │   └── AST::Details           — collapsible [details] section
     ├── Content
     │   ├── AST::Url               — href attribute
