@@ -762,14 +762,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
         expect(write(tokens.image(src: "a.png", alt: "x", width: 10, height: 5))).to eq(
           "![x|10x5](a.png)",
         )
-        expect(write(tokens.image(src: "a.png", alt: "x", width: 10))).to eq("![x|10](a.png)")
+        expect(write(tokens.image(src: "a.png", height: 5, width: 10))).to eq("![|10x5](a.png)")
+      end
+
+      it "writes no size for a width or a height alone, Discourse takes only both" do
+        expect(write(tokens.image(src: "a.png", alt: "x", width: 10))).to eq("![x](a.png)")
         expect(write(tokens.image(src: "a.png", alt: "x", height: 5))).to eq("![x](a.png)")
-        expect(write(tokens.image(src: "a.png", width: 10))).to eq("![|10](a.png)")
+        expect(write(tokens.image(src: "a.png", width: 10))).to eq("![](a.png)")
       end
 
       it "keeps a part of the alt text that looks like an option apart from the options" do
-        expect(write(tokens.image(src: "a.png", alt: "x|100x100", width: 10))).to eq(
-          "![x\\|100x100||10](a.png)",
+        expect(write(tokens.image(src: "a.png", alt: "x|100x100", width: 10, height: 5))).to eq(
+          "![x\\|100x100||10x5](a.png)",
         )
         expect(write(tokens.image(src: "a.png", alt: "x|thumbnail"))).to eq(
           "![x\\|thumbnail|](a.png)",
