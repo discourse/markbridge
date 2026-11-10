@@ -41,7 +41,7 @@ Like the other parsers, the convenience method returns a [`Markbridge::Conversio
 | `# item` / `## sub` | `1. item` (nested) | `AST::List` |
 | `----` | `---` | `AST::HorizontalRule` |
 | Line starting with a space | Code block | `AST::Code` |
-| `{\| ... \|}` | GFM table | `AST::Table` |
+| `{\| ... \|}` | GFM table, or an HTML table when Markdown cannot express it (a `colspan` or `rowspan`, uneven rows, a block in a cell) | `AST::Table` |
 
 </div>
 

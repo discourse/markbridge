@@ -31,6 +31,24 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::TableCellHandler do
       expect(context.current.header?).to be false
     end
 
+    it "reads colspan and rowspan from the attributes of the tag" do
+      token =
+        Markbridge::Parsers::BBCode::TagStartToken.new(
+          tag: "td",
+          attrs: {
+            colspan: "2",
+            rowspan: "3",
+          },
+          pos: 0,
+          source: "[td colspan=2 rowspan=3]",
+        )
+
+      handler.on_open(token:, context:, registry:)
+
+      expect(context.current.colspan).to eq(2)
+      expect(context.current.rowspan).to eq(3)
+    end
+
     it "creates a header cell for th tag" do
       token =
         Markbridge::Parsers::BBCode::TagStartToken.new(tag: "th", attrs: {}, pos: 0, source: "[th]")

@@ -17,6 +17,15 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::TableCellHandler do
       expect(result).to eq(parent.children[0])
     end
 
+    it "reads colspan and rowspan" do
+      element = Nokogiri.XML(%(<TD colspan="2" rowspan="3">data</TD>)).root
+
+      handler.process(element:, parent:)
+
+      expect(parent.children[0].colspan).to eq(2)
+      expect(parent.children[0].rowspan).to eq(3)
+    end
+
     it "creates a header cell for TH" do
       element = Nokogiri.XML("<TH>header</TH>").root
 

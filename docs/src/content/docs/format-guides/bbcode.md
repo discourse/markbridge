@@ -82,7 +82,7 @@ All tag names are case-insensitive. Aliases in the same row use the same handler
 
 | Tags | Renders as | AST node |
 |---|---|---|
-| `[table]`, `[tr]`, `[td]`, `[th]` | GFM table | `AST::Table` |
+| `[table]`, `[tr]`, `[td]`, `[th]` | GFM table, or an HTML table when Markdown cannot express it (a `colspan` or `rowspan`, uneven rows, a block in a cell) | `AST::Table` |
 
 ### Self-closing
 

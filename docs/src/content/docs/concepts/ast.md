@@ -50,7 +50,7 @@ AST::Node (base)
     └── Tables
         ├── AST::Table
         ├── AST::TableRow
-        └── AST::TableCell
+        └── AST::TableCell     — header, colspan, rowspan
 ```
 
 ## Invariants
