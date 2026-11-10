@@ -5,7 +5,7 @@ module Markbridge
     module Discourse
       module Tags
         # Images: an image token. The serializer writes
-        # `![alt|WIDTHxHEIGHT](url)`, `![alt|WIDTH](url)` or `![alt](url)`
+        # `![alt|WIDTHxHEIGHT](url)` or `![alt](url)`
         # with the alt text escaped like a link label, and <img> in an
         # HTML block.
         class ImageTag < Tag

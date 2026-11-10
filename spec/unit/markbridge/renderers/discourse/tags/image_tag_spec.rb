@@ -74,9 +74,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ImageTag do
 
     it "keeps an alt text that is nothing but an option" do
       # Discourse never takes the first part for an option.
-      element = Markbridge::AST::Image.new(src: "a.png", alt: "800x600", width: 5)
+      element = Markbridge::AST::Image.new(src: "a.png", alt: "800x600", width: 5, height: 4)
 
-      expect(rendered(element)).to eq("![800x600|5](a.png)")
+      expect(rendered(element)).to eq("![800x600|5x4](a.png)")
     end
 
     it "doubles a backslash in the image destination" do

@@ -412,7 +412,7 @@ RSpec.describe "BBCode to Markdown Conversion" do
         Markbridge.bbcode_to_markdown(
           "[img alt=\"a cat\" width=100]https://example.com/photo.jpg[/img]",
         )
-      expect(result.markdown).to eq("![a cat|100](https://example.com/photo.jpg)")
+      expect(result.markdown).to eq("![a cat](https://example.com/photo.jpg)")
     end
 
     it "converts image with dimensions" do
@@ -420,9 +420,9 @@ RSpec.describe "BBCode to Markdown Conversion" do
       expect(result.markdown).to eq("![|100x200](https://example.com/photo.jpg)")
     end
 
-    it "converts image with width attribute" do
+    it "writes no size for an image with a width only, Discourse reads a size as WxH" do
       result = Markbridge.bbcode_to_markdown("[img width=100]https://example.com/photo.jpg[/img]")
-      expect(result.markdown).to eq("![|100](https://example.com/photo.jpg)")
+      expect(result.markdown).to eq("![](https://example.com/photo.jpg)")
     end
   end
 

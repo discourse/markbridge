@@ -692,14 +692,15 @@ module Markbridge
               content.count(" ") < content.length
           end
 
-          # `![alt|WIDTHxHEIGHT](src)`, `![alt|WIDTH](src)` or `![alt](src)`.
-          # A height alone means nothing to Discourse.
+          # `![alt|WIDTHxHEIGHT](src)` or `![alt](src)`. Discourse reads a
+          # size only as both numbers: a width alone would stay in the alt
+          # text as `|100`.
           def image_piece(token, html_mode)
             _, src, alt, width, height = token
             alt = flat_alt(alt)
             return image_html(src, alt, width, height) if html_mode
 
-            size = ("#{width}x#{height}" if width && height) || width
+            size = "#{width}x#{height}" if width && height
             label = @escaper.escape(alt, in_link_label: true)
             "![#{label}#{"|" if ends_in_option?(alt)}#{"|#{size}" if size}](#{LinkDestination.escape(src)})"
           end
