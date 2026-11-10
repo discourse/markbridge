@@ -16,6 +16,8 @@ module Markbridge
       #     registry.block_level_tags << "my-block"
       #     registry.whitespace_preserving_tags.delete("tt")
       class HandlerRegistry
+        include Enumerable
+
         # HTML5 block-level elements (per MDN). The trim-before-block rule
         # applies to these regardless of whether a handler is registered.
         DEFAULT_BLOCK_LEVEL_TAGS = %w[
@@ -81,6 +83,15 @@ module Markbridge
           @handlers = {}
           @block_level_tags = Set.new(DEFAULT_BLOCK_LEVEL_TAGS)
           @whitespace_preserving_tags = Set.new(DEFAULT_WHITESPACE_PRESERVING_TAGS)
+        end
+
+        # Iterate over the registered (tag_name, handler) pairs, in the
+        # order of registration.
+        # @yieldparam tag_name [String]
+        # @yieldparam handler [BaseHandler]
+        # @return [Enumerator] when no block is given
+        def each(&block)
+          @handlers.each(&block)
         end
 
         # Register a handler for one or more tag names

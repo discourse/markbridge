@@ -151,6 +151,24 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
     end
   end
 
+  describe "#each" do
+    it "yields the (element_name, handler) pairs in the order of registration" do
+      registry = described_class.new
+      first = Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Bold)
+      second =
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(Markbridge::AST::Italic)
+      registry.register("z", first)
+      registry.register("a", second)
+
+      expect(registry.each.to_a).to eq([["Z", first], ["A", second]])
+    end
+
+    it "returns an Enumerator without a block and is Enumerable" do
+      expect(registry.each).to be_a(Enumerator)
+      expect(registry.map(&:first)).to include("B", "URL", "LIST")
+    end
+  end
+
   describe "#has_handler?" do
     it "returns true when a handler is registered for the upcased tag name" do
       expect(registry.has_handler?("b")).to be true
