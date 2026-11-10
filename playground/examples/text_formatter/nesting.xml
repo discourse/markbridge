@@ -1,0 +1,34 @@
+<r><QUOTE author="alice" post_id="3"><s>[quote=alice post_id=3]</s>
+<QUOTE author="bob" post_id="2"><s>[quote=bob post_id=2]</s>
+<QUOTE><s>[quote]</s>The original question, three quotes deep.<e>[/quote]</e></QUOTE>
+Bob's answer, with a list:
+<LIST><s>[list]</s>
+<LI><s>[*]</s><B><s>[b]</s>First<e>[/b]</e></B>, read the manual
+<LIST type="decimal"><s>[list=1]</s>
+<LI><s>[*]</s>the <I><s>[i]</s>whole<e>[/i]</e></I> manual
+<LIST><s>[list]</s>
+<LI><s>[*]</s>even the <URL url="https://example.com/appendix"><s>[url=https://example.com/appendix]</s>appendix with <B><s>[b]</s>bold <I><s>[i]</s>and italic<e>[/i]</e></I><e>[/b]</e></B> text<e>[/url]</e></URL></LI>
+<LI><s>[*]</s>and this:
+<CODE lang="sh"><s>[code=sh]</s>make install
+make check<e>[/code]</e></CODE></LI>
+<e>[/list]</e></LIST></LI>
+<LI><s>[*]</s>then read it again</LI>
+<e>[/list]</e></LIST></LI>
+<LI><s>[*]</s><S><s>[s]</s>Second, ask <U><s>[u]</s>here<e>[/u]</e></U><e>[/s]</e></S></LI>
+<e>[/list]</e></LIST>
+<e>[/quote]</e></QUOTE>
+Alice's reply, with a table in the quote:
+<TABLE><s>[table]</s>
+<TR><s>[tr]</s><TH><s>[th]</s>Step<e>[/th]</e></TH><TH><s>[th]</s>Done<e>[/th]</e></TH><e>[/tr]</e></TR>
+<TR><s>[tr]</s><TD><s>[td]</s><B><s>[b]</s>Manual<e>[/b]</e></B><e>[/td]</e></TD><TD><s>[td]</s><COLOR color="green"><s>[color=green]</s>yes<e>[/color]</e></COLOR><e>[/td]</e></TD><e>[/tr]</e></TR>
+<TR><s>[tr]</s><TD><s>[td]</s><I><s>[i]</s>Appendix<e>[/i]</e></I><e>[/td]</e></TD><TD><s>[td]</s><COLOR color="red"><s>[color=red]</s>no<e>[/color]</e></COLOR><e>[/td]</e></TD><e>[/tr]</e></TR>
+<e>[/table]</e></TABLE>
+<e>[/quote]</e></QUOTE>
+
+<ALIGN align="center"><s>[align=center]</s><B><s>[b]</s>Centered, bold, <SIZE size="150"><s>[size=150]</s>large <COLOR color="teal"><s>[color=teal]</s>and teal<e>[/color]</e></COLOR><e>[/size]</e></SIZE><e>[/b]</e></B><e>[/align]</e></ALIGN>
+
+<LIST><s>[list]</s>
+<LI><s>[*]</s>A list item with a quote:
+<QUOTE author="carol"><s>[quote=carol]</s>Lists in quotes, quotes in lists.<e>[/quote]</e></QUOTE></LI>
+<LI><s>[*]</s>And one with a spoiler: <SPOILER><s>[spoiler]</s><B><s>[b]</s>bold<e>[/b]</e></B> and a <URL url="https://example.com"><s>[url=https://example.com]</s>link<e>[/url]</e></URL><e>[/spoiler]</e></SPOILER></LI>
+<e>[/list]</e></LIST></r>

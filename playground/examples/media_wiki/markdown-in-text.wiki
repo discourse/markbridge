@@ -1,0 +1,26 @@
+Wiki pages are full of characters that mean something in Markdown. The renderer escapes the ones that would change the output, and only those.
+
+- not a list item
++ not one either
+1. not an ordered list
+1) and not this
+> not a quote
+#hashtag is an ordered item in wikitext, <nowiki>#hashtag</nowiki> is text
+
+--- not a rule ---
+===
+
+2 * 3 * 4 = 24, a_b_c, snake_case_name, **stars**, _underscores_, ~~tildes~~, `backticks`
+<nowiki>[a link](https://example.com) and ![an image](https://example.com/x.png) and [a reference][1]</nowiki>
+[brackets] without nowiki are an external link
+<https://example.com> and a < b > c, &amp; &copy;
+| not | a | table |
+| --- | --- | --- |
+\ a backslash, C:\Users\alice, \*already escaped\*
+:smile: @alice
+
+<nowiki># not a heading or an ordered item</nowiki>
+<nowiki>* not a list item</nowiki>
+<nowiki><div class="note">HTML</div>, <b>bold</b>, <!-- comment --></nowiki>
+
+'''Wikitext still works''' in the middle of it: ''2 * 3'', [https://example.com/a_b a_b].

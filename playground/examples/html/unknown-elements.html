@@ -1,0 +1,20 @@
+<article class="post" data-id="42">
+  <header><h2>Elements without a handler are transparent</h2></header>
+  <custom-card mode="loose">
+    <p>The wrapper is gone, the <strong>known</strong> children stay.</p>
+    <mystery-inline>Text in an unknown inline element, with <code>code</code>.</mystery-inline>
+    <ul>
+      <li>The list still works</li>
+    </ul>
+  </custom-card>
+  <details>
+    <summary>A details element</summary>
+    <p>has no handler by default. A converter registers one.</p>
+  </details>
+  <p><font color="red">Old</font> <center>markup</center> <mark>and</mark> <abbr title="new">new</abbr> <kbd>Ctrl</kbd> <small>elements</small>.</p>
+  <script>alert("the text of a script is dropped")</script>
+  <style>p { color: red }</style>
+  <iframe src="https://example.com/embed"></iframe>
+  <video src="https://example.com/video.mp4" controls></video>
+  <!-- a comment -->
+</article>

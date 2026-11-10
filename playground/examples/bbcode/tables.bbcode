@@ -1,0 +1,35 @@
+A table Markdown can express becomes a pipe table:
+
+[table]
+[tr][th]Feature[/th][th]Status[/th][th]Notes[/th][/tr]
+[tr][td][b]Parser[/b][/td][td]Ready[/td][td]All [i]four[/i] formats[/td][/tr]
+[tr][td][url=https://example.com/docs]Docs[/url][/td][td]Partial[/td][td]a | pipe and [tt]code | pipe[/tt][/td][/tr]
+[/table]
+
+Without a header row:
+
+[table]
+[tr][td]1[/td][td]2[/td][/tr]
+[tr][td]3[/td][td]4[/td][/tr]
+[/table]
+
+Uneven rows become HTML:
+
+[table]
+[tr][th]A[/th][th]B[/th][/tr]
+[tr][td]1[/td][td]2[/td][/tr]
+[tr][td]only one cell[/td][/tr]
+[/table]
+
+So does a cell with more than one line or with a block in it. The content is written as HTML then, because Markdown is not read inside an HTML block:
+
+[table]
+[tr][th]Inline[/th][th]Blocks[/th][/tr]
+[tr][td][b]bold[/b], [i]italic[/i], [s]strike[/s]
+and a second line with a [url=https://example.com]link[/url][/td][td][list]
+[*]a list
+[*]in a cell
+[/list][/td][/tr]
+[tr][td][code]code = "in a cell"[/code][/td][td][quote]A quote in a cell[/quote][/td][/tr]
+[tr][td][spoiler]a spoiler[/spoiler] and [color=red]a color[/color][/td][td][table][tr][td]a table[/td][td]in a table[/td][/tr][/table][/td][/tr]
+[/table]

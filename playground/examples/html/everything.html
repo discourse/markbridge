@@ -1,0 +1,53 @@
+<h1>Trip report: three days in the Dolomites</h1>
+
+<blockquote>
+  <p>Did the <i>Alta Via</i> hold up to the hype? <strong>Pictures or it didn't happen!</strong></p>
+</blockquote>
+
+<p>It did. Here is the short version, with <b>every</b> element the HTML parser knows.</p>
+
+<hr>
+
+<h2>Inline formatting</h2>
+<p><b>bold</b>, <strong>strong</strong>, <i>italic</i>, <em>emphasis</em>, <u>underline</u>, <s>strike</s>, <strike>strike too</strike>, <del>deleted</del>, H<sub>2</sub>O at 2<sup>3</sup> bar.</p>
+<p>Styles on a span: <span style="font-weight: bold">bold</span>, <span style="font-weight: 700">also bold</span>, <span style="font-style: italic">italic</span>, <span style="text-decoration: underline">underlined</span>, <span style="text-decoration: line-through">struck</span>, <span style="font-weight: bold; font-style: italic; color: red">bold and italic, the color is dropped</span>.</p>
+<p>A line that ends here<br>and goes on after a break.</p>
+
+<h3>Links and images</h3>
+<p><a href="https://example.com/map">The map</a>, <a href="https://example.com/alta-via">https://example.com/alta-via</a> and <a href="mailto:hut@example.com">the hut</a>.</p>
+<p><img src="https://example.com/photos/sunrise.jpg" alt="Sunrise over the ridge"> <img src="https://example.com/photos/ridge.jpg" width="640" height="360"></p>
+
+<h4>Code</h4>
+<p>The hut runs on <code>cron</code> and <tt>hope</tt>. Their booking script:</p>
+<pre><code class="language-ruby">def beds_left(hut)
+  hut.beds - hut.bookings.count # &lt;b&gt;not bold&lt;/b&gt; in here
+end</code></pre>
+<pre>  day 1 |  14 km | +1100 m
+  day 2 |  19 km |  +900 m</pre>
+
+<h5>Lists</h5>
+<ul>
+  <li>Boots, <b>broken in</b></li>
+  <li>Two liters of water
+    <ol>
+      <li>one bottle</li>
+      <li>one bladder</li>
+    </ol>
+  </li>
+  <li>Cash for the huts</li>
+</ul>
+<ol start="3">
+  <li>Book the huts</li>
+  <li>Check the weather</li>
+</ol>
+
+<h6>Tables</h6>
+<table>
+  <thead>
+    <tr><th>Day</th><th>Distance</th><th>Hut</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>14 km</td><td><i>Rifugio Lagazuoi</i></td></tr>
+    <tr><td>2</td><td>19 km</td><td><a href="https://example.com/nuvolau">Rifugio Nuvolau</a></td></tr>
+  </tbody>
+</table>

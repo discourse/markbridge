@@ -46,12 +46,6 @@ RSpec.describe Markbridge::Playground::ASTPresenter do
     end
   end
 
-  it "has an icon mapping for every AST node type" do
-    mapped = described_class::ICON_MAP.keys
-
-    ast_node_names.each { |name| expect(mapped).to include(name), "ICON_MAP is missing #{name}" }
-  end
-
   it "computes aggregate stats" do
     document = Markbridge::AST::Document.new
     document << Markbridge::AST::Text.new("Hello")

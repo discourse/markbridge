@@ -1,0 +1,24 @@
+<r>Forum posts are full of characters that mean something in Markdown. The renderer escapes the ones that would change the output, and only those.<br/>
+<br/>
+# not a heading<br/>
+#hashtag stays as it is<br/>
+- not a list item<br/>
++ not one either<br/>
+1. not an ordered list<br/>
+1) and not this<br/>
+&gt; not a quote<br/>
+<br/>
+--- not a rule ---<br/>
+---<br/>
+===<br/>
+<br/>
+2 * 3 * 4 = 24, a_b_c, snake_case_name, *stars*, **more stars**, _underscores_, ~~tildes~~, `backticks`<br/>
+[a link](https://example.com) and ![an image](https://example.com/x.png) and [a reference][1]<br/>
+&lt;div class="note"&gt;HTML&lt;/div&gt;, &lt;b&gt;bold&lt;/b&gt;, &lt;!-- comment --&gt;, a &lt; b &gt; c, &amp;amp; &amp;copy;<br/>
+&lt;https://example.com&gt; and &lt;alice@example.com&gt;<br/>
+| not | a | table |<br/>
+| --- | --- | --- |<br/>
+\ a backslash, C:\Users\alice, \*already escaped\*<br/>
+[b]BBCode that s9e left alone[/b], :smile: @alice #general<br/>
+<br/>
+<B><s>[b]</s>The elements still work<e>[/b]</e></B> in the middle of it: <I><s>[i]</s>2 * 3<e>[/i]</e></I>, <URL url="https://example.com/a_b"><s>[url=https://example.com/a_b]</s>a_b<e>[/url]</e></URL>.</r>

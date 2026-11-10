@@ -1,0 +1,50 @@
+<p>A table Markdown can express becomes a pipe table:</p>
+<table>
+  <thead>
+    <tr><th>Feature</th><th>Status</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Parser</strong></td><td>Ready</td><td>All <em>four</em> formats</td></tr>
+    <tr><td><a href="https://example.com/docs">Docs</a></td><td>Partial</td><td>a | pipe and <code>code | pipe</code></td></tr>
+  </tbody>
+  <tfoot>
+    <tr><td>Total</td><td>2</td><td></td></tr>
+  </tfoot>
+</table>
+
+<p>Without a header row:</p>
+<table>
+  <tr><td>1</td><td>2</td></tr>
+  <tr><td>3</td><td>4</td></tr>
+</table>
+
+<p>Uneven rows become HTML:</p>
+<table>
+  <tr><th>A</th><th>B</th></tr>
+  <tr><td>1</td><td>2</td></tr>
+  <tr><td>only one cell</td></tr>
+</table>
+
+<p>So does a cell with more than one line or with a block in it. The content is written as HTML then, because Markdown is not read inside an HTML block:</p>
+<table>
+  <tr><th>Inline</th><th>Blocks</th></tr>
+  <tr>
+    <td><b>bold</b>, <i>italic</i>, <s>strike</s><br>and a second line with a <a href="https://example.com">link</a></td>
+    <td><ul><li>a list</li><li>in a cell</li></ul></td>
+  </tr>
+  <tr>
+    <td><pre>code = "in a cell"</pre></td>
+    <td><blockquote>A quote in a cell</blockquote></td>
+  </tr>
+  <tr>
+    <td><img src="https://example.com/x.png" alt="An image"> and <h3>a heading</h3></td>
+    <td><table><tr><td>a table</td><td>in a table</td></tr></table></td>
+  </tr>
+</table>
+
+<p>Spans are not supported, the cells are written one after the other:</p>
+<table>
+  <tr><th colspan="2">Wide</th><th>C</th></tr>
+  <tr><td rowspan="2">Tall</td><td>1</td><td>2</td></tr>
+  <tr><td>3</td><td>4</td></tr>
+</table>

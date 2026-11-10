@@ -1,0 +1,49 @@
+= Trip report: three days in the Dolomites =
+
+Did the ''Alta Via'' hold up to the hype? It did. Here is the short version, with '''every''' piece of wikitext the MediaWiki parser knows.
+
+----
+
+== Inline formatting ==
+'''bold''', ''italic'', '''''bold and italic''''', <u>underline</u>, <ins>inserted</ins>, <s>strike</s>, <del>deleted</del>, H<sub>2</sub>O at 2<sup>3</sup> bar.<br>A line after a break.
+
+=== Links ===
+[[Alta Via]], [[Alta Via 1|the first one]], [[Help:Contents#Hiking|a section]], [https://example.com/map the map], [https://example.com/gpx] and https://example.com/alta-via as it is.
+
+==== Code ====
+The hut runs on <code>cron</code>. Their booking script:
+
+<pre>
+def beds_left(hut)
+  hut.beds - hut.bookings.count # '''not bold''' in here
+end
+</pre>
+
+A line that starts with a space is code too:
+
+ day 1 |  14 km | +1100 m
+ day 2 |  19 km |  +900 m
+
+<nowiki>'''Not bold''', [[not a link]] and == not a heading ==</nowiki>
+
+===== Lists =====
+* Boots, '''broken in'''
+* Two liters of water
+** one bottle
+** one bladder
+*** a small one
+* Cash for the huts
+
+# Book the huts
+# Check the weather
+## twice
+# Leave early
+
+====== Tables ======
+{|
+! Day !! Distance !! Hut
+|-
+| 1 || 14 km || ''Rifugio Lagazuoi''
+|-
+| 2 || 19 km || [https://example.com/nuvolau Rifugio Nuvolau]
+|}

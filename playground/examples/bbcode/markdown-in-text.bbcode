@@ -1,0 +1,25 @@
+Forum posts are full of characters that mean something in Markdown. The renderer escapes the ones that would change the output, and only those.
+
+# not a heading
+#hashtag stays as it is
+- not a list item
++ not one either
+1. not an ordered list
+1) and not this
+> not a quote
+    not an indented code block
+
+--- not a rule ---
+---
+===
+
+2 * 3 * 4 = 24, a_b_c, snake_case_name, *stars*, **more stars**, _underscores_, ~~tildes~~, `backticks`
+[a link](https://example.com) and ![an image](https://example.com/x.png) and [a reference][1]
+<div class="note">HTML</div>, <b>bold</b>, <!-- comment -->, a < b > c, &amp; &copy;
+<https://example.com> and <alice@example.com>
+| not | a | table |
+| --- | --- | --- |
+\ a backslash, C:\Users\alice, \*already escaped\*
+:smile: @alice #general
+
+[b]BBCode still works[/b] in the middle of it: [i]2 * 3[/i], [url=https://example.com/a_b]a_b[/url].

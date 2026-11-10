@@ -1,0 +1,7 @@
+<t>A post without any markup is stored in a t element, not in r.<br/>
+Its line breaks are br elements,<br/>
+and characters like * and _ or # at the start of a line are text:<br/>
+<br/>
+# not a heading<br/>
+- not a list item<br/>
+2 * 3 * 4 and snake_case_name &amp; &lt;b&gt;no HTML&lt;/b&gt;</t>

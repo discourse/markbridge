@@ -1,0 +1,20 @@
+What the renderer writes for these tags depends on the plugins of the Discourse site the posts go to. Open "Site" in the top bar and switch them.
+
+[b]discourse-bbcode[/b] (a plugin that needs an install) keeps colors and sizes. Without it only the text is left, because Discourse removes the style of a span:
+
+[color=#c13d1a]Red text[/color], [color=teal]teal text[/color], [size=150]large text[/size], [size=85]small text[/size], [color=navy][size=120][b]all of it[/b][/size][/color].
+
+[b]spoiler-alert[/b] (bundled with Discourse) blurs a spoiler. Without it the content is written as it is:
+
+The winner is [spoiler]the tortoise[/spoiler].
+[spoiler="The ending"]
+Everybody goes home, and [b]nobody[/b] is surprised.
+[/spoiler]
+
+In a library call the same switches are the features of the renderer:
+
+[code=ruby]renderer = Markbridge.discourse_renderer(
+  features: { spoiler: true, bbcode: true },
+  sizes: ->(size) { size },
+)
+Markbridge.bbcode_to_markdown(input, renderer:)[/code]

@@ -1,0 +1,95 @@
+# The examples of the playground, per format, in the order the picker
+# shows them. `file` is the input, in the directory of the format. The
+# name of the file is the name in the URL (/bbcode/everything).
+#
+# "everything" comes first and is the example the page opens with. It has
+# to show every tag of the parser, examples_spec.rb checks that.
+
+bbcode:
+  - title: Everything
+    description: Every tag and every alias of the BBCode parser, in one forum post
+    file: everything.bbcode
+  - title: Nesting
+    description: Quotes in quotes, lists four levels deep, code and tables inside both
+    file: nesting.bbcode
+  - title: Edge cases
+    description: Emphasis next to words, empty tags, odd URLs, text that looks like a tag
+    file: edge-cases.bbcode
+  - title: Broken markup
+    description: Tags closed in the wrong order or never, and tags the parser does not know
+    file: broken-markup.bbcode
+  - title: Markdown in the text
+    description: "Literal #, *, _, <, | and friends that the escaper has to keep as text"
+    file: markdown-in-text.bbcode
+  - title: Tables
+    description: Pipe tables, and the HTML form for uneven rows and blocks in cells
+    file: tables.bbcode
+  - title: Target site
+    description: Colors, sizes and spoilers, which depend on the plugins of the Discourse site
+    file: target-site.bbcode
+  - title: Normalization
+    description: Links in links and blocks in bold, which the normalizer moves and reports
+    file: normalization.bbcode
+
+html:
+  - title: Everything
+    description: Every element of the HTML parser, with the styles it reads from a span
+    file: everything.html
+  - title: Nesting
+    description: Blockquotes, lists and tables inside each other, and wrappers without a meaning
+    file: nesting.html
+  - title: Edge cases
+    description: Whitespace, entities, odd URLs, tags that are never closed
+    file: edge-cases.html
+  - title: Unknown elements
+    description: Custom elements, script, iframe and other tags without a handler
+    file: unknown-elements.html
+  - title: Markdown in the text
+    description: "Literal #, *, _, <, | and friends that the escaper has to keep as text"
+    file: markdown-in-text.html
+  - title: Tables
+    description: Pipe tables, and the HTML form for uneven rows, blocks in cells and spans
+    file: tables.html
+  - title: Normalization
+    description: Links in links and blocks in bold, which the normalizer moves and reports
+    file: normalization.html
+
+text_formatter:
+  - title: Everything
+    description: Every element of the s9e parser, as phpBB 3.2 and later store a post
+    file: everything.xml
+  - title: Nesting
+    description: Quotes in quotes, lists in lists, code and tables inside both
+    file: nesting.xml
+  - title: Plain text
+    description: A post without markup, which s9e stores in a t element
+    file: plain-text.xml
+  - title: Unknown elements
+    description: Media embeds, emoji, custom BBCodes and other elements without a handler
+    file: unknown-elements.xml
+  - title: Markdown in the text
+    description: "Literal #, *, _, <, | and friends that the escaper has to keep as text"
+    file: markdown-in-text.xml
+  - title: Target site
+    description: Colors, sizes and spoilers, which depend on the plugins of the Discourse site
+    file: target-site.xml
+
+media_wiki:
+  - title: Everything
+    description: All the wikitext the MediaWiki parser knows, in one page
+    file: everything.wiki
+  - title: Nesting
+    description: Lists four levels deep, mixed lists, formatting in headings and cells
+    file: nesting.wiki
+  - title: Edge cases
+    description: Apostrophes, headings that are none, odd links, lists that stop and start
+    file: edge-cases.wiki
+  - title: Unsupported wikitext
+    description: Templates, references, files and HTML that the parser leaves alone
+    file: unsupported.wiki
+  - title: Markdown in the text
+    description: "Literal *, _, <, | and friends that the escaper has to keep as text"
+    file: markdown-in-text.wiki
+  - title: Tables
+    description: Cells on one line or one per line, without a header, with uneven rows
+    file: tables.wiki

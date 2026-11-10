@@ -1,0 +1,45 @@
+Cells on one line:
+
+{|
+! Feature !! Page !! Notes
+|-
+| '''Parser''' || [[Main Page|Home]] || All ''four'' formats
+|-
+| Docs || [https://example.com/docs external] || <s>struck</s> and <code>code</code>
+|}
+
+One cell per line:
+
+{|
+|-
+! A
+! B
+! C
+|-
+| 1
+| 2
+| 3
+|}
+
+Without a header row:
+
+{|
+| 1 || 2
+|-
+| 3 || 4
+|}
+
+Uneven rows become HTML:
+
+{|
+! A !! B
+|-
+| 1 || 2
+|-
+| only one cell
+|}
+
+A table that is never closed:
+
+{|
+| 1 || 2

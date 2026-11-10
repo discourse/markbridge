@@ -1,0 +1,66 @@
+<r><ALIGN align="center"><s>[align=center]</s><SIZE size="150"><s>[size=150]</s><B><s>[b]</s>Trip report: three days in the Dolomites<e>[/b]</e></B><e>[/size]</e></SIZE><e>[/align]</e></ALIGN>
+
+<QUOTE author="alice" post_id="12" time="1700000000" user_id="2"><s>[quote=alice post_id=12 time=1700000000 user_id=2]</s>
+Did the <I><s>[i]</s>Alta Via<e>[/i]</e></I> hold up to the hype? <B><s>[b]</s>Pictures or it didn't happen!<e>[/b]</e></B>
+<e>[/quote]</e></QUOTE>
+
+It did. Here is the short version, with <B><s>[b]</s>every<e>[/b]</e></B> element the s9e parser knows.<br/>
+
+<U><s>[u]</s>Inline formatting<e>[/u]</e></U><br/>
+<B><s>[b]</s>bold<e>[/b]</e></B>, <I><s>[i]</s>italic<e>[/i]</e></I>, <U><s>[u]</s>underline<e>[/u]</e></U>, <S><s>[s]</s>strike<e>[/s]</e></S>.<br/>
+<COLOR color="#c13d1a"><s>[color=#c13d1a]</s>A color<e>[/color]</e></COLOR>, <COLOR color="teal"><s>[color=teal]</s>a named color<e>[/color]</e></COLOR>, <SIZE size="85"><s>[size=85]</s>small print<e>[/size]</e></SIZE> and <SIZE size="200"><s>[size=200]</s>a shout<e>[/size]</e></SIZE>.<br/>
+A line that ends here<br/>
+and goes on after a break. <i>[ignored]</i>Text that s9e ignored is not in the output.<br/>
+<br/>
+<U><s>[u]</s>Links<e>[/u]</e></U><br/>
+<URL url="https://example.com/alta-via"><s>[url]</s>https://example.com/alta-via<e>[/url]</e></URL>, <URL url="https://example.com/map"><s>[url=https://example.com/map]</s>the map<e>[/url]</e></URL>, <URL url="https://example.com/auto">https://example.com/auto</URL>, <EMAIL email="hut@example.com"><s>[email]</s>hut@example.com<e>[/email]</e></EMAIL> and <EMAIL email="booking@example.com"><s>[email=booking@example.com]</s>the booking desk<e>[/email]</e></EMAIL>.<br/>
+<br/>
+<U><s>[u]</s>Images and attachments<e>[/u]</e></U><br/>
+<IMG src="https://example.com/photos/sunrise.jpg"><s>[img]</s>https://example.com/photos/sunrise.jpg<e>[/img]</e></IMG><br/>
+<IMG src="https://example.com/photos/ridge.jpg" width="640" height="360" alt="The ridge"><s>[img]</s>https://example.com/photos/ridge.jpg<e>[/img]</e></IMG><br/>
+The elevation profile: <ATTACHMENT filename="profile.png" index="0"><s>[attachment=0]</s>profile.png<e>[/attachment]</e></ATTACHMENT> and the track: <ATTACH id="1"><s>[attach]</s>1<e>[/attach]</e></ATTACH><br/>
+<br/>
+<U><s>[u]</s>Code<e>[/u]</e></U>
+<CODE lang="ruby"><s>[code=ruby]</s>def beds_left(hut)
+  hut.beds - hut.bookings.count # [b]not bold[/b] in here
+end<e>[/code]</e></CODE>
+<CODE><s>[code]</s>  day 1 |  14 km | +1100 m
+  day 2 |  19 km |  +900 m<e>[/code]</e></CODE>
+
+<U><s>[u]</s>Lists<e>[/u]</e></U>
+<LIST><s>[list]</s>
+<LI><s>[*]</s>Boots, <B><s>[b]</s>broken in<e>[/b]</e></B></LI>
+<LI><s>[*]</s>Two liters of water
+<LIST type="decimal"><s>[list=1]</s>
+<LI><s>[*]</s>one bottle</LI>
+<LI><s>[*]</s>one bladder</LI>
+<e>[/list]</e></LIST></LI>
+<LI><s>[*]</s>Cash for the huts</LI>
+<e>[/list]</e></LIST>
+<LIST type="lower-alpha"><s>[list=a]</s>
+<LI><s>[*]</s>Book the huts</LI>
+<LI><s>[*]</s>Check the weather</LI>
+<e>[/list]</e></LIST>
+
+<U><s>[u]</s>Tables<e>[/u]</e></U>
+<TABLE><s>[table]</s>
+<TR><s>[tr]</s><TH><s>[th]</s>Day<e>[/th]</e></TH><TH><s>[th]</s>Distance<e>[/th]</e></TH><TH><s>[th]</s>Hut<e>[/th]</e></TH><e>[/tr]</e></TR>
+<TR><s>[tr]</s><TD><s>[td]</s>1<e>[/td]</e></TD><TD><s>[td]</s>14 km<e>[/td]</e></TD><TD><s>[td]</s><I><s>[i]</s>Rifugio Lagazuoi<e>[/i]</e></I><e>[/td]</e></TD><e>[/tr]</e></TR>
+<TR><s>[tr]</s><TD><s>[td]</s>2<e>[/td]</e></TD><TD><s>[td]</s>19 km<e>[/td]</e></TD><TD><s>[td]</s><URL url="https://example.com/nuvolau"><s>[url=https://example.com/nuvolau]</s>Rifugio Nuvolau<e>[/url]</e></URL><e>[/td]</e></TD><e>[/tr]</e></TR>
+<e>[/table]</e></TABLE>
+
+<U><s>[u]</s>Alignment<e>[/u]</e></U>
+<ALIGN align="left"><s>[align=left]</s>Left, like everything else.<e>[/align]</e></ALIGN>
+<ALIGN align="right"><s>[align=right]</s>Right.<e>[/align]</e></ALIGN>
+<ALIGN align="justify"><s>[align=justify]</s>Justified text needs a few more words before anybody can see what it does to a line.<e>[/align]</e></ALIGN>
+
+<U><s>[u]</s>Spoilers<e>[/u]</e></U><br/>
+<SPOILER><s>[spoiler]</s>The best hut was Nuvolau.<e>[/spoiler]</e></SPOILER>
+<SPOILER title="What went wrong"><s>[spoiler=What went wrong]</s>We forgot the <B><s>[b]</s>sunscreen<e>[/b]</e></B>.<e>[/spoiler]</e></SPOILER>
+
+<P>A paragraph element, as other s9e plugins write it.</P>
+
+<QUOTE><s>[quote]</s>
+A quote without an author,
+<QUOTE author="bob"><s>[quote=bob]</s>with a quote from bob inside.<e>[/quote]</e></QUOTE>
+<e>[/quote]</e></QUOTE></r>
