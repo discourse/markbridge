@@ -143,6 +143,9 @@ module Markbridge
 
           register("LI", Handlers::SimpleHandler.new(AST::ListItem))
 
+          # The [hr] BBCode of the s9e repository and a rule in Litedown
+          register("HR", Handlers::SelfClosingHandler.new(AST::HorizontalRule))
+
           # Paragraphs
           register("P", Handlers::SimpleHandler.new(AST::Paragraph))
 

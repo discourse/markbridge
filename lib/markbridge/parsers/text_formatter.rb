@@ -10,6 +10,7 @@ require_relative "../ast"
 # Handler classes
 require_relative "text_formatter/handlers/base_handler"
 require_relative "text_formatter/handlers/simple_handler"
+require_relative "text_formatter/handlers/self_closing_handler"
 require_relative "text_formatter/handlers/attribute_handler"
 require_relative "text_formatter/handlers/attachment_handler"
 require_relative "text_formatter/handlers/code_handler"

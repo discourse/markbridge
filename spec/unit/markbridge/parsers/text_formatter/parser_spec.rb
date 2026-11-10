@@ -155,6 +155,22 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
       )
     end
 
+    it "parses <HR> as a horizontal rule and starts a line after it" do
+      doc = parser.parse("<r>a\n<HR><s>[hr]</s><e>[/hr]</e></HR>\n  b</r>")
+
+      expect(doc.children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::HorizontalRule, Markbridge::AST::Text],
+      )
+      expect(doc.children.last.text).to eq("b")
+      expect(parser.unknown_tags).to be_empty
+    end
+
+    it "keeps the whitespace after a leaf that is not a block" do
+      doc = parser.parse(%(<r><IMG src="https://example.com/a.png"/> b</r>))
+
+      expect(doc.children.last.text).to eq(" b")
+    end
+
     it "keeps two <br> in different elements as two LineBreaks" do
       doc = parser.parse("<r><B>a<br/></B><br/>b</r>")
 

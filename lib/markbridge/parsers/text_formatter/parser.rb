@@ -162,8 +162,9 @@ module Markbridge
           elsif @handlers.has_handler?(tag_name)
             # The handler returned nil intentionally: a leaf like an image
             # or an attachment, whose content is only fallback text. It is
-            # visible, so the text after it is no longer at the line start.
-            @line_start = false
+            # visible, so the text after it is no longer at the line start,
+            # unless the leaf is a block like a horizontal rule.
+            @line_start = @block_classes[ast_parent.children.last.class]
           else
             # No handler found - track as unknown and process children directly
             @unknown_tags[tag_name] += 1

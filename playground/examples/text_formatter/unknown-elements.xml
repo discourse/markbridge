@@ -1,6 +1,5 @@
 <r>s9e has many plugins, and a forum can define its own BBCodes. An element without a handler is transparent: its content stays, the element is counted.
 
-<HR><s>[hr]</s><e>[/hr]</e></HR>
 <YOUTUBE id="dQw4w9WgXcQ"><s>[youtube]</s>https://www.youtube.com/watch?v=dQw4w9WgXcQ<e>[/youtube]</e></YOUTUBE>
 <E>:)</E> <EMOJI seq="1f600">😀</EMOJI>
 <MYBBCODE level="3"><s>[mybbcode=3]</s>A custom BBCode with <B><s>[b]</s>known children<e>[/b]</e></B>.<e>[/mybbcode]</e></MYBBCODE>
