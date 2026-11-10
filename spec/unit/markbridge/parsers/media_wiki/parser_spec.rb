@@ -572,6 +572,12 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(doc.children.last.children.size).to eq(1)
     end
 
+    it "keeps a pipe in the text of a caption" do
+      doc = parser.parse("{|\n|+ class=\"x\" | a | b\n| 1\n|}")
+
+      expect(doc.children.first.children.first.text).to eq("a | b")
+    end
+
     it "takes a caption without attributes, and no paragraph for an empty one" do
       doc = parser.parse("{|\n|+ Plain\n|+\n| 1\n|}")
 

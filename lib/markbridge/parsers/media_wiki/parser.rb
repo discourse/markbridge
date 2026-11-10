@@ -256,7 +256,7 @@ module Markbridge
         #
         # @param content [String] the line after `|+`
         def table_caption(content)
-          text = split_outside_brackets(content, "|", limit: 2).last.strip
+          text = split_outside_brackets(content, "|", limit: 2).last.lstrip
           return if text.empty?
 
           paragraph = AST::Paragraph.new
