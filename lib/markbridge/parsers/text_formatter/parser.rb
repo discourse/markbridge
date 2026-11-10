@@ -102,7 +102,6 @@ module Markbridge
         # text after them is not visible.
         BLOCK_NODES = [
           AST::Align,
-          AST::Code,
           AST::Details,
           AST::Heading,
           AST::HorizontalRule,
@@ -196,12 +195,15 @@ module Markbridge
           @pending_break = nil
         end
 
-        # Whether phpBB shows +node+ as a block: one of the BLOCK_NODES, or
-        # a spoiler that says so. An inline spoiler is part of its line.
+        # Whether the forum shows +node+ as a block: one of the BLOCK_NODES,
+        # or a spoiler or code that says so. An inline spoiler and a code
+        # span are part of their line.
         #
         # @param node [AST::Node, nil]
         def block?(node)
-          node.is_a?(AST::Spoiler) ? node.block : @block_classes[node.class]
+          return node.block if node.is_a?(AST::Spoiler) || node.is_a?(AST::Code)
+
+          @block_classes[node.class]
         end
 
         # @param element [Nokogiri::XML::Element]

@@ -89,14 +89,21 @@ RSpec.describe Markbridge::Playground::Examples do
       expect(node_classes("html")).to include(*element_classes(registry))
     end
 
-    it "uses every element name of the TextFormatter parser" do
-      input = described_class.everything("text_formatter").fetch(:input)
+    # phpBB stores the BBCode elements and Flarum the Litedown ones, so
+    # the two sets are in two examples.
+    it "uses every element name of the TextFormatter parser, with the Litedown example" do
+      litedown =
+        described_class.catalog.find { |example| example[:id] == "text_formatter/litedown" }
+      input = described_class.everything("text_formatter").fetch(:input) + litedown.fetch(:input)
       registry = Markbridge::Parsers::TextFormatter::HandlerRegistry.default
 
       missing = registry.map(&:first).reject { |name| input.match?(%r{<#{name}[\s>/]}) }
+      ast = Markbridge.parse_text_formatter_xml(litedown.fetch(:input)).ast
+      classes = node_classes("text_formatter") + ast.each_descendant.map(&:class)
 
-      expect(missing).to be_empty, "missing in everything.xml: #{missing.join(", ")}"
-      expect(node_classes("text_formatter")).to include(*element_classes(registry))
+      expect(missing).to be_empty,
+      "missing in everything.xml and litedown.xml: #{missing.join(", ")}"
+      expect(classes).to include(*element_classes(registry))
     end
 
     it "uses every inline tag and every block of the MediaWiki parser" do

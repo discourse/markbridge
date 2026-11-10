@@ -3,7 +3,9 @@
 # name of the file is the name in the URL (/bbcode/everything).
 #
 # "everything" comes first and is the example the page opens with. It has
-# to show every tag of the parser, examples_spec.rb checks that.
+# to show every tag of the parser, examples_spec.rb checks that. For
+# TextFormatter the elements of Litedown are in an example of their own,
+# because no forum stores them next to the BBCode ones.
 
 bbcode:
   - title: Everything
@@ -56,8 +58,11 @@ html:
 
 text_formatter:
   - title: Everything
-    description: Every element of the s9e parser, as phpBB 3.2 and later store a post
+    description: Every element of the s9e BBCodes, as phpBB 3.2 and later store a post
     file: everything.xml
+  - title: Litedown
+    description: Every element of Litedown, the Markdown of s9e, as Flarum stores a post
+    file: litedown.xml
   - title: Nesting
     description: Quotes in quotes, lists in lists, code and tables inside both
     file: nesting.xml

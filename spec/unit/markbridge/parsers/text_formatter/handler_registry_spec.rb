@@ -240,6 +240,51 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
         Markbridge::Parsers::TextFormatter::Handlers::SelfClosingHandler,
         Markbridge::AST::HorizontalRule,
       ],
+      "STRONG" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Bold,
+      ],
+      "EM" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Italic,
+      ],
+      "DEL" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Strikethrough,
+      ],
+      "SUP" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Superscript,
+      ],
+      "SUB" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Subscript,
+      ],
+      "C" => [Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler, Markbridge::AST::Code],
+      "H1" => [
+        Markbridge::Parsers::TextFormatter::Handlers::HeadingHandler,
+        Markbridge::AST::Heading,
+      ],
+      "H2" => [
+        Markbridge::Parsers::TextFormatter::Handlers::HeadingHandler,
+        Markbridge::AST::Heading,
+      ],
+      "H3" => [
+        Markbridge::Parsers::TextFormatter::Handlers::HeadingHandler,
+        Markbridge::AST::Heading,
+      ],
+      "H4" => [
+        Markbridge::Parsers::TextFormatter::Handlers::HeadingHandler,
+        Markbridge::AST::Heading,
+      ],
+      "H5" => [
+        Markbridge::Parsers::TextFormatter::Handlers::HeadingHandler,
+        Markbridge::AST::Heading,
+      ],
+      "H6" => [
+        Markbridge::Parsers::TextFormatter::Handlers::HeadingHandler,
+        Markbridge::AST::Heading,
+      ],
       "ISPOILER" => [
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
         Markbridge::AST::Spoiler,

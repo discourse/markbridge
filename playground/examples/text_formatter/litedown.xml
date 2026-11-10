@@ -1,0 +1,44 @@
+<r><H1><s># </s>Trip report: three days in the Dolomites</H1>
+
+<p>Flarum stores a post like this: Markdown, parsed by the Litedown plugin of s9e. The paragraphs are <C><s>`</s>p<e>`</e></C> elements, and the Markdown markers are kept in <C><s>`</s>s<e>`</e></C>, <C><s>`</s>e<e>`</e></C> and <C><s>`</s>i<e>`</e></C> elements, which the parser skips.</p>
+
+<H2><s>## </s>Inline formatting</H2>
+
+<p><STRONG><s>**</s>bold<e>**</e></STRONG>, <EM><s>*</s>italic<e>*</e></EM>, <STRONG><s>**</s>bold with <EM><s>_</s>italic<e>_</e></EM> in it<e>**</e></STRONG>, <DEL><s>~~</s>struck<e>~~</e></DEL>, H<SUB><s>~</s>2<e>~</e></SUB>O at 2<SUP><s>^</s>3<e>^</e></SUP> bar.<br/>
+The best hut was <ISPOILER><s>||</s>Nuvolau<e>||</e></ISPOILER>.</p>
+
+<H3><s>### </s>Links and images</H3>
+
+<p><URL url="https://example.com/map"><s>[</s>The map<e>](https://example.com/map)</e></URL>, <URL url="https://example.com/alta-via">https://example.com/alta-via</URL> and <EMAIL email="hut@example.com">hut@example.com</EMAIL>.</p>
+
+<p><IMG alt="Sunrise over the ridge" src="https://picsum.photos/id/29/640/360"><s>![</s>Sunrise over the ridge<e>](https://picsum.photos/id/29/640/360)</e></IMG></p>
+
+<H4><s>#### </s>Code</H4>
+
+<p>The hut runs on <C><s>`</s>cron<e>`</e></C>. Their booking script:</p>
+
+<CODE lang="ruby"><s>```ruby</s><i>
+</i>def beds_left(hut)
+  hut.beds - hut.bookings.count # **not bold** in here
+end<i>
+</i><e>```</e></CODE>
+
+<H5><s>##### </s>Lists and quotes</H5>
+
+<LIST><LI><s>- </s>Boots, <STRONG><s>**</s>broken in<e>**</e></STRONG></LI>
+<LI><s>- </s>Two liters of water
+<LIST type="decimal"><LI><s>1. </s>one bottle</LI>
+<LI><s>2. </s>one bladder</LI></LIST></LI>
+<LI><s>- </s>Cash for the huts</LI></LIST>
+
+<QUOTE><i>&gt; </i><p>Did the Alta Via hold up to the hype?<br/>
+<i>&gt; </i>Pictures or it didn't happen!</p></QUOTE>
+
+<SPOILER><i>&gt;! </i><p>What went wrong: we forgot the sunscreen.</p></SPOILER>
+
+<HR>* * *</HR>
+
+<H6><s>###### </s>The smallest heading</H6>
+
+<H2>A heading that is underlined<e>
+---</e></H2></r>

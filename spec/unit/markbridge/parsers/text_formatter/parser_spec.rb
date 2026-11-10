@@ -165,6 +165,69 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
       expect(parser.unknown_tags).to be_empty
     end
 
+    context "with the elements of Litedown" do
+      it "reads a code span as inline code and keeps the text after it on the line" do
+        doc = parser.parse("<r>a <C><s>`</s>x * y<e>`</e></C> b</r>")
+
+        code = doc.children[1]
+        expect(code).to be_a(Markbridge::AST::Code)
+        expect(code.block).to be_nil
+        expect(code.children.first.text).to eq("x * y")
+        expect(doc.children.last.text).to eq(" b")
+      end
+
+      it "starts a line after a fenced code block" do
+        doc = parser.parse("<r><CODE><s>```</s><i>\n</i>x<i>\n</i><e>```</e></CODE>\n b</r>")
+
+        expect(doc.children.first.block).to be(true)
+        expect(doc.children.last.text).to eq("b")
+      end
+
+      it "starts a line after code from a subclass that is a block" do
+        code_class = Class.new(Markbridge::AST::Code) { def initialize = super(block: true) }
+        handler = Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(code_class)
+        parser = described_class.new { |registry| registry.register("PRE", handler) }
+
+        expect(parser.parse("<r><PRE>x</PRE> b</r>").children.last.text).to eq("b")
+      end
+
+      it "reads a heading with its level and starts a line after it" do
+        doc = parser.parse("<r><H2><s>## </s>Title</H2>\n text</r>")
+
+        expect(doc.children.first).to be_a(Markbridge::AST::Heading)
+        expect(doc.children.first.level).to eq(2)
+        expect(doc.children.first.children.first.text).to eq("Title")
+        expect(doc.children.last.text).to eq("text")
+      end
+
+      it "reads the emphasis, strikethrough, superscript and subscript elements" do
+        doc =
+          parser.parse(
+            "<r><STRONG><s>**</s>a<e>**</e></STRONG><EM><s>*</s>b<e>*</e></EM>" \
+              "<DEL><s>~~</s>c<e>~~</e></DEL><SUP><s>^</s>d<e>^</e></SUP><SUB><s>~</s>e<e>~</e></SUB></r>",
+          )
+
+        expect(doc.children.map(&:class)).to eq(
+          [
+            Markbridge::AST::Bold,
+            Markbridge::AST::Italic,
+            Markbridge::AST::Strikethrough,
+            Markbridge::AST::Superscript,
+            Markbridge::AST::Subscript,
+          ],
+        )
+        expect(parser.unknown_tags).to be_empty
+      end
+
+      it "takes the rule of a horizontal rule as markup, not as text" do
+        doc = parser.parse("<r><p>a</p>\n\n<HR>* * *</HR>\n\n<p>b</p></r>")
+
+        expect(doc.children.map(&:class)).to eq(
+          [Markbridge::AST::Paragraph, Markbridge::AST::HorizontalRule, Markbridge::AST::Paragraph],
+        )
+      end
+    end
+
     it "starts a line in and after a block spoiler" do
       doc = parser.parse("<r><SPOILER><s>[spoiler]</s> a<e>[/spoiler]</e></SPOILER>\n b</r>")
 
