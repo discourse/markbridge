@@ -76,7 +76,7 @@ All tag names are case-insensitive. Aliases in the same row use the same handler
 |---|---|---|
 | `[list]`, `[ul]`, `[ulist]` | `- item` | `AST::List` |
 | `[ol]`, `[olist]` | `1. item` | `AST::List` |
-| `[*]`, `[li]`, `[.]` | List item | `AST::ListItem` |
+| `[*]`, `[li]` | List item | `AST::ListItem` |
 
 ### Tables
 

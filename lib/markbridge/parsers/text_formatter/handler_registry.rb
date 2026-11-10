@@ -141,9 +141,7 @@ module Markbridge
           register("ATTACHMENT", Handlers::AttachmentHandler.new)
           register("ATTACH", Handlers::AttachmentHandler.new)
 
-          # List item (supports both LI and * for compatibility)
           register("LI", Handlers::SimpleHandler.new(AST::ListItem))
-          register("*", Handlers::SimpleHandler.new(AST::ListItem))
 
           # Paragraphs
           register("P", Handlers::SimpleHandler.new(AST::Paragraph))
