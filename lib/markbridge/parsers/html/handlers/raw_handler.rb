@@ -33,24 +33,25 @@ module Markbridge
 
           private
 
+          HTML5_DOCUMENT = "Nokogiri::HTML5::Document"
+          private_constant :HTML5_DOCUMENT
+
+          # HTML drops a line break right after <pre>. Nokogiri's HTML5
+          # parser has done that already, its HTML4 parser keeps the line
+          # break. A line break inside a <code> in the <pre> is content.
+          # The class is compared by name, JRuby's Nokogiri has no HTML5.
+          def leading_newline_ignored?(element)
+            return false unless element.name == "pre" && element.children.first&.text?
+
+            !element.document.class.name.eql?(HTML5_DOCUMENT)
+          end
+
           # <pre> is a block by definition, so its content keeps the fenced
           # form even on one line; <code> and <tt> leave the decision to the
           # renderer's newline check.
           #
           # @param element [Nokogiri::XML::Element]
           # @return [Boolean, nil]
-          # HTML drops a line break right after <pre>. Nokogiri's HTML5
-          # parser has done that already, its HTML4 parser keeps the line
-          # break. A line break inside a <code> in the <pre> is content.
-          def leading_newline_ignored?(element)
-            return false unless element.name == "pre" && element.children.first&.text?
-
-            !(
-              defined?(Nokogiri::HTML5::Document) &&
-                element.document.is_a?(Nokogiri::HTML5::Document)
-            )
-          end
-
           def block_for(element)
             true if element.name == "pre"
           end
