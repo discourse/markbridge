@@ -184,17 +184,22 @@ module Markbridge
 
         # The value after `[tag=`. Without quotes it may have spaces, as in
         # `[quote=John Doe]`: it goes on over the words that follow, up to
-        # the `]` or to the first `name=` of a named attribute. A line
-        # break ends it like before.
+        # the `]` or to the first `name=` of a named attribute, or to a
+        # line break. The cursor may stand behind the blanks after the
+        # value, the caller skips whitespace there anyway.
         def scan_option_value
           start = @current_pos
           value = scan_attribute_value
-          return value if value.nil? || @current_pos == start || quote_byte?(@input.getbyte(start))
+          return value if value.nil? || quote_byte?(@input.getbyte(start))
 
           stop = @current_pos
-          stop = @current_pos while skip_blanks && !attribute_ahead? && scan_unquoted_value
+          loop do
+            skip_blanks
+            break if attribute_ahead? || !scan_unquoted_value
 
-          @current_pos = stop
+            stop = @current_pos
+          end
+
           @input.byteslice(start, stop - start)
         end
 
@@ -203,11 +208,8 @@ module Markbridge
         end
 
         # Skips spaces and tabs.
-        # @return [Boolean] whether there were any
         def skip_blanks
-          start = @current_pos
           @current_pos += 1 while (byte = current_byte) == SPACE || byte == TAB
-          @current_pos > start
         end
 
         # Whether a `name=` stands at the cursor, the start of a named

@@ -252,19 +252,17 @@ module Markbridge
       # were on two lines, and an HTML parser has trimmed the whitespace
       # at such a line edge.
       def coalesce(nodes)
-        acc = []
-        gap = false
-        nodes.each do |node|
-          if node.equal?(GAP)
-            gap = true
-            next
-          end
+        nodes
+          .each_with_index
+          .with_object([]) do |(node, index), acc|
+            next if node.equal?(GAP)
 
-          append(acc, AST::Text.new(" ")) if gap && touching?(acc.last, node)
-          gap = false
-          append(acc, node)
-        end
-        acc
+            # For the first node this looks at the last one, which does no
+            # harm: nothing is in front of the first node to touch.
+            gap = nodes.fetch(index - 1).equal?(GAP)
+            append(acc, AST::Text.new(" ")) if gap && touching?(acc.last, node)
+            append(acc, node)
+          end
       end
 
       def append(acc, node)

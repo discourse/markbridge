@@ -141,7 +141,7 @@ module Markbridge
           # spoiler of Litedown.
           register(
             "SPOILER",
-            Handlers::AttributeHandler.new(AST::Spoiler, attribute: :title, fixed: { block: true }),
+            Handlers::AttributeHandler.new(AST::Spoiler, attribute: :title, block: true),
           )
           register("ISPOILER", Handlers::SimpleHandler.new(AST::Spoiler))
           register("ATTACHMENT", Handlers::AttachmentHandler.new)

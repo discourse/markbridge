@@ -16,14 +16,14 @@ module Markbridge
         #
         # @example With a fixed keyword for every node
         #   # <SPOILER title="..."> is a block in phpBB
-        #   AttributeHandler.new(AST::Spoiler, attribute: :title, fixed: { block: true })
+        #   AttributeHandler.new(AST::Spoiler, attribute: :title, block: true)
         class AttributeHandler < BaseHandler
           # @param element_class [Class] the AST node class to instantiate
           # @param attribute [Symbol] the XML attribute name to extract
           # @param param [Symbol] the parameter name to pass to the AST node constructor
-          # @param fixed [Hash{Symbol => Object}] keywords every node gets,
-          #   next to the one from the attribute
-          def initialize(element_class, attribute:, param: nil, fixed: {})
+          # @param fixed [Hash{Symbol => Object}] more keywords, which every
+          #   node gets next to the one from the attribute
+          def initialize(element_class, attribute:, param: nil, **fixed)
             @element_class = element_class
             @attribute = attribute
             @param = param || attribute
