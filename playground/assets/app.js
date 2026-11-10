@@ -876,7 +876,12 @@
 
   function renderOptions() {
     sitePopover.querySelectorAll("[data-option]").forEach((input) => {
-      input.checked = state.options[input.dataset.option] === true;
+      const value = state.options[input.dataset.option];
+      if (input.type === "checkbox") {
+        input.checked = value === true;
+      } else if (input.value !== value) {
+        input.value = value || "";
+      }
     });
     const changed = Object.keys(defaults).some((key) => state.options[key] !== defaults[key]);
     $("#site-changed").hidden = !changed;
@@ -1075,9 +1080,10 @@
   });
 
   sitePopover.addEventListener("change", (event) => {
-    const option = event.target.dataset.option;
+    const input = event.target;
+    const option = input.dataset.option;
     if (option) {
-      setOptions({ ...state.options, [option]: event.target.checked });
+      setOptions({ ...state.options, [option]: input.type === "checkbox" ? input.checked : input.value.trim() });
     }
   });
   $("#site-reset").addEventListener("click", () => setOptions({ ...defaults }));

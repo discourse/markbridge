@@ -24,7 +24,12 @@ module Markbridge
       # builds their nodes.
       # spoiler-alert comes with Discourse, discourse-bbcode needs an
       # install, so the first is on and the second is off.
-      DEFAULT_OPTIONS = { "spoiler" => true, "bbcode" => false, "normalize" => true }.freeze
+      DEFAULT_OPTIONS = {
+        "spoiler" => true,
+        "bbcode" => false,
+        "normalize" => true,
+        "base_url" => "",
+      }.freeze
 
       COOKER = Cooker.new
 
@@ -80,7 +85,7 @@ module Markbridge
           Markbridge.convert(
             input,
             format: FORMATS.fetch(format) { raise ArgumentError, "unsupported format: #{format}" },
-            renderer: renderer_for(features),
+            renderer: renderer_for(features, base_url: options["base_url"].to_s.strip),
             normalize: options["normalize"] == true,
           )
         duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
@@ -102,9 +107,10 @@ module Markbridge
 
       # The sizes pass as they are: phpBB writes percent, which is what
       # the discourse-bbcode plugin reads.
-      def renderer_for(features)
+      def renderer_for(features, base_url: "")
         sizes = ->(size) { size } if features[:bbcode]
-        Markbridge.discourse_renderer(features:, sizes:)
+        base_url = nil if base_url.empty?
+        Markbridge.discourse_renderer(features:, sizes:, base_url:)
       end
 
       def unknown_tags(conversion)
