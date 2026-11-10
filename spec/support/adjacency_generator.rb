@@ -113,6 +113,9 @@ module AdjacencyGenerator
     underline
     sup
     sub
+    ins
+    del
+    mark
     spoiler
     color
     code
@@ -152,6 +155,12 @@ module AdjacencyGenerator
       AST::Superscript.new << AST::Text.new(content)
     when "sub"
       AST::Subscript.new << AST::Text.new(content)
+    when "ins"
+      AST::Insertion.new << AST::Text.new(content)
+    when "del"
+      AST::Deletion.new << AST::Text.new(content)
+    when "mark"
+      AST::Highlight.new << AST::Text.new(content)
     when "spoiler"
       AST::Spoiler.new << AST::Text.new(content)
     when "color"

@@ -2,7 +2,7 @@
 
 # The round-trip cases that fail today. A case on one of these lists is
 # expected to fail; the specs fail when a listed case starts to pass, so a
-# fix removes its entry in the same commit. The lists are empty right now.
+# fix removes its entry in the same commit.
 #
 # An entry names its reason and the cases it covers. A case in the
 # adjacency list is a case id (see AdjacencyGenerator) or a Regexp that
@@ -18,13 +18,22 @@ module RoundTripKnownBugs
 
   ADJACENCY = [].freeze
 
-  STRUCTURE = [].freeze
+  # An upload in html_mode is a Markdown island, a <div> with blank lines.
+  # Inside an inline element in a paragraph, `<p><del><div>`, the HTML
+  # parser ends the paragraph at the <div> and the inline element is left
+  # empty in front of it. The wrapper can be any inline element that is
+  # written as an HTML tag there (del, sub, s, ...).
+  UPLOAD_IN_INLINE_HTML =
+    "an upload inside an inline element inside a paragraph, in a table written as HTML: " \
+      "the island's <div> ends the <p>, and the inline element stays empty in front of it"
+
+  STRUCTURE = [entry(UPLOAD_IN_INLINE_HTML, cases: [1136, 4485])].freeze
 
   # The same cases cooked with the Discourse engine (any profile; the
   # reason names the profile when it matters).
   ADJACENCY_ENGINE = [].freeze
 
-  STRUCTURE_ENGINE = [].freeze
+  STRUCTURE_ENGINE = [entry(UPLOAD_IN_INLINE_HTML, cases: [1136])].freeze
 
   LISTS = {
     adjacency: ADJACENCY,
