@@ -137,6 +137,8 @@ module Markbridge
             "ALIGN",
             Handlers::AttributeHandler.new(AST::Align, attribute: :align, param: :alignment),
           )
+          # The [center] of the s9e repository, which Flarum has on
+          register("CENTER", Handlers::SimpleHandler.new(AST::Align, alignment: "center"))
           # phpBB shows a [spoiler] as a block. ISPOILER is the inline
           # spoiler of Litedown.
           register(

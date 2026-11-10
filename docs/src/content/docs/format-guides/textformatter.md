@@ -55,7 +55,7 @@ A line break is stored as `<br/>` followed by a newline in the next text node (`
 | `<LI>` | List item | `AST::ListItem` |
 | `<TABLE>`, `<TR>`, `<TD>`, `<TH>` | GFM table | `AST::Table` |
 | `<COLOR>`, `<SIZE>` | See [Colors and sizes](#colors-and-sizes) | `AST::Color`, `AST::Size` |
-| `<ALIGN>` | `<div align="…">` | `AST::Align` |
+| `<ALIGN>`, `<CENTER>` | `<div align="…">` | `AST::Align` |
 | `<SPOILER>` | Block spoiler: `[spoiler]` and `[/spoiler]` on lines of their own, a title as a paragraph in front | `AST::Spoiler` with `block: true` |
 | `<ISPOILER>` | `[spoiler]…[/spoiler]` inside the line | `AST::Spoiler` |
 | `<HR>` | `---` | `AST::HorizontalRule` |

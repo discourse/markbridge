@@ -119,6 +119,12 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
         expect(node.block).to be(true)
       end
 
+      it "dispatches CENTER to a centered Align" do
+        node = process_and_get_node("<CENTER>text</CENTER>")
+        expect(node).to be_a(Markbridge::AST::Align)
+        expect(node.alignment).to eq("center")
+      end
+
       it "dispatches ISPOILER to an inline Spoiler" do
         node = process_and_get_node("<ISPOILER>hidden</ISPOILER>")
         expect(node).to be_a(Markbridge::AST::Spoiler)
@@ -284,6 +290,10 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
       "H6" => [
         Markbridge::Parsers::TextFormatter::Handlers::HeadingHandler,
         Markbridge::AST::Heading,
+      ],
+      "CENTER" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Align,
       ],
       "ISPOILER" => [
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
