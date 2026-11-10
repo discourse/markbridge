@@ -10,6 +10,11 @@ module Markbridge
         # JavaScript, or document metadata that shouldn't appear in output.
         IGNORED_TAGS = %w[style script head title noscript template].freeze
 
+        # Tags that only group the rows of a table. Without a handler they
+        # are passed through like an unknown tag, but they are part of every
+        # table, so they are not counted as one.
+        TRANSPARENT_TAGS = %w[thead tbody tfoot].freeze
+
         WHITESPACE_RUN = /[ \t\r\n\f]+/
 
         attr_reader :unknown_tags
@@ -204,7 +209,7 @@ module Markbridge
         # @param node [Nokogiri::XML::Element]
         # @param parent [AST::Element]
         def handle_unknown_tag(node, parent)
-          @unknown_tags[node.name] += 1
+          @unknown_tags[node.name] += 1 unless TRANSPARENT_TAGS.include?(node.name)
           process_children(node, parent)
         end
 
