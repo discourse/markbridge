@@ -165,6 +165,23 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
       expect(parser.unknown_tags).to be_empty
     end
 
+    it "passes an escaped character, an emoticon and an emoji through without counting them" do
+      doc =
+        parser.parse(
+          "<r>a <ESC><s>\\</s>*</ESC> <E>:)</E> <EMOJI seq=\"263a\">\u263A</EMOJI> <X>x</X></r>",
+        )
+
+      expect(doc.children.map(&:text).join).to eq("a * :) \u263A x")
+      expect(parser.unknown_tags).to eq("X" => 1)
+    end
+
+    it "counts an element the registry no longer lists as transparent" do
+      parser = described_class.new { |registry| registry.transparent_tags.delete("E") }
+      parser.parse("<r><E>:)</E></r>")
+
+      expect(parser.unknown_tags).to eq("E" => 1)
+    end
+
     context "with the elements of Litedown" do
       it "reads a code span as inline code and keeps the text after it on the line" do
         doc = parser.parse("<r>a <C><s>`</s>x * y<e>`</e></C> b</r>")

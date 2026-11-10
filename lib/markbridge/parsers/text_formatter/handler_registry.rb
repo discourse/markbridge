@@ -50,11 +50,23 @@ module Markbridge
         # silently mutating state visible to every parser.
         def freeze
           @mappings.freeze
+          @transparent_tags.freeze
           super
         end
 
+        # Elements that are expected without a handler: <ESC> holds a
+        # character that a backslash made literal, <E> an emoticon and
+        # <EMOJI> an emoji, each with its text as content.
+        DEFAULT_TRANSPARENT_TAGS = %w[ESC E EMOJI].freeze
+
+        # @return [Set<String>] mutable set of element names that are not
+        #   counted as unknown when they have no handler. Their content
+        #   is processed like for any element without one.
+        attr_reader :transparent_tags
+
         def initialize
           @mappings = {}
+          @transparent_tags = Set.new(DEFAULT_TRANSPARENT_TAGS)
         end
 
         # Iterate over the registered (element_name, handler) pairs, in
@@ -137,8 +149,11 @@ module Markbridge
             "ALIGN",
             Handlers::AttributeHandler.new(AST::Align, attribute: :align, param: :alignment),
           )
-          # The [center] of the s9e repository, which Flarum has on
-          register("CENTER", Handlers::SimpleHandler.new(AST::Align, alignment: "center"))
+          # The alignment BBCodes of the s9e repository have no attribute,
+          # the name says how to align. Flarum has [center] on.
+          %w[CENTER LEFT RIGHT JUSTIFY].each do |name|
+            register(name, Handlers::SimpleHandler.new(AST::Align, alignment: name.downcase))
+          end
           # phpBB shows a [spoiler] as a block. ISPOILER is the inline
           # spoiler of Litedown.
           register(

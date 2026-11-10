@@ -119,10 +119,12 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
         expect(node.block).to be(true)
       end
 
-      it "dispatches CENTER to a centered Align" do
-        node = process_and_get_node("<CENTER>text</CENTER>")
-        expect(node).to be_a(Markbridge::AST::Align)
-        expect(node.alignment).to eq("center")
+      it "dispatches CENTER, LEFT, RIGHT and JUSTIFY to an Align with that alignment" do
+        %w[CENTER LEFT RIGHT JUSTIFY].each do |name|
+          node = process_and_get_node("<#{name}>text</#{name}>")
+          expect(node).to be_a(Markbridge::AST::Align)
+          expect(node.alignment).to eq(name.downcase)
+        end
       end
 
       it "dispatches ISPOILER to an inline Spoiler" do
@@ -170,6 +172,23 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
     it "returns an Enumerator without a block and is Enumerable" do
       expect(registry.each).to be_a(Enumerator)
       expect(registry.map(&:first)).to include("B", "URL", "LIST")
+    end
+  end
+
+  describe "#transparent_tags" do
+    it "defaults to the escape, emoticon and emoji elements" do
+      expect(described_class.new.transparent_tags).to eq(Set["ESC", "E", "EMOJI"])
+    end
+
+    it "is per-instance" do
+      registry = described_class.new
+      registry.transparent_tags << "X"
+
+      expect(described_class.new.transparent_tags).not_to include("X")
+    end
+
+    it "is frozen with the registry" do
+      expect { described_class.new.freeze.transparent_tags << "X" }.to raise_error(FrozenError)
     end
   end
 
@@ -292,6 +311,18 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
         Markbridge::AST::Heading,
       ],
       "CENTER" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Align,
+      ],
+      "LEFT" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Align,
+      ],
+      "RIGHT" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
+        Markbridge::AST::Align,
+      ],
+      "JUSTIFY" => [
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
         Markbridge::AST::Align,
       ],
