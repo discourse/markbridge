@@ -22,6 +22,9 @@ The default rules are CommonMark legality. Break one and the Markdown doesn't pa
 - **No link inside a link**, at any depth (§6.3). The inner link is unwrapped.
 - **A block inside an inline container is moved out.** An inline container holds inline content only. This isn't link-specific: emphasis (`Bold`, `Italic`, …) and headings are inline containers too, so a poll inside bold or a list inside a heading is handled the same way as a block inside a link. The block nodes cover `List`, `Table`, `Quote`, `Details`, `HorizontalRule`, `Align`, and the Discourse `Poll`/`Event` nodes.
 - **A fenced or multi-line code block inside an inline container is moved out.** A one-line code span is fine.
+- **A block spoiler inside an inline container is moved out.** That is an `AST::Spoiler` with `block: true`. An inline spoiler is fine.
+
+When a block is moved out and the texts on its two sides would touch, a space goes between them. With the block there they were on two lines, and an HTML parser has trimmed the whitespace at the line edges: `<i>Run <pre>…</pre> and wait</i>` becomes `*Run and wait*` and the code block.
 
 Discourse-specific policy is **not** built in. Moving an image out of a link, for example, is a rule you add yourself (see below) — a linked image (`[![alt](src)](url)`) is valid CommonMark, so the default leaves it alone.
 

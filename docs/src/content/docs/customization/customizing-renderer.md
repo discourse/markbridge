@@ -131,7 +131,7 @@ Some of what the renderer writes is BBCode that a Discourse plugin cooks. A site
 | Feature | Plugin | Default | With the plugin | Without it |
 |---|---|---|---|---|
 | `details` | discourse-details, bundled with Discourse (`details_enabled`) | on | `[details="title"]…[/details]` | the title as a paragraph in bold, then the content |
-| `spoiler` | spoiler-alert, bundled (`spoiler_enabled`) | on | `[spoiler]…[/spoiler]` | the content, so the hidden text shows |
+| `spoiler` | spoiler-alert, bundled (`spoiler_enabled`) | on | `[spoiler]…[/spoiler]`, with the tags on lines of their own for a block spoiler | the content, so the hidden text shows |
 | `poll` | poll, bundled (`poll_enabled`) | on | `[poll]…[/poll]` | the options as a bullet list |
 | `post_event` | discourse-events, bundled (`discourse_post_event_enabled`) | on | `[event …][/event]` | a paragraph with the name and the dates |
 | `bbcode` | [discourse-bbcode](https://github.com/discourse/discourse-bbcode), needs an install | undecided | `[color=…]…[/color]`, `[size=…]…[/size]` | the text |

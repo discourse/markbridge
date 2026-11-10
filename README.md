@@ -66,7 +66,7 @@ bin/playground
 
 Open `http://127.0.0.1:4567`. The input is on the left, the output on the right, and the output follows while you type. Paste markup, drop a file on the input, or pick an example.
 
-- **Formats**: BBCode, HTML, TextFormatter XML, MediaWiki. When your own input looks like another format, the playground offers to switch.
+- **Formats**: BBCode, HTML, TextFormatter XML, MediaWiki. Every format keeps its own input, so a switch shows what that format had last. When your input looks like another format, the playground offers to read it with the other parser.
 - **Output**: the Markdown, a preview, and the AST. The preview is cooked by Discourse's own engine when `bin/discourse-engine` has built it, otherwise by markdown-it (`npm ci --prefix spec/support/markdown_it`), which reads no BBCode.
 - **Site**: the plugins of the target Discourse site (`spoiler-alert`, `discourse-bbcode`), which are the `features:` of the renderer, and a switch for the normalizer.
 - **Notes**: unknown tags, tags the parser had to close and changes of the normalizer show up in the status bar.
