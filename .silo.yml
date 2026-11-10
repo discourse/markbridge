@@ -1,7 +1,7 @@
 # silo project configuration
 # https://github.com/gschlager/silo#project-configuration
 
-image: fedora/44
+image: fedora/45
 
 # Installs rv (MRI) and ruby-install (jruby/truffleruby), the listed Ruby
 # versions, pins the default, and wires up the shell. Replaces the manual
