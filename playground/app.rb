@@ -22,7 +22,9 @@ module Markbridge
       # The switches of the UI. The other features of the renderer
       # (details, poll, post_event) have no switch, because no parser
       # builds their nodes.
-      DEFAULT_OPTIONS = { "spoiler" => true, "bbcode" => true, "normalize" => true }.freeze
+      # spoiler-alert comes with Discourse, discourse-bbcode needs an
+      # install, so the first is on and the second is off.
+      DEFAULT_OPTIONS = { "spoiler" => true, "bbcode" => false, "normalize" => true }.freeze
 
       COOKER = Cooker.new
 
