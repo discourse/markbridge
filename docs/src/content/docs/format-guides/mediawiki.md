@@ -53,7 +53,7 @@ MediaWiki accepts a small set of inline HTML. Markbridge honors:
 
 `<ins>`, `<del>` and `<mark>` are written as the same HTML tags, which Discourse keeps.
 
-Inside `<nowiki>`, wiki syntax is preserved as literal text. The tag can go over several lines. The tags are read in lower case. Indented code and `<pre>` content render as fenced code blocks, even for a single line. `<code>` stays inline unless its content contains a newline.
+Inside `<nowiki>`, wiki syntax is preserved as literal text. The tag can go over several lines. The tags are read in any case, `<S>` like `<s>`. Indented code and `<pre>` content render as fenced code blocks, even for a single line. `<code>` stays inline unless its content contains a newline.
 
 ## Links to wiki pages
 

@@ -401,6 +401,12 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(texts(doc)).to eq(["x</nowiki> a\nb"])
     end
 
+    it "joins the lines of a tag in any case" do
+      doc = parse("<NOWIKI>a\nb</NoWiki>")
+
+      expect(texts(doc)).to eq(["a\nb"])
+    end
+
     it "keeps the lines inside a list item" do
       doc = parse("* item <nowiki>a\nb</nowiki>\n* next")
 

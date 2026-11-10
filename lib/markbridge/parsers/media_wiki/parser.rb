@@ -56,9 +56,8 @@ module Markbridge
 
         private
 
-        # Lower case only, like the inline parser reads the tag.
-        NOWIKI_OPEN = "<nowiki>"
-        NOWIKI_CLOSE = "</nowiki>"
+        NOWIKI_OPEN = /<nowiki>/i
+        NOWIKI_CLOSE = %r{</nowiki>}i
         private_constant :NOWIKI_OPEN, :NOWIKI_CLOSE
 
         # The parser works line by line, but <nowiki> can go over several
@@ -95,7 +94,7 @@ module Markbridge
         # @return [Integer, nil] the first line from +from+ on that closes
         #   a <nowiki>
         def closing_line(lines, from)
-          (from...lines.length).find { |index| lines.fetch(index).include?(NOWIKI_CLOSE) }
+          (from...lines.length).find { |index| lines.fetch(index).match?(NOWIKI_CLOSE) }
         end
 
         LINE_ENDING_RE = /\r\n?|[\u2028\u2029]+/
