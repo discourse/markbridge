@@ -29,6 +29,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ParagraphTag do
     context "in html_mode" do
       let(:context) { html_context }
 
+      it "renders a paragraph with nothing visible to nothing" do
+        empty = Markbridge::AST::Paragraph.new
+        blank = Markbridge::AST::Paragraph.new << Markbridge::AST::Text.new(" \n")
+
+        expect(tag.render(empty, interface)).to eq("")
+        expect(tag.render(blank, interface)).to eq("")
+      end
+
       it "wraps content in <p> with no trailing blank line" do
         element = Markbridge::AST::Paragraph.new
         element << Markbridge::AST::Text.new("hello")

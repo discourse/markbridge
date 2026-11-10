@@ -10,7 +10,8 @@ module Markbridge
           # Spaces and tabs at the start of the paragraph. Not a no-break
           # space: the escaper writes one where it wants indentation kept.
           LEADING_BLANKS = /\A[ \t]+/
-          private_constant :LEADING_BLANKS
+          VISIBLE = /[^[:space:]]/
+          private_constant :LEADING_BLANKS, :VISIBLE
 
           def render(element, interface)
             child_context = interface.with_parent(element)
@@ -20,8 +21,10 @@ module Markbridge
               # Also inside a table cell: without the <p> the paragraph
               # runs into the text next to it. A block inside the
               # paragraph closes the <p> early in the HTML parser, which
-              # is what the Markdown form does as well.
-              return "<p>#{content}</p>"
+              # is what the Markdown form does as well. A paragraph with
+              # nothing visible is nothing, like in Markdown: an empty <p>
+              # would keep a list item or a list around it alive.
+              return content.match?(VISIBLE) ? "<p>#{content}</p>" : ""
             end
 
             # Bracket with leading and trailing blank lines so adjacent
