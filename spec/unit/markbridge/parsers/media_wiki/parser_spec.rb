@@ -536,6 +536,49 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
 
     let(:parser) { described_class.new }
 
+    it "reads colspan and rowspan from the attributes of a cell" do
+      table =
+        parse_table("{|\n! scope=\"col\" colspan=\"2\" | Wide\n|-\n| 1 || ROWSPAN = '3' | 2\n|}")
+
+      wide = table.children[0].children[0]
+      expect([wide.colspan, wide.rowspan]).to eq([2, nil])
+      expect(wide.children.first.text).to eq("Wide")
+      plain, tall = table.children[1].children
+      expect([plain.colspan, plain.rowspan]).to eq([nil, nil])
+      expect([tall.colspan, tall.rowspan]).to eq([nil, 3])
+    end
+
+    it "does not read a span from the text of a cell without attributes" do
+      table = parse_table("{|\n| colspan=2\n|}")
+
+      expect(table.children[0].children[0].colspan).to be_nil
+    end
+
+    it "does not take a longer attribute name for a span" do
+      table = parse_table("{|\n| data-colspan=2 xrowspan=2 | a\n|}")
+
+      cell = table.children[0].children[0]
+      expect([cell.colspan, cell.rowspan]).to eq([2, nil])
+    end
+
+    it "writes the caption as a paragraph in front of the table" do
+      doc = parser.parse("{|\n|+ style=\"x\" | A '''caption'''\n| 1\n|}")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Paragraph, Markbridge::AST::Table])
+      expect(doc.children.first.children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::Bold],
+      )
+      expect(doc.children.first.children.first.text).to eq("A ")
+      expect(doc.children.last.children.size).to eq(1)
+    end
+
+    it "takes a caption without attributes, and no paragraph for an empty one" do
+      doc = parser.parse("{|\n|+ Plain\n|+\n| 1\n|}")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Paragraph, Markbridge::AST::Table])
+      expect(doc.children.first.children.first.text).to eq("Plain")
+    end
+
     it "parses a minimal table with a header row" do
       table = parse_table("{|\n! A !! B\n|}")
 

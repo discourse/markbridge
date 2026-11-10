@@ -54,7 +54,7 @@ parse.ast
 | `<blockquote>` | `[quote="name"]…[/quote]`; without attribution `> …`, or `[quote]…[/quote]` around a quote with attribution | `AST::Quote` |
 | `<ul>`, `<ol>` | `- item` / `1. item` | `AST::List` |
 | `<li>` | List item | `AST::ListItem` |
-| `<table>`, `<tr>`, `<td>`, `<th>` | GFM table | `AST::Table` |
+| `<table>`, `<tr>`, `<td>`, `<th>` | GFM table, or an HTML table when Markdown cannot express it (a `colspan` or `rowspan`, uneven rows, a block in a cell) | `AST::Table` |
 | `<br>` | Hard line break | `AST::LineBreak` |
 | `<hr>` | `---` | `AST::HorizontalRule` |
 | `<p>` | Paragraph spacing | — (transparent) |

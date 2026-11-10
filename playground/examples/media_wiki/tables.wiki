@@ -39,6 +39,17 @@ Uneven rows become HTML:
 | only one cell
 |}
 
+With a caption, attributes and a cell over two columns:
+
+{| class="wikitable" style="width: 100%"
+|+ Distances
+! scope="col" | Day !! Distance
+|-
+| style="text-align: right" | 1 || 14 km
+|-
+| colspan="2" | Rest day
+|}
+
 A table that is never closed:
 
 {|

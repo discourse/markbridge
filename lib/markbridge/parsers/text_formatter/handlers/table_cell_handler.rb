@@ -11,7 +11,12 @@ module Markbridge
           end
 
           def process(element:, parent:, processor: nil)
-            node = AST::TableCell.new(header: element.name.upcase == "TH")
+            node =
+              AST::TableCell.new(
+                header: element.name.upcase == "TH",
+                colspan: element["colspan"],
+                rowspan: element["rowspan"],
+              )
             parent << node
             node
           end

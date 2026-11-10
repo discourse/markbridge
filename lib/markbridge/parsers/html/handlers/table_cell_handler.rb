@@ -11,7 +11,12 @@ module Markbridge
           end
 
           def process(element:, parent:)
-            ast_element = AST::TableCell.new(header: element.name.downcase == "th")
+            ast_element =
+              AST::TableCell.new(
+                header: element.name.downcase == "th",
+                colspan: element["colspan"],
+                rowspan: element["rowspan"],
+              )
             parent << ast_element
             ast_element
           end

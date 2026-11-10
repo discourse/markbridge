@@ -13,6 +13,9 @@ Output and AST changes to check:
 - **`<HR>` in s9e XML** is a horizontal rule. It was counted as an unknown tag and dropped.
 - **Litedown elements in s9e XML.** `<STRONG>`, `<EM>`, `<DEL>`, `<SUP>`, `<SUB>`, `<C>` and `<H1>` to `<H6>` are read, which is what a Flarum post is made of. They were unknown tags, so their formatting was lost.
 - **More elements of s9e XML.** `<CENTER>`, `<LEFT>`, `<RIGHT>` and `<JUSTIFY>` are aligned blocks. `<ESC>`, `<E>` and `<EMOJI>` are passed through and no longer counted in `unknown_tags`; the set is `HandlerRegistry#transparent_tags` of the TextFormatter parser.
+- **`colspan` and `rowspan`.** `AST::TableCell` has the two as keywords, all four parsers read them, and a table with such a cell is written as an HTML table with the attributes, which Discourse keeps. Before, the spans were lost and the cells stood in the wrong columns.
+- **The caption of a wikitext table** (`|+ text`) is a paragraph in front of the table. It was a cell of the first row.
+- **HTML-like tags in wikitext** are read in any case: `<S>` like `<s>`.
 - **Bold inside italic in wikitext.** `''italic and '''bold''' in it''` is italic with bold in it. The three apostrophes ended the italic before.
 - **`<nowiki>` over several lines** in wikitext is one piece of literal text. Before, the tags showed as text and the lines were parsed.
 - **A tag that is never closed in a BBCode list item** ends with the item. `[list][*]one [b]bold[*]two[/list]` has two items now. Before, the second item was nested in the bold of the first and the `[/list]` showed as text. The same goes for a tag that is still open when the list ends.

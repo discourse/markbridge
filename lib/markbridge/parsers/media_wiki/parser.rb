@@ -223,6 +223,8 @@ module Markbridge
 
             if stripped.start_with?("|}")
               break
+            elsif stripped.start_with?("|+")
+              table_caption(stripped[2..])
             elsif stripped.start_with?("|-")
               # Row separator - next cells will go in a new row
               current_row = nil
@@ -248,6 +250,20 @@ module Markbridge
         # @param table [AST::Table]
         # @param current_row [AST::TableRow, nil]
         # @return [AST::TableRow]
+        # The caption of a table, `|+ text`, is a paragraph in front of
+        # it: Markdown has no caption for a table. Attributes in front of
+        # the text go, like the ones of a cell.
+        #
+        # @param content [String] the line after `|+`
+        def table_caption(content)
+          text = split_outside_brackets(content, "|", limit: 2).last.strip
+          return if text.empty?
+
+          paragraph = AST::Paragraph.new
+          @inline_parser.parse(text, parent: paragraph)
+          @document << paragraph
+        end
+
         def ensure_table_row(table, current_row)
           return current_row if current_row
 
@@ -264,6 +280,10 @@ module Markbridge
         # @param content [String] the line content after the leading ! or |
         # @param header [Boolean] whether these are header cells
         # @param row [AST::TableRow]
+        COLSPAN = /\bcolspan\s*=\s*["']?(\d+)/i
+        ROWSPAN = /\browspan\s*=\s*["']?(\d+)/i
+        private_constant :COLSPAN, :ROWSPAN
+
         def parse_table_cells(content, header:, row:)
           separator = header ? "!!" : "||"
           cells = split_outside_brackets(content, separator)
@@ -272,8 +292,14 @@ module Markbridge
             # A single | in a cell separates attributes from content
             parts = split_outside_brackets(raw_cell, "|", limit: 2)
             cell_text = parts.last
+            attributes = parts.first if parts.size == 2
 
-            cell = AST::TableCell.new(header:)
+            cell =
+              AST::TableCell.new(
+                header:,
+                colspan: attributes&.[](COLSPAN, 1),
+                rowspan: attributes&.[](ROWSPAN, 1),
+              )
             @inline_parser.parse(cell_text.strip, parent: cell)
             row << cell
           end

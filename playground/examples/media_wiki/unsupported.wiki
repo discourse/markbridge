@@ -19,13 +19,3 @@ Definition lists and indentation:
 ; Term
 : Definition
 :: Indented twice
-
-Tables with attributes:
-{| class="wikitable" style="width: 100%"
-|+ A caption
-! scope="col" | Day !! Distance
-|-
-| style="text-align: right" | 1 || 14 km
-|- class="highlight"
-| colspan="2" | A wide cell
-|}

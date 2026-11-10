@@ -14,7 +14,12 @@ module Markbridge
             # Auto-close previous cell if still open
             context.pop if context.current.instance_of?(AST::TableCell)
 
-            element = AST::TableCell.new(header: token.tag == "th")
+            element =
+              AST::TableCell.new(
+                header: token.tag == "th",
+                colspan: token.attrs[:colspan],
+                rowspan: token.attrs[:rowspan],
+              )
             context.push(element, token:)
           end
 

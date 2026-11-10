@@ -97,6 +97,32 @@ RSpec.describe Markbridge::AST::TableCell do
     expect(described_class.new).to be_a(Markbridge::AST::Element)
   end
 
+  describe "#colspan and #rowspan" do
+    it "are nil by default" do
+      cell = described_class.new
+
+      expect([cell.colspan, cell.rowspan]).to eq([nil, nil])
+    end
+
+    it "take a whole number above one, also as text" do
+      cell = described_class.new(colspan: 2, rowspan: "3")
+
+      expect([cell.colspan, cell.rowspan]).to eq([2, 3])
+    end
+
+    it "are nil for one, for zero and for what is no whole number" do
+      [1, "1", 0, -2, "", "x", "2.5", "2x", " ", nil, 2.0].each do |value|
+        cell = described_class.new(colspan: value, rowspan: value)
+
+        expect([cell.colspan, cell.rowspan]).to eq([nil, nil]), value.inspect
+      end
+    end
+
+    it "read the text as a decimal number" do
+      expect(described_class.new(colspan: "010").colspan).to eq(10)
+    end
+  end
+
   describe "#header?" do
     it "returns false by default" do
       expect(described_class.new.header?).to be false

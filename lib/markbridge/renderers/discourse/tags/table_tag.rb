@@ -56,7 +56,7 @@ module Markbridge
                   # can detect they're inside a cell via has_parent?.
                   cell_context = child_context.with_parent(cell)
                   content = interface.render_children(cell, context: cell_context).strip
-                  { content:, header: cell.header? }
+                  { content:, header: cell.header?, colspan: cell.colspan, rowspan: cell.rowspan }
                 end
 
               { cells: } unless cells.empty?
@@ -65,7 +65,8 @@ module Markbridge
 
           # Check if the table can be rendered as Markdown: not nested in a
           # table, no block in a cell, the header row (when there is one)
-          # first, every row as wide as the first, no cell on two lines.
+          # first, every row as wide as the first, no cell on two lines and
+          # no cell over several columns or rows.
           def markdown_compatible?(element, rows_data, interface)
             return false if interface.has_parent?(AST::Table)
             return false if block_in_cell?(element)
@@ -76,7 +77,7 @@ module Markbridge
             cell_count = rows_data.first[:cells].length
             rows_data.all? do |row|
               row[:cells].length == cell_count &&
-                row[:cells].none? { |c| c[:content].include?("\n") }
+                row[:cells].none? { |c| c[:content].include?("\n") || c[:colspan] || c[:rowspan] }
             end
           end
 
@@ -131,12 +132,21 @@ module Markbridge
             lines.join("\n")
           end
 
+          # Discourse keeps colspan and rowspan on a cell. The values are
+          # whole numbers, see AST::TableCell.
+          def span_attributes(cell)
+            attributes = +""
+            attributes << %( colspan="#{cell[:colspan]}") if cell[:colspan]
+            attributes << %( rowspan="#{cell[:rowspan]}") if cell[:rowspan]
+            attributes
+          end
+
           # Render a single HTML table row
           def html_row(row)
             cells_html =
               row[:cells].map do |cell|
                 tag = cell[:header] ? "th" : "td"
-                "<#{tag}>#{cell[:content]}</#{tag}>"
+                "<#{tag}#{span_attributes(cell)}>#{cell[:content]}</#{tag}>"
               end
 
             "<tr>#{cells_html.join}</tr>"

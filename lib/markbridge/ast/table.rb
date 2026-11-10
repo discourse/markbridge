@@ -41,20 +41,41 @@ module Markbridge
     # @example Header cell
     #   cell = AST::TableCell.new(header: true)
     #   cell << AST::Text.new("header")
+    #
+    # @example Cell over two columns
+    #   cell = AST::TableCell.new(colspan: 2)
     class TableCell < Element
+      # @return [Integer, nil] the number of columns the cell covers when
+      #   that is more than one
+      attr_reader :colspan
+
+      # @return [Integer, nil] the number of rows the cell covers when
+      #   that is more than one
+      attr_reader :rowspan
+
       # Create a new table cell.
       #
       # @param header [Boolean] whether this is a header cell (th)
-      def initialize(header: false)
+      # @param colspan [Integer, String, nil] the columns the cell covers.
+      #   A number as text is fine, the parsers pass the attribute as it
+      #   is. Anything that is no whole number above one is no span.
+      # @param rowspan [Integer, String, nil] the rows the cell covers
+      def initialize(header: false, colspan: nil, rowspan: nil)
         super()
         @header = header
+        @colspan = span(colspan)
+        @rowspan = span(rowspan)
       end
 
-      # Check if this is a header cell.
-      #
-      # @return [Boolean] true if this is a header cell
       def header?
         @header
+      end
+
+      private
+
+      def span(value)
+        number = value.is_a?(Integer) ? value : Integer(value.to_s, 10, exception: false)
+        number if number && number > 1
       end
     end
   end

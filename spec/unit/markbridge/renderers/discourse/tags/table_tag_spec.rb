@@ -107,6 +107,32 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
       expect(result).to include("</table>")
     end
 
+    def spanned_table(**spans)
+      table = Markbridge::AST::Table.new
+      row = Markbridge::AST::TableRow.new
+      row << (Markbridge::AST::TableCell.new(**spans) << Markbridge::AST::Text.new("a"))
+      row << (Markbridge::AST::TableCell.new << Markbridge::AST::Text.new("b"))
+      table << row
+    end
+
+    it "is HTML with the attribute for a cell over several columns" do
+      expect(tag.render(spanned_table(colspan: 2), interface)).to eq(
+        %(\n\n<table>\n<tr><td colspan="2">a</td><td>b</td></tr>\n</table>\n\n),
+      )
+    end
+
+    it "is HTML with the attribute for a cell over several rows" do
+      expect(tag.render(spanned_table(rowspan: 3), interface)).to eq(
+        %(\n\n<table>\n<tr><td rowspan="3">a</td><td>b</td></tr>\n</table>\n\n),
+      )
+    end
+
+    it "writes both attributes, also on a header cell" do
+      expect(tag.render(spanned_table(header: true, colspan: 2, rowspan: 3), interface)).to include(
+        %(<th colspan="2" rowspan="3">a</th>),
+      )
+    end
+
     it "falls back to HTML when cell content has newlines" do
       table = Markbridge::AST::Table.new
       row = Markbridge::AST::TableRow.new

@@ -6,7 +6,7 @@ RSpec.describe Markbridge::Parsers::HTML::Handlers::TableCellHandler do
 
   describe "#process" do
     it "creates a non-header cell for <td>" do
-      node = instance_double(Nokogiri::XML::Element, name: "td")
+      node = Nokogiri::HTML.fragment("<table><tr><td>x</td></tr></table>").at_css("td")
 
       result = handler.process(element: node, parent:)
 
@@ -16,7 +16,7 @@ RSpec.describe Markbridge::Parsers::HTML::Handlers::TableCellHandler do
     end
 
     it "creates a header cell for <th>" do
-      node = instance_double(Nokogiri::XML::Element, name: "th")
+      node = Nokogiri::HTML.fragment("<table><tr><th>x</th></tr></table>").at_css("th")
 
       result = handler.process(element: node, parent:)
 
@@ -25,11 +25,25 @@ RSpec.describe Markbridge::Parsers::HTML::Handlers::TableCellHandler do
     end
 
     it "handles case-insensitive tag names" do
-      node = instance_double(Nokogiri::XML::Element, name: "TH")
+      node = Nokogiri.XML("<TH>x</TH>").root
 
       handler.process(element: node, parent:)
 
       expect(parent.children[0].header?).to be true
+    end
+  end
+
+  describe "#process with spans" do
+    it "reads colspan and rowspan" do
+      node =
+        Nokogiri::HTML.fragment(
+          %(<table><tr><td colspan="2" rowspan="3">x</td></tr></table>),
+        ).at_css("td")
+
+      handler.process(element: node, parent:)
+
+      expect(parent.children[0].colspan).to eq(2)
+      expect(parent.children[0].rowspan).to eq(3)
     end
   end
 
