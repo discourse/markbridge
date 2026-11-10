@@ -217,6 +217,93 @@ RSpec.describe Markbridge::Parsers::BBCode::Scanner do
         expect(tokens[0]).to match_tag_start("url", option: "value")
       end
 
+      context "with an unquoted option that has spaces" do
+        it "takes the words up to the bracket" do
+          expect(scan("[quote=John Doe]")[0]).to match_tag_start("quote", option: "John Doe")
+          expect(scan("[spoiler=What went  wrong]")[0]).to match_tag_start(
+            "spoiler",
+            option: "What went  wrong",
+          )
+        end
+
+        it "takes a tab like a space" do
+          expect(scan("[quote=John\tDoe]")[0]).to match_tag_start("quote", option: "John\tDoe")
+        end
+
+        it "keeps the tag source complete" do
+          expect(scan("[quote=John Doe]x")[0].source).to eq("[quote=John Doe]")
+        end
+
+        it "leaves the whitespace in front of the bracket out" do
+          expect(scan("[quote=John Doe  ]")[0]).to match_tag_start("quote", option: "John Doe")
+          expect(scan("[quote=John  ]")[0]).to match_tag_start("quote", option: "John")
+        end
+
+        it "ends at the first named attribute" do
+          expect(scan("[quote=John Doe post_id=4 time=5]")[0]).to match_tag_start(
+            "quote",
+            option: "John Doe",
+            post_id: "4",
+            time: "5",
+          )
+        end
+
+        it "ends at a named attribute with whitespace in front of its `=`" do
+          expect(scan("[quote=John Doe post_id \t= 4]")[0]).to match_tag_start(
+            "quote",
+            option: "John Doe",
+            post_id: "4",
+          )
+        end
+
+        it "takes a word with a `=` inside that is no attribute name" do
+          expect(scan("[url=https://example.com/a b?c=d]")[0]).to match_tag_start(
+            "url",
+            option: "https://example.com/a b?c=d",
+          )
+        end
+
+        it "takes a `=` on its own as a word" do
+          expect(scan("[quote=a = b]")[0]).to match_tag_start("quote", option: "a = b")
+        end
+
+        it "takes multibyte words" do
+          expect(scan("[quote=Ünï Näme]")[0]).to match_tag_start("quote", option: "Ünï Näme")
+        end
+
+        it "does not go on after a quoted option" do
+          tokens = scan('[quote="John" Doe]')
+
+          expect(tokens[0]).to match_tag_start("quote", option: "John")
+        end
+
+        it "does not go on over a line break" do
+          tokens = scan("[quote=John\nDoe]")
+
+          expect(tokens[0]).to match_tag_start("quote", option: "John")
+        end
+
+        it "is no tag when the bracket never closes" do
+          tokens = scan("[quote=John Doe")
+
+          expect(tokens.map(&:class).uniq).to eq([Markbridge::Parsers::BBCode::TextToken])
+          expect(tokens.map(&:text).join).to eq("[quote=John Doe")
+        end
+
+        it "is no tag when another bracket opens in it" do
+          tokens = scan("[quote=John [b]")
+
+          expect(tokens[0]).to be_a(Markbridge::Parsers::BBCode::TextToken)
+          expect(tokens.last).to match_tag_start("b")
+        end
+
+        it "reads a named attribute that the input ends in" do
+          tokens = scan("[quote=John x")
+
+          expect(tokens.map(&:text).join).to eq("[quote=John x")
+        end
+      end
+
       it "tolerates whitespace between the option value and the next attribute" do
         tokens = scan("[img=100x200    alt=Photo]")
 

@@ -156,7 +156,7 @@ module Markbridge
           if current_byte == EQUALS
             @current_pos += 1
             skip_whitespace
-            if (val = scan_attribute_value)
+            if (val = scan_option_value)
               attrs[:option] = val
             end
             skip_whitespace
@@ -180,6 +180,45 @@ module Markbridge
 
           @current_pos += 1
           true
+        end
+
+        # The value after `[tag=`. Without quotes it may have spaces, as in
+        # `[quote=John Doe]`: it goes on over the words that follow, up to
+        # the `]` or to the first `name=` of a named attribute. A line
+        # break ends it like before.
+        def scan_option_value
+          start = @current_pos
+          value = scan_attribute_value
+          return value if value.nil? || @current_pos == start || quote_byte?(@input.getbyte(start))
+
+          stop = @current_pos
+          stop = @current_pos while skip_blanks && !attribute_ahead? && scan_unquoted_value
+
+          @current_pos = stop
+          @input.byteslice(start, stop - start)
+        end
+
+        def quote_byte?(byte)
+          byte == DOUBLE_QUOTE || byte == SINGLE_QUOTE
+        end
+
+        # Skips spaces and tabs.
+        # @return [Boolean] whether there were any
+        def skip_blanks
+          start = @current_pos
+          @current_pos += 1 while (byte = current_byte) == SPACE || byte == TAB
+          @current_pos > start
+        end
+
+        # Whether a `name=` stands at the cursor, the start of a named
+        # attribute. The cursor stays where it is.
+        def attribute_ahead?
+          index = @current_pos
+          index += 1 while index < @length && attr_name_byte?(@input.getbyte(index))
+          return false if index == @current_pos
+
+          index += 1 while index < @length && whitespace_byte?(@input.getbyte(index))
+          @input.getbyte(index) == EQUALS
         end
 
         def scan_attribute_value
