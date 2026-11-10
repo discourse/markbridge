@@ -339,10 +339,16 @@ module Markbridge
     #   name, or nil to drop a color. Without it the values are written
     #   as they are, and a value the plugin does not accept raises
     #   ArgumentError.
+    # @param base_url [String, nil] the http or https URL of the page the
+    #   content comes from. The relative addresses of links and images
+    #   are made absolute with it, like a browser does on that page:
+    #   +page.html+, +./Alta_Via+, +/files/a.png+. Without it they are
+    #   written as they are, and Discourse drops an address that has no
+    #   scheme and no leading slash. Mappings in +tags:+ still win.
     # @return [Renderers::Discourse::Renderer]
     # @raise [ArgumentError] for a feature that does not exist, for
-    #   +bbcode: true+ without +sizes:+, and for a mapping without
-    #   +bbcode: true+
+    #   +bbcode: true+ without +sizes:+, for a mapping without
+    #   +bbcode: true+, and for a +base_url:+ that is no http or https URL
     def discourse_renderer(
       tags: nil,
       tag_library: nil,
@@ -355,7 +361,8 @@ module Markbridge
       strip_trailing_invisibles: false,
       features: nil,
       sizes: nil,
-      colors: nil
+      colors: nil,
+      base_url: nil
     )
       # Dup the caller's library before mutating so successive
       # +discourse_renderer+ calls against the same +tag_library:+ don't
@@ -364,6 +371,7 @@ module Markbridge
       # +tag_library:+ branch.
       library = tag_library ? tag_library.dup : Renderers::Discourse::TagLibrary.default
       register_features(library, features || {}, sizes:, colors:)
+      register_base_url(library, base_url) if base_url
       library.merge!(tags) if tags
       Array(unregister).each { |klass| library.unregister(klass) }
 
@@ -394,6 +402,12 @@ module Markbridge
       end
 
       register_bbcode_feature(library, features[:bbcode], sizes:, colors:)
+    end
+
+    def register_base_url(library, url)
+      base_url = Renderers::Discourse::BaseUrl.new(url)
+      library.register(AST::Url, Renderers::Discourse::Tags::UrlTag.new(base_url:))
+      library.register(AST::Image, Renderers::Discourse::Tags::ImageTag.new(base_url:))
     end
 
     def register_bbcode_feature(library, bbcode, sizes:, colors:)

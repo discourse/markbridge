@@ -803,6 +803,58 @@ RSpec.describe Markbridge do
   end
 
   describe ".discourse_renderer" do
+    context "with base_url:" do
+      let(:renderer) do
+        described_class.discourse_renderer(base_url: "https://old.example.com/forum/")
+      end
+
+      it "makes the relative addresses of links and images absolute" do
+        html =
+          %(<a href="page.html">a page</a> <img src="/files/a.png" alt="x"> <a href="#top">top</a>)
+
+        expect(described_class.html_to_markdown(html, renderer:).markdown).to eq(
+          "[a page](https://old.example.com/forum/page.html) " \
+            "![x](https://old.example.com/files/a.png) [top](#top)",
+        )
+      end
+
+      it "keeps the page links of wikitext as links" do
+        renderer = described_class.discourse_renderer(base_url: "https://wiki.example.com/wiki/")
+
+        expect(described_class.mediawiki_to_markdown("[[Alta Via]]", renderer:).markdown).to eq(
+          "[Alta Via](https://wiki.example.com/wiki/Alta_Via)",
+        )
+      end
+
+      it "lets a tag from tags: win" do
+        custom = Markbridge::Renderers::Discourse::Tag.new { |_, _| "custom" }
+        renderer =
+          described_class.discourse_renderer(
+            base_url: "https://old.example.com/",
+            tags: {
+              Markbridge::AST::Url => custom,
+            },
+          )
+
+        expect(described_class.html_to_markdown(%(<a href="a">x</a>), renderer:).markdown).to eq(
+          "custom",
+        )
+      end
+
+      it "leaves the default library alone" do
+        renderer
+
+        expect(described_class.html_to_markdown(%(<a href="/a">x</a>)).markdown).to eq("[x](/a)")
+      end
+
+      it "raises for what is no http or https URL" do
+        expect { described_class.discourse_renderer(base_url: "old.example.com") }.to raise_error(
+          ArgumentError,
+          'base_url must be an http or https URL, got "old.example.com"',
+        )
+      end
+    end
+
     it "returns a Renderer that converts BBCode using a custom Tag" do
       fixed_bold =
         Class.new(Markbridge::Renderers::Discourse::Tag) do

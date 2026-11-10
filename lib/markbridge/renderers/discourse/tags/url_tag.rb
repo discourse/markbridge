@@ -21,8 +21,13 @@ module Markbridge
           EDGES = /\A([[:space:]]*).*?([[:space:]]*)\z/m
           private_constant :ALLOWED_SCHEMES, :SCHEME_LIKE, :EDGES
 
+          # @param base_url [BaseUrl, nil] makes a relative href absolute
+          def initialize(base_url: nil)
+            @base_url = base_url
+          end
+
           def render(element, interface)
-            href = element.href
+            href = @base_url ? @base_url.resolve(element.href) : element.href
             linkable = linkable?(href)
             # Url#bare? judges the AST, so label escaping cannot confuse it.
             return bare_tokens(element, href) if linkable && element.bare?
