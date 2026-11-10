@@ -229,6 +229,10 @@ RSpec.describe Markbridge::Parsers::TextFormatter::HandlerRegistry do
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
         Markbridge::AST::ListItem,
       ],
+      "HR" => [
+        Markbridge::Parsers::TextFormatter::Handlers::SelfClosingHandler,
+        Markbridge::AST::HorizontalRule,
+      ],
       "P" => [
         Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler,
         Markbridge::AST::Paragraph,
