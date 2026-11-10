@@ -407,9 +407,8 @@
       th, td { padding: 6px 12px; border: 1px solid ${color("--line-strong")}; text-align: left; vertical-align: top; }
       th { background: ${color("--sunken")}; }
       hr { border: 0; border-top: 1px solid ${color("--line-strong")}; }
-      img { max-width: 100%; max-height: 220px; width: auto; height: auto; min-width: 24px; min-height: 24px;
-        vertical-align: middle; outline: 1px dashed ${color("--line-strong")}; outline-offset: -1px;
-        color: ${color("--muted")}; font-size: 0.85em; }
+      img { max-width: 100%; height: auto; min-width: 24px; min-height: 24px; vertical-align: middle;
+        border-radius: 3px; background: ${color("--sunken")}; color: ${color("--muted")}; font-size: 0.85em; }
       .bbcode-b { font-weight: bold; } .bbcode-i { font-style: italic; }
       .bbcode-u { text-decoration: underline; } .bbcode-s { text-decoration: line-through; }
       .spoiler, .spoiled { filter: blur(5px); cursor: pointer; transition: filter 120ms; }
