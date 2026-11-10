@@ -3,9 +3,15 @@ title: AST normalization
 description: The pass that rewrites the AST so the renderer only sees markup the target format can express.
 ---
 
-Markup can nest elements in ways Markdown can't express: a link inside a link, a block element inside an inline container (a link label, but also bold or a heading), a fenced code block inside emphasis. If the renderer printed these as-is, the Markdown would break — the inner link wins and the outer one turns into text, a block's blank lines break out of the emphasis around it.
+Markup can nest things that Markdown cannot:
 
-`Markbridge::Normalizer` walks the AST once, between the parse-time `yield` hook and rendering, and rewrites it so the renderer only gets markup the target format can express. It runs **by default**. The renderer's tags stay simple string emitters; the rules about what may nest in what live here instead.
+- a link inside a link,
+- a list, a table or a quote inside bold, a heading or a link,
+- a code block inside italic text.
+
+Written as they are, they give broken Markdown. Of two nested links only the inner one works, and the outer one shows as text. The blank lines around a list end the bold around it, and the `**` show as text.
+
+`Markbridge::Normalizer` walks the AST once before rendering and rewrites these parts. It is on by default. The tags of the renderer can stay simple for that reason: the rules about what may nest in what are in one place, here.
 
 ## Where it runs
 
@@ -13,39 +19,39 @@ Markup can nest elements in ways Markdown can't express: a link inside a link, a
 parse → yield(ast) → normalize → render
 ```
 
-Because it runs after the `yield` hook, changes you make to the AST in that block are normalized too. It runs for every source format and for `Markbridge.render`, because normalization is about the *target* format, not the source.
+`yield(ast)` is the block you can pass to a `*_to_markdown` call. The normalizer runs after it, so what you change in the block is normalized too. It runs for every input format and for `Markbridge.render`, because the rules come from Markdown, not from the input.
 
 ## The default rules
 
-The default rules are CommonMark legality. Break one and the Markdown doesn't parse back as the tree meant:
+The default rules are what CommonMark allows. Markdown that breaks one of them is not read back as the tree it was written from:
 
-- **No link inside a link**, at any depth (§6.3). The inner link is unwrapped.
-- **A block inside an inline container is moved out.** An inline container holds inline content only. This isn't link-specific: emphasis (`Bold`, `Italic`, …) and headings are inline containers too, so a poll inside bold or a list inside a heading is handled the same way as a block inside a link. The block nodes cover `List`, `Table`, `Quote`, `Details`, `HorizontalRule`, `Align`, and the Discourse `Poll`/`Event` nodes.
+- **No link inside a link**, at any depth. The inner link is removed and its text stays in the outer link.
+- **A block inside an inline container is moved out.** Inline containers are the nodes that hold a line of text: links, headings, and the formatting nodes (`Bold`, `Italic`, `Underline`, …). The blocks are `List`, `Table`, `Quote`, `Details`, `HorizontalRule`, `Align`, `Poll` and `Event`.
 - **A fenced or multi-line code block inside an inline container is moved out.** A one-line code span is fine.
 - **A block spoiler inside an inline container is moved out.** That is an `AST::Spoiler` with `block: true`. An inline spoiler is fine.
 
 When a block is moved out and the texts on its two sides would touch, a space goes between them. With the block there they were on two lines, and an HTML parser has trimmed the whitespace at the line edges: `<i>Run <pre>…</pre> and wait</i>` becomes `*Run and wait*` and the code block.
 
-Discourse-specific policy is **not** built in. Moving an image out of a link, for example, is a rule you add yourself (see below) — a linked image (`[![alt](src)](url)`) is valid CommonMark, so the default leaves it alone.
+Rules that are a matter of taste are not built in. An image inside a link, `[![alt](src)](url)`, is valid Markdown, so the default keeps it. If you want images moved out of links, add a rule (see below).
 
 ## Strategies
 
-Each match resolves to one strategy:
+A rule names a parent class, a child class and what to do with the child, the strategy:
 
 | Strategy | Effect |
 |---|---|
-| `:keep` | Allow it. Records a decision and keeps it out of the report. |
-| `:hoist_after` | Move the node out and place it right after the outermost matching ancestor, keeping document order. An image in a bold that sits in a link moves after the whole link (out of both). The walker only moves a node out to a sibling; it never puts one into a wrapper it wasn't already in. |
-| `:unwrap` | Remove the element and put its children in its place. The built-in case is a link in a link: `[[text](inner)](outer)` becomes `[text](outer)` — the inner href is dropped, its text stays under the outer link. |
-| `:textify` | Replace the subtree with its plain text (`@name` for a mention, the joined text otherwise). |
+| `:keep` | Leave it where it is. Nothing is reported. |
+| `:hoist_after` | Move the node out and put it right after the outermost parent the rule matches. An image in bold text in a link, with a rule for images in links, goes after the whole link. The order of the document stays the same. |
+| `:unwrap` | Remove the element and put its children in its place. This is what happens to a link in a link: `[[text](inner)](outer)` becomes `[text](outer)`. |
+| `:textify` | Replace the node and everything in it with its plain text (`@name` for a mention). |
 | `:drop` | Remove it. |
-| callable | `->(boundary, node) { … }` returning a strategy symbol, an `Array<AST::Node>` to put in its place, or `nil` to drop it. For anything the built-in strategies don't cover. |
+| a lambda | `->(boundary, node) { … }` returns one of the symbols above, an Array of nodes to put in its place, or `nil` to remove it. `boundary` is the parent the rule matched. |
 
-A formatting wrapper (bold, italic, color, …) left empty after a hoist or drop is removed, so no empty `**` `**` markers remain. A link is the exception — an empty link is kept, because it renders as a plain URL.
+A formatting node (bold, italic, color, …) that is empty after a move is removed, so no `****` is left behind. A link is kept even when empty, because it is written as its URL.
 
 ## Diagnostics
 
-Every change is reported through the same channel as `unknown_tags`:
+Every change is reported in the diagnostics of the result:
 
 <!-- spec:before
 input = "[url=/a][url=/b]x[/url][/url]"
@@ -56,11 +62,11 @@ conversion.diagnostics[:normalization]
 # => [{ parent: "Url", child: "Url", strategy: :unwrap, count: 1 }]
 ```
 
-For a migration this feeds per-post warnings and shows which sources produce broken trees. The key is absent when nothing changed.
+In a migration, log these per post. They show where content was moved, and which kind of source markup causes it. The key is missing when nothing changed.
 
-## Opting out and customizing
+## Turn it off or add rules
 
-`normalize:` takes `true` (default — the shared normalizer), `false` (skip), or a `Normalizer` instance:
+`normalize:` takes `true` (the default), `false` (no normalizing), or your own `Normalizer`:
 
 <!-- spec:before
 input = "[b]hi[/b]"
@@ -75,13 +81,18 @@ normalizer.rule(parent: Markbridge::AST::Url, child: Markbridge::AST::Image, str
 Markbridge.convert(input, format: :bbcode, normalize: normalizer)
 ```
 
-Build a customized normalizer once and reuse it. `#normalize` and `#violations` keep no state on the instance, so one frozen instance is safe for every conversion, also across threads — passing your own is as fast as the default path. A rule for a `(parent, child)` pair that already exists is replaced, so your `#rule` calls override the defaults. Rules match subclasses too, for both `parent:` and `child:`. A rule for a more specific class takes priority. See [AST subclasses](/customization/extending/#ast-subclasses).
+Build your normalizer once and pass it to every conversion. It keeps no state between calls, so one instance works for all of them, also from several threads.
 
-`Markbridge::Normalizer.shared_default` is the default normalizer, built once and frozen; the `normalize: true` path uses it. Don't mutate it — call `.default` for a fresh, customizable one.
+How rules are matched:
 
-## Validation
+- A rule for a pair of classes that already has one replaces it. This is how you change a default.
+- A rule also matches subclasses, of the parent and of the child. A rule for a more specific class wins. See [AST subclasses](/customization/extending/#ast-subclasses).
 
-The same rules, without changing the tree:
+`Markbridge::Normalizer.default` returns a new normalizer with the default rules, for you to change. `Markbridge::Normalizer.shared_default` is the frozen one that `normalize: true` uses.
+
+## Check a tree without changing it
+
+`violations` applies the same rules and only reports:
 
 <!-- spec:before
 ast = Markbridge.parse_bbcode("[url=/a][url=/b]x[/url][/url]").ast
@@ -91,4 +102,4 @@ Markbridge::Normalizer.default.violations(ast)
 # => [{ parent: "Url", child: "Url", strategy: :unwrap }]
 ```
 
-Two uses: assert in your own suite that the trees your parsers and tag fixtures build have no violations, or run it as a lint over a corpus without changing any output. After a `normalize`, `violations` returns nothing — normalization is a single pass.
+Use it in your tests to make sure that the trees your own handlers build need no rewriting. Or run it over all your posts to see what the normalizer would do before you turn it on. After `normalize`, `violations` returns an empty list: one pass fixes everything.

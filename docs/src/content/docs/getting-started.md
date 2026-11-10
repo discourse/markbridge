@@ -3,24 +3,22 @@ title: Get started
 description: Install Markbridge, convert your first document, and read the result.
 ---
 
-Install Markbridge, choose the parser for your input, and read the converted Markdown. See the [Introduction](/introduction/) for an overview of the library.
+This page takes you from an empty Gemfile to converted Markdown. The [Introduction](/introduction/) explains what happens inside.
 
 ## Requirements
 
-You need Ruby 3.3 or newer. Markbridge supports CRuby, JRuby, and TruffleRuby.
+Ruby 3.3 or newer. Markbridge runs on CRuby, JRuby, and TruffleRuby.
 
 ## Install
-
-Add to your `Gemfile`:
 
 ```bash
 bundle add markbridge
 ```
 
-Or install it directly:
+The HTML and TextFormatter parsers need Nokogiri. Markbridge does not install it for you, because BBCode and MediaWiki work without it:
 
 ```bash
-gem install markbridge
+bundle add nokogiri
 ```
 
 ## Your first conversion
@@ -34,46 +32,40 @@ puts result.markdown
 # => **Hello** [world](https://example.com)!
 ```
 
-`require "markbridge/bbcode"` loads the BBCode parser plus the Discourse renderer. Swap `bbcode` for `html`, `mediawiki`, or `textformatter` for the other formats, or use `markbridge/all` to load all four at once. For HTML or TextFormatter, also add Nokogiri to your bundle:
+`require "markbridge/bbcode"` loads the BBCode parser and the Discourse renderer. The other formats load the same way: `markbridge/html`, `markbridge/mediawiki`, `markbridge/textformatter`. `markbridge/all` loads all four.
 
-```bash
-bundle add nokogiri
-```
-
-BBCode and MediaWiki do not need Nokogiri.
-
-`*_to_markdown` returns a `Markbridge::Conversion` value object, not a plain string. The rendered Markdown is on `.markdown`; `.to_s` delegates to it so `puts result` and string interpolation `"#{result}"` work. The Conversion also carries `.unknown_tags`, `.diagnostics`, and `.errors` — see [Result objects](/concepts/result-objects/) for the full shape.
+The result is a `Markbridge::Conversion`, not a String. The Markdown is in `result.markdown`, and `puts result` and `"#{result}"` print it too. The same object has the tags the parser did not know (`unknown_tags`), notes from the parser (`diagnostics`) and render errors (`errors`). See [Result objects](/concepts/result-objects/).
 
 ## The four formats
 
-Pick the method that matches your input:
-
-| Method | Input format | Guide |
+| Method | Input | Guide |
 |---|---|---|
-| `Markbridge.bbcode_to_markdown` | BBCode like `[b]...[/b]` | [BBCode](/format-guides/bbcode/) |
-| `Markbridge.html_to_markdown` | HTML (via Nokogiri) | [HTML](/format-guides/html/) |
+| `Markbridge.bbcode_to_markdown` | BBCode like `[b]…[/b]` | [BBCode](/format-guides/bbcode/) |
+| `Markbridge.html_to_markdown` | HTML | [HTML](/format-guides/html/) |
 | `Markbridge.mediawiki_to_markdown` | MediaWiki wikitext | [MediaWiki](/format-guides/mediawiki/) |
-| `Markbridge.text_formatter_xml_to_markdown` | <span class="nowrap">s9e/TextFormatter</span> XML (phpBB 3.2+) | [TextFormatter](/format-guides/textformatter/) |
+| `Markbridge.text_formatter_xml_to_markdown` | <span class="nowrap">s9e\TextFormatter</span> XML (phpBB 3.2+, Flarum) | [TextFormatter](/format-guides/textformatter/) |
 
-`Markbridge.convert(input, format: :bbcode)` dispatches to the right one when the format isn't fixed at the call site (useful when your application accepts several formats).
+When the format is only known at run time, use `Markbridge.convert(input, format: :bbcode)`. The formats are `:bbcode`, `:html`, `:mediawiki` and `:text_formatter_xml`.
 
-Each `*_to_markdown` method has a matching `parse_*` method that returns a `Parse` (with the AST and unknown-tag data) instead of rendering — useful when you want to inspect, transform, or re-render with a custom renderer.
+Every `*_to_markdown` method has a `parse_*` method next to it (`parse_bbcode`, `parse_html`, …). It stops after parsing and returns a `Parse` with the AST. Use it to look at the tree, to change it, or to render it with your own renderer.
 
-## Customizing output
+## Change the output
 
-Output is controlled by a `Renderer` instance, built once via `Markbridge.discourse_renderer(...)` and reused across calls:
+A `Renderer` decides how the tree is written. Build one with `Markbridge.discourse_renderer` and pass it to every call:
 
 ```ruby
-RENDERER = Markbridge.discourse_renderer(escape_hard_line_breaks: true)
+RENDERER = Markbridge.discourse_renderer(base_url: "https://old.example.com/forum/")
 
-result = Markbridge.bbcode_to_markdown("hi   \nthere", renderer: RENDERER)
+result = Markbridge.bbcode_to_markdown("[url=viewtopic.php?t=34]an older topic[/url]", renderer: RENDERER)
+result.markdown
+# => "[an older topic](https://old.example.com/forum/viewtopic.php?t=34)"
 ```
 
-See [Customizing the renderer](/customization/customizing-renderer/) for all options (custom tags, dropping tags, custom escaper, postprocessor).
+[Customizing the renderer](/customization/customizing-renderer/) lists all options: your own tags, the plugins of the target site, relative links, escaping.
 
 ## Next steps
 
-- **Converting your format?** See the [format guides](/format-guides/) for full tag coverage.
-- **Customizing the output?** See [Customizing the renderer](/customization/customizing-renderer/).
-- **Adding a tag the parser doesn't know?** See [Extending Markbridge](/customization/extending/).
-- **Migrating a forum?** Start with [Migrating to Discourse](/migrating/overview/).
+- **Your format in detail:** the [format guides](/format-guides/) list every tag.
+- **A tag the parser does not know:** [Extending Markbridge](/customization/extending/).
+- **A forum migration:** [Migrating to Discourse](/migrating/overview/).
+- **Try it in the browser:** clone the repository and run `bin/playground`.

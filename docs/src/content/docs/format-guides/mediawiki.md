@@ -3,7 +3,7 @@ title: MediaWiki
 description: Convert MediaWiki wikitext into Discourse-flavored Markdown.
 ---
 
-The MediaWiki parser handles the wikitext subset most commonly found in wiki exports — formatting, lists, headings, links, tables, and the HTML tags MediaWiki accepts inline.
+Use the MediaWiki parser for the wikitext of a wiki: the source of a page as an editor sees it, or the `<text>` of an XML export. It reads the markup that makes up most pages: formatting, headings, lists, links, files, tables, and the HTML tags wikitext allows. It does not expand templates, see [Limits](#limits).
 
 ## Quick start
 
@@ -15,7 +15,7 @@ result.markdown
 # => "**bold** and *italic*"
 ```
 
-Like the other parsers, the convenience method returns a [`Markbridge::Conversion`](/concepts/result-objects/).
+`result` is a [`Markbridge::Conversion`](/concepts/result-objects/). Next to `markdown` it has the AST and `unknown_tags`.
 
 ## Supported syntax
 
@@ -49,19 +49,29 @@ Like the other parsers, the convenience method returns a [`Markbridge::Conversio
 
 ### HTML tags
 
-MediaWiki accepts a small set of inline HTML. Markbridge honors:
+Wikitext allows some HTML tags. The parser reads these, in any case (`<S>` like `<s>`):
 
-`<nowiki>`, `<code>`, `<pre>`, `<br>`, `<s>`, `<del>`, `<u>`, `<ins>`, `<mark>`, `<sup>`, `<sub>`.
+| Tag | Renders as |
+|---|---|
+| `<nowiki>` | Its content as text, with the wiki markup in it left alone. It can go over several lines |
+| `<code>` | A code span; a fenced code block when the content has a line break |
+| `<pre>` | A fenced code block, also for one line; a code span inside a line of text |
+| `<br>` | A line break |
+| `<s>` | `~~strike~~` |
+| `<u>` | `[u]underline[/u]` |
+| `<sup>`, `<sub>` | `<sup>…</sup>`, `<sub>…</sub>` |
+| `<ins>`, `<del>`, `<mark>` | The same HTML tags, which Discourse keeps |
 
-`<ins>`, `<del>` and `<mark>` are written as the same HTML tags, which Discourse keeps.
-
-Inside `<nowiki>`, wiki syntax is preserved as literal text. The tag can go over several lines. The tags are read in any case, `<S>` like `<s>`. Indented code and `<pre>` content render as fenced code blocks, even for a single line. `<code>` stays inline unless its content contains a newline.
+Any other tag stays in the output as text, and `unknown_tags` counts it.
 
 ## Links to wiki pages
 
-A link to a page, `[[Main Page]]`, has an href relative to the wiki, in the form MediaWiki's own HTML has: `./Main_Page`, with underscores for the spaces of the title. A namespace and a section stay in it (`[[Help:Contents#Hiking]]` is `./Help:Contents#Hiking`), and a link to a section of the same page keeps its target (`[[#History]]` is `#History`).
+A link like `[[Main Page]]` names a page, not an address. The parser gives it an address relative to the wiki, the same one MediaWiki writes into its HTML: `./Main_Page`, with underscores for the spaces.
 
-Discourse drops the address of a link that has no scheme and no leading slash, so such a link shows as text there. Give the renderer the address of the wiki as `base_url:`, and the page links point to it:
+- A namespace and a section stay in the address: `[[Help:Contents#Hiking]]` is `./Help:Contents#Hiking`.
+- A link to a section of the same page keeps its target: `[[#History]]` is `#History`.
+
+A relative address is of no use in Discourse, which drops an address without a scheme and without a leading slash and shows the link as text. Give the renderer the address of the wiki as `base_url:`, and the links point to the wiki:
 
 ```ruby
 renderer = Markbridge.discourse_renderer(base_url: "https://wiki.example.com/wiki/")
@@ -71,7 +81,20 @@ Markbridge.mediawiki_to_markdown(wikitext, renderer:).markdown
 # => "See the [Main Page](https://wiki.example.com/wiki/Main_Page) and [the help](https://wiki.example.com/wiki/Help:Contents)."
 ```
 
-To send some pages somewhere else, to a topic in Discourse for example, change the links on the AST before rendering. Every page link starts with `./`, so they are easy to find. See [Customizing the renderer](/customization/customizing-renderer/#base_url--where-relative-addresses-point-to) for `base_url:`.
+The base URL is the address in front of a page title. For most wikis that is `https://…/wiki/`, with the slash at the end. See [Customizing the renderer](/customization/customizing-renderer/#base_url--where-relative-addresses-point-to).
+
+Some pages may move to Discourse with the content, and their links should point to the new topics. Change those links on the AST before rendering. Every page link starts with `./`, so they are easy to find.
+
+## Files and categories
+
+`[[File:Sunrise.jpg|thumb|200px|A sunrise]]` embeds a file. What it becomes depends on the file:
+
+- **An image** (`.png`, `.jpg`, `.gif`, `.svg`, `.webp`, …) is an `AST::Image`. Its address is `./Special:FilePath/Sunrise.jpg`, the page a wiki answers with the file itself. Like a page link it needs `base_url:` to work in Discourse.
+- **Any other file** is a link to its page, `./File:Track.gpx`, with the caption or the file name as its text.
+
+The caption is the alternative text of the image, or `alt=…` when the embed has one. A size with a width and a height, `200x100px`, is kept. A width alone is dropped, because Discourse has no form for it. The options for the frame and the alignment (`thumb`, `right`, `border`, …) are dropped, Markdown has no form for them. `[[Image:…]]` is the old name of the same thing.
+
+`[[Category:Hiking]]` puts a page into a category and shows nothing in the text, so the parser drops it. With a colon in front, `[[:Category:Hiking]]`, it is a normal link to the category page, and `[[:File:Sunrise.jpg]]` is one to the file page.
 
 ## Using the parser directly
 
@@ -84,7 +107,11 @@ renderer.render(ast)
 # => "## Section\n\n- one\n- two"
 ```
 
-MediaWiki's block syntax is fixed — there's no handler registry for headings, lists, tables, etc. Inline HTML-like tags (`<nowiki>`, `<code>`, `<sup>`, etc.) go through an `InlineTagRegistry` you can customize via the `handlers:` kwarg:
+Calling the renderer yourself skips normalizing and the final cleanup of the output. `Markbridge.render(Markbridge.parse_mediawiki(input))` does both.
+
+## Customizing
+
+The block syntax of wikitext is fixed, so there are no handlers for headings, lists or tables. What you can register are HTML-like tags, in an `InlineTagRegistry` that you pass as `handlers:`:
 
 <!-- spec:before
 MyCustomNode = Class.new(Markbridge::AST::Element)
@@ -97,18 +124,22 @@ registry.register("custom", :raw, MyCustomNode)
 Markbridge.mediawiki_to_markdown(input, handlers: registry)
 ```
 
-`type` is one of `:raw` (content preserved verbatim, not re-parsed), `:formatting` (content re-parsed), or `:self_closing` (leaf with no content).
+The second argument says what the tag does with its content:
 
-For block-level customization, transform the AST after parsing, or register a different renderer tag via [`Markbridge.discourse_renderer(tags:)`](/customization/customizing-renderer/).
+- `:raw` keeps the content as it is and does not parse it.
+- `:formatting` parses the content as wikitext.
+- `:self_closing` is a tag without content.
 
-## Limitations
+For anything else, change the AST after parsing, or register another renderer tag with [`Markbridge.discourse_renderer(tags:)`](/customization/customizing-renderer/).
 
-The parser targets the bulk of content you'll see in wiki exports, not the full MediaWiki specification:
+## Limits
 
-- **No templates** (`{{Template}}`). They're passed through as literal text.
-- **No magic words or parser functions** (`__NOTOC__`, `{{#if:}}`, etc.).
-- **Files** keep their address on the wiki. An image is an image at `Special:FilePath`, the page a wiki answers with the file itself, so it needs `base_url:` to show. The caption is its alternative text, the frame and alignment options are dropped. Any other file is a link to its page.
-- **Categories** show nothing, like on the wiki. They are not turned into tags or categories of Discourse.
-- **Reference footnotes** (`<ref>`) are not special-cased.
+The parser reads wikitext, it does not run a wiki. What a wiki computes when it shows a page is missing:
 
-If your export relies on these, pre-process before handing it to Markbridge, or post-process the AST.
+- **Templates.** `{{Infobox …}}` or `{{cite web|…}}` are text in the output, with their braces. Expanding one needs the template's page and the parser functions of MediaWiki.
+- **Magic words and parser functions** (`__NOTOC__`, `{{PAGENAME}}`, `{{#if:…}}`) are text too.
+- **References.** `<ref>` and `<references/>` are text, like every tag the parser does not know. No footnotes are built.
+- **Files and images are not copied.** They keep pointing to the wiki.
+- **Categories** are not turned into tags or categories of Discourse.
+
+When your pages depend on templates, the wiki itself is the better source: its API returns the HTML of a page with every template expanded (`action=parse`), and the [HTML parser](/format-guides/html/) reads that.

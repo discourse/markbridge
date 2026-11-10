@@ -1,68 +1,52 @@
 ---
 title: Architecture
-description: The three-phase pipeline that turns markup into Markdown.
+description: The steps that turn markup into Markdown, and why they are separate.
 ---
 
-Markbridge is built around a **Parse → AST → Render** pipeline. Each phase has a single responsibility and doesn't know about the others. The parse and AST stages are renderer-agnostic; Discourse-flavored Markdown is what the shipped renderer produces.
+Markbridge converts in steps: parse the input into a tree, normalize the tree, render it. Each step knows nothing about the others. That is why four input formats can share one renderer, and why you can change one step without touching the rest.
 
 <figure class="diagram">
   <img class="diagram-light" src="/diagrams/architecture.svg" alt="Three-phase pipeline: Input (BBCode / HTML / MediaWiki / XML) → AST (Document tree) → Discourse Markdown">
   <img class="diagram-dark" src="/diagrams/architecture-dark.svg" alt="Three-phase pipeline: Input (BBCode / HTML / MediaWiki / XML) → AST (Document tree) → Discourse Markdown">
 </figure>
 
-## Phase 1 — parse
+## Parse
 
-A format-specific parser consumes the input and produces an `AST::Document`. There are four parsers today:
+A parser reads one input format and returns an `AST::Document`. There are four:
 
-- `Parsers::BBCode::Parser` — token scanner + handler registry (stateful handler API).
-- `Parsers::HTML::Parser` — Nokogiri fragment walker (stateless handler API).
-- `Parsers::TextFormatter::Parser` — Nokogiri XML walker for the s9e format.
-- `Parsers::MediaWiki::Parser` — line-based wikitext parser with no handler registry.
+| Parser | How it works |
+|---|---|
+| `Parsers::BBCode::Parser` | A scanner turns the input into tokens. Handlers turn the tokens into nodes. |
+| `Parsers::HTML::Parser` | Nokogiri parses the HTML. Handlers turn its elements into nodes. |
+| `Parsers::TextFormatter::Parser` | The same, for the XML of s9e\TextFormatter. |
+| `Parsers::MediaWiki::Parser` | Reads wikitext line by line, and the markup inside a line with a second parser. |
 
-All four produce the same AST node types.
+A parser does not raise on bad markup. A tag without a handler is counted, and its content is parsed as if the tag were not there. See [Parsers](/concepts/parsers/).
 
-## Phase 2 — the AST
+## The AST
 
-The AST is a tree of `AST::Node` instances. It's renderer-agnostic: nothing in the tree knows about Markdown.
+The AST is a tree of `AST::Node` objects: text, line breaks, and elements with children, like `AST::Bold`, `AST::List` or `AST::Table`. Every parser builds the same node types, and no node knows how it is written in Markdown.
 
-```
-Node (base)
-├── Text (leaf)
-├── LineBreak, HorizontalRule (leaf)
-└── Element (container, has children)
-    ├── Document (root)
-    ├── Inline: Bold, Italic, Underline, Strikethrough, Superscript, Subscript, Insertion, Deletion, Highlight
-    ├── Block: Quote, List, ListItem, Code, Spoiler, Heading, HorizontalRule
-    └── Content: Url, Image, Attachment, Color, Size, Align, Table, TableRow, TableCell
-```
+Between parsing and rendering the tree is yours. `Markbridge.bbcode_to_markdown(input) { |ast| … }` yields it, and you can replace, add or remove nodes. See [The AST](/concepts/ast/).
 
-Adjacent `Text` nodes auto-merge on insert, which keeps the tree small. `Element` validates that its children are `AST::Node` instances.
+## Normalize
 
-## Phase 3 — render
+Markup can nest things that Markdown cannot: a link inside a link, a list inside bold, a code block inside a heading. `Markbridge::Normalizer` walks the tree once and rewrites these parts, so the renderer only gets trees that Markdown can express. It runs after your block, so your changes are normalized too. It is on by default. See [AST normalization](/concepts/normalization/).
 
-Before the renderer runs, the AST goes through a normalization pass (`parse → yield → normalize → render`). It rewrites nesting Markdown can't express — a link inside a link, a block inside bold — so the renderer's tags stay simple string emitters. It's on by default; see [AST normalization](/concepts/normalization/).
+## Render
 
-`Renderers::Discourse::Renderer` walks the tree. For each node it looks up a `Tag` in the `TagLibrary` and calls `tag.render(element, interface)`. The interface carries a `RenderContext` — an immutable parent chain that lets tags ask "am I inside a list?" or "what's my depth?" without passing state around manually.
+`Renderers::Discourse::Renderer` walks the tree. For every node it looks up a `Tag` in its `TagLibrary` and calls `tag.render(element, interface)`. The tag returns Markdown.
 
-`RenderContext` is a linked parent chain: each nested level adds one small context object, and `has_parent?` / `find_parent` walk the chain (nesting depth is shallow in practice).
+A tag often needs to know where it is: a list item inside a list inside a quote is indented and prefixed differently from one at the top. The `interface` answers such questions (`has_parent?`, `find_parent`, `previous_sibling`), so a tag keeps no state of its own. See [Renderers](/concepts/renderers/).
 
-## Design patterns in use
+## What you can change
 
-- **Composite** — `Element` contains children forming a tree.
-- **Strategy** — BBCode uses pluggable closing strategies (Strict, Reordering).
-- **Registry** — `HandlerRegistry` for parsers, `TagLibrary` for the renderer.
-- **Visitor** — the renderer dispatches AST nodes to tag implementations.
-- **Immutable context** — `RenderContext` creates new instances instead of mutating.
+| You want to | Change |
+|---|---|
+| Read a tag the parser does not know | Register a handler in the parser's `HandlerRegistry` |
+| Write a node differently | Register a tag with `Markbridge.discourse_renderer(tags:)` |
+| Change the content itself | Edit the AST in the block of a `*_to_markdown` call |
+| Change what may nest in what | Add a rule to the `Normalizer` |
+| Write another output format | Write a renderer that walks the AST |
 
-## Why this shape
-
-- **Parsers don't know about Markdown.** You can add a new output format without touching them.
-- **The renderer doesn't know about BBCode or HTML.** You can add a new input format without touching it.
-- **Registries keep customization from forking the core.** Add a handler, add a tag — no subclassing required.
-
-## Next
-
-- [The AST](/concepts/ast/) — node types and invariants
-- [Parsers](/concepts/parsers/) — how each parser works
-- [Renderers](/concepts/renderers/) — how tags and the rendering interface fit together
-- [Performance](/concepts/performance/) — where the pipeline is tuned
+Handlers and tags are registered, not subclassed into the gem. Your code stays outside of Markbridge, and an update of the gem does not overwrite it. See [Customization](/customization/).

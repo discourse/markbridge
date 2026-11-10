@@ -3,7 +3,7 @@ title: BBCode
 description: Convert BBCode forum markup into Discourse-flavored Markdown.
 ---
 
-BBCode is Markbridge's most feature-rich input format. The default handler registry covers formatting, lists, tables, quotes, spoilers, images, attachments, sizing, color, alignment, and more.
+BBCode is what most forum software stores: phpBB before 3.2, vBulletin, XenForo, SMF, MyBB and many others. Every forum has its own dialect, so the parser knows the common tags and their aliases, repairs tags that are closed in the wrong order, and lets you register handlers for the tags only your forum has.
 
 ## Quick start
 
@@ -16,20 +16,20 @@ result.markdown
 # => "**Hello** [world](https://example.com)!"
 ```
 
-`result` is a [`Markbridge::Conversion`](/concepts/result-objects/) — `.markdown` is the rendered string, and the same object also exposes `.unknown_tags`, `.diagnostics` (auto-closed counts, depth-exceeded counts, unclosed raw-tag list), and `.errors`.
+`result` is a [`Markbridge::Conversion`](/concepts/result-objects/). Next to `markdown` it has `unknown_tags`, `diagnostics` (what the parser had to repair) and `errors`.
 
-To get the AST instead of rendered Markdown:
+To get the AST without rendering it:
 
 <!-- spec:continue -->
 ```ruby
 parse = Markbridge.parse_bbcode(bbcode)
 parse.ast
-# => AST::Document(Bold("Hello"), Text(" "), Url("world", href: "..."))
+# => an AST::Document with Bold("Hello"), Text(" "), Url("world") and Text("!")
 ```
 
 ## Supported tags
 
-All tag names are case-insensitive. Aliases in the same row use the same handler.
+Tag names are read in any case, `[B]` like `[b]`. The tags in one row are aliases: they have the same handler.
 
 <div class="format-tags">
 
@@ -93,20 +93,21 @@ All tag names are case-insensitive. Aliases in the same row use the same handler
 
 </div>
 
-A few tags take variants:
+### Options and other forms
 
-- **Code language** — `[code=ruby]` or `[code lang=ruby]`.
-- **Ordered list** — `[list=1]` (same as `[ol]`).
-- **Quote attribution** — `[quote="author, post:1, topic:2"]`.
-- **Options with spaces** — an option without quotes goes on up to the `]`: `[quote=John Doe]` quotes "John Doe". It ends at the first `name=` of a named attribute, so `[quote=John Doe post_id=4]` has the option and one attribute. A line break ends it too.
-- **Link forms** — `[url]` also accepts `[url=href]text[/url]` and `[url]href[/url]`; `[email=addr]text[/email]` and `[img=src]alt[/img]` follow the same shape.
-- **Bare links** — a `[url]` whose text equals the href (or has no text) renders as the plain link, not `[href](href)`, so Discourse autolinks and oneboxes it.
+- **Code language:** `[code=ruby]` or `[code lang=ruby]`.
+- **Ordered list:** `[list=1]`, the same as `[ol]`.
+- **Quote with an author:** `[quote="author, post:1, topic:2"]`.
+- **Links:** `[url=href]text[/url]` or `[url]href[/url]`. `[email=addr]text[/email]` and `[img=src]alt[/img]` work the same way.
+- **A link without a text of its own** is written as the bare URL, not as `[href](href)`. Discourse links a bare URL itself and shows a onebox for it when it stands on its own line.
+- **Relative links and images** are written as they are. Discourse drops an address without a scheme and without a leading slash, so give the renderer the address of the old forum as [`base_url:`](/customization/customizing-renderer/#base_url--where-relative-addresses-point-to).
+- **An option without quotes** runs up to the `]`, with its spaces: `[quote=John Doe]` quotes "John Doe". It ends earlier at a named attribute, so `[quote=John Doe post_id=4]` has the option "John Doe" and the attribute `post_id`. A line break ends it too.
 
-For the exact registration list, see [`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/bbcode/handler_registry.rb).
+[`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/bbcode/handler_registry.rb) is the exact list.
 
 ## Using the parser directly
 
-The `bbcode_to_markdown` convenience wraps parser + renderer. Calling them directly gives you the AST for inspection or custom rendering:
+`bbcode_to_markdown` runs the parser and the renderer for you. You can also call them yourself:
 
 ```ruby
 parser = Markbridge::Parsers::BBCode::Parser.new
@@ -120,14 +121,16 @@ renderer.render(ast)
 # => "**bold** with mystery"
 ```
 
-For most callers, `parse_bbcode` is the better entry point — it returns a `Parse` object that already exposes `.unknown_tags` and `.diagnostics` without reaching for the parser instance.
+`Markbridge.parse_bbcode` is easier in most cases. It returns a `Parse` that has the AST, `unknown_tags` and `diagnostics` in one object. Calling the renderer yourself also skips normalizing and the final cleanup of the output, which `Markbridge.render(parse)` does for you.
 
 ## Closing strategies
 
-BBCode inputs from real forums often have mismatched or out-of-order tags. Markbridge ships with two strategies:
+BBCode from real forums often closes tags in the wrong order, or not at all. A closing strategy decides what the parser makes of that. There are two:
 
-- **Reordering** (default) — reconciles sequences of up to 5 mismatched closing tags, e.g. `[b][i]text[/b][/i]` → `Bold(Italic("text"))`.
-- **Strict** — only auto-closes; won't reorder. More predictable, more likely to reject input.
+- **Reordering** is the default. It looks ahead up to five closing tags and matches them with the open tags, so `[b][i]text[/b][/i]` is bold and italic text.
+- **Strict** never reorders. A closing tag closes the open tags inside it, and a closing tag that matches nothing stays as text. Use it when your source is clean and you want to see every tag that is not.
+
+To use the strict one:
 
 ```ruby
 require "markbridge/bbcode"
@@ -141,25 +144,25 @@ handlers =
 Markbridge.bbcode_to_markdown("[b][i]text[/b][/i]", handlers:)
 ```
 
-## Graceful degradation
+## Unknown tags
 
-Unknown tags don't raise. The wrapper is skipped; children are parsed normally:
+A tag without a handler does not raise. The tag itself is dropped and its content is parsed like any other content:
 
 ```ruby
 Markbridge.bbcode_to_markdown("[unknown]inner text[/unknown]")
 # => "inner text"
 ```
 
-Unknown tag counts are surfaced on `Conversion#unknown_tags` (and `Parse#unknown_tags`) — no need to drop to the parser instance.
+`unknown_tags` on the result counts them, opening and closing tags each: `{"unknown" => 2}` here. Collect the counts over all your posts to see which tags need a handler.
 
 ## Limits
 
-- **Max nesting depth**: 100. Exceeding raises `MaxDepthExceededError`.
-- **Max auto-close depth**: 5 levels — also bounds how deep `Reordering` will look for a matching opener.
+- **Nesting stops at 100 levels.** A tag that opens deeper than that stays in the output as text, and `diagnostics[:depth_exceeded_count]` counts it.
+- **A closing tag closes at most five open tags inside it.** `Reordering` also looks no further than five tags to find a match.
 
 ## Customizing
 
-Register a custom handler to recognize a new tag, or replace the built-in one:
+Register a handler for a tag the parser does not know, or to replace a built-in one:
 
 <!-- spec:before
 class MyCalloutHandler < Markbridge::Parsers::BBCode::Handlers::BaseHandler
@@ -180,4 +183,4 @@ handlers =
 Markbridge.bbcode_to_markdown(input, handlers:)
 ```
 
-See [Extending Markbridge](/customization/extending/) for a full walkthrough, or [Wrapping a default handler](/customization/extending/#wrapping-a-default-handler) for `HandlerRegistry#overlay` — the cleanest way to delegate to the default for the cases your handler doesn't need to change.
+[Extending Markbridge](/customization/extending/) shows the handler, the AST node and the renderer tag for a new tag step by step. To change a built-in handler only for some cases, wrap it: see [Wrapping a default handler](/customization/extending/#wrapping-a-default-handler).

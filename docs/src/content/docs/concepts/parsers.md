@@ -3,31 +3,35 @@ title: Parsers
 description: How the four parsers work and where they differ.
 ---
 
-Each parser targets one input format but produces the same AST. They share philosophy (graceful degradation, bounded recursion) but not implementation.
+Each parser reads one input format. All four build the same AST and follow the same rules for bad input. How they work inside differs, and so does the way you extend them.
 
-## BBCode parser
+## What all parsers share
 
-**Path:** `Markbridge::Parsers::BBCode::Parser`
+- **Bad input does not raise.** Forum content is full of broken markup, and a migration must not stop at one post.
+- **A tag without a handler is counted, not kept.** Its content is parsed as if the tag were not there. `unknown_tags` on the result has the count per tag name.
+- **The root is an `AST::Document`.**
+- **Line endings are normalized**, CRLF to LF, before parsing.
 
-A hand-written, two-stage parser:
+## BBCode
 
-1. **Scanner** — streams the input and produces `TextToken`, `TagStartToken`, `TagEndToken`. Byte-offset based (`byteslice` / `byteindex` / `getbyte`, not character indices, which are O(n) on multibyte input), no regex except for character classes, minimal allocations.
-2. **Parser** — consumes tokens through a `HandlerRegistry`. Each handler implements `on_open` / `on_close`. A `ParserState` tracks the node stack and enforces the max-depth limit (100).
+`Markbridge::Parsers::BBCode::Parser` is written by hand and works in two stages.
 
-**Unique to BBCode:** closing strategies. Real-world BBCode often has mismatched tags (`[b][i]text[/b][/i]`). A `ClosingStrategy` decides how to recover:
+The **scanner** turns the input into tokens: text, an opening tag, a closing tag. It works on byte offsets, because an index by character is slow on text with multibyte characters.
 
-- `Strict` — auto-close only.
-- `Reordering` (default) — reconciles sequences of up to 5 mismatched closing tags by peeking ahead.
+The **parser** gives every tag token to the handler registered for the tag name. A handler has two callbacks, `on_open` and `on_close`, and pushes or pops elements on the stack of open elements (`ParserState`). The stack is limited to 100 levels.
 
-**Handler API:** stateful. Handlers push/pop elements on the parser state stack via `on_open` / `on_close` callbacks.
+BBCode from real forums often closes tags in the wrong order, like `[b][i]text[/b][/i]`. A closing strategy decides what to do:
 
-## HTML parser
+- `Reordering` (the default) looks ahead up to five closing tags and matches them with the open elements.
+- `Strict` only closes the open elements on top of the stack.
 
-**Path:** `Markbridge::Parsers::HTML::Parser`
+See the [BBCode guide](/format-guides/bbcode/#closing-strategies) for how to choose one.
 
-Thin wrapper over `Nokogiri::HTML.fragment` + a handler registry. Walks the DOM and dispatches each element to a handler.
+## HTML
 
-**Handler API:** stateless — an object responding to `#process(element:, parent:)`. It adds an AST node to `parent` and returns either the node to descend into, or `nil` to skip children.
+`Markbridge::Parsers::HTML::Parser` lets Nokogiri parse the HTML and walks the result. Nokogiri repairs broken HTML, so Markbridge does not have to.
+
+A handler here is simpler than a BBCode handler. It is an object with `#process(element:, parent:)`. It adds a node to `parent` and returns the node the children of the element go into, or `nil` to skip the children:
 
 <!-- spec:before
 require "markbridge/html"
@@ -35,7 +39,7 @@ registry = Markbridge::Parsers::HTML::HandlerRegistry.default
 -->
 ```ruby
 class AsideHandler < Markbridge::Parsers::HTML::Handlers::BaseHandler
-  # Descend the children straight into the parent — no AST node for <aside>.
+  # No AST node for <aside>: its children go into the parent.
   def process(element:, parent:)
     parent
   end
@@ -44,46 +48,33 @@ end
 registry.register("aside", AsideHandler.new)
 ```
 
-Relies on Nokogiri for malformed-HTML recovery — no need for Markbridge to do its own.
+The parser collapses whitespace like a browser does, except inside `<pre>` and `<code>`.
 
-## TextFormatter parser
+## TextFormatter
 
-**Path:** `Markbridge::Parsers::TextFormatter::Parser`
+`Markbridge::Parsers::TextFormatter::Parser` reads the XML that <a href="https://github.com/s9e/TextFormatter" class="nowrap">s9e\TextFormatter</a> stores. phpBB 3.2+ and Flarum save posts in this form, not as the BBCode or Markdown the user typed.
 
-Parses the XML format produced by <a href="https://github.com/s9e/TextFormatter" class="nowrap">s9e/TextFormatter</a>. Used primarily for phpBB 3.2+ migrations, where BBCode is stored as parsed XML rather than raw BBCode.
+Handlers work like in the HTML parser. What is special is the format:
 
-Same stateless handler API as the HTML parser. The main quirks are format-level:
+- The root is `<t>` for plain text or `<r>` for text with markup.
+- Elements have uppercase names: `<B>`, `<URL>`, `<QUOTE>`.
+- The markup the user typed is kept in `<s>`, `<e>` and `<i>` elements. The parser skips them.
 
-- Roots are `<t>` (plain) or `<r>` (rich).
-- Formatted elements use **uppercase** names (`<B>`, `<URL>`).
-- `<s>` / `<e>` tags preserve original BBCode markup and are ignored during parsing.
+Input that is not valid XML is read as plain text.
 
-Invalid XML falls back to treating the input as plain text.
+## MediaWiki
 
-## MediaWiki parser
+`Markbridge::Parsers::MediaWiki::Parser` has no handler registry for blocks. The block syntax of wikitext is fixed, so the parser reads the input line by line and decides what each line is: a heading, a list item, a table row, indented code, or text. An `InlineParser` reads the markup inside a line (`'''bold'''`, `[[links]]`).
 
-**Path:** `Markbridge::Parsers::MediaWiki::Parser`
+The one thing you can register is HTML-like inline tags (`<nowiki>`, `<sup>`, `<mark>`), in the `InlineTagRegistry`. For anything else, change the AST after parsing. See the [MediaWiki guide](/format-guides/mediawiki/#using-the-parser-directly).
 
-Unlike the others, MediaWiki's block syntax is fixed — wikitext lines are classified (heading, list, table, preformatted, blank, plain) and dispatched without a handler registry. An `InlineParser` handles intra-line formatting (`'''bold'''`, `[[links]]`, etc.).
+## Which parser for which input
 
-The one parser-level extension point is `InlineTagRegistry` for HTML-like inline tags (`<nowiki>`, `<code>`, `<sup>`, etc.). Pass a customized registry via the `handlers:` kwarg. Block-level customization is post-parse: transform the AST or register a different renderer tag.
-
-## Shared traits
-
-All four parsers:
-
-- **Don't raise on bad input.** Unknown tags/elements are skipped (children still processed).
-- **Return an `AST::Document`.** The root is always a `Document` containing children.
-- **Track unknown tags** so you can audit migrations. Surfaced via `Parse#unknown_tags` and `Conversion#unknown_tags` as `Hash{String => Integer}`.
-- **Normalize line endings** (CRLF → LF) before parsing.
-
-## Picking one
-
-| Input | Use |
+| Input looks like | Parser |
 |---|---|
-| `[b]...[/b]` | BBCode |
-| `<p><strong>...</strong></p>` | HTML |
-| `<r><B>...</B></r>` | TextFormatter |
+| `[b]…[/b]` | BBCode |
+| `<p><strong>…</strong></p>` | HTML |
+| `<r><B>…</B></r>` | TextFormatter |
 | `'''bold''' and [[links]]` | MediaWiki |
 
-If you have a choice (e.g. phpBB 3.2+ stores both), prefer the TextFormatter parser over re-parsing the raw BBCode — it's faster and closer to the source of truth.
+phpBB 3.2+ stores the XML of s9e\TextFormatter, and the XML has the BBCode in it. Use the TextFormatter parser there, not the BBCode parser: the XML says what phpBB made of every tag, so nothing has to be guessed again.

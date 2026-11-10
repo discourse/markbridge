@@ -16,18 +16,18 @@ version. The numbers behind it are further down.
   needs about 20 seconds to get there.
 - **A script that converts a few hundred posts and exits: Ruby 4.0.**
   It runs at full speed from the first window. TruffleRuby and JRuby
-  spend the first seconds warming up, and a short job never earns that
-  back.
+  spend the first seconds warming up, and a short job is over before
+  they are fast.
 - **On CRuby, take 4.0.** Ruby 3.3 converts 28% to 35% slower, and 3.4
   is slower still — it loses to 3.3 on most reports and on the corpus
   run.
 - **JRuby only if you are on the JVM anyway.** It converts 17% to 50%
   slower than Ruby 4.0, though it escapes text faster, and a process
-  that converts ASCII before multibyte can drop to half speed for the
-  rest of its life (see the end of this page).
+  that converts ASCII before multibyte can drop to half speed and stay
+  there until it exits (see the end of this page).
 - **Multibyte content costs every runtime** between 23% and 36%
-  against its own ASCII result. Worth planning for if the forum you
-  are moving is not English.
+  against its own ASCII result. Plan for that if the forum you are
+  moving is not English.
 
 ## Machine
 
@@ -214,22 +214,21 @@ TruffleRuby loses only 5% to 8% in the same sequence.
 
 That looks like a JIT decision made for ASCII strings that does not
 recover once multibyte strings arrive at the same call sites. Real
-imports convert mixed content, so a JRuby migration can land in either
-state. Worth knowing before choosing JRuby for a large import, and
-worth a bug report if someone wants to dig into it.
+imports convert mixed content, so a JRuby migration can end up in
+either state. Know this before you choose JRuby for a large import.
 
 ## Caveats
 
 - Single run per engine; for production decisions, average 3+ runs.
 - The machine ran a normal desktop session during the measurements,
   so a few percent of noise is expected, and the slow decline of
-  some later windows may come from that. Keep an eye on the
-  standard deviation and repeat a run that looks odd.
-- The `--isolated` mode pays a fork-per-report cost, so total
-  wallclock is ~10× a single report. Use suite mode (`bench/bench.rb`
-  with no flag) for a quick smoke test.
-- `--yjit` is enabled on all CRuby runs and matters: without it
-  numbers are 2–5× lower and don't reflect production.
+  some later windows may come from that. Look at the standard
+  deviation and repeat a run that looks odd.
+- The `--isolated` mode forks a process for every report, so the
+  whole run takes about ten times as long as one report. Use
+  `bench/bench.rb` without the flag for a quick check.
+- `--yjit` is on for all CRuby runs. Without it the numbers are 2 to
+  5 times lower.
 - TruffleRuby was measured with the Oracle GraalVM native build. The
   Community build is usually slower, and the JVM build starts slower
   but can reach higher peaks.

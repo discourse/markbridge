@@ -3,13 +3,11 @@ title: Performance
 description: Reuse your configuration, process large inputs, and measure conversion speed.
 ---
 
-Measure performance with representative input. Document size, nesting, custom handlers, and your Ruby engine all affect conversion time.
+Markbridge is fast enough that most projects never have to think about it: a typical forum post converts in well under a tenth of a millisecond (see [Benchmark results](/concepts/benchmarks/)). This page is for the cases where it matters, like a migration with millions of posts. It covers what to reuse, the limits the parsers have, and how to measure your own input.
 
 ## Reuse your configuration
 
-The default handler registries and tag library are shared and frozen. Use `.default` to build a fresh registry when you need to customize it.
-
-Build a custom renderer once and reuse it across conversions:
+Building a renderer or a handler registry takes about as long as converting a short post. Build them once, outside the loop:
 
 <!-- spec:before
 posts = [Struct.new(:body).new("[b]Hello[/b]")]
@@ -23,11 +21,13 @@ posts.each do |post|
 end
 ```
 
-The renderer keeps nothing from one document to the next, so one instance serves any number of conversions in a row. It does keep state for the render call in progress, so use one renderer per thread. Custom handlers and tags should keep no state between calls either.
+A renderer keeps nothing from one document to the next. It does keep state while a render call runs, so use one renderer per thread. Your own handlers and tags should keep no state between calls either.
+
+Without options there is nothing to build: the defaults are created once per process and frozen. To change a default registry, get a copy with `.default` or `.build_from_default`.
 
 ## Process one document at a time
 
-Each conversion builds its AST and output in memory. For large collections, read and write one document at a time instead of keeping every result.
+A conversion holds its AST and its output in memory. With many documents, read one, convert it and write it, and do not collect the results:
 
 <!-- spec:before
 require "csv"
@@ -48,21 +48,18 @@ end
 
 ## Parser limits
 
-The BBCode parser limits nesting to 100 levels. Its built-in handlers preserve an opening tag as text when that limit is reached and record `depth_exceeded_count` in the diagnostics. A custom handler that calls `ParserState#push` without a token can raise `MaxDepthExceededError` at that limit.
+The parsers have limits, so that hostile or broken input cannot make a conversion slow:
 
-Closing strategies search at most five levels when reconciling mismatched tags. These limits keep searches bounded on deeply nested input.
+- **The BBCode parser nests at most 100 levels.** A tag that opens deeper than that stays in the output as text, and `depth_exceeded_count` in the diagnostics counts it. Your own handler can raise `MaxDepthExceededError` at the limit if it calls `ParserState#push` without the token.
+- **The closing strategies look at most five levels up or ahead** when they match a closing tag with an open element.
 
-## How parsing works
+## Do not parse twice
 
-- **BBCode:** the scanner uses byte offsets and integer checks for ASCII syntax. Offsets remain on character boundaries for multibyte input.
-- **HTML and TextFormatter:** Nokogiri parses the input before Markbridge walks the document. Pass an existing Nokogiri node if your code has already parsed it.
-- **MediaWiki:** the parser reads block syntax by line and uses a separate parser for inline markup.
-
-Adjacent text nodes merge during AST construction. The renderer walks the resulting tree and uses a parent context for nested content.
+The HTML and TextFormatter parsers take a Nokogiri node in place of a String. If your code already parsed the input, for example to rewrite some elements, pass the node on.
 
 ## Measure your workload
 
-Read input before timing if you want to measure conversion without file access:
+Numbers from someone else's machine and input say little about yours. The size of the documents, how deep they nest, your own handlers and the Ruby you run all change the result. Measure with your own content, and read it into memory first, so the time for reading files is not part of the number:
 
 <!-- spec:before
 File.define_singleton_method(:readlines) { |_path, **| ["[b]Hello[/b]", "[i]world[/i]"] }
@@ -86,11 +83,11 @@ On CRuby, compare runs with YJIT enabled:
 ruby --yjit your_script.rb
 ```
 
-JRuby and TruffleRuby have their own JIT compilers. Allow time for warmup and compare both startup time and sustained conversion speed.
+JRuby and TruffleRuby compile while the program runs and need time to get fast. For a short script the start time counts, for a long migration the speed after warmup does. Measure both.
 
 ## Repository benchmarks
 
-Run benchmarks through `bin/bench-env`. It selects the fastest CPU cores and reports power and governor settings. Compare runs on AC power with the same governor.
+This part is for work on Markbridge itself. Run every benchmark through `bin/bench-env`. It runs the process on the fastest CPU cores and prints the power source and the CPU governor. Only compare runs on AC power with the same governor.
 
 ```bash
 bin/bench-env bundle exec ruby --yjit bench/bench.rb --isolated
@@ -98,4 +95,4 @@ DURATION=60 WINDOW=5 POSTS=2000 CORPUS=ascii bin/bench-env bundle exec ruby --yj
 DURATION=60 WINDOW=5 POSTS=2000 CORPUS=multi bin/bench-env bundle exec ruby --yjit bench/sustained_bench.rb
 ```
 
-Run the ASCII and multibyte corpora in separate processes. See [Benchmark results](/concepts/benchmarks/) for recorded measurements and their limits.
+Run the ASCII and the multibyte corpus in separate processes. [Benchmark results](/concepts/benchmarks/) has the recorded numbers and says what they do and do not show.
