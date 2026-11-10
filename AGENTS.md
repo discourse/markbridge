@@ -307,6 +307,27 @@ expect(token).to match_tag_end("b")
   the exact Markdown string. A Markdown expectation written from the
   current output also fixes the current bug in place.
 
+**Checking the TextFormatter parser against s9e**:
+- `spec/integration/markbridge/s9e_reference_spec.rb` takes what
+  s9e\TextFormatter itself makes of the inputs of its own plugin tests:
+  the XML it stores and the HTML it renders. It converts the XML with
+  Markbridge, cooks the Markdown with the Discourse engine (so the spec
+  is tagged `:discourse_engine`) and compares the result with the HTML
+  of s9e. A case that differs is listed in `INTENDED_DIFFERENCES` or
+  `KNOWN_BUGS` with a reason, and the spec fails when a listed case
+  starts to match.
+- `S9eReference` (`spec/support/s9e_reference.rb`) loads the cases and
+  brings the HTML of the two engines into one form. A rule there is a
+  difference between s9e and Discourse that says nothing about
+  Markbridge, like the anchor Discourse puts into a heading.
+- `spec/fixtures/s9e/cases.json` is generated: `php
+  spec/support/s9e/generate.php path/to/TextFormatter` runs s9e (a
+  checkout with `composer install --no-dev`, PHP with the dom and xsl
+  extensions) with two profiles, `flarum` (what Flarum turns on) and
+  `bbcodes` (the BBCodes of the s9e repository that Markbridge reads).
+  To cover a new element, add its BBCode or plugin to a profile and a
+  test class with inputs for it to `$sources`, then generate again.
+
 **Cooking with markdown-it** (needs Node 22; `bin/setup` runs `npm ci
 --prefix spec/support/markdown_it`):
 - Every spec that cooks Markdown cooks with markdown-it, which is what
