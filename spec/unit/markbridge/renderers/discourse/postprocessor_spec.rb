@@ -3,6 +3,18 @@
 RSpec.describe Markbridge::Renderers::Discourse::Postprocessor do
   let(:postprocessor) { described_class.new }
 
+  describe "#collapse_blank_lines" do
+    it "collapses runs of blank lines and keeps the ends as they are" do
+      expect(postprocessor.collapse_blank_lines("\n\n\na\n\n\n\nb \n\n\n")).to eq("\n\na\n\nb \n\n")
+    end
+
+    it "leaves the blank lines of a code fence alone" do
+      text = "a\n\n\n```\nx\n\n\n\ny\n```"
+
+      expect(postprocessor.collapse_blank_lines(text)).to eq("a\n\n```\nx\n\n\n\ny\n```")
+    end
+  end
+
   describe "#call" do
     it "collapses runs of three or more newlines to exactly two" do
       expect(postprocessor.call("a\n\n\n\nb")).to eq("a\n\nb")
