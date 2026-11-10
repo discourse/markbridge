@@ -5,7 +5,9 @@
   const FORMATS = [
     { id: "bbcode", label: "BBCode", extensions: ["bbcode", "bb"] },
     { id: "html", label: "HTML", extensions: ["html", "htm"] },
-    { id: "text_formatter", label: "TextFormatter", extensions: ["xml"] },
+    // The short name is for the format switch, the full one for where
+    // there is room: the name of the library is s9e\TextFormatter.
+    { id: "text_formatter", label: "TextFormatter", longLabel: "s9e\\TextFormatter", extensions: ["xml"] },
     { id: "media_wiki", label: "MediaWiki", extensions: ["wiki", "mediawiki", "wikitext"] }
   ];
 
@@ -86,6 +88,11 @@
     }
   }
 
+  function longFormatLabel(id) {
+    const format = FORMATS.find((entry) => entry.id === id);
+    return format?.longLabel || format?.label || id;
+  }
+
   function formatLabel(id) {
     return FORMATS.find((format) => format.id === id)?.label || id;
   }
@@ -158,6 +165,7 @@
     formatSwitch.innerHTML = FORMATS.map(
       (format) => `
         <button type="button" role="radio" class="segment" data-format="${format.id}"
+          title="${escapeHtml(longFormatLabel(format.id))}"
           aria-checked="${format.id === state.format}">${format.label}</button>`
     ).join("");
   }
@@ -169,7 +177,7 @@
     hint.hidden = !differs;
     if (differs) {
       hint.dataset.format = guess.format;
-      $("#format-hint-name").textContent = formatLabel(guess.format);
+      $("#format-hint-name").textContent = longFormatLabel(guess.format);
     }
   }
 
@@ -353,7 +361,7 @@
     }
     const text = await file.text();
     openOwnInput(text, formatForFile(file.name, text));
-    showToast(`Opened ${file.name} as ${formatLabel(state.format)}`);
+    showToast(`Opened ${file.name} as ${longFormatLabel(state.format)}`);
   }
 
   function shareLink() {
@@ -754,7 +762,7 @@
 
     return examples
       .map((example) => {
-        const label = `${example.title} ${example.description} ${formatLabel(example.format)}`.toLowerCase();
+        const label = `${example.title} ${example.description} ${longFormatLabel(example.format)}`.toLowerCase();
         const input = example.input.toLowerCase();
         if (!terms.every((term) => label.includes(term) || input.includes(term))) {
           return null;
@@ -796,9 +804,8 @@
   function renderPicker() {
     const matches = searchExamples(examplesSearch.value);
     renderPickerFormats(matches);
-    // The format in use comes first, the others in their usual order.
-    const order = [state.format, ...FORMATS.map((format) => format.id).filter((id) => id !== state.format)];
-    pickerItems = order
+    // The formats in the order of the format switch.
+    pickerItems = FORMATS.map((format) => format.id)
       .filter((format) => pickerFormat === "all" || pickerFormat === format)
       .flatMap((format) => matches.filter((match) => match.example.format === format));
     pickerIndex = Math.min(pickerIndex, Math.max(pickerItems.length - 1, 0));
@@ -816,7 +823,7 @@
         group = example.format;
         const count = pickerItems.filter((other) => other.example.format === group).length;
         html += `<div class="picker-group" data-format="${group}">
-          <span class="picker-group-name">${formatLabel(group)}</span>
+          <span class="picker-group-name">${escapeHtml(longFormatLabel(group))}</span>
           <span class="picker-group-count">${plural(count, "example", "examples")}</span>
         </div>`;
       }
