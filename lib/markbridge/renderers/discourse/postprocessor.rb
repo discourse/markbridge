@@ -55,6 +55,18 @@ module Markbridge
           @strip_trailing_invisibles = strip_trailing_invisibles
         end
 
+        # The cleanup of {#call} without the trim at the ends: runs of
+        # blank lines become one blank line, outside of code fences. For a
+        # tag that writes something in front of every line of its content,
+        # like the `>` of a quote. After that a blank line is no blank
+        # line anymore, and {#call} cannot collapse the run.
+        #
+        # @param text [String]
+        # @return [String]
+        def collapse_blank_lines(text)
+          clean_document(text)
+        end
+
         # @param text [String]
         # @return [String]
         def call(text)

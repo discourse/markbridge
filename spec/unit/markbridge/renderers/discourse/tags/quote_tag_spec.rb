@@ -131,6 +131,24 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::QuoteTag do
         expect(tag.render(element, interface)).to eq("\n\n> > in\n> \n> out\n\n")
       end
 
+      it "has one blank line between two blocks of a blockquote" do
+        element =
+          quote do
+            [
+              Markbridge::AST::Paragraph.new << text("one"),
+              Markbridge::AST::Paragraph.new << text("two"),
+            ]
+          end
+
+        expect(rendered(element)).to eq("\n\n> one\n> \n> two\n\n")
+      end
+
+      it "keeps the blank lines of a code block in a blockquote" do
+        element = quote { [text("a"), Markbridge::AST::Code.new << text("x\n\n\n\ny")] }
+
+        expect(rendered(element)).to eq("\n\n> a\n> \n> ```\n> x\n> \n> \n> \n> y\n> ```\n\n")
+      end
+
       it "stays a blockquote around a quote attributed by ids only" do
         element = quote { quote(post_id: 1, user_id: 2) { text("in") } }
 

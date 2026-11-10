@@ -36,7 +36,7 @@ module Markbridge
                 "[quote]\n#{content}\n[/quote]"
               else
                 # Plain quote rendered as Markdown blockquote
-                content.split("\n").map { |line| "> #{line}" }.join("\n")
+                blockquote(content)
               end
 
             # Bracket with leading and trailing blank lines so consecutive
@@ -46,6 +46,15 @@ module Markbridge
           end
 
           private
+
+          # Two blocks in the content have more than one blank line
+          # between them, which the postprocessor collapses at the end.
+          # With a `>` in front of every line it does not see them as
+          # blank lines, so they are collapsed here.
+          def blockquote(content)
+            content = Postprocessor::DEFAULT.collapse_blank_lines(content)
+            content.split("\n").map { |line| "> #{line}" }.join("\n")
+          end
 
           # @param element [AST::Element]
           # @return [Boolean] whether a quote that renders as [quote="…"]
