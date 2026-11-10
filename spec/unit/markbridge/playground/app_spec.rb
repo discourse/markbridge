@@ -37,18 +37,16 @@ RSpec.describe Markbridge::Playground::App do
       expect { convert("", format: "wat") }.to raise_error(ArgumentError, /unsupported format/)
     end
 
-    it "writes colors, sizes and spoilers as BBCode by default" do
+    it "writes a spoiler as BBCode and the text of colors and sizes by default" do
       result = convert("[color=red]a[/color] [size=120]b[/size] [spoiler]c[/spoiler]")
 
-      expect(result.fetch(:markdown)).to eq(
-        "[color=red]a[/color] [size=120]b[/size] [spoiler]c[/spoiler]",
-      )
+      expect(result.fetch(:markdown)).to eq("a b [spoiler]c[/spoiler]")
     end
 
-    it "writes the text of colors and sizes for a site without discourse-bbcode" do
-      result = convert("[color=red]a[/color] [size=120]b[/size]", bbcode: false)
+    it "writes colors and sizes as BBCode for a site with discourse-bbcode" do
+      result = convert("[color=red]a[/color] [size=120]b[/size]", bbcode: true)
 
-      expect(result.fetch(:markdown)).to eq("a b")
+      expect(result.fetch(:markdown)).to eq("[color=red]a[/color] [size=120]b[/size]")
     end
 
     it "writes the content of a spoiler for a site without spoiler-alert" do
