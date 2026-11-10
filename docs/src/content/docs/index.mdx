@@ -1,10 +1,10 @@
 ---
 title: Markbridge
-description: Convert BBCode, HTML, MediaWiki, and s9e TextFormatter XML to Markdown in Ruby.
+description: Convert BBCode, HTML, MediaWiki, and s9e\TextFormatter XML to Markdown in Ruby.
 template: splash
 hero:
   title: Your markup, in Markdown.
-  tagline: Convert BBCode, HTML, MediaWiki, and s9e TextFormatter XML with one Ruby library. Inspect the content and choose how it renders.
+  tagline: Convert BBCode, HTML, MediaWiki, and s9e\TextFormatter XML with one Ruby library. Inspect the content and choose how it renders.
   image:
     file: ../../assets/markbridge-icon.svg
     alt: Markbridge logo
@@ -37,7 +37,7 @@ result = Markbridge.bbcode_to_markdown(
 result.markdown # => "**Hello** [world](https://example.com)!"
 ```
 
-The shipped renderer produces **Discourse-flavored Markdown**. The parsers and AST are independent of the renderer, so you can use the same parsed content for your own output format.
+The renderer that ships with Markbridge writes Markdown for Discourse. The parsers and the AST do not depend on it, so you can use the parsed content for your own output format.
 
 ## Choose your input format
 
@@ -45,7 +45,7 @@ The shipped renderer produces **Discourse-flavored Markdown**. The parsers and A
   <LinkCard title="BBCode" href="/format-guides/bbcode/" description="Convert bracket tags for formatting, quotes, lists, tables, and attachments." />
   <LinkCard title="HTML" href="/format-guides/html/" description="Convert HTML strings or work directly with a Nokogiri document." />
   <LinkCard title="MediaWiki" href="/format-guides/mediawiki/" description="Convert wikitext headings, links, lists, tables, and code." />
-  <LinkCard title="s9e TextFormatter" href="/format-guides/textformatter/" description="Read stored XML from phpBB and other TextFormatter applications." />
+  <LinkCard title="s9e\TextFormatter" href="/format-guides/textformatter/" description="Read the XML that phpBB 3.2+, Flarum and other s9e\TextFormatter applications store." />
 </CardGrid>
 
 ## Keep control of the output
@@ -65,9 +65,9 @@ The shipped renderer produces **Discourse-flavored Markdown**. The parsers and A
 
 <Steps>
 
-1. **Parse your input.** Each parser builds the same kind of AST.
-2. **Inspect or edit the AST.** Your code can change nodes before normalization prepares them for Markdown.
-3. **Render the result.** Use the Discourse renderer or write your own renderer for the shared AST.
+1. **Parse your input.** Every parser builds the same kind of tree, the AST.
+2. **Look at the AST or change it.** Your code gets the tree before Markbridge rewrites what Markdown cannot nest.
+3. **Render the result.** Use the Discourse renderer, or write your own renderer for the same tree.
 
 </Steps>
 
@@ -75,6 +75,6 @@ Read the [architecture guide](/concepts/architecture/) for the details.
 
 ## Migrating to Discourse
 
-You can convert post bodies, track unknown tags, and resolve uploads, users, and internal links in your own code. The migration guide explains how these parts work together.
+Markbridge converts the posts and counts the tags it did not know. Uploads, users and internal links stay in your hands: you get them as nodes of the tree and resolve them in your importer. The migration guide explains how the parts work together.
 
 <LinkCard title="Plan your forum migration" href="/migrating/overview/" description="Convert posts, review the results, and handle references to your source data." />

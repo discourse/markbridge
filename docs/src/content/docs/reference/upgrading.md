@@ -5,37 +5,54 @@ description: Breaking-change notes between Markbridge releases.
 
 ## Upgrading to 0.5.1
 
-Output and AST changes to check:
+Most projects update without a change to their code. What changes is the output for some input, and a few nodes of the AST. Look at the group of the format you convert.
+
+### New options and nodes
 
 - **`base_url:` for relative links and images.** `Markbridge.discourse_renderer(base_url: "https://old.example.com/forum/")` makes relative addresses absolute. Discourse drops an address without a scheme and without a leading slash, so without it such links show as text. See [Customizing the renderer](/customization/customizing-renderer/#base_url--where-relative-addresses-point-to).
-- **MediaWiki page links.** The href of `[[Page title]]` is `./Page_title` now, relative to the wiki and with underscores for spaces, like MediaWiki's own HTML has it. It was the title as written. `[[Alta Via]]` renders as `[Alta Via](./Alta_Via)`, before it was plain text; `[[Help:Contents|help]]` keeps its link. Pass the address of the wiki as `base_url:` to make them full URLs. If you map page titles to URLs on the AST, look for hrefs that start with `./`. See the [MediaWiki guide](/format-guides/mediawiki/#links-to-wiki-pages).
 - **`<ins>`, `<del>` and `<mark>`.** The HTML and MediaWiki parsers read them into the new nodes `AST::Insertion`, `AST::Deletion` and `AST::Highlight`, and the renderer writes the HTML tags, which Discourse keeps. Before, `<del>` was strikethrough (`~~…~~`), `<ins>` in wikitext was underline (`[u]…[/u]`), and HTML dropped `<ins>` and `<mark>`. `[del]` in BBCode is still strikethrough.
-- **Spoilers in s9e XML.** `<SPOILER>` is a block spoiler now: `AST::Spoiler` has a `block:` keyword, and the renderer writes `[spoiler]` and `[/spoiler]` on lines of their own, with a title as a paragraph in front (`Title:`). Before, the spoiler was written inside the line and the text after it was glued to it. `<ISPOILER>` is read as an inline spoiler. A block spoiler inside bold or a link is moved out by the normalizer.
-- **`<HR>` in s9e XML** is a horizontal rule. It was counted as an unknown tag and dropped.
-- **Litedown elements in s9e XML.** `<STRONG>`, `<EM>`, `<DEL>`, `<SUP>`, `<SUB>`, `<C>` and `<H1>` to `<H6>` are read, which is what a Flarum post is made of. They were unknown tags, so their formatting was lost.
-- **More elements of s9e XML.** `<CENTER>`, `<LEFT>`, `<RIGHT>` and `<JUSTIFY>` are aligned blocks. `<ESC>`, `<E>` and `<EMOJI>` are passed through and no longer counted in `unknown_tags`; the set is `HandlerRegistry#transparent_tags` of the TextFormatter parser.
-- **Files and categories in wikitext.** `[[File:Name.jpg|thumb|Caption]]` is an image with the caption as its alternative text, at `./Special:FilePath/Name.jpg`; with `base_url:` that is the file on the wiki. A file that is no image is a link to its page. `[[Category:Name]]` shows nothing. Before, both were links with the options in their text.
 - **`colspan` and `rowspan`.** `AST::TableCell` has the two as keywords, all four parsers read them, and a table with such a cell is written as an HTML table with the attributes, which Discourse keeps. Before, the spans were lost and the cells stood in the wrong columns.
+
+### BBCode
+
+- **Unquoted BBCode options with spaces.** `[quote=John Doe]` quotes "John Doe", not "John"; `[url=https://example.com/a b]` keeps the whole address; `[spoiler=What went wrong]` is a spoiler with that title and no longer text. The option ends at the `]` or at the first `name=`.
+- **A tag that is never closed in a BBCode list item** ends with the item. `[list][*]one [b]bold[*]two[/list]` has two items now. Before, the second item was nested in the bold of the first and the `[/list]` showed as text. The same goes for a tag that is still open when the list ends.
+- **The line break right after a code tag** is not a first, empty line of the code anymore: `[code]`, `[pre]`, HTML `<pre>` and `<pre>` in wikitext drop one line break after the tag. HTML itself says so for `<pre>`. A second line break stays, and so does one after `[tt]` or `<code>`.
+
+### HTML
+
+- **`thead`, `tbody` and `tfoot`** are no longer in `unknown_tags` of the HTML parser. The set is `HandlerRegistry#transparent_tags`, add the wrappers you expect.
+
+### MediaWiki
+
+- **MediaWiki page links.** The href of `[[Page title]]` is `./Page_title` now, relative to the wiki and with underscores for spaces, like MediaWiki's own HTML has it. It was the title as written. `[[Alta Via]]` renders as `[Alta Via](./Alta_Via)`, before it was plain text; `[[Help:Contents|help]]` keeps its link. Pass the address of the wiki as `base_url:` to make them full URLs. If you map page titles to URLs on the AST, look for hrefs that start with `./`. See the [MediaWiki guide](/format-guides/mediawiki/#links-to-wiki-pages).
+- **Files and categories in wikitext.** `[[File:Name.jpg|thumb|Caption]]` is an image with the caption as its alternative text, at `./Special:FilePath/Name.jpg`; with `base_url:` that is the file on the wiki. A file that is no image is a link to its page. `[[Category:Name]]` shows nothing. Before, both were links with the options in their text.
 - **The caption of a wikitext table** (`|+ text`) is a paragraph in front of the table. It was a cell of the first row.
-- **HTML-like tags in wikitext** are read in any case: `<S>` like `<s>`.
 - **Bold inside italic in wikitext.** `''italic and '''bold''' in it''` is italic with bold in it. The three apostrophes ended the italic before.
 - **`<nowiki>` over several lines** in wikitext is one piece of literal text. Before, the tags showed as text and the lines were parsed.
-- **A tag that is never closed in a BBCode list item** ends with the item. `[list][*]one [b]bold[*]two[/list]` has two items now. Before, the second item was nested in the bold of the first and the `[/list]` showed as text. The same goes for a tag that is still open when the list ends.
+- **HTML-like tags in wikitext** are read in any case: `<S>` like `<s>`.
+- **`[[]]` in wikitext** is text. The MediaWiki parser raised `NoMethodError` for it.
+
+### s9e\TextFormatter XML
+
+- **Litedown elements in s9e XML.** `<STRONG>`, `<EM>`, `<DEL>`, `<SUP>`, `<SUB>`, `<C>` and `<H1>` to `<H6>` are read, which is what a Flarum post is made of. They were unknown tags, so their formatting was lost.
+- **Spoilers in s9e XML.** `<SPOILER>` is a block spoiler now: `AST::Spoiler` has a `block:` keyword, and the renderer writes `[spoiler]` and `[/spoiler]` on lines of their own, with a title as a paragraph in front (`Title:`). Before, the spoiler was written inside the line and the text after it was glued to it. `<ISPOILER>` is read as an inline spoiler. A block spoiler inside bold or a link is moved out by the normalizer.
+- **`<HR>`** is a horizontal rule. It was counted as an unknown tag and dropped.
+- **More elements of s9e XML.** `<CENTER>`, `<LEFT>`, `<RIGHT>` and `<JUSTIFY>` are aligned blocks. `<ESC>`, `<E>` and `<EMOJI>` are passed through and no longer counted in `unknown_tags`; the set is `HandlerRegistry#transparent_tags` of the TextFormatter parser.
+- **The space after a code span at the start of a line** in s9e XML is kept.
+
+### Normalizer and renderer
+
+- **Text around a block that was moved out.** When the normalizer moves a block out of bold, a link or another inline container, the texts on its two sides get a space between them when they would touch.
 - **A URL right in front of a closing `~~` or a closing BBCode tag.** Discourse takes `~~`, `[/u]`, `[/color]`, `[/size]` and `[/spoiler]` into a URL that stands right in front of them, so the link was wrong and the closing tag showed as text. A link whose text is its URL is written as `[url](url)` there, and a URL in plain text gets an empty comment after it: `~~see https://example.com/a<!---->~~`.
 - **A `<` in front of a scheme at the end of a text** gets a backslash, `\<mailto:`. With a link right after it the two cooked as one broken autolink.
-- **The line break right after a code tag** is not a first, empty line of the code anymore: `[code]`, `[pre]`, HTML `<pre>` and `<pre>` in wikitext drop one line break after the tag. HTML itself says so for `<pre>`. A second line break stays, and so does one after `[tt]` or `<code>`.
 - **An image with only a width** is written without a size, `![alt](src)`. Discourse reads a size only as `WIDTHxHEIGHT`, so the `100` of `![alt|100](src)` stayed in the alt text.
-- **The space after a code span at the start of a line** in s9e XML is kept.
+- **Blockquotes.** Two blocks in a `>` quote have one `>` line between them, not three.
 - **A paragraph with an upload in a table written as HTML** is a `<div>`, not a `<p>`. A `<p>` ends at the `<div>` of the upload, and an inline element around the upload, a `<del>` for example, stayed behind empty.
 - **An empty paragraph in a table written as HTML** is nothing. It was an empty `<p></p>`, which kept a list item around it alive.
 - **The normalizer report** names a node of a class without a name (from `Class.new`) after its nearest named ancestor. It raised `NoMethodError`.
-- **Unquoted BBCode options with spaces.** `[quote=John Doe]` quotes "John Doe", not "John"; `[url=https://example.com/a b]` keeps the whole address; `[spoiler=What went wrong]` is a spoiler with that title and no longer text. The option ends at the `]` or at the first `name=`.
-- **Blockquotes.** Two blocks in a `>` quote have one `>` line between them, not three.
-- **Text around a hoisted block.** When the normalizer moves a block out of bold, a link or another inline container, the texts on its two sides get a space between them when they would touch.
-- **`thead`, `tbody` and `tfoot`** are no longer in `unknown_tags` of the HTML parser. The set is `HandlerRegistry#transparent_tags`, add the wrappers you expect.
-- **`[[]]` in wikitext** is text. The MediaWiki parser raised `NoMethodError` for it.
 
-Removed:
+### Removed
 
 - The BBCode list item alias `[.]` and the TextFormatter element `*`. No input reached either of them.
 
@@ -422,7 +439,7 @@ This swaps in `Markbridge::Renderers::Discourse::IdentityEscaper`, a tiny class 
 
 ### Change the AST between parse and render
 
-You can edit the parsed tree before it's rendered — handy for adding attachments that weren't in the post body. Every `*_to_markdown` / `convert` method takes a block, or you can render a `Parse` by hand:
+You can edit the parsed tree before it is rendered, for example to add attachments that were not in the text of the post. Every `*_to_markdown` / `convert` method takes a block, or you can render a `Parse` by hand:
 
 <!-- spec:before
 class OrphanAttachment < Markbridge::AST::Node

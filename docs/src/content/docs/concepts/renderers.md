@@ -3,11 +3,13 @@ title: Renderers
 description: How the Discourse Markdown renderer walks the AST.
 ---
 
-The renderer takes an `AST::Document` and produces a Markdown string. It lives under `Markbridge::Renderers::Discourse` and has three collaborators:
+The renderer takes an `AST::Document` and returns Markdown. This page explains how it does that, which you need to know before you write a tag of your own. To only change options, read [Customizing the renderer](/customization/customizing-renderer/).
 
-- **`Renderer`** — walks the tree.
-- **`TagLibrary`** — maps `AST::Node` classes to `Tag` implementations.
-- **`RenderingInterface`** — what a `Tag` actually sees when rendering.
+The renderer is in `Markbridge::Renderers::Discourse` and has three parts:
+
+- **`Renderer`** walks the tree.
+- **`TagLibrary`** says which `Tag` writes which AST class.
+- **`RenderingInterface`** is what a tag gets from the renderer: the output of its children and answers about where it is in the tree.
 
 ## The rendering loop
 
@@ -18,11 +20,11 @@ renderer.render(document)
     render with the tag, or render the children if no tag matches
 ```
 
-The renderer holds no state beyond the running output and the context. All decisions about markup (`**`, `_`, backticks, etc.) live in the individual `Tag` classes.
+The renderer itself knows no Markdown. What a node looks like (`**`, a fence of backticks, `> `) is decided by its tag.
 
 ## Tags
 
-A `Tag` is any class (or block) that responds to `render(element, interface)` and returns finished Markdown:
+A tag is an object with `render(element, interface)` that returns finished Markdown:
 
 ```ruby
 class SpoilerTag < Markbridge::Renderers::Discourse::Tag
@@ -36,7 +38,7 @@ class SpoilerTag < Markbridge::Renderers::Discourse::Tag
 end
 ```
 
-For simple cases, the block constructor is often enough:
+For a short tag, pass a block to `Tag.new`:
 
 ```ruby
 Markbridge::Renderers::Discourse::Tag.new do |element, interface|
@@ -60,37 +62,36 @@ A tag that returns a String next to a tag that returns tokens is fine: the seria
 
 ## The rendering interface
 
-`Tag` implementations never see the renderer directly. They receive a `RenderingInterface` that exposes only what a tag should need:
+A tag never gets the renderer itself. It gets a `RenderingInterface` with what a tag needs:
 
 | Method | Use |
 |---|---|
-| `render_children(element)` | Recurse into children, write their output as Markdown |
-| `render_tokens(element)` | The output of the children as inline tokens, for a tag that returns tokens |
-| `with_parent(element)` | Return a new context that treats `element` as parent |
-| `find_parent(klass)` | Walk ancestors for a specific class |
-| `has_parent?(klass)` | Boolean ancestor check |
-| `count_parents(klass)` | How deep a specific ancestor is (nested lists, quotes) |
+| `render_children(element, context:)` | The children as Markdown. `context:` is optional, pass `with_parent(element)` so the children know their parent |
+| `render_tokens(element, context:)` | The children as inline tokens, for a tag that returns tokens |
+| `render_default(node)` | The node written by the tag Markbridge ships for it, even when you registered your own |
+| `with_parent(element)` | A new context with `element` as the parent |
+| `find_parent(klass)` | The nearest ancestor of a class, or nil |
+| `has_parent?(klass)` | Whether an ancestor of a class exists |
+| `count_parents(klass)` | How many ancestors of a class there are (the depth of a nested list or quote) |
 | `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset:)` | The neighbors of an element among the children of its parent |
 | `previous_list(element)` | The last list in front of the element, or the node whose output ends with one, with nothing visible between them |
 | `choose_list_marker(node, ordered:)`, `list_marker(node)` | The marker for the items of a list, the one the list in front did not use; and the marker chosen for a node in this render call |
 | `leading_list(node, children: false)`, `trailing_list(node, children: false)` | The list the output of `node` starts or ends with, as its tag says (`Tag#leading_list`, `Tag#trailing_list`); with `children: true` the answer for the first or last child with something in it |
-| `block_context?(element)` | Block vs. inline position |
+| `block_context?(element)` | Whether the element stands where a block can stand |
 | `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML without a blank line, or write its Markdown through `markdown_island`; the serializer takes care of it for tokens |
 | `markdown_island(markdown, block:)` | Markdown that Discourse has to read as Markdown (the BBCode of a plugin, an upload, a placeholder for one): as it is, with blank lines around a block; inside an HTML block an island in a `<div>`, `<div>\n\n…\n\n</div>` |
 
-The interface decouples tags from the renderer: you could write a second renderer (HTML, plain text, JSON) and reuse every tag by providing a compatible interface.
+[Extending Markbridge](/customization/extending/#the-rendering-interface) has the same table with more detail on each method.
 
 ## RenderContext
 
-Behind the interface is a `RenderContext` — an immutable, linked parent chain. Creating a child context (via `with_parent`) links a new instance to the current one; the old one is untouched. `has_parent?` / `find_parent` walk that chain, so each nested level is a single fixed-size allocation rather than a copied parent array, and nesting depth stays shallow in practice.
-
-A child context does not change the context used by its siblings.
+The interface gets its answers from a `RenderContext`: the chain of parents of the node that is being rendered. A context is never changed. `with_parent` returns a new one that points to the old one, so a tag cannot change what its siblings see.
 
 ## TagLibrary
 
-The Discourse renderer ships with a default library mapping each built-in AST class to its Tag. `TagLibrary.default` returns a fresh copy each call (mutating it doesn't affect other callers).
+The default library has a tag for every AST class Markbridge ships. `TagLibrary.default` returns a new copy on every call, so changing it changes nothing for other callers.
 
-For most customization, prefer the `Markbridge.discourse_renderer(tags:, unregister:)` factory over hand-mutating a library — it gives you a complete, reusable Renderer:
+You rarely need the library itself. `Markbridge.discourse_renderer(tags:, unregister:)` builds a renderer with your changes on top of the defaults:
 
 <!-- spec:before
 MyUrlTag = Class.new(Markbridge::Renderers::Discourse::Tag) do
@@ -104,20 +105,20 @@ RENDERER = Markbridge.discourse_renderer(
 )
 ```
 
-The renderer checks the node's class, then its nearest registered ancestor class. If neither has a tag, it renders only the children. To render only the children of a subclass with an inherited tag, register `Tag::PASSTHROUGH`. See [AST subclasses](/customization/extending/#ast-subclasses).
+The renderer looks for a tag for the class of the node, then for the nearest superclass that has one. Without any tag it renders only the children. A subclass that should render only its children, although a superclass has a tag, gets `Tag::PASSTHROUGH`. See [AST subclasses](/customization/extending/#ast-subclasses).
 
-For lower-level use, `TagLibrary.new.auto_register!` discovers convention-paired classes (`BoldTag` → `AST::Bold`, etc.) under `Markbridge::Renderers::Discourse::Tags::*`. Consumer-defined tag classes still need explicit registration.
+To build a library by hand, start from `TagLibrary.default`, or from `TagLibrary.new.auto_register!`, which registers every tag class in `Markbridge::Renderers::Discourse::Tags` for the AST class of the same name (`BoldTag` for `AST::Bold`). Your own tag classes are not found that way, register them with `library.register(MyNode, MyTag.new)`. Pass the library to the factory as `tag_library:`.
 
 ## Output cleanup
 
-After the tree walk, the renderer's `Postprocessor` runs a small cleanup pass on the joined output:
+Tags write blank lines around their blocks without knowing their neighbors, so the joined output has too many of them. A `Postprocessor` cleans up after the walk:
 
-- Collapse runs of 3+ newlines to 2.
-- Strip whitespace-only lines.
-- Trim leading/trailing whitespace.
+- Three or more newlines in a row become two.
+- A line with only whitespace becomes an empty line.
+- Whitespace at the start and the end of the document is removed.
 
-The default postprocessor is `Markbridge::Renderers::Discourse::Postprocessor::DEFAULT`. Pass a custom one (or a subclass) via `Markbridge.discourse_renderer(postprocessor:)` to change or extend the cleanup. Calling `Renderer#render` directly returns the *un*-postprocessed string.
+`Markbridge.discourse_renderer(postprocessor:)` takes your own, see [Customizing the renderer](/customization/customizing-renderer/#postprocessor--clean-up-the-final-string). `Renderer#render` returns the output before this cleanup. The `*_to_markdown` methods and `Markbridge.render` return it cleaned up.
 
 ## Writing a new renderer
 
-Because the AST is renderer-agnostic, writing (say) a plain-text renderer is a matter of implementing a new `Renderer` that walks the AST and emits whatever you want. Re-using the `Tag` / `TagLibrary` pattern is recommended — it gives you the same extension points for free.
+The AST does not depend on the Discourse renderer. A renderer for plain text or HTML is a class that walks the tree and writes what you need. We recommend the same split into a renderer and a library of tags: it gives the users of your renderer the same way to replace one tag.

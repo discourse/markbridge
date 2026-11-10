@@ -1,9 +1,9 @@
 ---
 title: Customizing the renderer
-description: Build a reusable Discourse renderer with Markbridge.discourse_renderer — override tags, drop tags, swap escapers, post-process output.
+description: The options of Markbridge.discourse_renderer — your own tags, the plugins of the target site, relative links, escaping, and cleanup.
 ---
 
-The Discourse renderer is configurable through a single factory: `Markbridge.discourse_renderer`. Build a `Renderer` once with the customizations you need, then pass it to as many `*_to_markdown` calls as you like via the `renderer:` kwarg.
+The default renderer writes Markdown for a Discourse site with the default plugins. When your site or your content needs something else, build your own renderer with `Markbridge.discourse_renderer` and pass it to every conversion as `renderer:`.
 
 <!-- spec:before
 MyPlaceholderUrlTag = Class.new(Markbridge::Renderers::Discourse::Tag) do
@@ -25,9 +25,21 @@ posts.each do |post|
 end
 ```
 
-The renderer is safe to reuse across thousands of posts. Nothing leaks from one post to the next — you collect any side data per call by walking `result.ast`. A render call keeps its state on the renderer until it returns, so use one renderer per thread.
+Build the renderer once and use it for all posts. It keeps nothing from one post to the next. It does keep state while a render call runs, so use one renderer per thread.
 
-## The factory
+## The options
+
+Which option for which problem:
+
+| You want to | Option |
+|---|---|
+| Write a node your own way, or not at all | [`tags:`](#tags--override-or-add-tags), [`unregister:`](#unregister--drop-ast-classes) |
+| Write what the plugins of your site can show | [`features:`](#features--the-plugins-of-the-target-site), with `sizes:` and `colors:` |
+| Keep relative links and images working | [`base_url:`](#base_url--where-relative-addresses-point-to) |
+| Keep Markdown that is already in the source | [`allow:`](#allow--let-specific-markdown-markers-through), [`escape:`](#escape--turn-escaping-off-entirely), [`escaper:`](#escaper--full-escaper-replacement) |
+| Change the final cleanup | [`postprocessor:`](#postprocessor--clean-up-the-final-string) |
+
+All of them, with their defaults:
 
 ```ruby
 Markbridge.discourse_renderer(
@@ -46,11 +58,11 @@ Markbridge.discourse_renderer(
 )
 ```
 
-Every kwarg is optional. The defaults give you the standard Discourse renderer.
+Every option is optional. Without any you get the default renderer.
 
 ### `tags:` — override or add Tags
 
-`tags:` is a hash of AST class → `Tag` instance. Mappings merge on top of the default `TagLibrary`, so unmapped classes keep their default rendering.
+`tags:` is a Hash from an AST class to the `Tag` that writes it. Your entries are added to the default library, so every class you do not list keeps its default tag.
 
 <!-- spec:before
 MyBoldTag = MyPlaceholderUrlTag = Class.new(Markbridge::Renderers::Discourse::Tag) do
@@ -66,11 +78,13 @@ Markbridge.discourse_renderer(
 )
 ```
 
-Map a class to `nil` to unregister it (same as listing it under `unregister:`).
+A class with `nil` as its tag is removed from the library, the same as listing it in `unregister:`. [Extending Markbridge](/customization/extending/) explains how to write a tag.
 
 ### `unregister:` — drop AST classes
 
-Removing a built-in tag keeps its children, including their formatting. For a subclass, removing its own tag allows the nearest registered ancestor tag to apply. Use `Tag::PASSTHROUGH` to render only the children when an ancestor has a tag.
+A node without a tag is written as its children. So removing the tag of `AST::Color` drops the color and keeps the text, with all formatting inside it.
+
+For a subclass this works differently: without a tag of its own, the tag of the nearest superclass writes it. To write only the children of a subclass, register `Tag::PASSTHROUGH` for it.
 
 ```ruby
 Markbridge.discourse_renderer(
@@ -80,22 +94,22 @@ Markbridge.discourse_renderer(
 
 ### `escape_hard_line_breaks:` — strip trailing-space line breaks
 
-In Markdown, a line ending in two or more trailing spaces becomes a hard break (`<br>`). When source content happens to carry that whitespace, the result can surprise readers.
+In Markdown, two or more spaces at the end of a line are a line break. Source text often has such spaces by accident, and they would become line breaks nobody wrote.
 
 ```ruby
 Markbridge.discourse_renderer(escape_hard_line_breaks: true)
-# Strips "  \n" → "\n" before escaping; no <br>.
+# "a  \nb" is written as "a\nb"
 ```
 
-The default (`false`) preserves trailing spaces and lets the downstream Markdown renderer decide.
+The default, `false`, keeps the spaces.
 
 ### `escaper:` — full escaper replacement
 
-For control beyond the hard-line-breaks toggle, pass your own `MarkdownEscaper` (or subclass). Mutually exclusive with `escape_hard_line_breaks:` — if you supply an escaper, the boolean is ignored.
+The escaper puts backslashes in front of the characters in source text that Markdown would read as markup. For full control pass your own, usually a subclass of `MarkdownEscaper`. With an `escaper:`, `escape_hard_line_breaks:` is ignored.
 
 ```ruby
 class ListPermissiveEscaper < Markbridge::Renderers::Discourse::MarkdownEscaper
-  # Allow leading "- " through unescaped so importer-supplied lists survive.
+  # Keep a "- " at the start of a text, so lists typed as plain text stay lists.
   def escape(text, context: nil)
     return text if text.match?(/\A- /)
     super
@@ -107,23 +121,27 @@ Markbridge.discourse_renderer(escaper: ListPermissiveEscaper.new)
 
 ### `allow:` — let specific Markdown markers through
 
-By default the escaper escapes Markdown found in source text, so a literal `- ` or `1.` from a forum post doesn't accidentally turn into a list. If the source *does* use real Markdown lists you want to keep, allow those markers instead of subclassing the escaper:
+A forum post that starts a line with `- ` or `1.` did not mean a list, so the escaper escapes these markers. Some sources do mean it: users typed Markdown lists into a forum that showed them as text. To keep such lists, allow the markers:
 
 ```ruby
 Markbridge.discourse_renderer(allow: :lists)
 ```
 
-The keys are `:bullet_list`, `:ordered_list`, `:atx_heading`, and `:block_quote`, plus the alias `:lists` (bullet + ordered). An unknown key raises `ArgumentError`. Thematic breaks (`---`, `***`) and setext underlines (`===`) stay escaped — `allow:` opens up specific markers, not the whole escaper. It builds on the default escaper, so don't combine it with a custom `escaper:`.
+The keys are `:bullet_list`, `:ordered_list`, `:atx_heading` and `:block_quote`. `:lists` stands for both list keys. An unknown key raises `ArgumentError`.
+
+Everything else stays escaped, also horizontal rules (`---`, `***`) and the underline of a heading (`===`). `allow:` changes the default escaper, so it cannot be combined with your own `escaper:`.
 
 ### `escape:` — turn escaping off entirely
 
-When the source is already trusted Markdown, skip escaping altogether:
+When the text of your source is Markdown already, turn escaping off:
 
 ```ruby
 Markbridge.discourse_renderer(escape: false)
 ```
 
-This swaps in `Markbridge::Renderers::Discourse::IdentityEscaper`, which returns text unchanged. `escape: false` can't be combined with `escape_hard_line_breaks:` or `allow:` (those configure the normal escaper, which `escape: false` replaces); an explicit `escaper:` always wins. To skip escaping for a single node rather than the whole document, use `AST::MarkdownText`.
+The renderer then uses `Markbridge::Renderers::Discourse::IdentityEscaper`, which returns text as it is. `escape: false` cannot be combined with `escape_hard_line_breaks:` or `allow:`, which are options of the default escaper. An `escaper:` you pass wins over all three.
+
+To leave only one piece of text unescaped, put it into the tree as an `AST::MarkdownText` node.
 
 ### `features:` — the plugins of the target site
 
@@ -141,13 +159,13 @@ Some of what the renderer writes is BBCode that a Discourse plugin cooks. A site
 renderer = Markbridge.discourse_renderer(features: { post_event: false, bbcode: false })
 ```
 
-The bundled plugins are on by default even when a site has turned them off: Discourse keeps the raw Markdown and cooks it again when a setting changes, so the BBCode of a plugin that is off today becomes a details block or a poll as soon as the plugin is on. The plain form cannot be turned back. Turn a feature off for a site that will not use the plugin.
+Leave a bundled plugin on, even when your site has it turned off today. Discourse stores the Markdown and renders it again when a setting changes. The BBCode of a plugin that is off becomes a details block or a poll as soon as someone turns the plugin on. The plain form stays plain forever. Turn a feature off only for a site that will never use the plugin.
 
 An unknown feature raises `ArgumentError`. A tag in `tags:` wins over `features:`. Underline (`[u]`), quotes with an author (`[quote="…"]`) and aligned blocks (`<div align>`) need no plugin, Discourse core cooks them.
 
 #### Colors and sizes
 
-Discourse core removes the style of a `<span>`, so without the discourse-bbcode plugin a color or size is lost, and with it the BBCode only works with the values the plugin accepts. Markbridge does not decide this for you: with `bbcode` undecided, the first color or size in a post raises `Markbridge::UndecidedFeatureError` (through `raise_on_error:`, like every render error). A source without colors and sizes never sees the error.
+Discourse shows colors and sizes only with the discourse-bbcode plugin, and the plugin accepts only some values. Markbridge cannot know whether your site has the plugin, and both guesses lose something: BBCode shows as text on a site without it, and plain text loses the colors on a site with it. So you have to decide. Until you do, the first color or size in a post raises `Markbridge::UndecidedFeatureError`. A source without colors and sizes never raises it.
 
 - `features: { bbcode: false }` writes the text only.
 - `features: { bbcode: true }` writes the BBCode and needs `sizes:`. The plugin reads `[size=…]` as a percentage, and every forum has its own scale, so `sizes:` maps the values of your source to a whole number from 1 to 999. A Hash is read with `fetch`, so a value it does not know raises `KeyError`; a lambda can do anything; `nil` drops the size on purpose. Any other result raises `ArgumentError`.
@@ -164,15 +182,20 @@ Markbridge.bbcode_to_markdown("[color=red]a[/color] [size=5]b[/size]", renderer:
 # => "[color=red]a[/color] [size=150]b[/size]"
 ```
 
-- Every paragraph gets its own tags, because the BBCode can't span a blank line.
-- Inside a link the text renders without BBCode, because Discourse doesn't parse BBCode in link text. No decision is needed for that.
-- Inside an HTML block (for example a table with uneven rows) the output is `<span style="color:red">` or `<span style="font-size:85%">`, the form the plugin lets through.
+Three things the renderer does on its own:
+
+- A color over several paragraphs gets its tags in every paragraph, because the BBCode cannot go over a blank line.
+- A color inside a link is written as its text. Discourse does not read BBCode in the text of a link.
+- Inside a table that is written as HTML, the output is `<span style="color:red">` or `<span style="font-size:85%">`, the form the plugin allows.
 
 ### `base_url:` — where relative addresses point to
 
-A post can link to `page.html`, `../files/a.pdf` or `/images/a.png`. On the source site a browser reads these next to the page they are on. In Discourse they point nowhere: it drops the address of a link or an image that has no scheme and no leading slash, and an address with a leading slash points to the Discourse site itself.
+A post can link to `page.html`, `../files/a.pdf` or `/images/a.png`. On the source site these are addresses relative to the page they are on. In Discourse they do not work:
 
-With `base_url:` the renderer makes them absolute, like a browser does on a page at that URL:
+- Discourse drops an address without a scheme and without a leading slash. The link shows as text, the image not at all.
+- An address with a leading slash points to the Discourse site, not to the site the post came from.
+
+With `base_url:` the renderer makes relative addresses absolute, like a browser does on a page at that URL:
 
 ```ruby
 renderer = Markbridge.discourse_renderer(base_url: "https://old.example.com/forum/")
@@ -182,13 +205,23 @@ Markbridge.html_to_markdown(html, renderer:).markdown
 # => "[an older topic](https://old.example.com/forum/viewtopic.php?t=34) ![a](https://old.example.com/images/a.png)"
 ```
 
-The last segment of the base URL is a page, so relative addresses are read next to it. End the URL with a slash when it is a directory. An address with a scheme, a `//` at the start, or only a fragment (`#top`) stays as it is.
+How addresses are resolved:
 
-Without `base_url:` a relative address is written as it is. A link whose target is no URL and no path, and whose text is the same as the target, is written as its text.
+| In the source | With `base_url: "https://old.example.com/forum/index.php"` |
+|---|---|
+| `viewtopic.php?t=34` | `https://old.example.com/forum/viewtopic.php?t=34` |
+| `../files/a.pdf` | `https://old.example.com/files/a.pdf` |
+| `/images/a.png` | `https://old.example.com/images/a.png` |
+| `?page=2` | `https://old.example.com/forum/index.php?page=2` |
+| `https://example.org/`, `//cdn.example.org/a.png`, `mailto:a@example.org`, `#top` | unchanged |
+
+The last part of the base URL is a page, and relative addresses are next to it. End the base URL with a slash when it names a directory. A `base_url:` that is no http or https URL raises `ArgumentError`.
+
+The option applies to links and images. A tag you pass in `tags:` for `AST::Url` or `AST::Image` replaces it for that class.
 
 ### `postprocessor:` — clean up the final string
 
-After all Tags have rendered, the output runs through a `Postprocessor` that collapses multi-blank-line runs, strips whitespace-only lines, and trims document edges. Subclass `Markbridge::Renderers::Discourse::Postprocessor` and override `#call` to change that.
+The tags write blank lines around their blocks, so the joined output has too many. A `Postprocessor` cleans up at the end: it turns several blank lines into one, empties lines with only whitespace, and removes whitespace at the start and the end. To add a step of your own, subclass it and override `#call`:
 
 ```ruby
 class StripDoubleSpaces < Markbridge::Renderers::Discourse::Postprocessor
@@ -200,11 +233,11 @@ end
 Markbridge.discourse_renderer(postprocessor: StripDoubleSpaces.new)
 ```
 
-Pass the bare base class (`Postprocessor.new`) to keep the default cleanup; pass `->(text) { text }` if you want output without cleanup.
+`->(text) { text }` as the postprocessor gives you the output without any cleanup.
 
-## Build once, reuse everywhere
+## Build once, use for every post
 
-The renderer keeps nothing between posts: every top-level `*_to_markdown` call produces its own `Conversion`. Constructing a renderer is cheap; constructing thousands is wasteful. The build-once pattern is the recommended shape:
+Building a renderer takes about as long as converting a short post. Built for every post, it would add half of the work again for nothing. Build it once, for example in a constant:
 
 ```ruby
 class ForumImporter
@@ -221,10 +254,10 @@ class ForumImporter
 end
 ```
 
-There's no shared default `Renderer` instance — each bare call wraps a fresh (cheap) `Renderer` around the shared default tag library. Pass `renderer:` to reuse one instance across calls and carry your customizations.
+A call without `renderer:` costs nothing extra: it uses the default tag library, which is built once per process.
 
 ## See also
 
-- [Migrating to Discourse → Overview](/migrating/overview/) — when this page's customizations show up in a real importer.
-- [Extending Markbridge](/customization/extending/) — how to write the custom Tags and handlers you'd register here.
-- [Reference → Upgrading](/reference/upgrading/) — the full break list from the previous API.
+- [Extending Markbridge](/customization/extending/) — how to write the tags and handlers you register here.
+- [Migrating to Discourse](/migrating/overview/) — these options in an importer.
+- [Upgrading](/reference/upgrading/) — what changed between versions.

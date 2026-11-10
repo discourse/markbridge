@@ -1,28 +1,34 @@
 ---
 title: Placeholders
-description: Render links, uploads, mentions, and other importer-resolved tags as placeholder strings, then collect what you need by walking the parsed AST.
+description: Write links, uploads and mentions that your importer resolves later as placeholders, and find them again in the AST.
 ---
 
-A *placeholder* is a short literal string in the rendered Markdown that the Discourse importer swaps for a real value later: an upload reference, a topic link, a resolved mention. Markbridge gives you everything you need to produce that placeholder, and to find every placeholder again afterwards by walking the parsed tree — no side channel required.
+When a post is converted, some of what it points to does not exist in Discourse yet: the attachment is not uploaded, the linked topic is not imported, the user has no new name. You cannot write the final Markdown for these at that moment.
 
-The pattern looks like this:
+A placeholder solves that. It is a short text in the Markdown, like `[upload|42]`, that your importer replaces with the real value later. Markbridge writes the placeholder for you and keeps the data that belongs to it in the AST, where the importer finds it again:
 
 <figure class="diagram">
   <img class="diagram-light" src="/diagrams/placeholders.svg" alt="The placeholder flow: a source [attachment=0] tag becomes an AttachmentPlaceholder AST node, which the renderer Tag formats into a [upload|HASH] string in the Markdown output; the importer re-reads the same nodes via conversion.ast.descendants">
   <img class="diagram-dark" src="/diagrams/placeholders-dark.svg" alt="The placeholder flow: a source [attachment=0] tag becomes an AttachmentPlaceholder AST node, which the renderer Tag formats into a [upload|HASH] string in the Markdown output; the importer re-reads the same nodes via conversion.ast.descendants">
 </figure>
 
-Every placeholder is built from the same three parts: an **AST node** to hold the parsed data, a **parser handler** to build that node, and a **renderer Tag** to turn it into the placeholder string. When the importer later needs the details (which uploads a post used, which mentions to look up), it reads them back off the AST nodes — `conversion.ast` is the same tree that produced the Markdown, so `conversion.ast.descendants(YourPlaceholder)` hands you every placeholder that made it through parsing.
+A placeholder has three parts:
 
-> Markbridge ships with a built-in `Markbridge::AST::Attachment` that maps to Discourse's resolved upload syntax. For migrations the source post doesn't *have* a Discourse upload yet — it has a reference to a row in the source forum's attachments table. Define your own AST class so the importer can resolve those references.
+- an **AST node** that holds the data from the source,
+- a **parser handler** that builds the node,
+- a **renderer tag** that writes the node as the placeholder text.
 
-## The three parts, end to end
+When the importer needs the details later (which uploads a post has, which users it mentions), it asks the tree: `conversion.ast.descendants(YourPlaceholder)` returns every node of your class in the post.
 
-Concrete example: phpBB3 emits attachments as `[attachment=N]filename[/attachment]`, where `N` is the position index of the attachment within the post (zero-based). The actual file lives in `phpbb_attachments` joined to the post; the BBCode just points at slot N.
+Markbridge has a built-in `AST::Attachment`, which is written as Discourse's upload Markdown. That is for an upload that exists. In a migration the post only has a reference to a row in the attachments table of the old forum, so you need a node of your own.
 
-The pipeline below turns `[attachment=0]filename.jpg[/attachment]` into `[upload|<upload_id>]` in the output — Discourse's upload-marker shape, with the upload identifier looked up from the source post's attachment rows. The `upload_id` is whatever stable identifier the importer's converter framework derives from the source filename/path (not the file's content hash) so each placeholder maps unambiguously to one source-side row.
+## An example from start to end
 
-(vBulletin's `[ATTACH]N[/ATTACH]` and IPB's `[attachment=N:filename]` follow the same shape — the example below adapts to either by tweaking the handler.)
+phpBB 3 writes an attachment as `[attachment=N]filename[/attachment]`. `N` is the position of the attachment in the post, starting at 0. The file itself is a row in `phpbb_attachments` that belongs to the post.
+
+The code below turns `[attachment=0]filename.jpg[/attachment]` into `[upload|<upload_id>]`. The `upload_id` is the id your importer uses for that file. It has to be the same every time the importer runs and must name exactly one row of the source.
+
+vBulletin (`[ATTACH]N[/ATTACH]`) and IPB (`[attachment=N:filename]`) work the same way, with small changes to the handler.
 
 ### 1. The AST node
 
@@ -39,7 +45,7 @@ module ForumMigration
 end
 ```
 
-`Node` (rather than `Element`) makes it a leaf — the filename comes from the BBCode body but the handler captures it at parse time and pins it on the node, so there are no children to render. Pick whatever class name maps to your domain — `ForumMigration::AttachmentPlaceholder`, `Migration::SourceAttachment`, anything that won't collide with built-in AST classes.
+The class is a `Node`, not an `Element`, so it has no children. The file name stands between the tags in the BBCode, but the handler reads it and puts it on the node, and nothing is left to render. Name the class as you like and keep it in your own module, so it cannot clash with a built-in AST class.
 
 ### 2. The parser handler
 
@@ -60,7 +66,7 @@ module ForumMigration
       context.add_child(AttachmentPlaceholder.new(position:, filename: presence(filename)))
     end
 
-    # The collector consumes the closing tag; if one slips through, render it as literal text.
+    # The collector reads up to the closing tag. A closing tag without an opening one is text.
     def on_close(token:, context:, registry:, tokens: nil)
       context.add_child(Markbridge::AST::Text.new(token.source))
     end
@@ -75,11 +81,11 @@ module ForumMigration
 end
 ```
 
-`RawContentCollector` is the same helper Markbridge's built-in `AttachmentHandler` uses to grab the body between `[attachment=0]` and `[/attachment]` as a literal string. Storing the filename on the node directly means the renderer Tag doesn't have to call `render_children` later. Markbridge ships a handler for `[attachment]` / `[attach]` already (it builds `AST::Attachment`); registering this one overrides the defaults so they go through your migration-aware path.
+`RawContentCollector` reads everything between `[attachment=0]` and `[/attachment]` as text, without parsing it. The built-in `AttachmentHandler` uses it too. Markbridge already has a handler for `[attachment]` and `[attach]`, which builds an `AST::Attachment`. Registering yours for the same names replaces it.
 
 ### 3. The renderer Tag
 
-The Tag needs the post's attachment list at render time so it can map a position to an `upload_id`. Pass it through the constructor. The Tag stays a one-line output formatter — no side effects, just a string:
+The tag has to turn a position into an `upload_id`, and for that it needs the attachments of the post. Pass them to its constructor:
 
 <!-- spec:continue -->
 ```ruby
@@ -97,11 +103,11 @@ module ForumMigration
 end
 ```
 
-`[upload|<id>]` is the upload-marker shape Discourse importers recognize — they substitute a real `upload://...` URL once the file has been ingested. What they put there is Markdown that Discourse has to cook, so the placeholder goes through `interface.markdown_island`: outside a table that is the placeholder as it is, inside a table the renderer writes as HTML it is a Markdown island (see [HTML mode and placeholders](#html-mode-and-placeholders)).
+The importer replaces `[upload|<id>]` with the Markdown of the upload once the file is in Discourse. Discourse has to read that as Markdown, so the tag returns the placeholder through `interface.markdown_island`. In most places that is the placeholder as it is. Inside a table that is written as HTML it gets a wrapper, see [HTML mode and placeholders](#html-mode-and-placeholders).
 
-### 4. Wire it up
+### 4. Put it together
 
-The handler is stateless, so register it once and share it across every post. The renderer holds the per-post attachment list, so build it inside the migration loop:
+The handler keeps no state, so register it once for all posts. The tag has the attachments of one post, so the renderer is built per post:
 
 <!-- spec:before
 module SourceDB
@@ -133,17 +139,16 @@ posts.each do |post|
 
   result = Markbridge.bbcode_to_markdown(post.body, handlers:, renderer:)
 
-  # The placeholders that made it into the output are exactly the
-  # AttachmentPlaceholder nodes left in the tree. Walk them to record
-  # which uploads this post referenced.
+  # Every AttachmentPlaceholder node in the tree is one placeholder
+  # in the Markdown. Store which uploads this post has.
   referenced = result.ast.descendants(ForumMigration::AttachmentPlaceholder)
   store(post, result.markdown, referenced)
 end
 ```
 
-One handler instance is registered under both `[attachment]` and `[attach]`, so the closing logic finds the same object on both sides. When a tag has several names like this, you have to share one instance — [Extending Markbridge](/customization/extending/#wrapping-a-default-handler) explains why.
+`[attachment]` and `[attach]` are registered with the same handler object. A tag with several names needs that, [Extending Markbridge](/customization/extending/#wrapping-a-default-handler) explains why.
 
-Constructing the renderer per post breaks the build-once-reuse-many pattern, but only for the slice of state that varies post-to-post (the attachment table). Shared parts — handler registry, custom escaper, postprocessor, decorators that don't depend on per-post data — stay outside the loop.
+Everywhere else these docs say to build the renderer once. Here it is built per post, because the tag needs data of the post. Keep everything that does not depend on the post outside the loop: the handler registry, an escaper, a postprocessor.
 
 ### 5. What you get
 
@@ -174,26 +179,24 @@ result = Markbridge.bbcode_to_markdown(
 result.markdown
 # => "Screenshot: [upload|u_screenshot_png_3a7c2] — see what I mean?"
 
-# Re-read the placeholder nodes straight off the tree.
+# The placeholder nodes of the post.
 result.ast.descendants(ForumMigration::AttachmentPlaceholder).map(&:position)
 # => [0]
 ```
 
-The importer downstream substitutes `[upload|u_screenshot_png_3a7c2]` for the resolved `upload://...` URL once the file is ingested into Discourse's upload store.
+Later the importer uploads the file and replaces `[upload|u_screenshot_png_3a7c2]` with the Markdown of the upload.
 
-## Placeholder strings pass through verbatim
+## A placeholder is not escaped
 
-A common worry: "if my placeholder contains `[`, won't the Markdown escaper mangle it?" It will not.
+A placeholder like `[upload|42]` has characters that mean something in Markdown. They are not escaped. Markbridge escapes only `AST::Text` nodes, the text of the source. What a tag returns is written as it is.
 
-Markbridge escapes only `AST::Text` nodes — the textual content from the source document. A Tag's return value is written into its parent's output as it is. Whatever you return from `Tag#render` is exactly what appears in the surrounding Markdown.
+So `"[upload|u_screenshot_png_3a7c2]"`, `"@@MENTION:alice@@"` and `"<<TOPIC:7>>"` all arrive in the output unchanged. Choose a form your importer can find again without doubt.
 
-This is what makes placeholders safe. `"[upload|u_screenshot_png_3a7c2]"`, `"@@MENTION:alice@@"`, `"<<TOPIC:7>>"` all reach the output untouched. Pick whatever sigil pattern your importer parses cleanly downstream.
-
-What the renderer can add is something *between* a placeholder and its neighbor: a backslash in front of a `!`, or an empty HTML comment (`<!---->`) next to emphasis markers or a mention. It decides that from the characters on both sides of the join, and for a String placeholder those are the placeholder's own characters. The next section shows how to tell it what will stand there instead.
+The renderer can add something between a placeholder and its neighbor: a backslash in front of a `!`, or an empty HTML comment (`<!---->`) next to emphasis markers or a mention. It decides that from the characters on both sides. For a placeholder returned as a String, these are the characters of the placeholder, not of what replaces it. The next section shows how to tell the renderer what will stand there.
 
 ## Tell Markbridge what replaces the placeholder
 
-Whether `**` opens or closes, whether `@alice` is a mention and whether a bare URL is linked depends on the characters right next to it. The renderer knows these rules and puts an invisible `<!---->` where a join needs one. With a String placeholder it sees the placeholder, not the text the importer puts there later:
+In Markdown the characters next to each other decide a lot: whether `**` opens or closes, whether `@alice` is a mention, whether a bare URL becomes a link. The renderer knows these rules and puts an invisible `<!---->` between two pieces where they would go wrong. With a String placeholder it sees the placeholder, not the text the importer puts there later:
 
 | The renderer writes | The importer replaces `[link\|17]` | Cooked by Discourse |
 |---|---|---|
@@ -364,13 +367,13 @@ markdown.gsub("[link|17]", "https://forum.example.com/t/17")
 # => "**See:**<!---->https://forum.example.com/t/17"
 ```
 
-That's the Markdown the importer hands to Discourse.
+That is the Markdown your importer gives to Discourse.
 
 ## HTML mode and placeholders
 
-When a parent renders an HTML block — currently only `TableTag` doing its HTML-fallback path for uneven rows or nested tables — children render with `interface.html_mode?` true. Per [CommonMark §4.6](https://spec.commonmark.org/0.31.2/#html-blocks), content inside an HTML block is treated as raw HTML, not Markdown, until the next blank line. Your placeholder Tag has two valid choices:
+A table that Markdown cannot express is written as an HTML table: one with a `colspan`, with rows of different length, or with a block in a cell. Inside it, Markdown is not read as Markdown. [CommonMark](https://spec.commonmark.org/0.31.2/#html-blocks) takes everything up to the next blank line as raw HTML. A tag knows that it is inside such a table from `interface.html_mode?`.
 
-A placeholder token (`Tokens.placeholder`) is written as it is in html_mode too, so these choices apply to it as well.
+A placeholder in such a table has to be written so that its replacement still works there. That is true for a placeholder token too: `Tokens.placeholder` is written as it is in HTML mode. There are two ways:
 
 **Raw HTML.** If what the importer puts there has an HTML form, write that form with the placeholder inside. A link to a profile the importer resolves, for example:
 
@@ -403,11 +406,11 @@ The blank lines close the HTML block, CommonMark parses the placeholder as Markd
 
 Discourse's upload Markdown is such a case: Discourse reads the dimensions and the `attachment` marker from the Markdown only, and its sanitizer drops the `upload://` href of a raw HTML link. The built-in `UploadTag` writes the island for that reason, the built-in `PollTag` and `EventTag` do it for their BBCode, and the attachment placeholder from above does it already.
 
-The blank lines force a paragraph break around the placeholder, which is fine for block-level placeholders (uploads in tables tend to want their own row anyway) but unsightly for inline ones (mentions, links). Prefer the raw HTML form for inline placeholders that can land inside tables, when there is one.
+The island is a block of its own, with space around it. For a block placeholder like an upload that is fine. For an inline one, a mention or a link, it breaks the line where no break was. Use the raw HTML form for inline placeholders when there is one.
 
 ## Collecting more than one kind of placeholder
 
-A migration usually has several placeholder concepts in flight at once — uploads, internal links, mentions. Each gets its own AST class, and the importer pulls each kind off the tree independently after the conversion:
+A migration has several kinds of placeholders: uploads, internal links, mentions. Give each kind its own AST class and ask the tree for each of them:
 
 <!-- spec:before
 module ForumMigration
@@ -432,35 +435,32 @@ RESOLVED_TOPICS = { 42 => 7 }.freeze
 links    = result.ast.descendants(ForumMigration::InternalLink)
 mentions = result.ast.descendants(ForumMigration::Mention)
 
-# Reconcile whatever you need — e.g. flag links whose source topic
-# didn't resolve to a Discourse topic yet.
+# For example: the links to topics that are not in Discourse yet.
 unresolved = links.reject { |link| RESOLVED_TOPICS.key?(link.source_topic_id) }
 ```
 
-Because the tree is the record, you never have to keep the collected data balanced or paired the way a side-channel buffer would force you to — each query is independent and reads exactly the nodes that reached the output.
+Each call is independent of the others and returns the nodes that are in the Markdown.
 
-## Resolution: handler vs Tag
+## Resolve in the handler or in the tag?
 
-Where should the source-id-to-Discourse-id resolution happen — in the handler (parse time) or the Tag (render time)?
+An id of the source has to become an id of Discourse somewhere. That can happen in the handler, while parsing, or in the tag, while rendering:
 
-| Resolution at parse | Resolution at render |
+| In the handler | In the tag |
 |---|---|
-| Handler does the lookup; AST node carries the resolved Discourse value. | Handler stores the source value; Tag does the lookup at render. |
-| Failures surface as missing AST nodes (or `unknown_tags` bumps). | Failures surface when you walk the tree afterwards and reconcile. |
-| Cleaner separation; the renderer is dumb. | Lets you batch lookups across many calls or defer entirely. |
+| The handler looks the value up. The node has the Discourse value. | The handler stores the source value. The tag looks it up. |
+| A value that is not found shows while parsing. | A value that is not found shows when you walk the tree afterwards. |
+| The tag only writes. | You can look up many values at once, or later. |
 
-The forum-migration tradeoff usually goes: simple lookups (path → slug, name → user_id) at parse time; lookups that require global state (cross-post topic IDs) at render time, with a second pass over `conversion.ast.descendants(...)` to reconcile the references that need it. There's no one right answer — pick the side that matches your data flow.
+A split that works for most migrations: look up in the handler what needs no other post (a path, a user name). Look up in the tag, or in a second pass over `conversion.ast.descendants(...)`, what depends on other posts being imported, like the id of a topic.
 
-## What goes in the AST node
+## What belongs in the AST node
 
-A few rules of thumb for the placeholder AST node:
-
-- Carry everything the importer needs to reconcile the placeholder later (position, original URL, source id, filename). The node *is* the record you read back via `descendants`, so don't drop data you'll want downstream.
-- Use `attr_reader` and a keyword constructor. Mutability has no upside here.
-- Inherit from `Element` if it can wrap inline content (link text, mention name). Inherit from `Node` if it's a leaf (a poll, an event, a hr-style separator).
-- One AST class per *concept*, not per *source tag alias*. `[url]`, `[link]`, and `[iurl]` all build `AST::Url`; the same Tag renders all three. The same applies to placeholders that have multiple aliases in the source format.
+- **Everything the importer needs to resolve the placeholder:** the position, the original URL, the id in the source, the file name. The node is what you read later, so do not leave out what you will need.
+- **Read-only attributes.** Use `attr_reader` and a constructor with keywords, like the built-in nodes.
+- **`Element` or `Node`.** Inherit from `Element` when the node has content, like the text of a link. Inherit from `Node` when it has none, like a poll.
+- **One class per kind of thing, not per tag name.** `[url]`, `[link]` and `[iurl]` all build an `AST::Url`, and one tag writes all three. Do the same for your placeholders.
 
 ## Where next
 
-- [Customizing the renderer](/customization/customizing-renderer/) — the factory kwargs in detail.
-- [Extending Markbridge](/customization/extending/) — broader extension patterns including `HandlerRegistry#overlay` for delegating to default handlers.
+- [Customizing the renderer](/customization/customizing-renderer/) — every option of the renderer.
+- [Extending Markbridge](/customization/extending/) — handlers and tags in general, and how to wrap a default handler.

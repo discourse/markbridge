@@ -1,30 +1,26 @@
 # Markbridge
 
-Markbridge converts BBCode, HTML, MediaWiki wikitext, and s9e/TextFormatter XML into Discourse-flavored Markdown through a clean parse → AST → render pipeline. It's built for forum migrations into Discourse, but works for any job that needs predictable, repeatable conversion.
+Markbridge is a Ruby library that converts BBCode, HTML, MediaWiki wikitext, and s9e\TextFormatter XML to Markdown. It parses the input into a tree, so you can look at the content and change it before it is written. The renderer that ships with it writes Markdown for [Discourse](https://www.discourse.org), and migrating a forum to Discourse is what it is used for most.
 
-Full documentation lives at **[markbridge.dev](https://markbridge.dev)**.
+The documentation is at **[markbridge.dev](https://markbridge.dev)**.
 
 ## How it works
 
-Every conversion runs the same three steps:
+Every conversion has three steps:
 
-1. **Parse** – a format-specific parser turns the input into an `AST::Document`. Unknown tags are counted, not raised — the parser keeps going.
-2. **AST** – a renderer-agnostic tree of text, formatting, lists, links, and so on. The same tree comes out no matter which format went in.
-3. **Render** – `Markbridge::Renderers::Discourse::Renderer` walks the tree and emits Discourse-compatible Markdown.
+1. **Parse.** A parser for the input format builds a tree, the AST. It does not raise on bad markup. Tags it does not know are counted.
+2. **Normalize.** Markup can nest what Markdown cannot, like a link inside a link. This step rewrites those parts of the tree.
+3. **Render.** The renderer walks the tree and writes Markdown.
+
+The AST has the same node types for every input format, and it does not depend on the renderer.
 
 ## Installation
-
-Add the gem to your project:
 
 ```bash
 bundle add markbridge
 ```
 
-Or install it directly:
-
-```bash
-gem install markbridge
-```
+The HTML and TextFormatter parsers also need Nokogiri (`bundle add nokogiri`). Markbridge needs Ruby 3.3 or newer and runs on CRuby, JRuby and TruffleRuby.
 
 ## Quick start
 
@@ -35,22 +31,34 @@ bbcode = "[b]Hello[/b] [url=https://example.com]world[/url]!"
 result = Markbridge.bbcode_to_markdown(bbcode)
 
 puts result.markdown
-# => "**Hello** [world](https://example.com)!"
+# => **Hello** [world](https://example.com)!
 ```
 
-Swap `bbcode` for `html`, `mediawiki`, or `textformatter` for the other formats, or `require "markbridge/all"` to load everything.
+The other formats work the same way: `require "markbridge/html"` and `Markbridge.html_to_markdown`, `markbridge/mediawiki` and `mediawiki_to_markdown`, `markbridge/textformatter` and `text_formatter_xml_to_markdown`. `require "markbridge/all"` loads all four.
 
-`*_to_markdown` returns a `Markbridge::Conversion`, not a plain string. The rendered Markdown is on `.markdown` (and `.to_s` delegates to it, so `puts result` works). The same object also carries `.unknown_tags`, `.diagnostics`, and `.errors` — handy when you're migrating a forum and want to know what showed up.
+The result is a `Markbridge::Conversion`, not a String. Next to `markdown` it has the tree (`ast`), the tags the parser did not know (`unknown_tags`), what the parser had to repair (`diagnostics`) and render errors (`errors`).
 
-## Customizing output
+## Change the output
 
-Build a renderer once with `Markbridge.discourse_renderer(...)` and pass it via `renderer:` — custom tags, a custom escaper, dropping tags, and more. See [Customizing the renderer](https://markbridge.dev/customization/customizing-renderer/), and [Migrating to Discourse](https://markbridge.dev/migrating/overview/) for the full forum-migration workflow.
+Build a renderer with `Markbridge.discourse_renderer` and pass it to every call:
+
+```ruby
+RENDERER = Markbridge.discourse_renderer(
+  features: { bbcode: false },                  # the target site has no discourse-bbcode plugin
+  base_url: "https://old.example.com/forum/",   # makes relative links and images absolute
+)
+
+Markbridge.bbcode_to_markdown(bbcode, renderer: RENDERER)
+```
+
+[Customizing the renderer](https://markbridge.dev/customization/customizing-renderer/) lists the options. For tags only your forum has, see [Extending Markbridge](https://markbridge.dev/customization/extending/). For a forum migration, start with [Migrating to Discourse](https://markbridge.dev/migrating/overview/).
 
 ## Learn more
 
-* [markbridge.dev](https://markbridge.dev) – guides, format references, and the architecture deep-dive.
-* `spec/` – executable documentation of every supported tag and edge case.
-* `bin/console` – an interactive prompt for poking at things during development.
+* [markbridge.dev](https://markbridge.dev) has the guides for every format and explains how the parts work.
+* `spec/` has a test for every supported tag and many edge cases.
+* `bin/console` starts IRB with Markbridge loaded.
+* `bin/playground` starts a web UI to try input in the browser, see below.
 
 ## Development
 

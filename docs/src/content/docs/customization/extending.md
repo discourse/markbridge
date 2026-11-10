@@ -3,15 +3,19 @@ title: Extending Markbridge
 description: Add support for new tags, customize rendering, and swap behavior without patching core.
 ---
 
-Markbridge has two places to plug in: **handlers** teach a parser to recognize new tags, and **renderer tags** turn AST nodes into Markdown. Both live in registries, so you add your own on top of the defaults without forking the gem.
+Every forum has tags of its own: a `[callout]`, a `[youtube]`, an `<aside class="note">`. The default handlers do not know them, so their content is kept and the tag is lost. This page shows how to teach Markbridge such a tag.
 
-## Connect parsing and rendering
+A tag takes three things:
 
 ```
-custom BBCode tag  →  custom handler  →  custom AST node  →  custom renderer tag  →  Markdown
+tag in the source  →  handler  →  AST node  →  renderer tag  →  Markdown
 ```
 
-To support a new tag, register a handler that creates an AST node. Then choose how that node should render. You can register a renderer tag or inherit one from a built-in AST class.
+- A **handler** tells the parser what to build when it sees the tag.
+- An **AST node** holds what the tag means. Use a built-in class when one fits, or write your own.
+- A **renderer tag** writes the node as Markdown. A built-in node already has one.
+
+Handlers and renderer tags are registered next to the defaults. You do not change the gem.
 
 ## Adding a custom BBCode tag
 
@@ -70,7 +74,7 @@ handlers =
 
 ### 4. Write the renderer tag
 
-The block form is the quickest path:
+For a short tag, pass a block to `Tag.new`:
 
 ```ruby
 callout_tag =
@@ -94,7 +98,7 @@ renderer = Markbridge.discourse_renderer(
 )
 ```
 
-`tags:` merges on top of the default library, so every other AST class keeps its built-in rendering. See [Customizing the renderer](/customization/customizing-renderer/) for the full set of factory options.
+Every other AST class keeps its default tag. [Customizing the renderer](/customization/customizing-renderer/) has the other options.
 
 ### 6. Use it
 
@@ -111,30 +115,32 @@ result.markdown
 
 ## The rendering interface
 
-Custom tags receive `(element, interface)`. The interface exposes context-aware helpers:
+A tag gets `(element, interface)`. The element is the node to write. The interface gives the tag the output of its children and answers questions about where the node is in the tree:
 
 | Method | Purpose |
 |---|---|
-| `render_children(element)` | Render child nodes and write their output as Markdown. A tag that writes a closing BBCode tag right after them passes it as `following: "[/mytag]"`: a link at the end that would be a bare URL is written as `[url](url)` then, because Discourse takes the closing tag into a bare URL |
-| `render_tokens(element)` | The output of the children as inline tokens (`Markbridge::Renderers::Discourse::Inline::Tokens`), for a tag that returns tokens and leaves the markers to the serializer, as the built-in emphasis tags do |
-| `render_default(node)` | Render `node` with its stock Tag, bypassing your override — intercept only some nodes and defer the rest |
-| `with_parent(element)` | Return a new context that treats `element` as a parent |
-| `find_parent(klass)` | Walk up the ancestor chain for a specific AST class |
-| `has_parent?(klass)` | Boolean parent check |
-| `count_parents(klass)` | Depth of a specific ancestor type (useful for nested lists) |
+| `render_children(element, context:)` | The children as Markdown. Pass `context: interface.with_parent(element)`, so the children know their parent. A tag that writes a closing BBCode tag right after the children also passes it, as `following: "[/mytag]"`. Discourse would read the closing tag as part of a bare URL in front of it, so a link at the end is then written as `[url](url)` |
+| `render_tokens(element, context:)` | The children as inline tokens (`Markbridge::Renderers::Discourse::Inline::Tokens`), for a tag that returns tokens, see below |
+| `render_default(node)` | The node written by the tag Markbridge ships for it, even when you replaced that tag. Use it in a tag that handles only some nodes itself |
+| `with_parent(element)` | A new context with `element` as the parent |
+| `find_parent(klass)` | The nearest ancestor of an AST class, or nil |
+| `has_parent?(klass)` | Whether an ancestor of a class exists |
+| `count_parents(klass)` | How many ancestors of a class there are, for the depth of nested lists |
 | `previous_sibling(element)`, `next_sibling(element)`, `sibling(element, offset:)` | The neighbors of an element among the children of its parent (nil at the edges) |
 | `previous_list(element)` | The last list in front of the element, or the node whose output ends with one, with nothing visible between them (nil when there is none) |
 | `choose_list_marker(node, ordered:)`, `list_marker(node)` | The marker for the items of a list, or of a node that writes a list of its own: the one the list in front did not use, `- ` or `* `, `1. ` or `1) `. `list_marker` returns the marker chosen for a node in this render call, `ListItemTag` and `HorizontalRuleTag` read it |
 | `leading_list(node, children: false)`, `trailing_list(node, children: false)` | The list the output of `node` starts or ends with, as its tag says through `Tag#leading_list` and `Tag#trailing_list` (nil when it starts or ends with something else). With `children: true` the answer for the first or last child with something in it, for a tag whose output starts or ends with the children's, like the plain form of `DetailsTag` |
-| `block_context?(element)` | True if the current position is a block context |
+| `block_context?(element)` | Whether the element stands where a block can stand |
 | `html_mode?` | True inside a CommonMark HTML block — a Tag that returns a String must emit raw HTML without a blank line, or write its Markdown through `markdown_island`; the serializer takes care of it for tokens |
 | `markdown_island(markdown, block:)` | Markdown that Discourse has to read as Markdown (the BBCode of a plugin, an upload, a placeholder for one), in the form of the place: as it is, with blank lines around a block, or an island in a `<div>` inside an HTML block |
 
-Use `find_parent` / `has_parent?` to render differently inside specific ancestors (e.g. a code span inside a table cell).
+Most tags need only the first few rows. The list methods are for tags that write a list or stand next to one.
 
 ## Tags that return inline tokens
 
-A tag that writes a block, a BBCode wrapper or a block placeholder returns a String, as above. Inline formatting is different: whether `**`, `*` or `[text](url)` means what it should depends on the characters next to it (the flanking rules of emphasis, where a bare URL ends, a `!` in front of a `[`). The built-in emphasis, link and image tags therefore return tokens, and so do the tags that write an inline HTML tag (superscript, subscript), and the renderer's serializer writes them with the neighbors in view. A custom tag can do the same:
+A tag that writes a block or a pair of BBCode tags returns a String, as above. For inline formatting a String is not enough. Whether `**` makes text bold depends on the characters next to it: `**bold**text` works, `**bold **text` does not. A tag does not see its neighbors, so it cannot know.
+
+The built-in tags for emphasis, links, images, superscript and subscript therefore do not write Markdown. They return tokens, and the renderer's serializer writes the tokens when it has the whole line and sees every neighbor. Your tag can do the same:
 
 ```ruby
 require "markbridge"
@@ -149,7 +155,7 @@ class HighlightTag < Markbridge::Renderers::Discourse::Tag
 end
 ```
 
-`render_tokens` returns the children's output as an Array of tokens, where finished Markdown from a child is a plain String. The token kinds, all built by `Tokens`:
+`render_tokens` returns the output of the children as an Array of tokens. A child that returned finished Markdown is a String in it. `Tokens` builds all kinds of tokens:
 
 | Token | Written as |
 |---|---|
@@ -164,22 +170,32 @@ end
 | `Tokens.html(string)` | raw HTML, as it is; a newline right after it becomes `<br>`, so an opening tag is never alone on its line, where it would open an HTML block |
 | `Tokens.placeholder(text, like:)` | `text`, as it is, joined with its neighbors as if `like` stood there; for a placeholder that a later step replaces, see [Placeholders](/migrating/placeholders/#tell-markbridge-what-replaces-the-placeholder) |
 
-Inside a CommonMark HTML block (`interface.html_mode?`) the serializer writes the HTML form of every token (`<strong>`, `<a href>`, `<img>`, `<br>`, …), so a tag that returns tokens needs no html_mode branch of its own. A tag that returns a String still does (see below).
+Inside an HTML block (`interface.html_mode?`) the serializer writes the HTML form of every token: `<strong>`, `<a href>`, `<img>`, `<br>`. A tag that returns tokens does not have to care about HTML mode. A tag that returns a String does, see [below](#rendering-inside-html-blocks).
 
-Inline markup can't span a blank line: the blank line ends the paragraph, and the markers stay visible as text. A tag that writes its own markers into a String can close them before every blank line and open them again after it with `Markbridge::Renderers::Discourse::Paragraphs.wrap(content, "[x]", "[/x]")`, which keeps whitespace at the edges of every paragraph outside the markers. `Paragraphs.map(content) { |paragraph| … }` yields the paragraphs for anything else. Content with a code fence is one paragraph.
+### Markers over several paragraphs
 
-A Tag must return a String — returning `nil` (or anything else) raises a `TypeError`. To handle only some nodes, defer the rest with `render_default(node)` instead of falling through to `nil`.
+Inline markup cannot go over a blank line. The blank line ends the paragraph, and the markers show as text. A tag that writes its own markers into a String has to close them in front of every blank line and open them again after it. `Markbridge::Renderers::Discourse::Paragraphs.wrap(content, "[x]", "[/x]")` does that and keeps whitespace at the edges of every paragraph outside the markers. `Paragraphs.map(content) { |paragraph| … }` yields the paragraphs for anything else. Content with a code fence counts as one paragraph.
+
+### What a tag may return
+
+A String or an Array of tokens. `nil` or anything else raises a `TypeError`. A tag that handles only some nodes returns `interface.render_default(node)` for the others.
 
 ## Rendering inside HTML blocks
 
-Tables with uneven rows, multiline cells, or nested tables use HTML output. Inside these tables, `interface.html_mode?` is `true`. Each custom tag must return either:
+A Markdown table cannot hold everything. A table with a `colspan`, with rows of different length, or with a list or a line break in a cell is written as an HTML table. Inside an HTML table Markdown is not read: `**bold**` would show with its asterisks. So everything inside such a table has to be written as HTML, and `interface.html_mode?` tells a tag that it is in one.
 
-- An HTML equivalent, with user-controlled text and attributes escaped using `Markbridge::Renderers::Discourse::HtmlEscaper`, and no blank line in it: a blank line ends the HTML block.
-- Its Markdown through `interface.markdown_island(markdown, block:)`, for Markdown that has no HTML form, like the BBCode of a plugin or an upload. Inside an HTML block it puts the Markdown between blank lines inside a `<div>`, so CommonMark parses the Markdown and the `</div>` line opens the block again for the rest of the cell; outside one it is the Markdown itself, with blank lines around it when `block: true`. The island adds paragraph spacing, so prefer HTML when a suitable element exists.
+A tag that returns a String has two ways to do that:
 
-The callout example above uses `<aside>` in HTML mode. Child tags receive the same HTML mode through the context.
+1. **Write HTML.** Return the HTML form of the node, like `<aside>` in the callout example above. Escape text and attribute values from the source with `Markbridge::Renderers::Discourse::HtmlEscaper`. Write no blank line: a blank line ends the HTML block.
+2. **Write a Markdown island.** Some Markdown has no HTML form, like the BBCode of a plugin or an upload. Return it through `interface.markdown_island(markdown, block:)`. Inside an HTML block that puts the Markdown between blank lines inside a `<div>`, where Discourse reads it as Markdown again. Outside an HTML block it is the Markdown itself, with blank lines around it when `block: true`.
 
-Test your tag with the shared RSpec example. Use content with Markdown characters so the check can detect unescaped output:
+Prefer HTML when there is an element for it. An island is a block of its own, so it adds space around the content.
+
+The children of your node are rendered in HTML mode too. You do not have to pass that on.
+
+### Test it
+
+Markbridge ships an RSpec example that renders a tag in HTML mode and fails when Markdown markers are in the output. Put Markdown characters into the content, so the check has something to find:
 
 <!-- spec:before
 require "rspec"
@@ -202,20 +218,20 @@ RSpec.describe CalloutTag do
 end
 ```
 
-Use your own tag and AST classes in place of `CalloutTag` and `Callout`. Override `markbridge_renderer` inside the example if your children need a custom tag library. This structural check complements tests for your expected output.
+Use your own classes in place of `CalloutTag` and `Callout`. When the children need tags of your own, define `markbridge_renderer` inside the block with a renderer that has them. The example checks only the form of the output. Whether the output is the right one is a test you write yourself.
 
 ## AST subclasses
 
-A subclass inherits its base class's normalizer rules and renderer tag. You can add data or identify a group of nodes without repeating the built-in behavior:
+Sometimes a built-in node is nearly right: you want a code block, but you also want to know later that it came from a `[php]` tag. Subclass the node. A subclass gets the renderer tag and the normalizer rules of its superclass:
 
 ```ruby
 class LegacyCode < Markbridge::AST::Code
 end
 ```
 
-A `LegacyCode` node uses `CodeTag`. Normalizer rules for `AST::Code` also apply to it. An exact registration for the subclass takes priority over an inherited registration. `interface.render_default(node)` uses the stock tag of the nearest matching class, even when your renderer overrides that class.
+A `LegacyCode` node is written by `CodeTag`, and the normalizer rules for `AST::Code` apply to it. A tag or a rule registered for the subclass itself wins over the inherited one.
 
-To keep only the children instead of using the inherited tag:
+To write only the children of the subclass, and not use the inherited tag:
 
 <!-- spec:before
 class LegacyCode < Markbridge::AST::Code; end
@@ -226,11 +242,11 @@ renderer = Markbridge.discourse_renderer(
 )
 ```
 
-Removing the subclass registration with `unregister:` allows the ancestor tag to apply again. See [AST normalization](/concepts/normalization/) to add rules for your own classes.
+`unregister:` does not do that for a subclass: without a tag of its own, the inherited tag writes it. See [AST normalization](/concepts/normalization/) for rules for your own classes.
 
 ## HTML and TextFormatter parsers
 
-Both use a simpler, stateless handler API. A handler is an object responding to `#process(element:, parent:)`. Add your node to `parent` and return the node you want children to recurse into, or `nil` to skip them.
+Handlers for these two parsers are simpler than BBCode handlers, because the input is already a tree. A handler is an object with `#process(element:, parent:)`. It adds a node to `parent` and returns the node that the children of the element go into, or `nil` to skip the children.
 
 <!-- spec:before
 input = "<details>hi</details>"
@@ -258,11 +274,11 @@ html_handlers =
 Markbridge.html_to_markdown(input, handlers: html_handlers)
 ```
 
-The TextFormatter registry works the same way (handlers respond to `#process(element:, parent:, processor:)`), but element names are **UPPERCASE** per s9e convention.
+The TextFormatter registry works the same way, with two differences: a handler gets a third keyword, `#process(element:, parent:, processor:)`, and the element names are uppercase (`"SPOILER"`), like in the XML.
 
 ## Replacing a built-in renderer tag
 
-You don't need a new AST node — re-render an existing one however you like by passing it through `tags:`:
+To write a built-in node differently, register your own tag for its class. This one changes links that start with a slash and leaves the rest to the default tag:
 
 ```ruby
 renderer = Markbridge.discourse_renderer(
@@ -281,7 +297,7 @@ renderer = Markbridge.discourse_renderer(
 
 ## Wrapping a default handler
 
-`HandlerRegistry#overlay` replaces a tag's binding by yielding the previous handler — useful when you want to delegate to the default for the easy cases and only customize the awkward ones:
+Often the default handler is right for most cases and you want to change only a few. `HandlerRegistry#overlay` gives you the handler that is registered for a tag and registers what your block returns:
 
 <!-- spec:before
 class LoggingQuoteHandler
@@ -303,9 +319,9 @@ handlers.overlay("quote") do |default|
 end
 ```
 
-`overlay` is available on the BBCode, HTML, and TextFormatter `HandlerRegistry`. The yielded `default` is `nil` if nothing was previously registered. (MediaWiki's `InlineTagRegistry` has a different shape — see [Format guides → MediaWiki](/format-guides/mediawiki/).)
+The BBCode, HTML and TextFormatter registries have `overlay`. `default` is `nil` when no handler was registered for the tag. The MediaWiki `InlineTagRegistry` works differently, see the [MediaWiki guide](/format-guides/mediawiki/#customizing).
 
-When several tag names share one AST class (e.g. `url`/`link`/`iurl` all build `AST::Url`), the wrapper has to be a *single* instance so the closing strategy's element-to-handler lookup matches on both sides. Use plain `register` for that, not `overlay`:
+In BBCode, be careful with tags that have aliases. `url`, `link` and `iurl` all build an `AST::Url`, and the parser finds the handler for a closing tag by the element that is open. All aliases therefore need the same handler object. `overlay` would build one per name, so use `register` with all names:
 
 <!-- spec:before
 class LoggingUrlHandler
@@ -326,25 +342,16 @@ default_url = handlers["url"]
 handlers.register(%w[url link iurl], LoggingUrlHandler.new(default: default_url))
 ```
 
-## Convention-based auto-registration
+## In a migration
 
-`TagLibrary.new.auto_register!` discovers Markbridge's built-in tags by naming convention:
+A migration has tags whose target does not exist yet when the post is converted: a link to a topic that is not imported, an upload, a mention. The same three parts apply. The renderer tag writes a placeholder, and your importer finds the nodes again with `conversion.ast.descendants(...)`. [Placeholders](/migrating/placeholders/) is the guide for that.
 
-```ruby
-library = Markbridge::Renderers::Discourse::TagLibrary.new
-library.auto_register!
-# Discovers BoldTag → AST::Bold, ItalicTag → AST::Italic, etc.
-```
+## Which way for which problem
 
-`auto_register!` only walks `Markbridge::Renderers::Discourse::Tags::*`, so consumer-defined tag classes aren't picked up automatically — register those explicitly via `Markbridge.discourse_renderer(tags: { MyAst => MyTag.new })` or by calling `library.register(MyAst, MyTag.new)` before passing it as `tag_library:` to the factory.
-
-## Migration use cases
-
-When you extend Markbridge for a Discourse migration — links to resolve later, uploads to track, mentions to look up — the same three parts apply. The renderer Tag stays a simple formatter that returns the placeholder string, and you read the placeholder nodes from `conversion.ast.descendants(...)` after conversion. The [Placeholders](/migrating/placeholders/) page is the full guide; this page only covers the general mechanics.
-
-## When to customize vs. fork
-
-- **Unknown tag** in input → register a handler.
-- **Known tag, different output** → pass `tags: { ASTClass => MyTag.new }` to `discourse_renderer`.
-- **Wrap default behavior** → `HandlerRegistry#overlay` for parser-side; `tags:` overrides for renderer-side.
-- **New output format** (not Discourse Markdown) → write a new renderer that walks the AST. The parsers and AST are renderer-agnostic.
+| Problem | Way |
+|---|---|
+| A tag the parser does not know | Register a handler |
+| A known tag that should be written differently | `tags: { ASTClass => MyTag.new }` |
+| A default handler that is right in most cases | `HandlerRegistry#overlay` |
+| A default tag that is right in most cases | Your own tag that calls `interface.render_default(node)` |
+| Another output format | A renderer of your own for the same AST |

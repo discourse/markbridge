@@ -1,37 +1,40 @@
 ---
 title: Migrating to Discourse — overview
-description: The big picture for using Markbridge to migrate forum content into Discourse.
+description: How a forum migration to Discourse uses Markbridge, from the post in the old database to Markdown.
 ---
 
-You have a forum's worth of posts in BBCode, HTML, MediaWiki wikitext, or s9e/TextFormatter XML, and you want each one stored on Discourse as Markdown. Most of the body translates straight across — bold text, lists, headings — but a few tags need more than that: internal links to topics that don't exist on Discourse yet, uploads to ship, mentions to look up, polls and events that map to Discourse plugins. That awkward last mile is exactly what Markbridge is built for.
+You have the posts of a forum in BBCode, HTML, MediaWiki wikitext or s9e\TextFormatter XML, and every one of them has to become Markdown in Discourse.
 
-This page is the big picture. The next page — [Placeholders](/migrating/placeholders/) — fills in the details.
+Most of a post converts by itself: bold text, lists, quotes, code. The hard part is what points to other things:
+
+- a link to a topic that is not in Discourse yet,
+- an attachment that has to be uploaded first,
+- a mention of a user whose name changes in the migration,
+- a poll or an event, which are plugins in Discourse.
+
+Markbridge cannot resolve these, because only your importer knows the new ids. What it does is keep them findable: it writes a placeholder into the Markdown and gives you the node with the data. This page shows how a migration is put together. [Placeholders](/migrating/placeholders/) has the details.
 
 ## How a migration uses the pipeline
 
-Every conversion runs the same parse → AST → render pipeline — the [Introduction](/introduction/) covers it. A migration wraps three points around that pipeline:
+Every conversion parses the input into a tree, the AST, and renders the tree (see the [Introduction](/introduction/)). A migration adds its own code in three places:
 
-- **On the way in**, custom handlers turn source tags into AST nodes — including your own nodes for uploads, mentions, and internal links.
-- **On the way out**, custom Tags format each node. A placeholder Tag is a one-line formatter that returns its placeholder and nothing else: a placeholder token that says what the importer will put there for an inline placeholder, a string with blank lines around it for a block.
-- **After the conversion**, you walk the AST to collect what each post referenced and write it into Discourse.
+1. **In the parser.** Your handlers turn the tags of the source into AST nodes, also into your own nodes for uploads, mentions and internal links.
+2. **In the renderer.** Your tags write these nodes. A tag for a placeholder is short: it returns the placeholder text.
+3. **After the conversion.** You walk the tree, collect what the post points to, and resolve it in your importer.
 
-That last step — the read-back — is the heart of the workflow; the [Placeholders](/migrating/placeholders/) page covers it in full.
+Every `*_to_markdown` call returns a [`Conversion`](/concepts/result-objects/) with what the three steps need: `markdown`, `ast`, `unknown_tags`, `diagnostics` and `errors`.
 
-## What you get back
+## Placeholders and their data
 
-Every `*_to_markdown` call — and `Markbridge.convert`, which dispatches by `format:` when a corpus mixes formats — returns a [`Conversion`](/concepts/result-objects/): the rendered `markdown` plus the `ast`, `unknown_tags`, `diagnostics`, and `errors`. The rest of this page leans on those fields; [Result objects](/concepts/result-objects/) covers the full shape.
+For every placeholder in a post, the importer needs the data to resolve it later:
 
-## Side data: read it back off the AST
-
-A migration usually needs more than the rendered string. For each placeholder in a post, you also need the data to resolve it later:
-
-| Tag in source | Placeholder string in markdown | Side data to resolve later |
+| Tag in the source | Placeholder in the Markdown | Data to resolve it |
 |---|---|---|
 | `[upload=42]` | `[upload\|42]` | `{ upload_id: 42, path: "..." }` |
 | `[mention]alice[/mention]` | `[mention\|alice]` | `{ name: "alice", source_id: nil }` |
 | `[url=/topics/old-id-7]` | `[topic\|7]` | `{ source_topic_id: 7 }` |
 
-You don't need a side channel for this. The custom AST node carries the parsed data, and `conversion.ast` is the exact tree that produced the Markdown — so the Tag stays a pure formatter:
+You do not have to collect that data while the post renders. Your AST node has it, and `conversion.ast` is the tree the Markdown was written from. So the tag only writes the placeholder:
 
 ```ruby
 class UploadTag < Markbridge::Renderers::Discourse::Tag
@@ -41,7 +44,7 @@ class UploadTag < Markbridge::Renderers::Discourse::Tag
 end
 ```
 
-After the conversion, collect every upload the post referenced by walking the tree for your placeholder class. (In real use, `result` comes from a `*_to_markdown` call; here we build a one-node tree by hand to keep the snippet self-contained.)
+After the conversion, ask the tree for all nodes of your class. In this example the tree is built by hand to keep it short. In your importer, `result` comes from a `*_to_markdown` call:
 
 <!-- spec:before
 def record_upload(**); end
@@ -64,11 +67,11 @@ result.ast.descendants(UploadPlaceholder).each do |node|
 end
 ```
 
-`descendants(klass)` walks the whole tree (leaf nodes included) and returns the nodes that survived parsing — exactly the placeholders that reached the output, for this one conversion only. Nothing leaks between posts, because each call has its own `ast`. The three pieces that make this work — the AST node, the handler, and the Tag — are explained on the [Placeholders](/migrating/placeholders/) page.
+`descendants(klass)` returns every node of the class in the tree. These are the placeholders in the Markdown of this post and of no other, because every conversion has its own tree. [Placeholders](/migrating/placeholders/) explains the node, the handler and the tag.
 
 ## Unknown tags
 
-Source content rarely covers exactly the tags you've planned for. `Conversion#unknown_tags` (and `Parse#unknown_tags`) gives you the punch list:
+A forum always has tags you did not plan for: from a plugin that was removed years ago, or typed by hand. The parser drops such a tag, keeps its content, and counts it in `unknown_tags`:
 
 <!-- spec:before
 result = Markbridge.bbcode_to_markdown("[marquee]hi[/marquee]")
@@ -78,7 +81,7 @@ result.unknown_tags
 # => {"marquee" => 3, "blink" => 1, "googletools" => 12}
 ```
 
-What you do with it is policy:
+Log the counts for every post:
 
 <!-- spec:before
 RENDERER = Markbridge.discourse_renderer
@@ -94,11 +97,11 @@ posts.each do |post|
 end
 ```
 
-Aggregate across the corpus to find which tags are worth writing handlers for, which to silently drop, and which to fail on. Markbridge never raises for an unknown tag — that decision belongs to your migration script.
+Add them up over all posts before the real migration. The list shows which tags are common enough for a handler and which you can drop. Markbridge never raises for an unknown tag. Whether a post with one is fine is your decision.
 
-## Per-post failure isolation
+## One bad post must not stop the run
 
-Forum corpora contain edge cases that surface only when you migrate them. By default, render-time errors propagate; a single bad post crashes the loop. Pass `raise_on_error: false` to flip that:
+Among millions of posts there is always one that makes a tag of yours raise. By default the error is raised, and your loop ends at that post. With `raise_on_error: false` the errors are collected in `result.errors`:
 
 <!-- spec:before
 RENDERER = Markbridge.discourse_renderer
@@ -117,11 +120,11 @@ posts.each do |post|
 end
 ```
 
-Errors collect on `Conversion#errors` instead of raising. The default stays `raise_on_error: true` so you don't accidentally suppress bugs in unit tests.
+The default is `true` on purpose: in your tests an error should be raised, not collected.
 
 ## Build the renderer once
 
-Construct a `Renderer` once outside your migration loop and pass it to every call. It carries your custom Tags, the unregistered AST classes you don't want to render, your escaper, and your postprocessor. It holds no per-post state, so the same instance is safe across thousands of posts.
+Build one renderer in front of the loop and pass it to every call. It has your tags and your options, and it keeps nothing from one post to the next. Use one per thread.
 
 <!-- spec:before
 InternalLinkTag = UploadTag = MentionTag = Class.new(Markbridge::Renderers::Discourse::Tag) do
@@ -146,10 +149,13 @@ posts.each do |post|
 end
 ```
 
-See [Customizing the renderer](/customization/customizing-renderer/) for every kwarg. `features:` is the one to look at first: it says which plugins the target site has, so a `[spoiler]`, a `[details]` block, a poll or a color is written in a form the site can show.
+[Customizing the renderer](/customization/customizing-renderer/) lists every option. Two of them matter for nearly every migration:
+
+- **`features:`** says which plugins the target site has, so that a spoiler, a details block, a poll or a color is written in a form the site can show. Colors and sizes raise an error until you decide.
+- **`base_url:`** is the address of the old forum. Relative links and images are made absolute with it. Without it Discourse drops them.
 
 ## Where next
 
-- [Placeholders](/migrating/placeholders/) — the AST node, handler, and Tag in detail, with the full round-trip.
-- [Customizing the renderer](/customization/customizing-renderer/) — the full factory reference.
-- [Extending Markbridge](/customization/extending/) — adding handlers and custom Tags from scratch.
+- [Placeholders](/migrating/placeholders/) — the node, the handler and the tag for a placeholder, step by step.
+- [Customizing the renderer](/customization/customizing-renderer/) — every option of the renderer.
+- [Extending Markbridge](/customization/extending/) — handlers and tags for the tags only your forum has.

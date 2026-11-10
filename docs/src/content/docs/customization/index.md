@@ -1,11 +1,11 @@
 ---
 title: Customization
-description: Shape Markbridge's output without forking — custom renderers, tags, and handlers.
+description: Change what Markbridge reads and writes with renderer options, your own tags, and your own handlers.
 ---
 
-Markbridge is built to be customized without monkey-patching or forking. There are two layers:
+You change Markbridge by registering your own objects, not by patching the gem. There are two levels:
 
-- **[Customizing the renderer](/customization/customizing-renderer/)** — build a reusable `Renderer`: override or drop tags, swap the escaper, post-process the output.
-- **[Extending Markbridge](/customization/extending/)** — teach a parser tags it doesn't know, and render them with your own Tags.
+- **[Customizing the renderer](/customization/customizing-renderer/)** — the options of `Markbridge.discourse_renderer`: replace or remove tags, say which plugins the target site has, resolve relative links, change the escaping.
+- **[Extending Markbridge](/customization/extending/)** — teach a parser a tag it does not know, and write the renderer tag for it.
 
-Most jobs need only the first; reach for the second when your source has tags the defaults don't cover.
+Most projects only need the first page. Read the second one when your source has tags the default handlers do not cover.

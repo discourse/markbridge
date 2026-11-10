@@ -1,13 +1,15 @@
 ---
 title: TextFormatter
-description: Convert s9e/TextFormatter XML (used by phpBB 3.2+) into Discourse-flavored Markdown.
+description: Convert the XML that s9e\TextFormatter stores (phpBB 3.2+, Flarum) into Discourse-flavored Markdown.
 ---
 
-The TextFormatter parser reads the XML format produced by <a href="https://github.com/s9e/TextFormatter" class="nowrap">s9e/TextFormatter</a>, the library phpBB 3.2+ uses to store parsed BBCode. Converting the stored XML directly is faster and more faithful than re-parsing the original BBCode.
+<a href="https://github.com/s9e/TextFormatter" class="nowrap">s9e\TextFormatter</a> is the PHP library that phpBB 3.2+ and Flarum format posts with. These forums do not store what the user typed. They store XML that the library made of it, with the BBCode or Markdown markup still inside. If the post column of your database starts with `<r>` or `<t>`, this is your format.
+
+Read the XML, not the markup inside it. The XML says what the forum made of every tag: which `[b]` was really bold, where a list item ends, what a bare URL links to. A BBCode parser would have to guess all of that again.
 
 ## Requirements
 
-Add `nokogiri` to your Gemfile. It's a runtime dependency for the TextFormatter parser:
+Add `nokogiri` to your Gemfile. Markbridge does not depend on it, because the BBCode and MediaWiki parsers work without it:
 
 ```ruby
 gem "nokogiri"
@@ -24,16 +26,19 @@ result.markdown
 # => "**Hello** world!"
 ```
 
-## The s9e format in brief
+## The format in short
 
-TextFormatter wraps content in one of two roots:
+The root element says whether the post has markup:
 
-- `<t>` — plain text (no BBCode was used).
-- `<r>` — rich text (contains formatted elements).
+- `<t>` is plain text.
+- `<r>` is text with markup ("rich").
 
-Inside `<r>`, formatted children use **uppercase element names** by convention (`<B>`, `<URL>`, `<CODE>`). Each formatted element may wrap its original BBCode markup in `<s>` (start) and `<e>` (end) tags — Markbridge ignores these during parsing. It also ignores `<i>` (lowercase), which holds text that s9e did not use, like the newline after `[list]` or a `[/b]` without a matching `[b]`. `<I>` (uppercase) is italic.
+Inside `<r>`, the elements with a meaning have uppercase names: `<B>`, `<URL>`, `<CODE>`. The markup the user typed is kept next to them in three lowercase elements, which the parser skips:
 
-A line break is stored as `<br/>` followed by a newline in the next text node (`a<br/>\nb`). Forums render the XML as HTML, so that newline and any spaces at the start of a line are not visible. Markbridge removes them outside of `<CODE>`, so `a<br/>\nb` becomes `a\nb` and indented lines don't turn into code blocks. Two `<br/>` become a blank line. Text inside `<CODE>` stays as it is.
+- `<s>` and `<e>` hold the start and the end markup of an element, like `[b]` and `[/b]`.
+- `<i>` holds text that s9e ignored, like the newline after `[list]` or a `[/b]` that closes nothing. Do not mix it up with `<I>`, which is italic.
+
+A line break is stored as `<br/>` with a newline after it: `a<br/>\nb`. The forum shows the XML as HTML, where that newline and spaces at the start of a line are not visible. The parser removes them, so `a<br/>\nb` is `a\nb` in Markdown and an indented line does not become a code block. Two `<br/>` are a blank line. Text inside `<CODE>` stays as it is.
 
 ## Supported elements
 
@@ -47,9 +52,9 @@ A line break is stored as `<br/>` followed by a newline in the next text node (`
 | `<U>` | `<u>underline</u>` | `AST::Underline` |
 | `<CODE>` | Fenced code block, including single-line content | `AST::Code` |
 | `<URL>` | `[text](href)` | `AST::Url` |
-| `<EMAIL>` | `[text](mailto:addr)` | `AST::Url` |
+| `<EMAIL>` | `[text](mailto:addr)` | `AST::Email` |
 | `<IMG>` | `![](src)` | `AST::Image` |
-| `<ATTACHMENT>` | Discourse upload syntax | `AST::Attachment` |
+| `<ATTACHMENT>`, `<ATTACH>` | Discourse upload syntax | `AST::Attachment` |
 | `<QUOTE>` | `[quote="name"]…[/quote]`; without attribution `> …`, or `[quote]…[/quote]` around a quote with attribution | `AST::Quote` |
 | `<LIST>` | `- item` / `1. item` | `AST::List` |
 | `<LI>` | List item | `AST::ListItem` |
@@ -65,7 +70,7 @@ A line break is stored as `<br/>` followed by a newline in the next text node (`
 
 ### Litedown
 
-Litedown is the Markdown plugin of s9e. Flarum stores its posts with it, and it has elements of its own next to the BBCode ones:
+Litedown is the Markdown plugin of s9e\TextFormatter. Flarum uses it, so a Flarum post is Markdown that was stored as XML. Litedown has elements of its own next to the BBCode ones:
 
 | Element | Markdown source | Renders as | AST node |
 |---|---|---|---|
@@ -80,23 +85,32 @@ Litedown is the Markdown plugin of s9e. Flarum stores its posts with it, and it 
 | `<SPOILER>` | `>! spoiler` | Block spoiler | `AST::Spoiler` with `block: true` |
 | `<p>` | A paragraph | Paragraph spacing | `AST::Paragraph` |
 
-`<QUOTE>`, `<LIST>`, `<LI>`, `<URL>`, `<EMAIL>`, `<IMG>` and `<HR>` are the same elements as for BBCode. The markers of the Markdown source sit in `<s>`, `<e>` and `<i>` elements, which the parser skips like the BBCode tags there.
+`<QUOTE>`, `<LIST>`, `<LI>`, `<URL>`, `<EMAIL>`, `<IMG>` and `<HR>` are the same elements as for BBCode. The Markdown markers (`**`, `#`, `>`) are in `<s>`, `<e>` and `<i>` elements, like the BBCode tags.
 
-`<ESC>` (a character that a backslash made literal), `<E>` (an emoticon) and `<EMOJI>` have no handler either, but they are expected: their text is passed through and they are not counted in `unknown_tags`. The set is `HandlerRegistry#transparent_tags`, like in the HTML parser.
+Three more elements have no handler on purpose: `<ESC>` (a character the user escaped with a backslash), `<E>` (an emoticon) and `<EMOJI>`. Their text goes into the output and `unknown_tags` does not count them. They are the `transparent_tags` of the `HandlerRegistry`. Add your own to the set like in the [HTML parser](/format-guides/html/#tags-without-a-handler).
 
-Flarum's own elements, for example the mentions of users and posts, have no handler. Register one for the ones your forum uses, see [Extending Markbridge](/customization/extending/).
+Flarum's own elements have no handler, for example `<USERMENTION>` and `<POSTMENTION>`. Their text is kept and `unknown_tags` counts them. Register handlers for the ones your forum uses, see [Extending Markbridge](/customization/extending/#html-and-textformatter-parsers).
 
 ### Notes on the elements
 
 phpBB shows a `[spoiler]` as a block, so `<SPOILER>` is a block spoiler and the text after it starts a new line. `<ISPOILER>` is the inline spoiler of the Litedown plugin. `<HR>` comes from the `[hr]` BBCode of the s9e repository and from Litedown.
 
-Several elements carry attributes Markbridge reads: `<CODE>` (`lang`), `<URL>` (`url`), `<EMAIL>` (`email`), `<IMG>` (`src`), `<LIST>` (`type` — `bullet` or `decimal`), and `<QUOTE>` (attribution).
+The parser reads these attributes: `lang` of `<CODE>`, `url` of `<URL>`, `email` of `<EMAIL>`, `src` of `<IMG>`, `type` of `<LIST>` (`bullet` or `decimal`), the author of `<QUOTE>`, and `colspan` and `rowspan` of `<TD>` and `<TH>`.
 
-For the exact list, see [`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/text_formatter/handler_registry.rb).
+Relative links and images are written as they are, and Discourse drops an address without a scheme and without a leading slash. Give the renderer the address of the old forum as [`base_url:`](/customization/customizing-renderer/#base_url--where-relative-addresses-point-to).
+
+[`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/text_formatter/handler_registry.rb) is the exact list.
 
 ## Colors and sizes
 
-Discourse core removes the style of a `<span>`, so what to do with `<COLOR>` and `<SIZE>` depends on the site: build the renderer with `features: { bbcode: false }` to write their text, or with `features: { bbcode: true }` for a site with the discourse-bbcode plugin, which keeps them as `[color=…]` and `[size=…]` BBCode. Until you decide, a color or size raises `Markbridge::UndecidedFeatureError`. phpBB 3.x stores `[size]` as a percentage, and the plugin reads it the same way, so the size value passes as it is:
+Discourse shows colors and sizes only with the discourse-bbcode plugin. Markbridge cannot know whether your site has it, so you have to say:
+
+- `features: { bbcode: false }` writes the text without color and size.
+- `features: { bbcode: true }` writes `[color=…]` and `[size=…]` BBCode for the plugin.
+
+Without the decision, the first color or size raises `Markbridge::UndecidedFeatureError`.
+
+phpBB 3.x stores `[size]` as a percentage and the plugin reads it as one, so the size passes as it is:
 
 ```ruby
 renderer = Markbridge.discourse_renderer(features: { bbcode: true }, sizes: ->(size) { size })
@@ -119,13 +133,9 @@ renderer.render(ast)
 # => "**bold**"
 ```
 
-## Behavior notes
+## What else to know
 
-- **Invalid XML** falls back to treating the input as plain text instead of raising.
-- **Unknown elements** are skipped — their children are still processed.
-- **Leaf elements** like `<IMG>` and `<ATTACHMENT>` skip their content. It is only the fallback text (the URL or the filename).
-- **Stateless handler API**: like the HTML parser, handlers are callables receiving `(element:, parent:, processor:)`. The `processor:` argument is the parser instance and exposes `process_children(xml_element, ast_node)` for handlers that want to recurse manually. Lambdas are accepted.
-
-## When to use this vs. the BBCode parser
-
-If you're migrating **from** phpBB 3.2+ and already have the stored XML, use this parser — it's both faster and closer to the source of truth than re-parsing the BBCode. For plain BBCode from other forums, use the [BBCode parser](/format-guides/bbcode/).
+- **Input that is not valid XML** is read as plain text. Nothing is raised.
+- **An element without a handler** is dropped and its content is processed. `unknown_tags` counts it.
+- **The content of `<IMG>` and `<ATTACHMENT>` is skipped.** It is only the URL or the filename again.
+- **A handler** is an object with `#process(element:, parent:, processor:)`, or a lambda with the same keywords. `processor` is the parser. Call `processor.process_children(xml_element, ast_node)` when the handler has to process the children itself.

@@ -3,7 +3,7 @@ title: Result objects
 description: Read Markdown, AST nodes, unknown tags, and diagnostics from Conversion and Parse results.
 ---
 
-Markbridge's convenience methods don't return a plain string. The render methods return a `Conversion`; the parse-only methods return a `Parse`. Both carry their data alongside the result, so you never need a side channel.
+A conversion gives you more than Markdown. You also get the tree it was written from, the tags the parser did not know, and notes about what the parser had to repair. For that reason `Markbridge.*_to_markdown` returns a `Conversion` object, not a String, and `Markbridge.parse_*` returns a `Parse`.
 
 ## Conversion
 
@@ -24,9 +24,9 @@ result.diagnostics   # parser-specific diagnostics (e.g. auto-close counts)
 result.errors        # render-time errors, when raise_on_error: false
 ```
 
-`Conversion#to_s` delegates to `markdown`, so `puts result` and `"#{result}"` work without a `.markdown` call. It does *not* delegate other String methods — `result.gsub(...)` raises. Reach for `result.markdown.gsub(...)` or unwrap explicitly.
+`Conversion#to_s` returns the Markdown, so `puts result` and `"#{result}"` work. Other String methods are not there: `result.gsub(...)` raises. Call `result.markdown.gsub(...)`.
 
-`Markbridge.convert(input, format:)` returns the same `Conversion`, dispatching to the right `*_to_markdown` method — handy when one corpus mixes formats:
+`Markbridge.convert(input, format:)` returns the same `Conversion`. Use it when the format is only known at run time, for example when your posts are in more than one format:
 
 <!-- spec:before
 RENDERER = Markbridge.discourse_renderer
@@ -44,7 +44,7 @@ end
 
 ## Parse
 
-Each `*_to_markdown` has a matching `parse_*` that stops after building the AST. It returns a `Markbridge::Parse` — everything a `Conversion` has except the rendered `markdown` (and `errors`, which are render-time):
+Every `*_to_markdown` method has a `parse_*` method that stops after parsing. It returns a `Markbridge::Parse`: what a `Conversion` has, without `markdown` and without `errors`, which only rendering can have.
 
 <!-- spec:before
 input = "[b]hi[/b]"
@@ -58,10 +58,10 @@ parse.unknown_tags  # Hash{String => Integer}
 parse.diagnostics   # parser-specific diagnostics
 ```
 
-Reach for `parse_*` when you want to inspect or transform the tree before rendering, or render it yourself with a custom renderer. Hand a `Parse` to `Markbridge.render(parse, renderer:)` to get a `Conversion` back (the source `format`, `unknown_tags`, and `diagnostics` carry through).
+Use `parse_*` to look at the tree or to change it before rendering. `Markbridge.render(parse, renderer:)` renders a `Parse` and returns a `Conversion`, with the `format`, `unknown_tags` and `diagnostics` of the parse.
 
 ## What the fields mean
 
-- **`unknown_tags`** — tags the parser didn't recognize, with a count each. The parser never raises on them; what you do with the list is your call.
-- **`diagnostics`** — parser-specific notes (auto-closed tags, depth limits hit, unclosed raw tags, and so on). Also carries `:normalization` — the nesting fixes the [normalizer](/concepts/normalization/) applied on the way to render, absent when nothing changed.
-- **`errors`** — render-time errors collected instead of raised, when you pass `raise_on_error: false`. Empty otherwise. One to expect in a migration is `Markbridge::UndecidedFeatureError`: a post has a color or size and the renderer was not told whether the site has the discourse-bbcode plugin (see [`features:`](/customization/customizing-renderer/#features--the-plugins-of-the-target-site)).
+- **`unknown_tags`** has the tags no handler was registered for, with a count each. The parser does not raise on them. Whether a post with unknown tags is fine, gets logged, or fails is your decision.
+- **`diagnostics`** has what the parser had to repair. The BBCode parser reports how many tags it closed itself (`auto_closed_tags_count`), how many it left as text because they were nested too deep (`depth_exceeded_count`), and code tags that were never closed (`unclosed_raw_tags`). The key `:normalization` lists what the [normalizer](/concepts/normalization/) rewrote. It is missing when nothing changed.
+- **`errors`** has the errors of rendering when you pass `raise_on_error: false`. Without that option an error is raised and the list stays empty. In a migration, expect `Markbridge::UndecidedFeatureError`: a post has a color or a size, and the renderer was not told whether the site has the discourse-bbcode plugin (see [`features:`](/customization/customizing-renderer/#features--the-plugins-of-the-target-site)).

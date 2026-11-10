@@ -1,14 +1,15 @@
 ---
 title: Concepts
-description: How Markbridge works under the hood — the pipeline, the AST, parsers, renderers, and performance.
+description: How Markbridge works — the pipeline, the AST, parsers, renderers, and performance.
 ---
 
-The deep dives, for when you want to understand or change how Markbridge works:
+Read these pages when you want to understand how Markbridge works, or before you change how it works:
 
-- **[Architecture](/concepts/architecture/)** — the parse → AST → render pipeline, and why it's shaped that way.
-- **[The AST](/concepts/ast/)** — node types, invariants, and how the tree is built and walked.
-- **[Result objects](/concepts/result-objects/)** — what you get back: the `Conversion` and `Parse` value objects.
-- **[Parsers](/concepts/parsers/)** — how each of the four parsers works, and their trade-offs.
-- **[Renderers](/concepts/renderers/)** — the Discourse renderer, Tags, and the rendering interface.
-- **[AST normalization](/concepts/normalization/)** — the pass that rewrites nesting Markdown can't express before rendering.
-- **[Performance](/concepts/performance/)** — where the pipeline is tuned, and how to measure your own workload.
+- **[Architecture](/concepts/architecture/)** — the three steps of a conversion and why they are separate.
+- **[The AST](/concepts/ast/)** — the node types, the rules of the tree, and how to build and walk it.
+- **[Result objects](/concepts/result-objects/)** — what a conversion returns: `Conversion` and `Parse`.
+- **[Parsers](/concepts/parsers/)** — how each of the four parsers works and where they differ.
+- **[Renderers](/concepts/renderers/)** — the Discourse renderer, its tags, and what a tag can ask the renderer.
+- **[AST normalization](/concepts/normalization/)** — the step that rewrites nesting Markdown cannot express.
+- **[Performance](/concepts/performance/)** — what to reuse, the limits of the parsers, and how to measure your own input.
+- **[Benchmark results](/concepts/benchmarks/)** — recorded measurements on CRuby, JRuby and TruffleRuby.

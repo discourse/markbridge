@@ -3,11 +3,11 @@ title: HTML
 description: Convert HTML into Discourse-flavored Markdown using Nokogiri.
 ---
 
-The HTML parser uses Nokogiri to tolerate malformed HTML and produces the same AST the other parsers feed into.
+Use the HTML parser when your source stores posts or pages as HTML: a forum with a WYSIWYG editor, a blog, a help center, a mailing list archive. Nokogiri parses the HTML, so tags that are not closed or nested wrongly are repaired the way a browser repairs them.
 
 ## Requirements
 
-Add `nokogiri` to your Gemfile. It's a runtime dependency for the HTML parser:
+Add `nokogiri` to your Gemfile. Markbridge does not depend on it, because the BBCode and MediaWiki parsers work without it:
 
 ```ruby
 gem "nokogiri"
@@ -23,7 +23,7 @@ result.markdown
 # => "Hello **world**!"
 ```
 
-`result` is a [`Markbridge::Conversion`](/concepts/result-objects/) — `.markdown`, plus `.unknown_tags`, `.errors` for migration use.
+`result` is a [`Markbridge::Conversion`](/concepts/result-objects/). Next to `markdown` it has `unknown_tags`, `diagnostics` and `errors`.
 
 To get the AST:
 
@@ -57,11 +57,24 @@ parse.ast
 | `<table>`, `<tr>`, `<td>`, `<th>` | GFM table, or an HTML table when Markdown cannot express it (a `colspan` or `rowspan`, uneven rows, a block in a cell) | `AST::Table` |
 | `<br>` | Hard line break | `AST::LineBreak` |
 | `<hr>` | `---` | `AST::HorizontalRule` |
-| `<p>` | Paragraph spacing | — (transparent) |
+| `<p>` | A paragraph, with a blank line around it | `AST::Paragraph` |
+| `<span style="…">` | Bold, italic, underline or strikethrough when the style says so (`font-weight`, `font-style`, `text-decoration`); otherwise its content | the nodes above |
 
 </div>
 
-`<thead>`, `<tbody>`, `<tfoot>` are transparent — their children are processed as if the wrapper weren't there. Unregistered tags are skipped, but their children are still processed (graceful degradation), and the parser counts them in `unknown_tags`. The transparent tags are not counted. When your source is full of a wrapper you expect, add it to the set, so `unknown_tags` only shows what you did not expect:
+Relative links and images are written as they are, and Discourse drops an address without a scheme and without a leading slash. Give the renderer the address of the source site as [`base_url:`](/customization/customizing-renderer/#base_url--where-relative-addresses-point-to) to keep them working.
+
+[`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/html/handler_registry.rb) is the exact list.
+
+## Tags without a handler
+
+What the parser does with a tag it has no handler for depends on the tag:
+
+- **Ignored with their content:** `<script>`, `<style>`, `<head>`, `<title>`, `<noscript>`, `<template>`. Nothing of them reaches the output.
+- **Transparent:** `<thead>`, `<tbody>`, `<tfoot>`. Their children are processed as if the tag were not there.
+- **Unknown:** every other tag, like `<div>`, `<font>` or `<iframe>`. Its children are processed too, and `unknown_tags` counts the tag.
+
+So the only difference between transparent and unknown is the count. When your source is full of a wrapper you expect, add it to the transparent tags. Then `unknown_tags` only shows what you did not expect:
 
 ```ruby
 parser =
@@ -74,18 +87,18 @@ parser.unknown_tags
 # => {"custom-card" => 1}
 ```
 
-For the authoritative list, see [`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/html/handler_registry.rb).
+To give such a tag a meaning, for example `<details>` as a spoiler, register a handler. See [Customizing](#customizing) below.
 
 ## Code languages
 
-For syntax highlighting, the parser uses the first valid language from:
+A code block keeps its language for syntax highlighting. The parser takes the first valid one of these:
 
 1. A `language-*` class on the element.
 2. A `language-*` class on its direct `<code>` child.
 3. The element's `lang` attribute.
 4. A single class on the element or its direct `<code>` child.
 
-The language must contain only letters, digits, underscores, plus signs, or hyphens, and start with a letter or digit. A class list such as `hljs codeblock` does not become a language.
+A valid language starts with a letter or a digit and has only letters, digits, `_`, `+` and `-`. With more than one class and none of them a `language-*` class, like `hljs codeblock`, the block has no language.
 
 ```ruby
 require "markbridge/html"
@@ -95,11 +108,19 @@ result.markdown
 # => "```ruby\nputs 1\n```"
 ```
 
-## Parser characteristics
+## Whitespace
 
-- **Uses Nokogiri's HTML fragment parser** — handles malformed input without raising.
-- **Stateless handlers** — simpler than BBCode's open/close callback API. A handler is an object responding to `#process(element:, parent:)`.
-- **Collapses whitespace like a browser** — runs of whitespace become one space, and a space at the start or end of a line (a block boundary) or right after another space is dropped, wherever the inline boundaries fall: `<b>a </b> b` keeps one space. Text inside `<pre>`, `<code>`, `<textarea>` and `<tt>` is kept verbatim. Both tag sets are configurable on the `HandlerRegistry` (`block_level_tags`, `whitespace_preserving_tags`).
+HTML source is often indented and wrapped, and a browser does not show that. The parser collapses whitespace the same way:
+
+- Several whitespace characters in a row become one space.
+- A space at the start or the end of a block is dropped, and so is a space right after another one, also across tags: `<b>a </b> b` keeps one space.
+- Text inside `<pre>`, `<code>`, `<textarea>` and `<tt>` stays as it is.
+
+Which tags are blocks and which keep their whitespace is set on the `HandlerRegistry`: `block_level_tags` and `whitespace_preserving_tags`.
+
+## Customizing
+
+A handler is an object with `#process(element:, parent:)`. It adds a node to `parent` and returns the node that the children of the element go into, or `nil` to skip the children:
 
 ```ruby
 class AsideHandler < Markbridge::Parsers::HTML::Handlers::BaseHandler
@@ -112,7 +133,7 @@ class AsideHandler < Markbridge::Parsers::HTML::Handlers::BaseHandler
   def process(element:, parent:)
     note = AST::Quote.new
     parent << note
-    note # return node to recurse into for children
+    note # the children of <aside> go into the quote
   end
 end
 
@@ -124,7 +145,11 @@ handlers =
 Markbridge.html_to_markdown("<aside>heads up</aside>", handlers:)
 ```
 
+[Extending Markbridge](/customization/extending/#html-and-textformatter-parsers) has more on handlers.
+
 ## Using the parser directly
+
+The parser takes a String or a Nokogiri node, so HTML you already parsed is not parsed again:
 
 ```ruby
 parser = Markbridge::Parsers::HTML::Parser.new
@@ -134,10 +159,10 @@ renderer = Markbridge::Renderers::Discourse::Renderer.new
 renderer.render(ast)
 ```
 
-## What's not supported
+## Limits
 
-The default registry is intentionally scoped to the Discourse-facing subset. Notably:
+The default handlers cover the HTML that has a form in Discourse Markdown. What they leave out:
 
-- Inline styles and `<span>`/`<div>` without handlers pass through transparently (children only).
-- `<script>`, `<style>`, `<iframe>` and similar tags are not registered; children are still processed.
-- If you need semantic mappings for something richer (for example `<details>` → spoiler), register a handler — see [Extending Markbridge](/customization/extending/).
+- **Styles.** Colors, sizes and fonts in a `style` attribute or a `<font>` tag are dropped. Only the bold, italic, underline and strikethrough of a `<span>` are read.
+- **Embeds.** `<iframe>`, `<video>`, `<audio>` and `<object>` have no handler. Only the fallback content between their tags is written, not the address of the embed. Register a handler that writes a link if you need them.
+- **`<details>`, `<dl>`, `<figure>`** and other structures have no handler either. Their text is kept, their structure is not.
