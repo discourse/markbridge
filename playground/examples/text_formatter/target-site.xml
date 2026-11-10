@@ -1,0 +1,10 @@
+<r>What the renderer writes for these elements depends on the plugins of the Discourse site the posts go to. Open "Site" in the top bar and switch them.<br/>
+<br/>
+<B><s>[b]</s>discourse-bbcode<e>[/b]</e></B> (a plugin that needs an install) keeps colors and sizes. Without it only the text is left. phpBB stores a size as percent, which is what the plugin reads:<br/>
+<br/>
+<COLOR color="#c13d1a"><s>[color=#c13d1a]</s>Red text<e>[/color]</e></COLOR>, <COLOR color="teal"><s>[color=teal]</s>teal text<e>[/color]</e></COLOR>, <SIZE size="150"><s>[size=150]</s>large text<e>[/size]</e></SIZE>, <SIZE size="85"><s>[size=85]</s>small text<e>[/size]</e></SIZE>, <COLOR color="navy"><s>[color=navy]</s><SIZE size="120"><s>[size=120]</s><B><s>[b]</s>all of it<e>[/b]</e></B><e>[/size]</e></SIZE><e>[/color]</e></COLOR>.<br/>
+<br/>
+<B><s>[b]</s>spoiler-alert<e>[/b]</e></B> (bundled with Discourse) blurs a spoiler. Without it the content is written as it is:<br/>
+<br/>
+The winner is <SPOILER><s>[spoiler]</s>the tortoise<e>[/spoiler]</e></SPOILER>.
+<SPOILER title="The ending"><s>[spoiler=The ending]</s>Everybody goes home, and <B><s>[b]</s>nobody<e>[/b]</e></B> is surprised.<e>[/spoiler]</e></SPOILER></r>

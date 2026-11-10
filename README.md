@@ -58,10 +58,20 @@ This repository is set up to run inside [silo](https://github.com/gschlager/silo
 
 ## Playground
 
-A local web UI for exploring parsers interactively:
+A local web UI to see what Markbridge makes of a piece of markup:
 
 ```bash
 bin/playground
 ```
 
-Open `http://127.0.0.1:4567` to select a parser (BBCode, HTML, TextFormatter XML, MediaWiki), pick an example, edit the input, and inspect the AST tree and Markdown output. Keyboard shortcuts: `1` Input, `2` Output, `3` AST, `Cmd/Ctrl+Enter` to render.
+Open `http://127.0.0.1:4567`. The input is on the left, the output on the right, and the output follows while you type. Paste markup, drop a file on the input, or pick an example.
+
+- **Formats**: BBCode, HTML, TextFormatter XML, MediaWiki. When your own input looks like another format, the playground offers to switch.
+- **Output**: the Markdown, a preview, and the AST. The preview is cooked by Discourse's own engine when `bin/discourse-engine` has built it, otherwise by markdown-it (`npm ci --prefix spec/support/markdown_it`), which reads no BBCode.
+- **Site**: the plugins of the target Discourse site (`spoiler-alert`, `discourse-bbcode`), which are the `features:` of the renderer, and a switch for the normalizer.
+- **Notes**: unknown tags, tags the parser had to close and changes of the normalizer show up in the status bar.
+- **Examples** (`Ctrl/Cmd+K`): searchable, also by a tag or a word in their input. The first one of every format, "Everything", shows every tag the parser knows; a spec checks it against the handler registries. An example has an address (`/bbcode/everything`), and "Copy link" makes one for your own input.
+
+Keyboard: `Ctrl/Cmd+K` examples, `Alt+1` Markdown, `Alt+2` Preview, `Alt+3` AST.
+
+To add an example, put a file into `playground/examples/<format>/` and list it in `playground/examples/catalog.yml`.

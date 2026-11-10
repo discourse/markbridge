@@ -1,0 +1,20 @@
+<p>HTML can nest things Markdown has no way to write. The normalizer rewrites the AST between parsing and rendering, and reports what it did. Switch "Normalize the AST" off under "Site" to see the output without it.</p>
+
+<p>A link in a link, the inner one is unwrapped:</p>
+<a href="https://example.com/outer">outer <span><a href="https://example.com/inner">inner</a></span> outer</a>
+
+<p>A list in bold, the list moves out:</p>
+<b>Shopping: <ul><li>milk</li><li>bread</li></ul> and that is all</b>
+
+<p>A code block in italic:</p>
+<i>Run <pre>bundle install
+bundle exec rake</pre> and wait</i>
+
+<p>A quote in a link:</p>
+<a href="https://example.com">Read <blockquote>the whole thing</blockquote> here</a>
+
+<p>A list in a heading:</p>
+<h2>Agenda <ul><li>one</li><li>two</li></ul></h2>
+
+<p>A table in a link in bold:</p>
+<b><a href="https://example.com/prices">Prices <table><tr><td>1</td><td>2</td></tr></table></a></b>

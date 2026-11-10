@@ -1,0 +1,32 @@
+<p>Emphasis that touches a word: wo<i>rd</i>s, <b>bold</b>ly, snake<u>_</u>case.</p>
+<p>Whitespace at the edges: <b>bold </b>word, <b> padded </b>, <i>
+  italic on its own lines
+</i>.</p>
+<p>Empty elements: <b></b>, <i> </i>, <a href="https://example.com"></a>, <a>no href</a>.</p>
+<p>The same element twice: <b><b>bold</b></b>, <b>one</b><b>two</b>, <i>one</i><b>two</b>.</p>
+<p>Markers in the content: <i>*stars*</i>, <b>_underscores_</b>, <s>~tildes~</s>, <code>a ` backtick</code>.</p>
+
+<p>Whitespace     collapses
+   like in a browser,&nbsp;&nbsp;but not non-breaking spaces.</p>
+<p>Entities: &amp; &lt; &gt; &quot; &copy; &#8212; &#x1F600;</p>
+
+<p>Bare URLs: https://example.com/a_b_c. (https://example.com/x), https://example.com/q?a=1&amp;b=2!</p>
+<p>URLs with odd characters: <a href="https://example.com/wiki/Foo_(bar)">parentheses</a>, <a href="https://example.com/with space">a space</a>, <a href="/relative/path">a relative one</a>, <a href="#anchor">an anchor</a>.</p>
+<p>A link around its own URL: <a href="https://example.com">https://example.com</a>, <a href="https://example.com/padded"> https://example.com/padded </a>.</p>
+<p>A linked image: <a href="https://example.com/full.jpg"><img src="https://example.com/thumb.jpg" alt="A [thumbnail]"></a></p>
+
+<p>Breaks:<br>one<br><br>two<br></p>
+Text without a paragraph, <b>then bold</b>
+<p>then a paragraph</p>
+and text again.
+
+<UL><LI>Upper case</LI><li>an item that is never closed<li>and the next one</UL>
+<p>A paragraph that is never closed
+<p>and <b>bold that <i>is closed in the wrong order</b></i>.
+
+<pre>
+A pre block keeps <b>its text</b>, *stars* and
+    indentation.
+</pre>
+<p><code>one line</code> and <code>two
+lines</code></p>

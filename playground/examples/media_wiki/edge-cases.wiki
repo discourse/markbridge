@@ -1,0 +1,36 @@
+Apostrophes: it's, the dogs' bowl, ''it's italic'', '''bold's''', L'''arbre'' and ''''four''''.
+Bold inside italic: ''italic and '''bold''' in it''.
+Quotes that are never closed: ''italic until the end of the line
+and '''bold until the end of the line
+
+Headings: 
+=Without spaces=
+== With a trailing space == 
+== Not a heading = because the sides differ
+=== 
+= = =
+Not a heading: a = b and == in the middle == of a line.
+
+Links: [[A page with spaces]], [[Page|]], [[|text]], [[]], [https://example.com], [not a link], [[Category:Hiking]], [[File:Sunrise.jpg|thumb|A sunrise]].
+URLs: https://example.com/a_b_c. (https://example.com/x), [https://example.com/wiki/Foo_(bar) parentheses].
+
+Lists that stop and start:
+* one
+* two
+not an item
+* a new list
+:indented with a colon
+; a term : and its definition
+
+A space at the start of a line makes code:
+ like this
+  and this, with one more space
+
+<nowiki>'''not bold''' and <b>not HTML</b></nowiki>, <code>'''not bold''' in code</code>, <pre>one line of pre</pre>
+<nowiki>A nowiki tag that goes over
+two lines</nowiki>
+A break<br>and another<br />one.
+
+----
+---
+-----

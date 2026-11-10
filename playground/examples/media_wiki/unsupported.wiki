@@ -1,0 +1,31 @@
+The parser reads the wikitext most exports are made of, not all of MediaWiki. What it does not know stays as text, or loses its tag and keeps the content.
+
+Templates and magic words: {{Infobox mountain|name=Lagazuoi|elevation=2835}}, {{cite web|url=https://example.com}}, __NOTOC__, {{#if: x | yes | no}}, {{PAGENAME}}.
+
+References: The hut opened in 1965.<ref>Hut guide, 2020, p. 12</ref><ref name="guide" />
+
+<references />
+
+Files and categories: [[File:Sunrise.jpg|thumb|200px|A sunrise]], [[Image:Old.png]], [[Category:Hiking]], [[:Category:Hiking|a link to the category]].
+
+HTML that is not on the list: <b>bold</b>, <i>italic</i>, <span style="color:red">red</span>, <div class="note">a note</div>, <small>small</small>, <big>big</big>, <center>centered</center>, <blockquote>a quote</blockquote>, <!-- a comment -->.
+
+Extension tags: <syntaxhighlight lang="ruby">puts "hello"</syntaxhighlight>, <math>E = mc^2</math>, <gallery>
+File:One.jpg
+File:Two.jpg
+</gallery>
+
+Definition lists and indentation:
+; Term
+: Definition
+:: Indented twice
+
+Tables with attributes:
+{| class="wikitable" style="width: 100%"
+|+ A caption
+! scope="col" | Day !! Distance
+|-
+| style="text-align: right" | 1 || 14 km
+|- class="highlight"
+| colspan="2" | A wide cell
+|}

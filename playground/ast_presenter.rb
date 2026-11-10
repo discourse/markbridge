@@ -39,42 +39,6 @@ module Markbridge
         "Url" => "link",
       }.freeze
 
-      ICON_MAP = {
-        "Align" => "alignCenter",
-        "Attachment" => "paperclip",
-        "Bold" => "bold",
-        "Code" => "terminal",
-        "Color" => "palette",
-        "Details" => "chevronsDownUp",
-        "Document" => "treePine",
-        "Email" => "mail",
-        "Event" => "calendarDays",
-        "Heading" => "heading",
-        "HorizontalRule" => "minus",
-        "Image" => "image",
-        "Italic" => "italic",
-        "LineBreak" => "cornerDownLeft",
-        "List" => "list",
-        "ListItem" => "chevronRight",
-        "MarkdownText" => "wholeWord",
-        "Mention" => "atSign",
-        "Paragraph" => "pilcrow",
-        "Poll" => "barChart",
-        "Quote" => "messageSquareQuote",
-        "Size" => "aLargeSmall",
-        "Spoiler" => "eyeOff",
-        "Strikethrough" => "strikethrough",
-        "Subscript" => "subscript",
-        "Superscript" => "superscript",
-        "Table" => "table",
-        "TableCell" => "squareAsterisk",
-        "TableRow" => "rows3",
-        "Text" => "textCursor",
-        "Underline" => "underline",
-        "Upload" => "upload",
-        "Url" => "link",
-      }.freeze
-
       def initialize(node)
         @node = node
       end
@@ -120,7 +84,6 @@ module Markbridge
           type: type_name(node),
           kind: node_kind(node),
           category: category_for(node),
-          icon: icon_for(node),
           label: label_for(node),
           preview: preview_for(node),
           attributes: attribute_pairs(node).to_h,
@@ -165,10 +128,6 @@ module Markbridge
 
       def category_for(node)
         CATEGORY_MAP.fetch(type_name(node), "generic")
-      end
-
-      def icon_for(node)
-        ICON_MAP.fetch(type_name(node), "generic")
       end
 
       def attribute_pairs(node)

@@ -1,0 +1,37 @@
+Emphasis that touches a word: wo[i]rd[/i]s, [b]bold[/b]ly, snake[u]_[/u]case.
+Whitespace at the edges: [b]bold [/b]word, [b] padded [/b], [i]
+italic on its own lines
+[/i].
+Empty tags: [b][/b], [i] [/i], [url][/url], [list][/list].
+The same tag twice: [b][b]bold[/b][/b], [b]one[/b][b]two[/b], [i]one[/i][b]two[/b].
+
+[b]Bold that goes on
+
+after a blank line.[/b]
+
+Markers in the content: [i]*stars*[/i], [b]_underscores_[/b], [s]~tildes~[/s], [tt]a ` backtick[/tt].
+
+Bare URLs: https://example.com/a_b_c. (https://example.com/x), https://example.com/q?a=1&b=2! and www.example.com.
+URLs with odd characters: [url=https://example.com/wiki/Foo_(bar)]parentheses[/url], [url=https://example.com/a?b=[c]]brackets[/url], [url="https://example.com/with space"]a space[/url].
+A link around its own URL: [url=https://example.com]https://example.com[/url], [url] https://example.com/padded [/url].
+
+Tag names in any case: [B]bold[/B], [Url=https://example.com]link[/URL].
+Text that looks like a tag: [not a tag], [1], [], [b, a smiley :[ and an array[0].
+A word in brackets is read as a tag: [citation] is unknown and dropped.
+Line breaks:
+one
+two[br]three
+
+four
+
+[code]
+A code block keeps [b]tags[/b], *stars* and
+    indentation as they are.
+[/code]
+[code]one line[/code]
+Inline: [tt]x = y[/tt].
+
+
+An item without a list starts one, and the list takes the rest of the post:
+[*]one
+[*]two

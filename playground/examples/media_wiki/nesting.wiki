@@ -1,0 +1,28 @@
+* '''Level 1''' with '''''bold italic''' and italic''
+** ''Level 2'' with [[Page|a link with '''bold''' text]]
+*** Level 3 with <code>code()</code>, <s>struck <u>and underlined</u></s> and [https://example.com an external link]
+**** Level 4
+* Back at level 1
+
+# '''Ordered level 1'''
+## ''Ordered level 2''
+### Ordered level 3 with [[Deep Page]]
+# Ordered level 1 again
+
+Mixed lists:
+
+* A bullet
+*# with a numbered item
+*# and another one
+*#* and a bullet under it
+#* A bullet under a number
+
+== A heading with ''italic'', '''bold''' and a [[Page|link]] ==
+
+{|
+! '''Bold''' header !! ''Italic'' header
+|-
+| [[Page|A link]] in a cell || <code>code</code> and H<sub>2</sub>O
+|-
+| '''''Bold italic <s>struck</s>''''' || x<sup>2</sup>
+|}

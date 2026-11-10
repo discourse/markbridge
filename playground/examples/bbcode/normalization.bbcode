@@ -1,0 +1,17 @@
+BBCode can nest things Markdown has no way to write. The normalizer rewrites the AST between parsing and rendering, and reports what it did. Switch "Normalize the AST" off under "Site" to see the output without it.
+
+A link in a link, the inner one is unwrapped:
+[url=https://example.com/outer]outer [url=https://example.com/inner]inner[/url] outer[/url]
+
+A list in bold, the list moves out:
+[b]Shopping: [list][*]milk[*]bread[/list] and that is all[/b]
+
+A code block in italic:
+[i]Run [code]bundle install
+bundle exec rake[/code] and wait[/i]
+
+A quote in a link:
+[url=https://example.com]Read [quote=alice]the whole thing[/quote] here[/url]
+
+A table in a link in bold:
+[b][url=https://example.com/prices]Prices [table][tr][td]1[/td][td]2[/td][/tr][/table][/url][/b]
