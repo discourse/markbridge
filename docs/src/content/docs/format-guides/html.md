@@ -41,10 +41,10 @@ parse.ast
 |---|---|---|
 | `<b>`, `<strong>` | `**bold**` | `AST::Bold` |
 | `<i>`, `<em>` | `*italic*` | `AST::Italic` |
-| `<s>`, `<strike>`, `<del>` | `~~strike~~` | `AST::Strikethrough` |
+| `<s>`, `<strike>` | `~~strike~~` | `AST::Strikethrough` |
 | `<u>` | `<u>underline</u>` | `AST::Underline` |
 | `<sup>`, `<sub>` | `<sup>…</sup>` / `<sub>…</sub>` | `AST::Superscript`, `AST::Subscript` |
-| `<ins>` | `<ins>…</ins>` | `AST::Insertion` |
+| `<ins>`, `<del>` | `<ins>…</ins>` / `<del>…</del>` | `AST::Insertion`, `AST::Deletion` |
 | `<mark>` | `<mark>…</mark>` | `AST::Highlight` |
 | `<code>`, `<tt>` | Code span; fenced block for multiline content | `AST::Code` |
 | `<pre>` | Fenced code block, including single-line content | `AST::Code` |

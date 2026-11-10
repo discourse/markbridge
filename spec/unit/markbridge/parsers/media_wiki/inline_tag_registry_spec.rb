@@ -151,7 +151,7 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineTagRegistry do
     it "includes del as formatting" do
       entry = registry["del"]
       expect(entry.type).to eq(:formatting)
-      expect(entry.element_class).to eq(Markbridge::AST::Strikethrough)
+      expect(entry.element_class).to eq(Markbridge::AST::Deletion)
     end
 
     it "includes u as formatting" do

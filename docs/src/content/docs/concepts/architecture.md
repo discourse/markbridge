@@ -31,7 +31,7 @@ Node (base)
 ├── LineBreak, HorizontalRule (leaf)
 └── Element (container, has children)
     ├── Document (root)
-    ├── Inline: Bold, Italic, Underline, Strikethrough, Superscript, Subscript, Insertion, Highlight
+    ├── Inline: Bold, Italic, Underline, Strikethrough, Superscript, Subscript, Insertion, Deletion, Highlight
     ├── Block: Quote, List, ListItem, Code, Spoiler, Heading, HorizontalRule
     └── Content: Url, Image, Attachment, Color, Size, Align, Table, TableRow, TableCell
 ```

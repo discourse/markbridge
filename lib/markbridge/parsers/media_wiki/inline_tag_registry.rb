@@ -83,7 +83,7 @@ module Markbridge
 
           # Formatting tags -content parsed for inline wiki markup
           registry.register("s", :formatting, AST::Strikethrough)
-          registry.register("del", :formatting, AST::Strikethrough)
+          registry.register("del", :formatting, AST::Deletion)
           registry.register("u", :formatting, AST::Underline)
           registry.register("ins", :formatting, AST::Insertion)
           registry.register("mark", :formatting, AST::Highlight)

@@ -44,6 +44,7 @@ module Markbridge
       AST::Superscript,
       AST::Subscript,
       AST::Insertion,
+      AST::Deletion,
       AST::Highlight,
       AST::Heading,
     ].freeze

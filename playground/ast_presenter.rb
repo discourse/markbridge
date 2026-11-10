@@ -9,6 +9,7 @@ module Markbridge
         "Bold" => "formatting",
         "Code" => "code",
         "Color" => "formatting",
+        "Deletion" => "formatting",
         "Details" => "block",
         "Document" => "document",
         "Email" => "link",

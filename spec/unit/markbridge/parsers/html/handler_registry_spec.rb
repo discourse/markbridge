@@ -158,7 +158,7 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
         Markbridge::Parsers::HTML::Handlers::SimpleHandler,
         Markbridge::AST::Strikethrough,
       ],
-      "del" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Strikethrough],
+      "del" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Deletion],
       "u" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Underline],
       "sup" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Superscript],
       "sub" => [Markbridge::Parsers::HTML::Handlers::SimpleHandler, Markbridge::AST::Subscript],

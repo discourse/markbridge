@@ -29,6 +29,7 @@ AST::Node (base)
     │   ├── AST::Superscript
     │   ├── AST::Subscript
     │   ├── AST::Insertion         — added text, <ins>
+    │   ├── AST::Deletion          — removed text, <del>
     │   └── AST::Highlight         — highlighted text, <mark>
     ├── Block-level
     │   ├── AST::Paragraph
