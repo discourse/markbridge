@@ -304,9 +304,9 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children.first.children.first.text).to eq("deleted")
     end
 
-    it "parses <del>...</del> as strikethrough" do
+    it "parses <del>...</del> as a deletion" do
       doc = parse("<del>deleted</del>")
-      expect(doc.children.first).to be_a(Markbridge::AST::Strikethrough)
+      expect(doc.children.first).to be_a(Markbridge::AST::Deletion)
     end
 
     it "parses <u>...</u> as underline" do

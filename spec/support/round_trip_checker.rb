@@ -75,6 +75,7 @@ class RoundTripChecker
     sup
     sub
     ins
+    del
     mark
     table
     tr
@@ -141,6 +142,7 @@ class RoundTripChecker
     AST::Superscript,
     AST::Subscript,
     AST::Insertion,
+    AST::Deletion,
     AST::Highlight,
   ].freeze
 
@@ -445,6 +447,8 @@ class RoundTripChecker
       [skeleton("sub", children: expected_children(node, html:))]
     when AST::Insertion
       [skeleton("ins", children: expected_children(node, html:))]
+    when AST::Deletion
+      [skeleton("del", children: expected_children(node, html:))]
     when AST::Highlight
       [skeleton("mark", children: expected_children(node, html:))]
     when AST::Table

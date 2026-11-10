@@ -22,9 +22,9 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
       expect(result.markdown).to eq("~~deleted~~")
     end
 
-    it "converts strikethrough with <del>" do
+    it "keeps <del> as the HTML tag" do
       result = Markbridge.mediawiki_to_markdown("<del>deleted</del>")
-      expect(result.markdown).to eq("~~deleted~~")
+      expect(result.markdown).to eq("<del>deleted</del>")
     end
 
     it "converts underline with <u>" do

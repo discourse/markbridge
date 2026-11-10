@@ -149,11 +149,12 @@ module Markbridge
           new.tap do |registry|
             registry.register(%w[b strong], Handlers::SimpleHandler.new(AST::Bold))
             registry.register(%w[i em], Handlers::SimpleHandler.new(AST::Italic))
-            registry.register(%w[s strike del], Handlers::SimpleHandler.new(AST::Strikethrough))
+            registry.register(%w[s strike], Handlers::SimpleHandler.new(AST::Strikethrough))
             registry.register("u", Handlers::SimpleHandler.new(AST::Underline))
             registry.register("sup", Handlers::SimpleHandler.new(AST::Superscript))
             registry.register("sub", Handlers::SimpleHandler.new(AST::Subscript))
             registry.register("ins", Handlers::SimpleHandler.new(AST::Insertion))
+            registry.register("del", Handlers::SimpleHandler.new(AST::Deletion))
             registry.register("mark", Handlers::SimpleHandler.new(AST::Highlight))
             registry.register(%w[code pre tt], Handlers::RawHandler.new(AST::Code))
             registry.register("a", Handlers::UrlHandler.new)

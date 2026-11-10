@@ -40,6 +40,7 @@ module Markbridge
         AST::Superscript,
         AST::Subscript,
         AST::Insertion,
+        AST::Deletion,
         AST::Highlight,
         AST::Color,
         AST::Size,
