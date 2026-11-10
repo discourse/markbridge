@@ -103,6 +103,12 @@ module Markbridge
         AUTOLINK =
           %r{\A<(?:https?://|mailto:)[^>\s]*>|\A<[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*>}i
 
+        # The start of an autolink that the text does not close: `<`, a
+        # scheme and no whitespace up to the end of the text. Whatever
+        # comes next can close it, a link for example, and then the two
+        # are one autolink to a Markdown parser, backslashes included.
+        OPEN_AUTOLINK = /\A<[a-zA-Z][a-zA-Z0-9+.-]{1,31}:[^\s<>]*\z/
+
         # Match HTML-like constructs that need escaping:
         # - Processing instructions: <?php, <?xml, etc.
         # - SGML declarations: <!DOCTYPE, <!ELEMENT, <![CDATA[, <!--, etc.
@@ -568,7 +574,8 @@ module Markbridge
             matched = match[0]
             @inline_result << matched
             pos + matched.bytesize
-          elsif HTML_TAG.match?(remaining) || HTML_TAG_START.match?(remaining)
+          elsif HTML_TAG.match?(remaining) || HTML_TAG_START.match?(remaining) ||
+                OPEN_AUTOLINK.match?(remaining)
             # The backslash keeps the tag text. What is inside the tag
             # goes on through the loop like any text: a backslash, a
             # backtick or an entity in an attribute needs its escape too.

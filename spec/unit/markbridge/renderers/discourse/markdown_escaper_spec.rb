@@ -629,6 +629,27 @@ RSpec.describe Markbridge::Renderers::Discourse::MarkdownEscaper do
         expect(escaper.escape("foo<http://x>bar")).to eq("foo<http://x>bar")
       end
 
+      # What follows the text can close the autolink, a link for example.
+      # To a Markdown parser the two are one autolink then.
+      it "escapes the < of an autolink that the text does not close" do
+        expect(escaper.escape("<mailto:")).to eq("\\<mailto:")
+        expect(escaper.escape("see <https://example.com/a")).to eq("see \\<https://example.com/a")
+        expect(escaper.escape("<x-custom+1.2:")).to eq("\\<x-custom+1.2:")
+      end
+
+      it "leaves a < alone when whitespace or a bracket ends the autolink start" do
+        expect(escaper.escape("<mailto: x")).to eq("<mailto: x")
+        expect(escaper.escape("<ftp://x> y")).to eq("<ftp://x> y")
+        expect(escaper.escape("<a:b<")).to eq("<a:b<")
+      end
+
+      it "leaves a < alone in front of what is no scheme" do
+        expect(escaper.escape("<1")).to eq("<1")
+        expect(escaper.escape("<1a:")).to eq("<1a:")
+        expect(escaper.escape("<a:")).to eq("<a:")
+        expect(escaper.escape("<#{"a" * 33}:")).to eq("<#{"a" * 33}:")
+      end
+
       # `gsub` → `sub` in the HTML-tag backtick escape: only first backtick
       # is escaped under mutation. Need ≥2 backticks in the tag attribute.
       it "escapes every backtick in an HTML tag attribute (gsub not sub)" do
