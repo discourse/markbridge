@@ -519,6 +519,21 @@ RSpec.describe "BBCode to Markdown Conversion" do
     end
   end
 
+  describe "lists with tags that are never closed" do
+    it "ends an open tag with its item" do
+      result = Markbridge.bbcode_to_markdown("[list][*]one [b]bold[*]two[/list] after")
+
+      expect(result.markdown).to eq("- one **bold**\n- two\n\nafter")
+      expect(result.diagnostics[:auto_closed_tags_count]).to eq(1)
+    end
+
+    it "ends an open tag with the list" do
+      result = Markbridge.bbcode_to_markdown("[list][*]one [b]bold[/list] after")
+
+      expect(result.markdown).to eq("- one **bold**\n\nafter")
+    end
+  end
+
   describe "spoiler" do
     it "converts simple spoiler" do
       result = Markbridge.bbcode_to_markdown("[spoiler]secret content[/spoiler]")

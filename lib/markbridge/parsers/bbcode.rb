@@ -20,6 +20,7 @@ require_relative "bbcode/closing_strategies/reordering"
 
 # Base Handlers
 require_relative "bbcode/handlers/base_handler"
+require_relative "bbcode/handlers/open_item"
 require_relative "bbcode/handlers/raw_handler"
 
 # Handlers

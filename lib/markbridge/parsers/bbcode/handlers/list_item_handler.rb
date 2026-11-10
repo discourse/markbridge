@@ -4,14 +4,16 @@ module Markbridge
   module Parsers
     module BBCode
       module Handlers
-        # Handler for list item tags (*, li, .)
+        # Handler for list item tags (*, li)
         class ListItemHandler < BaseHandler
+          include OpenItem
+
           def initialize
             @element_class = AST::ListItem
           end
 
           def on_open(token:, context:, registry:, tokens: nil)
-            context.pop if context.current.instance_of?(AST::ListItem)
+            close_open_item(context)
 
             element = AST::ListItem.new
             context.push(element, token:)
