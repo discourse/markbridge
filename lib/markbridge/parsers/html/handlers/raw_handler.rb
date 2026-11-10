@@ -17,8 +17,8 @@ module Markbridge
           end
 
           def process(element:, parent:)
-            # Get the inner text content
             content = element.inner_text
+            content = content.delete_prefix("\n") if leading_newline_ignored?(element)
 
             ast_element =
               @element_class.new(language: language_for(element), block: block_for(element))
@@ -39,6 +39,18 @@ module Markbridge
           #
           # @param element [Nokogiri::XML::Element]
           # @return [Boolean, nil]
+          # HTML drops a line break right after <pre>. Nokogiri's HTML5
+          # parser has done that already, its HTML4 parser keeps the line
+          # break. A line break inside a <code> in the <pre> is content.
+          def leading_newline_ignored?(element)
+            return false unless element.name == "pre" && element.children.first&.text?
+
+            !(
+              defined?(Nokogiri::HTML5::Document) &&
+                element.document.is_a?(Nokogiri::HTML5::Document)
+            )
+          end
+
           def block_for(element)
             true if element.name == "pre"
           end

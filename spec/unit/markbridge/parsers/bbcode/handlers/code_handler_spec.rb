@@ -42,6 +42,22 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::CodeHandler do
       document.children.first
     end
 
+    it "drops one line break right after [code] and [pre]" do
+      expect(parse_tag("code", content: "\n\na\n").children.first.text).to eq("\na\n")
+    end
+
+    it "drops the line break after [pre] too" do
+      expect(parse_tag("pre", content: "\na").children.first.text).to eq("a")
+    end
+
+    it "keeps the line break after [tt], which is no block" do
+      expect(parse_tag("tt", content: "\na").children.first.text).to eq("\na")
+    end
+
+    it "has no text when the content is only that line break" do
+      expect(parse_tag("code", content: "\n").children).to be_empty
+    end
+
     it "sets block on the element for code" do
       expect(parse_tag("code", content: "x").block).to be true
     end

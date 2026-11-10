@@ -15,6 +15,7 @@ Output and AST changes to check:
 - **`<HR>` in s9e XML** is a horizontal rule. It was counted as an unknown tag and dropped.
 - **Litedown elements in s9e XML.** `<STRONG>`, `<EM>`, `<DEL>`, `<SUP>`, `<SUB>`, `<C>` and `<H1>` to `<H6>` are read, which is what a Flarum post is made of. They were unknown tags, so their formatting was lost.
 - **More elements of s9e XML.** `<CENTER>`, `<LEFT>`, `<RIGHT>` and `<JUSTIFY>` are aligned blocks. `<ESC>`, `<E>` and `<EMOJI>` are passed through and no longer counted in `unknown_tags`; the set is `HandlerRegistry#transparent_tags` of the TextFormatter parser.
+- **The line break right after a code tag** is not a first, empty line of the code anymore: `[code]`, `[pre]`, HTML `<pre>` and `<pre>` in wikitext drop one line break after the tag. HTML itself says so for `<pre>`. A second line break stays, and so does one after `[tt]` or `<code>`.
 - **An image with only a width** is written without a size, `![alt](src)`. Discourse reads a size only as `WIDTHxHEIGHT`, so the `100` of `![alt|100](src)` stayed in the alt text.
 - **The space after a code span at the start of a line** in s9e XML is kept.
 - **An empty paragraph in a table written as HTML** is nothing. It was an empty `<p></p>`, which kept a list item around it alive.
