@@ -183,14 +183,14 @@ module Markbridge
         strategy, boundary = @rules.resolve(child, stack, walk_cache)
         strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
         unless strategy.nil? || strategy == :keep
-          found << { parent: demodulize(boundary.class), child: demodulize(child.class), strategy: }
+          found << {
+            parent: Report.short_name(boundary.class),
+            child: Report.short_name(child.class),
+            strategy:,
+          }
         end
         collect_violations(child, stack, found, walk_cache) if child.is_a?(AST::Element)
       end
-    end
-
-    def demodulize(klass)
-      klass.name.split("::").last
     end
   end
 end

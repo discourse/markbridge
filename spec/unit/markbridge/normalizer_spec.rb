@@ -121,6 +121,15 @@ RSpec.describe Markbridge::Normalizer do
       end
     end
 
+    it "names a class without a name after its nearest named ancestor" do
+      rule = Class.new(Markbridge::AST::HorizontalRule).new
+      bold = el(Class.new(Markbridge::AST::Bold), rule)
+
+      expect(described_class.default.violations(doc(bold))).to eq(
+        [{ parent: "Bold", child: "HorizontalRule", strategy: :hoist_after }],
+      )
+    end
+
     it "keeps an inline spoiler but flags a block spoiler, in any inline container" do
       described_class::INLINE_CONTAINERS.each do |container|
         inline = el(Markbridge::AST::Spoiler, text("x"))
