@@ -68,7 +68,7 @@ Open `http://127.0.0.1:4567`. The input is on the left, with its tags in color, 
 
 - **Formats**: BBCode, HTML, TextFormatter XML, MediaWiki. Every format keeps its own input, so a switch shows what that format had last. When your input looks like another format, the playground offers to read it with the other parser.
 - **Output**: the Markdown, a preview, and the AST. The preview is cooked by Discourse's own engine when `bin/discourse-engine` has built it, otherwise by markdown-it (`npm ci --prefix spec/support/markdown_it`), which reads no BBCode.
-- **Site**: the plugins of the target Discourse site (`spoiler-alert`, `discourse-bbcode`), which are the `features:` of the renderer, and a switch for the normalizer.
+- **Site**: the plugins of the target Discourse site (`spoiler-alert`, `discourse-bbcode`), which are the `features:` of the renderer, a base URL for relative links and images, and a switch for the normalizer.
 - **Notes**: unknown tags, tags the parser had to close and changes of the normalizer show up in the status bar.
 - **Examples** (`Ctrl/Cmd+K`): searchable, also by a tag or a word in their input. The first one of every format, "Everything", shows every tag the parser knows; a spec checks it against the handler registries. An example has an address (`/bbcode/everything`), and "Copy link" makes one for your own input.
 

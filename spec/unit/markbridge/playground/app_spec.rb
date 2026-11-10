@@ -53,6 +53,16 @@ RSpec.describe Markbridge::Playground::App do
       expect(convert("[spoiler]c[/spoiler]", spoiler: false).fetch(:markdown)).to eq("c")
     end
 
+    it "makes relative addresses absolute with a base URL" do
+      result = convert("[url=page.html]x[/url]", base_url: " https://old.example.com/forum/ ")
+
+      expect(result.fetch(:markdown)).to eq("[x](https://old.example.com/forum/page.html)")
+    end
+
+    it "writes relative addresses as they are without a base URL" do
+      expect(convert("[url=/page]x[/url]").fetch(:markdown)).to eq("[x](/page)")
+    end
+
     it "normalizes the AST and reports what changed" do
       result = convert("[url=/a][url=/b]x[/url][/url]")
 
