@@ -42,6 +42,9 @@
     format: "bbcode",
     exampleId: null, // the example the input started from, null for own input
     edited: false,
+    // What every format had in the input last, so a switch of the format
+    // comes back to it: { exampleId, edited, input } by format.
+    buffers: {},
     view: "markdown",
     previewSource: false,
     options: { ...defaults },
@@ -183,12 +186,30 @@
   }
 
   function saveDraft() {
-    save(STORAGE.draft, {
-      format: state.format,
+    state.buffers[state.format] = {
       exampleId: state.exampleId,
       edited: state.edited,
       input: state.edited ? sourceInput.value : null
-    });
+    };
+    save(STORAGE.draft, { format: state.format, buffers: state.buffers });
+  }
+
+  // Puts what a format had in the input last back into it.
+  // @return {boolean} whether there was edited input to put back
+  function restoreBuffer(format) {
+    const buffer = state.buffers[format];
+    if (!buffer?.edited || typeof buffer.input !== "string") {
+      return false;
+    }
+    state.format = format;
+    state.exampleId = findExample(buffer.exampleId) ? buffer.exampleId : null;
+    state.edited = true;
+    sourceInput.value = buffer.input;
+    sourceInput.scrollTop = 0;
+    renderFormatSwitch();
+    updateUrl();
+    inputChanged();
+    return true;
   }
 
   function inputChanged() {
@@ -226,23 +247,25 @@
     inputChanged();
   }
 
+  // Every format has its own input. The markup of one format is noise
+  // to the parser of another, so a switch shows what the new format had
+  // last: the edited input, or its example.
   function selectFormat(format) {
-    if (format === state.format) {
+    if (format === state.format || restoreBuffer(format)) {
       return;
     }
-    // An example nobody touched belongs to its format: show the one of
-    // the new format. Own text stays, only the parser changes.
-    if (!state.edited) {
-      const current = findExample(state.exampleId);
-      const same = current && findExample(`${format}/${current.slug}`);
-      openExample((same || examples.find((example) => example.format === format)).id);
-      return;
-    }
-    state.format = format;
-    state.exampleId = null;
-    renderFormatSwitch();
-    updateUrl();
-    inputChanged();
+    const last = findExample(state.buffers[format]?.exampleId);
+    const current = findExample(state.exampleId);
+    const same = current && findExample(`${format}/${current.slug}`);
+    openExample((last || same || examples.find((example) => example.format === format)).id);
+  }
+
+  // For input that is in the wrong format: the text stays and goes to
+  // the parser of +format+. The format it was in gets its example back.
+  function reparseAs(format) {
+    const text = sourceInput.value;
+    delete state.buffers[state.format];
+    openOwnInput(text, format);
   }
 
   function formatForFile(name, text) {
@@ -646,9 +669,16 @@
           return null;
         }
         const inLabel = terms.every((term) => label.includes(term));
-        return { example, snippet: terms.length && !inLabel ? snippet(example.input, terms) : null };
+        const inTitle = terms.every((term) => example.title.toLowerCase().includes(term));
+        return {
+          example,
+          // A match in the title comes first, then one in the description.
+          rank: inTitle ? 0 : inLabel ? 1 : 2,
+          snippet: terms.length && !inLabel ? snippet(example.input, terms) : null
+        };
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .sort((a, b) => a.rank - b.rank);
   }
 
   function renderPicker() {
@@ -828,7 +858,7 @@
     event.target.value = "";
   });
   $("#share-button").addEventListener("click", () => copyText(shareLink(), "Link copied"));
-  $("#format-hint-switch").addEventListener("click", () => selectFormat($("#format-hint").dataset.format));
+  $("#format-hint-switch").addEventListener("click", () => reparseAs($("#format-hint").dataset.format));
 
   viewTabs.addEventListener("click", (event) => {
     const button = event.target.closest("[data-view]");
@@ -954,6 +984,7 @@
       ? findExample(`${pathFormat.replaceAll("-", "_")}/${pathSlug || "everything"}`)
       : null;
     const draft = load(STORAGE.draft);
+    state.buffers = draft?.buffers || {};
 
     if (shared && FORMATS.some((format) => format.id === shared[1])) {
       try {
@@ -964,18 +995,15 @@
       }
     }
 
-    const draftFits = draft?.edited && typeof draft.input === "string" && (!fromPath || draft.exampleId === fromPath.id);
-    if (draftFits) {
-      state.format = draft.format;
-      state.exampleId = findExample(draft.exampleId) ? draft.exampleId : null;
-      state.edited = true;
-      sourceInput.value = draft.input;
-      renderFormatSwitch();
-      updateUrl();
-      inputChanged();
-    } else {
-      openExample((fromPath || findExample(draft?.exampleId) || examples[0]).id);
+    // The input of the last visit, unless the path asks for an example
+    // that it was not made from.
+    const format = fromPath ? fromPath.format : draft?.format;
+    const buffer = state.buffers[format];
+    const fits = !fromPath || buffer?.exampleId === fromPath.id;
+    if (fits && restoreBuffer(format)) {
+      return;
     }
+    openExample((fromPath || findExample(buffer?.exampleId) || examples[0]).id);
   }
 
   start();
