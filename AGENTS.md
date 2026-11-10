@@ -77,7 +77,9 @@ inline tokens (`Inline::Tokens`) that the renderer's
 `Inline::Serializer` writes with the neighbors in view: marker
 placement, HTML fallbacks, bare URLs, joins and the html_mode form
 live there. The interface provides:
-- `render_children(element, context:)` - the children as Markdown
+- `render_children(element, context:)` - the children as Markdown;
+  `following: "[/x]"` says that the tag writes a closing BBCode tag
+  right after them, so a bare URL at the end is written as a link
 - `render_tokens(element, context:)` - the children as inline tokens
 - `render_default(node)` - stock rendering, bypassing tag overrides
   (lets a custom tag intercept only the nodes it cares about)
@@ -275,14 +277,15 @@ expect(token).to match_tag_end("b")
 - `spec/integration/markbridge/renderers/discourse/adjacency_roundtrip_spec.rb`
   puts two nodes next to each other on purpose (`AdjacencyGenerator`):
   every inline node kind with every character class at the edge that
-  faces its neighbor, in twelve positions (in a paragraph, at the start
+  faces its neighbor, in fifteen positions (in a paragraph, at the start
   or the end of a line, after a block, in strong emphasis, in a heading,
-  in a list item, in a link label, in a quote, in superscript, in the
-  cell of a Markdown table, in the cell of a table the renderer writes
+  in a list item, in a link label, in a quote, in superscript, in
+  strikethrough, in underline, in a color, in the cell of a Markdown
+  table, in the cell of a table the renderer writes
   as HTML, where the pair is written in html_mode), and block pairs (two
   lists with whitespace, a line break or an empty element between them,
   a list followed by text in an item, two blocks in a table cell, ...).
-  CI runs a fixed sample of 2000 of the 2,588,492 inline pairs
+  CI runs a fixed sample of 2000 of the 3,248,375 inline pairs
   (`ADJACENCY_SAMPLE=N` changes the size) plus every block pair. A case
   id names the case: `paragraph/text(*)+bold(a)` or
   `blocks/item/ul+space+ul`.

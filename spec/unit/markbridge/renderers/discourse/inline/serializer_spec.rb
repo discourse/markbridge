@@ -16,6 +16,37 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
   end
 
   describe "#write" do
+    it "keeps a closing ~~ or [/u] out of a URL at the end of the text" do
+      expect(write(tokens.open(:s), tokens.text("see http://e.com/a"), tokens.close(:s))).to eq(
+        "~~see http://e.com/a<!---->~~",
+      )
+      expect(write(tokens.open(:u), tokens.text("http://e.com/a"), tokens.close(:u))).to eq(
+        "[u]http://e.com/a<!---->[/u]",
+      )
+      expect(
+        write(tokens.open(:strong), tokens.text("http://e.com/a"), tokens.close(:strong)),
+      ).to eq("**http://e.com/a**")
+      expect(write(*em(tokens.text("http://e.com/a")))).to eq("*http://e.com/a*")
+    end
+
+    # After a line break the content would start a line, and a [spoiler]
+    # there begins a block that leaves the [u] around it as text.
+    it "moves a line break at the start of underline out of the tag" do
+      expect(write(tokens.open(:u), "\n[spoiler]x[/spoiler]", tokens.close(:u))).to eq(
+        "\n[u][spoiler]x[/spoiler][/u]",
+      )
+      expect(write(tokens.open(:u), " \t\na \n", tokens.close(:u))).to eq(" \t\n[u]a[/u] \n")
+      expect(
+        write(tokens.text("x"), tokens.open(:u), tokens.hard_break, "a", tokens.close(:u)),
+      ).to eq("x\n[u]a[/u]")
+    end
+
+    it "keeps other whitespace at the edges of underline inside the tag" do
+      expect(write(tokens.open(:u), " a ", tokens.close(:u))).to eq("[u] a [/u]")
+      expect(write(tokens.open(:u), "a\n", tokens.close(:u))).to eq("[u]a\n[/u]")
+      expect(write(tokens.open(:u), "a\nb", tokens.close(:u))).to eq("[u]a\nb[/u]")
+    end
+
     it "writes nothing for no tokens" do
       expect(write).to eq("")
     end
@@ -628,6 +659,35 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
 
       it "stays bare on its own" do
         expect(write(tokens.bare_url(href))).to eq(href)
+      end
+
+      # markdown-it's linkify takes a closing `~~` or `[/u]` into a URL
+      # that stands right in front of it. It stops at a `*`.
+      it "becomes a link at the end of strikethrough and of underline" do
+        expect(
+          write(tokens.open(:s), tokens.text("a "), tokens.bare_url(href), tokens.close(:s)),
+        ).to eq("~~a #{link}~~")
+        expect(
+          write(tokens.open(:u), tokens.text("a "), tokens.bare_url(href), tokens.close(:u)),
+        ).to eq("[u]a #{link}[/u]")
+      end
+
+      it "stays bare at the end of emphasis" do
+        expect(
+          write(
+            tokens.open(:strong),
+            tokens.text("a "),
+            tokens.bare_url(href),
+            tokens.close(:strong),
+          ),
+        ).to eq("**a #{href}**")
+        expect(write(*em(tokens.text("a "), tokens.bare_url(href)))).to eq("*a #{href}*")
+      end
+
+      it "stays bare in strikethrough when text follows it" do
+        expect(
+          write(tokens.open(:s), tokens.bare_url(href), tokens.text(" b"), tokens.close(:s)),
+        ).to eq("~~#{href} b~~")
       end
 
       it "stays bare at the start and at the end of the run" do

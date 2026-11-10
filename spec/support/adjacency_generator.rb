@@ -236,6 +236,13 @@ module AdjacencyGenerator
     "label" => ->(left, right) { AST::Document.new([AST::Url.new(href: HREF) << left << right]) },
     "quote" => ->(left, right) { AST::Document.new([AST::Quote.new << left << right]) },
     "sup" => ->(left, right) { AST::Document.new([AST::Superscript.new << left << right]) },
+    # The closing `~~` and the closing BBCode tags glue to a URL in front
+    # of them, which the other markers do not.
+    "strike" => ->(left, right) { AST::Document.new([AST::Strikethrough.new << left << right]) },
+    "underline" => ->(left, right) { AST::Document.new([AST::Underline.new << left << right]) },
+    "color" => ->(left, right) do
+      AST::Document.new([AST::Color.new(color: "red") << left << right])
+    end,
     "cell" => ->(left, right) { AdjacencyGenerator.table_document([left, right], html: false) },
     "html-cell" => ->(left, right) { AdjacencyGenerator.table_document([left, right], html: true) },
   }.freeze

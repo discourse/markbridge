@@ -34,6 +34,11 @@ module Markbridge
             u: ["[u]", "[/u]", %(<span class="bbcode-u">), "</span>", nil],
           }.freeze
 
+          # The closing markers that a bare URL in front of them takes into
+          # its link: markdown-it's linkify goes on over `~~` and over a
+          # BBCode tag. It stops at a `*`.
+          GLUING_CLOSE = { s: "~~", u: "[/u]" }.freeze
+
           # Whitespace and <br> only: nothing a marker could wrap.
           NOTHING_TO_WRAP = /\A(?:[[:space:]]|<br>)*\z/
           # Leading or trailing whitespace, Unicode-aware: CommonMark's
@@ -43,6 +48,12 @@ module Markbridge
           # `<br>[a](u)`, which keeps the label to the text.
           EDGES = /\A((?:[[:space:]]|<br>)*)(.+?)((?:[[:space:]]|<br>)*)\z/m
           BR = "<br>"
+          # A line break in front of the content of a BBCode tag. The tag
+          # keeps other whitespace inside, but after a line break the
+          # content starts a line, and a `[spoiler]` there begins a block
+          # that leaves the tag around it as text. So the break moves out,
+          # and the line starts with the tag.
+          LEADING_BREAK = /\A(?:[[:blank:]]|<br>)*(?:\n|<br>)/
 
           # Text after a bare URL glues to it, unless it starts with
           # whitespace or with sentence punctuation that is followed by
@@ -158,10 +169,14 @@ module Markbridge
           # @param children [Array] the children
           # @param html_mode [Boolean]
           # @param before [Proc, nil] called with the buffer and the child
+          # @param following [String, nil] what the caller writes right
+          #   after the result, a closing BBCode tag for example. A bare
+          #   URL at the end is written as a link then, because the parser
+          #   would take the tag into the URL.
           # @yieldparam child [Object]
           # @yieldreturn [String, Array<Array>] the child's output
           # @return [String]
-          def write_groups(children, html_mode: false, before: nil)
+          def write_groups(children, html_mode: false, before: nil, following: nil)
             buffer = +""
             # A bare URL at the end of an output waits for the first piece
             # of the next output that has one.
@@ -191,7 +206,7 @@ module Markbridge
                   write_tokens(buffer, output, 0, output.size, html_mode, pending, before, child)
               end
             end
-            join_like(buffer, bare_url_piece(pending, buffer, nil)) if pending
+            join_like(buffer, bare_url_piece(pending, buffer, following)) if pending
             drop_trailing_breaks(buffer, html_mode)
           end
 
@@ -252,7 +267,14 @@ module Markbridge
                     close =
                       matching_close(tokens, index - 1, to, Tokens::OPEN, Tokens::CLOSE, value)
                     content =
-                      run(tokens, index, close, html_mode, trailing_blank_lines(buffer, blank))
+                      run(
+                        tokens,
+                        index,
+                        close,
+                        html_mode,
+                        trailing_blank_lines(buffer, blank),
+                        GLUING_CLOSE[value],
+                      )
                     # A break at the end of the content moves out of the
                     # markers with its newline.
                     moved_break = after_break?(content)
@@ -480,14 +502,16 @@ module Markbridge
           # its own. Its pieces are joined among themselves; what stands
           # outside the pair is not known here, as a tag that returned a
           # String would not know it either.
-          def run(tokens, from, to, html_mode, blank)
-            single_string(tokens, from, to) || joined(tokens, from, to, html_mode, blank)
+          # +closing+ is the marker that follows the content when it
+          # would glue to a bare URL at the end, see GLUING_CLOSE.
+          def run(tokens, from, to, html_mode, blank, closing = nil)
+            single_string(tokens, from, to) || joined(tokens, from, to, html_mode, blank, closing)
           end
 
-          def joined(tokens, from, to, html_mode, blank)
+          def joined(tokens, from, to, html_mode, blank, closing)
             buffer = +""
             pending = write_tokens(buffer, tokens, from, to, html_mode, nil, blank:)
-            join_like(buffer, bare_url_piece(pending, buffer, nil)) if pending
+            join_like(buffer, bare_url_piece(pending, buffer, closing)) if pending
             buffer
           end
 
@@ -559,7 +583,7 @@ module Markbridge
             open, close, html_open, html_close, char = delimiter
             return content if nothing_to_wrap?(content)
 
-            if char && edge_whitespace?(content)
+            if char ? edge_whitespace?(content) : content.match?(LEADING_BREAK)
               match = content.match(EDGES)
               lead = match[1]
               core = match[2]
@@ -573,6 +597,8 @@ module Markbridge
               "#{lead}#{html_open}#{core}#{html_close}#{trail}"
             else
               core = escape_colon(core) if open.start_with?("[")
+              # `~~` and `[/u]` glue to a URL in front of them, a `*` does not.
+              core = Joins.close_url(core) unless char == ASTERISK
               "#{lead}#{open}#{keep_backslash(core)}#{close}#{trail}"
             end
           end

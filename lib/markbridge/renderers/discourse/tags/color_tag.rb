@@ -48,7 +48,7 @@ module Markbridge
             color = bbcode_color(element.color, interface)
             return interface.render_tokens(element, context:) if color.nil?
 
-            content = interface.render_children(element, context:)
+            content = interface.render_children(element, context:, following: "[/color]")
             # The style that the discourse-bbcode plugin lets through.
             return %(<span style="color:#{color}">#{content}</span>) if interface.html_mode?
 

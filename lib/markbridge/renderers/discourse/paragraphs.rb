@@ -79,7 +79,7 @@ module Markbridge
             # it reads as a link reference definition, `[color=red]:x`,
             # and cooks to nothing; the backslash keeps the colon text.
             core = "\\#{core}" if open.start_with?("[") && core.start_with?(":")
-            "#{lead}#{open}#{core}#{close}#{trail}"
+            "#{lead}#{open}#{Inline::Joins.close_url(core)}#{close}#{trail}"
           end
         end
       end

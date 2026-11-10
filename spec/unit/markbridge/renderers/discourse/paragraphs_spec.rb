@@ -72,6 +72,9 @@ RSpec.describe Markbridge::Renderers::Discourse::Paragraphs do
 
     # `[x]:a` at the start of a line is a link reference definition.
     it "escapes a colon right after a BBCode tag" do
+      expect(described_class.wrap("see http://e.com/a\n\nb", "[x]", "[/x]")).to eq(
+        "[x]see http://e.com/a<!---->[/x]\n\n[x]b[/x]",
+      )
       expect(described_class.wrap(":a", "[x]", "[/x]")).to eq("[x]\\:a[/x]")
       expect(described_class.wrap(" :a\n\n:b", "[x]", "[/x]")).to eq(" [x]\\:a[/x]\n\n[x]\\:b[/x]")
     end

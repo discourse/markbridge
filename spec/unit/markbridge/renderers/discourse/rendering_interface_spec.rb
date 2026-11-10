@@ -20,7 +20,6 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
     {
       render_node: :render,
       render_default: :render_default,
-      render_children: :render_children,
       render_tokens: :render_tokens,
     }.each do |method, renderer_method|
       it "##{method} delegates to the renderer with the current context, or the one given" do
@@ -33,6 +32,21 @@ RSpec.describe Markbridge::Renderers::Discourse::RenderingInterface do
 
         expect(renderer).to have_received(renderer_method).with(element, context: other_context)
       end
+    end
+
+    it "#render_children delegates to the renderer with the context and what follows" do
+      allow(renderer).to receive(:render_children).and_return("rendered")
+
+      expect(interface.render_children(element)).to eq("rendered")
+      expect(renderer).to have_received(:render_children).with(element, context:, following: nil)
+
+      interface.render_children(element, context: other_context, following: "[/x]")
+
+      expect(renderer).to have_received(:render_children).with(
+        element,
+        context: other_context,
+        following: "[/x]",
+      )
     end
 
     it "#render_children passes the block on to the renderer" do

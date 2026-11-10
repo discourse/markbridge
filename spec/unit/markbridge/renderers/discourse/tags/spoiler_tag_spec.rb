@@ -18,6 +18,40 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
       expect(tag.render(element, interface)).to eq("[spoiler]\\:x[/spoiler]")
     end
 
+    context "with a URL at the end of the content" do
+      let(:url) { Markbridge::AST::Url.new(href: "https://e.com/a") }
+
+      def spoiler_with(*children, **options)
+        element = Markbridge::AST::Spoiler.new(**options)
+        children.each { |child| element << child }
+        element
+      end
+
+      # The closing tag would become part of the URL in front of it.
+      it "writes a bare URL as a link and puts a comment after a URL in text" do
+        expect(rendered(spoiler_with(Markbridge::AST::Text.new("see "), url))).to eq(
+          "[spoiler]see [https://e.com/a](https://e.com/a)[/spoiler]",
+        )
+        expect(rendered(spoiler_with(Markbridge::AST::Text.new("https://e.com/a")))).to eq(
+          "[spoiler]https://e.com/a<!---->[/spoiler]",
+        )
+      end
+
+      it "leaves the URL bare where no closing tag follows it on the line" do
+        block = spoiler_with(url, block: true)
+        link = Markbridge::AST::Url.new(href: "https://example.com")
+
+        expect(rendered(block)).to eq("\n\n[spoiler]\nhttps://e.com/a\n[/spoiler]\n\n")
+        expect(rendered(spoiler_with(url), interface_for(link))).to eq("https://e.com/a")
+        expect(described_class.new(bbcode: false).render(spoiler_with(url), interface)).to eq(
+          "https://e.com/a",
+        )
+        expect(rendered(spoiler_with(url), interface_for(html_mode: true))).to eq(
+          %(<span class="spoiler"><a href="https://e.com/a">https://e.com/a</a></span>),
+        )
+      end
+    end
+
     it "renders an empty element to nothing" do
       element = Markbridge::AST::Spoiler.new(title: "Click me")
 

@@ -61,6 +61,18 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::ColorTag do
         expect(rendered(color("red", text("hi")))).to eq("[color=red]hi[/color]")
       end
 
+      # The closing tag would become part of the URL in front of it.
+      it "writes a bare URL at the end as a link, and a comment after a URL in text" do
+        url = Markbridge::AST::Url.new(href: "https://e.com/a")
+
+        expect(rendered(color("red", text("see "), url))).to eq(
+          "[color=red]see [https://e.com/a](https://e.com/a)[/color]",
+        )
+        expect(rendered(color("red", text("https://e.com/a")))).to eq(
+          "[color=red]https://e.com/a<!---->[/color]",
+        )
+      end
+
       it "accepts #rgb and #rrggbb values" do
         expect(rendered(color("#f00", text("a")))).to eq("[color=#f00]a[/color]")
         expect(rendered(color("#FF0000", text("a")))).to eq("[color=#FF0000]a[/color]")
