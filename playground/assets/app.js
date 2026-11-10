@@ -17,9 +17,13 @@
 
   const STORAGE = { draft: "markbridge.playground.draft", options: "markbridge.playground.options", ui: "markbridge.playground.ui" };
   const CONVERT_DELAY = 120;
+  // Above this the input is shown without colors, a keystroke would take
+  // too long.
+  const HIGHLIGHT_LIMIT = 200000;
 
   const $ = (selector) => document.querySelector(selector);
   const sourceInput = $("#source-input");
+  const sourceHighlight = $("#source-highlight");
   const formatSwitch = $("#format-switch");
   const viewTabs = $("#view-tabs");
   const viewActions = $("#view-actions");
@@ -168,6 +172,72 @@
     }
   }
 
+  // --- Input colors ---
+
+  // What stands out in the markup of a format, as [class, pattern] in
+  // the order of priority. The patterns of a format are joined into one,
+  // so the first one that matches at a position wins.
+  const HTML_TAG = ["tok-tag", /<\/?[A-Za-z][^<>]*>/];
+  const ENTITY = ["tok-code", /&(?:[a-z][a-z0-9]*|#\d+|#x[0-9a-f]+);/i];
+  const INPUT_TOKENS = {
+    bbcode: [["tok-tag", /\[\/?[a-z*][^\[\]\n]*\]/i]],
+    html: [["tok-comment", /<!--[\s\S]*?-->/], HTML_TAG, ENTITY],
+    // The <s>, <e> and <i> elements hold the markup of the source, which
+    // the parser skips.
+    text_formatter: [["tok-comment", /<([sei])>[^<]*<\/\1>/], HTML_TAG, ENTITY],
+    media_wiki: [
+      ["tok-comment", /<nowiki>[\s\S]*?<\/nowiki>|<!--[\s\S]*?-->/],
+      ["tok-mark", /^=+.*=+[ \t]*$|^(?:\{\||\|\}|\|-|\|\+|----+)|^[*#:;]+|^[!|]|\|\||!!/m],
+      ["tok-link", /\[\[[^\]\n]*\]\]|\[(?:https?:)?\/\/[^\]\n]*\]/],
+      ["tok-strong", /'{2,5}/],
+      HTML_TAG,
+      ENTITY
+    ]
+  };
+  const INPUT_PATTERNS = Object.fromEntries(
+    Object.entries(INPUT_TOKENS).map(([format, tokens]) => [
+      format,
+      {
+        classes: tokens.map(([name]) => name),
+        // A backreference counts from the start of the joined pattern,
+        // so each token is one named group and \1 is rewritten.
+        pattern: new RegExp(
+          tokens
+            .map(([, pattern], index) => `(?<t${index}>${pattern.source.replace(/\\1/g, `\\k<b${index}>`).replace("([sei])", `(?<b${index}>[sei])`)})`)
+            .join("|"),
+          "gim"
+        )
+      }
+    ])
+  );
+
+  function highlightInput() {
+    const text = sourceInput.value;
+    const plain = text.length > HIGHLIGHT_LIMIT;
+    sourceHighlight.parentElement.classList.toggle("is-plain", plain);
+    if (plain) {
+      sourceHighlight.textContent = "";
+      return;
+    }
+
+    const { classes, pattern } = INPUT_PATTERNS[state.format];
+    let html = "";
+    let last = 0;
+    for (const match of text.matchAll(pattern)) {
+      if (match[0] === "") {
+        continue;
+      }
+      const index = classes.findIndex((_, i) => match.groups[`t${i}`] !== undefined);
+      html += escapeHtml(text.slice(last, match.index));
+      html += `<span class="${classes[index]}">${escapeHtml(match[0])}</span>`;
+      last = match.index + match[0].length;
+    }
+    // A newline at the very end has no height in a <pre>, the space
+    // gives the last line one, like the textarea has.
+    sourceHighlight.innerHTML = `${html}${escapeHtml(text.slice(last))} `;
+    sourceHighlight.scrollTop = sourceInput.scrollTop;
+  }
+
   // --- Input ---
 
   function updateSourceName() {
@@ -213,6 +283,7 @@
   }
 
   function inputChanged() {
+    highlightInput();
     updateSourceName();
     updateFormatHint();
     saveDraft();
@@ -832,6 +903,10 @@
       updateUrl();
     }
     inputChanged();
+  });
+
+  sourceInput.addEventListener("scroll", () => {
+    sourceHighlight.scrollTop = sourceInput.scrollTop;
   });
 
   sourceInput.addEventListener("dragover", (event) => {
