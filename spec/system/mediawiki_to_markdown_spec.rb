@@ -86,7 +86,7 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
       # Display text equals the target, so the link is "bare" — the raw
       # target comes through (a wiki page name is not a resolvable href).
       result = Markbridge.mediawiki_to_markdown("[[Page Name]]")
-      expect(result.markdown).to eq("Page Name")
+      expect(result.markdown).to eq("[Page Name](./Page_Name)")
     end
 
     it "converts internal link with display text" do
@@ -94,7 +94,7 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
       # whitespace-containing destinations get the <> CommonMark form.
       # Consumers remap wiki targets to real URLs on the AST.
       result = Markbridge.mediawiki_to_markdown("[[Page Name|display text]]")
-      expect(result.markdown).to eq("[display text](<Page Name>)")
+      expect(result.markdown).to eq("[display text](./Page_Name)")
     end
   end
 
@@ -259,7 +259,7 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
       result = Markbridge.mediawiki_to_markdown(wiki)
 
       expect(result.markdown).to eq(
-        "| Page | Status |\n| --- | --- |\n| [Home](<Main Page>) | Ready |",
+        "| Page | Status |\n| --- | --- |\n| [Home](./Main_Page) | Ready |",
       )
     end
 
@@ -273,7 +273,7 @@ RSpec.describe "MediaWiki to Markdown Conversion" do
 
       result = Markbridge.mediawiki_to_markdown(wiki)
 
-      expect(result.markdown).to eq("| [Home](<Main Page>) |\n| --- |")
+      expect(result.markdown).to eq("| [Home](./Main_Page) |\n| --- |")
     end
   end
 end
