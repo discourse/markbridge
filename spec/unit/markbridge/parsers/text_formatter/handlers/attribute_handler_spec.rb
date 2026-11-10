@@ -27,8 +27,7 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Handlers::AttributeHandler do
     end
 
     it "passes the fixed keywords next to the attribute" do
-      handler =
-        described_class.new(Markbridge::AST::Spoiler, attribute: :title, fixed: { block: true })
+      handler = described_class.new(Markbridge::AST::Spoiler, attribute: :title, block: true)
 
       handler.process(element: build_element('<SPOILER title="surprise"/>'), parent:)
 

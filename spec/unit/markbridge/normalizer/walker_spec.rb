@@ -348,6 +348,22 @@ RSpec.describe Markbridge::Normalizer::Walker do
       expect(texts_after_normalizing(text("a"), spoiler, text("b"))).to eq(["a b"])
     end
 
+    it "gets a space for a hoisted subclass of a block, of code and of a spoiler" do
+      # The report names the classes, so they need a name.
+      code_class = stub_const("FencedCode", Class.new(Markbridge::AST::Code))
+      list_class = stub_const("TaskList", Class.new(Markbridge::AST::List))
+      spoiler_class = stub_const("Fold", Class.new(Markbridge::AST::Spoiler))
+      nodes = [
+        el(code_class, text("a\nb")),
+        el(list_class, el(Markbridge::AST::ListItem, text("x"))),
+        el(spoiler_class, text("s"), block: true),
+      ]
+
+      nodes.each do |node|
+        expect(texts_after_normalizing(text("a"), node, text("b"))).to eq(["a b"])
+      end
+    end
+
     it "gets no space when the text in front ends with whitespace" do
       expect(texts_after_normalizing(text("Run\n"), code, text("and"))).to eq(["Run\nand"])
     end
@@ -377,6 +393,13 @@ RSpec.describe Markbridge::Normalizer::Walker do
 
       expect(texts_after_normalizing(el(italic, text("a")), code, text("b"))).to eq([italic, " b"])
       expect(texts_after_normalizing(text("a"), code, el(italic, text("b")))).to eq(["a ", italic])
+    end
+
+    it "gets the space only where the block was, not between later nodes" do
+      italic = Markbridge::AST::Italic
+      result = texts_after_normalizing(text("a"), code, el(italic, text("i")), text("b"))
+
+      expect(result).to eq(["a ", italic, "b"])
     end
 
     it "gets no space next to a line break" do

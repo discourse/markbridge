@@ -172,6 +172,21 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
       expect(doc.children.last.text).to eq("b")
     end
 
+    it "starts a line after a subclass of Spoiler that is a block" do
+      spoiler_class = Class.new(Markbridge::AST::Spoiler)
+      handler =
+        Markbridge::Parsers::TextFormatter::Handlers::AttributeHandler.new(
+          spoiler_class,
+          attribute: :title,
+          block: true,
+        )
+      parser = described_class.new { |registry| registry.register("FOLD", handler) }
+
+      doc = parser.parse("<r><FOLD>a</FOLD> b</r>")
+
+      expect(doc.children.last.text).to eq("b")
+    end
+
     it "keeps the whitespace in and after an inline spoiler" do
       doc = parser.parse("<r>x<ISPOILER><s>||</s> a<e>||</e></ISPOILER> b</r>")
 

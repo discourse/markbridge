@@ -256,6 +256,14 @@ RSpec.describe Markbridge::Parsers::BBCode::Scanner do
           )
         end
 
+        it "ends at a named attribute with one space in front of its `=`" do
+          expect(scan("[quote=John Doe post_id =4]")[0]).to match_tag_start(
+            "quote",
+            option: "John Doe",
+            post_id: "4",
+          )
+        end
+
         it "takes a word with a `=` inside that is no attribute name" do
           expect(scan("[url=https://example.com/a b?c=d]")[0]).to match_tag_start(
             "url",
