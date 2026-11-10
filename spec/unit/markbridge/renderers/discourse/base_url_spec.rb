@@ -76,6 +76,9 @@ RSpec.describe Markbridge::Renderers::Discourse::BaseUrl do
         "x/." => "/wiki/x/",
         "../../.." => "/",
         "a/..b/.c" => "/wiki/a/..b/.c",
+        "dir/" => "/wiki/dir/",
+        "../../a" => "/a",
+        "../../../a/b" => "/a/b",
       }.each do |address, path|
         expect(base.resolve(address)).to eq("https://wiki.example.com#{path}"), address
       end
@@ -85,6 +88,8 @@ RSpec.describe Markbridge::Renderers::Discourse::BaseUrl do
       expect(base.resolve("a?b=../c")).to eq("https://wiki.example.com/wiki/a?b=../c")
       expect(base.resolve("./a#../b")).to eq("https://wiki.example.com/wiki/a#../b")
       expect(base.resolve("a/../b?c=1#d?e")).to eq("https://wiki.example.com/wiki/b?c=1#d?e")
+      expect(base.resolve("a?b=x/../c")).to eq("https://wiki.example.com/wiki/a?b=x/../c")
+      expect(base.resolve("a#x/./c")).to eq("https://wiki.example.com/wiki/a#x/./c")
     end
   end
 end

@@ -26,14 +26,14 @@ module Markbridge
         #   it. End the URL with a slash to resolve inside a directory.
         # @raise [ArgumentError] when +url+ is no http or https URL
         def initialize(url)
-          match = PARTS.match(url.to_s)
+          match = PARTS.match(url)
           unless match
             raise ArgumentError, "base_url must be an http or https URL, got #{url.inspect}"
           end
 
           @origin = match[1]
           @path = match[2].empty? ? "/" : match[2]
-          @directory = @path[0..@path.rindex("/")]
+          @directory = @path[..@path.rindex("/")]
         end
 
         # @param address [String, nil] the href of a link or the src of an
@@ -64,7 +64,7 @@ module Markbridge
           path, rest = location.split(/(?=[?#])/, 2)
           segments =
             path
-              .split("/", -1)
+              .split("/")
               .each_with_object([]) do |segment, kept|
                 case segment
                 when "."
@@ -75,9 +75,10 @@ module Markbridge
                   kept << segment
                 end
               end
-          segments << "" if path.end_with?("/.", "/..")
+          # A slash or a dot segment at the end names a directory.
+          slash = "/" if path.end_with?("/", "/.", "/..")
 
-          "#{segments.join("/")}#{rest}"
+          "#{segments.join("/")}#{slash}#{rest}"
         end
       end
     end
