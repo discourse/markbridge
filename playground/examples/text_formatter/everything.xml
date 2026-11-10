@@ -17,8 +17,8 @@ and goes on after a break. <i>[ignored]</i>Text that s9e ignored is not in the o
 <URL url="https://example.com/alta-via"><s>[url]</s>https://example.com/alta-via<e>[/url]</e></URL>, <URL url="https://example.com/map"><s>[url=https://example.com/map]</s>the map<e>[/url]</e></URL>, <URL url="https://example.com/auto">https://example.com/auto</URL>, <EMAIL email="hut@example.com"><s>[email]</s>hut@example.com<e>[/email]</e></EMAIL> and <EMAIL email="booking@example.com"><s>[email=booking@example.com]</s>the booking desk<e>[/email]</e></EMAIL>.<br/>
 <br/>
 <U><s>[u]</s>Images and attachments<e>[/u]</e></U><br/>
-<IMG src="https://example.com/photos/sunrise.jpg"><s>[img]</s>https://example.com/photos/sunrise.jpg<e>[/img]</e></IMG><br/>
-<IMG src="https://example.com/photos/ridge.jpg" width="640" height="360" alt="The ridge"><s>[img]</s>https://example.com/photos/ridge.jpg<e>[/img]</e></IMG><br/>
+<IMG src="https://picsum.photos/id/29/640/360"><s>[img]</s>https://picsum.photos/id/29/640/360<e>[/img]</e></IMG><br/>
+<IMG src="https://picsum.photos/id/1036/640/360" width="640" height="360" alt="The ridge"><s>[img]</s>https://picsum.photos/id/1036/640/360<e>[/img]</e></IMG><br/>
 The elevation profile: <ATTACHMENT filename="profile.png" index="0"><s>[attachment=0]</s>profile.png<e>[/attachment]</e></ATTACHMENT> and the track: <ATTACH id="1"><s>[attach]</s>1<e>[/attach]</e></ATTACH><br/>
 <br/>
 <U><s>[u]</s>Code<e>[/u]</e></U>
