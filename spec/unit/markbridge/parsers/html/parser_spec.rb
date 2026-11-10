@@ -165,6 +165,17 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(parser.unknown_tags).to be_empty
     end
 
+    it "passes thead, tbody and tfoot through without counting them as unknown" do
+      doc =
+        parser.parse(
+          "<table><thead><tr><th>h</th></tr></thead><tbody><tr><td>b</td></tr></tbody>" \
+            "<tfoot><tr><td>f</td></tr></tfoot></table><unknown>x</unknown>",
+        )
+
+      expect(parser.unknown_tags).to eq("unknown" => 1)
+      expect(doc.children.first.children.map(&:class)).to eq([Markbridge::AST::TableRow] * 3)
+    end
+
     it "tracks unknown tags" do
       parser.parse("<unknown>text</unknown>")
 
