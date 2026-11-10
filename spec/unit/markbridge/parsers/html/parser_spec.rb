@@ -176,6 +176,23 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       expect(doc.children.first.children.map(&:class)).to eq([Markbridge::AST::TableRow] * 3)
     end
 
+    it "does not count a tag the registry lists as transparent" do
+      parser = described_class.new { |registry| registry.transparent_tags << "div" }
+
+      doc = parser.parse("<div><b>x</b></div><section>y</section>")
+
+      expect(parser.unknown_tags).to eq("section" => 1)
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Bold, Markbridge::AST::Text])
+    end
+
+    it "counts a table section again when it is taken off the transparent tags" do
+      parser = described_class.new { |registry| registry.transparent_tags.delete("tbody") }
+
+      parser.parse("<table><tbody><tr><td>b</td></tr></tbody></table>")
+
+      expect(parser.unknown_tags).to eq("tbody" => 1)
+    end
+
     it "tracks unknown tags" do
       parser.parse("<unknown>text</unknown>")
 

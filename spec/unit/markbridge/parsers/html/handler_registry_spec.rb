@@ -46,6 +46,18 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
     end
   end
 
+  describe "#transparent_tags" do
+    it "defaults to the sections of a table" do
+      expect(registry.transparent_tags).to eq(Set["thead", "tbody", "tfoot"])
+    end
+
+    it "is per-instance (mutations don't leak across registries)" do
+      registry.transparent_tags << "div"
+
+      expect(described_class.new.transparent_tags).not_to include("div")
+    end
+  end
+
   describe "#register" do
     it "registers a handler for a single tag" do
       registry.register("b", handler)
@@ -314,6 +326,12 @@ RSpec.describe Markbridge::Parsers::HTML::HandlerRegistry do
       frozen = described_class.new.freeze
 
       expect { frozen.block_level_tags << "my-block" }.to raise_error(FrozenError)
+    end
+
+    it "freezes the transparent tag set" do
+      frozen = described_class.new.freeze
+
+      expect { frozen.transparent_tags << "div" }.to raise_error(FrozenError)
     end
 
     it "freezes the whitespace-preserving tag set" do

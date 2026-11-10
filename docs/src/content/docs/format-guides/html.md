@@ -59,7 +59,18 @@ parse.ast
 
 </div>
 
-`<thead>`, `<tbody>`, `<tfoot>` are transparent — their children are processed as if the wrapper weren't there. Unregistered tags are skipped, but their children are still processed (graceful degradation).
+`<thead>`, `<tbody>`, `<tfoot>` are transparent — their children are processed as if the wrapper weren't there. Unregistered tags are skipped, but their children are still processed (graceful degradation), and the parser counts them in `unknown_tags`. The transparent tags are not counted. When your source is full of a wrapper you expect, add it to the set, so `unknown_tags` only shows what you did not expect:
+
+```ruby
+parser =
+  Markbridge::Parsers::HTML::Parser.new do |registry|
+    registry.transparent_tags.merge(%w[div section font])
+  end
+
+parser.parse("<div><b>bold</b></div><custom-card>text</custom-card>")
+parser.unknown_tags
+# => {"custom-card" => 1}
+```
 
 For the authoritative list, see [`HandlerRegistry.default`](https://github.com/discourse/markbridge/blob/main/lib/markbridge/parsers/html/handler_registry.rb).
 
