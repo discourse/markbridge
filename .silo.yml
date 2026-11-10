@@ -18,6 +18,9 @@ setup:
   # packages make it `node` and `npm`, --allowerasing replaces the ones of
   # Node 22 when a silo already has them.
   - sudo dnf install -y --allowerasing nodejs24 nodejs24-bin nodejs24-npm-bin pnpm
+  # PHP and composer to run s9e\TextFormatter, which writes the fixture of
+  # the s9e reference spec (spec/support/s9e/generate.php).
+  - sudo dnf install -y php-cli php-xml php-mbstring composer
   # Every engine needs its own gems. A plain `bundle install` only serves
   # the default one, and the others then fall back to its gems or fail.
   # Keep this list the same as `use.ruby.versions` above.
