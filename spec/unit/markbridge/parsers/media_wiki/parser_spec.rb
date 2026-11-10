@@ -359,6 +359,55 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
     end
   end
 
+  describe "<nowiki> over several lines" do
+    def texts(doc)
+      doc.children.map { |child| child.children.map(&:text).join }
+    end
+
+    it "is one text with the line breaks in it" do
+      doc = parse("a <nowiki># no heading\n* no list\n'''no bold'''</nowiki> b\nafter")
+
+      expect(texts(doc)).to eq(["a # no heading\n* no list\n'''no bold''' b", "after"])
+    end
+
+    it "joins the lines of a second tag that opens on the closing line" do
+      doc = parse("<nowiki>a\nb</nowiki> x <nowiki>c\nd</nowiki>\ne")
+
+      expect(texts(doc)).to eq(["a\nb x c\nd", "e"])
+    end
+
+    it "takes the first line that closes the tag" do
+      doc = parse("<nowiki>a\nb</nowiki>\nc</nowiki>")
+
+      expect(texts(doc).first).to eq("a\nb")
+    end
+
+    it "leaves the lines of a tag that is never closed apart" do
+      doc = parse("<nowiki>a\nb")
+
+      expect(doc.children.size).to eq(2)
+    end
+
+    it "leaves a tag alone that is closed on its line" do
+      doc = parse("<nowiki>a</nowiki>\nb</nowiki>")
+
+      expect(texts(doc).first).to eq("a")
+      expect(doc.children.size).to eq(2)
+    end
+
+    it "does not take an end tag in front of the last opening tag as its end" do
+      doc = parse("x</nowiki> <nowiki>a\nb</nowiki>")
+
+      expect(texts(doc)).to eq(["x</nowiki> a\nb"])
+    end
+
+    it "keeps the lines inside a list item" do
+      doc = parse("* item <nowiki>a\nb</nowiki>\n* next")
+
+      expect(doc.children.first.children.size).to eq(2)
+    end
+  end
+
   describe "inline formatting in text lines" do
     it "parses bold in text" do
       doc = parse("This is '''bold''' text")
