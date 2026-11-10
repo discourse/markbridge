@@ -233,7 +233,13 @@ module Markbridge
           text = text_node.content
 
           if ast_parent.is_a?(AST::Code)
-            ast_parent << AST::Text.new(text) if text.match?(/\S/)
+            # Code is visible, so what follows a code span is not at the
+            # start of its line anymore. After a code block the line
+            # starts again, see process_handled_children.
+            if text.match?(/\S/)
+              ast_parent << AST::Text.new(text)
+              @line_start = false
+            end
           elsif @line_start
             text = text.lstrip
             return if text.empty?

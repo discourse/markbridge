@@ -10,7 +10,7 @@ module Markbridge
           # @return [AST::Heading] the heading, so the children are
           #   processed into it
           def process(element:, parent:, processor: nil)
-            heading = AST::Heading.new(level: element.name.delete_prefix("H").to_i)
+            heading = AST::Heading.new(level: Integer(element.name.delete_prefix("H")))
             parent << heading
 
             heading

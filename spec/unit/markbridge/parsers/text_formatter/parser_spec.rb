@@ -176,6 +176,18 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
         expect(doc.children.last.text).to eq(" b")
       end
 
+      it "keeps the whitespace after a code span that starts the line" do
+        doc = parser.parse("<r><C><s>`</s>x<e>`</e></C> b</r>")
+
+        expect(doc.children.last.text).to eq(" b")
+      end
+
+      it "starts a line after a code block that follows text" do
+        doc = parser.parse("<r>a<CODE><s>```</s><i>\n</i>x<i>\n</i><e>```</e></CODE>\n b</r>")
+
+        expect(doc.children.last.text).to eq("b")
+      end
+
       it "starts a line after a fenced code block" do
         doc = parser.parse("<r><CODE><s>```</s><i>\n</i>x<i>\n</i><e>```</e></CODE>\n b</r>")
 
@@ -188,7 +200,7 @@ RSpec.describe Markbridge::Parsers::TextFormatter::Parser do
         handler = Markbridge::Parsers::TextFormatter::Handlers::SimpleHandler.new(code_class)
         parser = described_class.new { |registry| registry.register("PRE", handler) }
 
-        expect(parser.parse("<r><PRE>x</PRE> b</r>").children.last.text).to eq("b")
+        expect(parser.parse("<r>a<PRE>x</PRE> b</r>").children.last.text).to eq("b")
       end
 
       it "reads a heading with its level and starts a line after it" do
