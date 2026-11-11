@@ -47,6 +47,8 @@ class BBCodeGenerator
   # row or a cell without the list or the table it belongs to.
   STRUCTURE = /\A\[(?:list|table|tr|td)\b/
 
+  # The name of a tag: "url" for `[url=…]` and for `[/url]`.
+  NAME = /[a-z]+/
   BLOCK_OPEN = /\A\[(?:quote|center|list|table)\b/
   NEEDS = { "[*]" => "[list", "[tr]" => "[table", "[td]" => "[tr" }.freeze
 
@@ -77,7 +79,7 @@ class BBCodeGenerator
     open = []
     tokens.each_with_index do |token, position|
       if token.match?(CLOSE)
-        index = open.rindex { |tag| tag.start_with?(token.sub("/", "").chomp("]")) }
+        index = open.rindex { |tag| tag[NAME] == token[NAME] }
         next unless index
 
         inner = open[(index + 1)..]
