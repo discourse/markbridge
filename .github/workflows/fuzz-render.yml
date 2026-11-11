@@ -1,4 +1,4 @@
-name: Fuzz the renderer
+name: Fuzz the renderer and the parsers
 
 on:
   schedule:
@@ -48,4 +48,44 @@ jobs:
         with:
           name: fuzz-render
           path: tmp/fuzz-render/
+          retention-days: 14
+
+  # The checks that start with text: the run time of repeated markup,
+  # and random BBCode read by Markbridge and by s9e\TextFormatter.
+  fuzz-parse:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, xsl
+          tools: composer
+
+      - name: Fetch s9e\TextFormatter
+        run: bin/s9e-setup
+
+      - name: Run the checks
+        run: bin/fuzz-parse --seeds 1000 --output tmp/fuzz-parse
+
+      - name: Upload the failure reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-parse
+          path: tmp/fuzz-parse/
           retention-days: 14

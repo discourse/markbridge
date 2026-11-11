@@ -1,0 +1,143 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Runs the checks that start with text and not with a tree, over more
+# cases than the specs do:
+#
+#   bin/fuzz-parse                       # both families
+#   bin/fuzz-parse --only time           # the run time of every piece of markup
+#   bin/fuzz-parse --only s9e --seeds 5000 --output tmp/fuzz-parse
+#   bin/fuzz-parse --all                 # run the known cases like every other
+#
+# - time: every piece of markup of RunTimeChecker, repeated, has to
+#   convert in a time that grows with its length and not with the
+#   square of it.
+# - s9e: random BBCode has to give the same Markdown through the BBCode
+#   parser as through s9e\TextFormatter and the TextFormatter parser
+#   (S9eDifferentialChecker). Needs PHP and `bin/s9e-setup`.
+#
+# The inputs that differ are shrunk, and those that are the same but
+# for their words are one group with one report. With --output the
+# reports go to <dir>/failures.txt and the summary to
+# <dir>/summary.txt. The exit status is 1 when a case fails that is not
+# known, or when a known s9e case reads the same now. A known time
+# case is at the limit, over it on one run and under it on the next,
+# so one that is fast is only reported.
+
+ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../Gemfile", __dir__)
+
+require "bundler/setup"
+require "fileutils"
+require "optparse"
+require "markbridge/all"
+require_relative "../spec/support/run_time_checker"
+require_relative "../spec/support/s9e_differential_checker"
+
+class FuzzParse
+  FAMILIES = %w[time s9e].freeze
+
+  def initialize(argv)
+    @seeds = 1000
+    @only = FAMILIES
+    @output = nil
+    @all = false
+    OptionParser
+      .new do |opts|
+        opts.banner = "usage: bin/fuzz-parse [options]"
+        opts.on("--seeds N", Integer, "inputs for s9e (default: 1000)") { |n| @seeds = n }
+        opts.on("--only FAMILY", FAMILIES, "run only time or s9e") { |family| @only = [family] }
+        opts.on("--output DIR", "write failures.txt and summary.txt to DIR") { |dir| @output = dir }
+        opts.on("--all", "run the known cases like every other case") { @all = true }
+      end
+      .parse!(argv)
+    @reports = []
+    @summary = []
+    @failed = false
+  end
+
+  def run
+    time if @only.include?("time")
+    s9e if @only.include?("s9e")
+
+    reports = @reports.join("\n\n#{"=" * 72}\n\n")
+    summary = @summary.join("\n")
+    if @output
+      FileUtils.mkdir_p(@output)
+      File.write(File.join(@output, "failures.txt"), reports)
+      File.write(File.join(@output, "summary.txt"), summary)
+    else
+      puts reports unless reports.empty?
+    end
+    puts summary
+    exit(@failed ? 1 : 0)
+  end
+
+  private
+
+  def time
+    cases = RunTimeChecker.cases
+    slow = []
+    known = []
+    fast = []
+    cases.each do |kase|
+      reason = (RunTimeChecker.known(kase) unless @all)
+      growth = RunTimeChecker.slow(kase)
+      if reason
+        (growth ? known : fast) << kase
+      elsif growth
+        slow << [kase, growth]
+      end
+    end
+
+    slow.each do |kase, growth|
+      @reports << "time #{kase.id}\n\nan input #{RunTimeChecker::FACTOR} times as long takes " \
+        "#{growth.round(1)} times as long, the limit is #{RunTimeChecker::LIMIT}"
+    end
+    @failed ||= !slow.empty?
+    @summary << "time: #{cases.size} cases, #{slow.size} slow, #{known.size} known"
+    slow.each { |kase, growth| @summary << "  slow: #{kase.id} (#{growth.round(1)})" }
+    fast.each { |kase| @summary << "  known, but fast on this run: #{kase.id}" }
+  end
+
+  def s9e
+    abort "bin/fuzz-parse: #{S9eParser.missing}" if S9eParser.missing
+
+    checker = S9eDifferentialChecker.new
+    intended = Hash.new(0)
+    known = []
+    stale = []
+    # signature => [report, seeds]
+    groups = {}
+    (1..@seeds).each do |seed|
+      tokens = BBCodeGenerator.new(seed).tokens
+      kind = BBCodeGenerator.intended_difference(tokens)
+      differs = !checker.difference(tokens).nil?
+      reason = (S9eDifferentialChecker::KNOWN[seed] unless @all)
+      if kind
+        intended[kind] += 1 if differs
+      elsif reason
+        (differs ? known : stale) << seed
+      elsif differs
+        small = checker.shrink(tokens)
+        group = (groups[checker.signature(small)] ||= [checker.difference(small), []])
+        group[1] << seed
+      end
+      warn "s9e: #{seed}/#{@seeds}, #{groups.size} distinct differences" if (seed % 500).zero?
+    end
+
+    groups
+      .values
+      .sort_by { |_, seeds| -seeds.size }
+      .each do |report, seeds|
+        @reports << "s9e, #{seeds.size} cases: seed #{seeds.first(10).join(", ")}\n\n#{report}"
+      end
+    @failed ||= !groups.empty? || !stale.empty?
+    different = groups.values.sum { |_, seeds| seeds.size }
+    @summary << "s9e: #{@seeds} inputs, #{different} differ in #{groups.size} ways, " \
+      "#{known.size} known"
+    intended.each { |kind, count| @summary << "  different on purpose, #{kind}: #{count}" }
+    stale.each { |seed| @summary << "  known, but the same now, remove its entry: seed #{seed}" }
+  end
+end
+
+FuzzParse.new(ARGV).run
