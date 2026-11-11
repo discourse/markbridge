@@ -25,8 +25,8 @@ parse → yield(ast) → normalize → render
 
 The default rules are what CommonMark allows. Markdown that breaks one of them is not read back as the tree it was written from:
 
-- **No link inside a link**, at any depth. The inner link is removed and its text stays in the outer link.
-- **A block inside an inline container is moved out.** Inline containers are the nodes that hold a line of text: links, headings, and the formatting nodes (`Bold`, `Italic`, `Underline`, …). The blocks are `List`, `Table`, `Quote`, `Details`, `HorizontalRule`, `Align`, `Poll` and `Event`.
+- **No link inside a link**, at any depth. The inner link is removed and its text stays in the outer link. A mail address (`AST::Email`) counts as a link here.
+- **A block inside an inline container is moved out.** Inline containers are the nodes that hold a line of text: links, mail addresses, headings, and the formatting nodes (`Bold`, `Italic`, `Underline`, `Color`, `Size`, …). The blocks are `List`, `Table`, `Quote`, `Details`, `HorizontalRule`, `Align`, `Poll` and `Event`.
 - **A fenced or multi-line code block inside an inline container is moved out.** A one-line code span is fine.
 - **A block spoiler inside an inline container is moved out.** That is an `AST::Spoiler` with `block: true`. An inline spoiler is fine.
 - **No heading inside a heading.** The inner heading is removed and its text stays in the outer one.

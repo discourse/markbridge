@@ -798,23 +798,23 @@ RSpec.describe Markbridge::Normalizer::Walker do
     end
 
     it "walks a hoisted subtree against the ancestors above its boundary" do
-      # (Url, Quote) hoists the quote out of the link; a custom (Color, Image)
+      # (Url, Quote) hoists the quote out of the link; a custom (Spoiler, Image)
       # rule must still fire on the image inside that quote, which is only
-      # possible if the destination stack still contains the Color ancestor.
-      # (Color is used because, unlike an inline container, it has no block
+      # possible if the destination stack still contains the Spoiler ancestor.
+      # (A spoiler is used because, unlike an inline container, it has no block
       # rule of its own, so the quote's boundary stays at the Url.)
       custom = Markbridge::Normalizer.default
       custom.rule(
-        parent: Markbridge::AST::Color,
+        parent: Markbridge::AST::Spoiler,
         child: Markbridge::AST::Image,
         strategy: :hoist_after,
       )
       img = image
-      color = el(Markbridge::AST::Color, url(el(Markbridge::AST::Quote, img)), color: "red")
-      tree = doc(color)
+      spoiler = el(Markbridge::AST::Spoiler, url(el(Markbridge::AST::Quote, img)))
+      tree = doc(spoiler)
       custom.normalize(tree)
 
-      # image escaped the quote entirely (destination stack retained Color)
+      # image escaped the quote entirely (destination stack retained Spoiler)
       quote = tree.descendants(Markbridge::AST::Quote).first
       expect(quote.descendants(Markbridge::AST::Image)).to be_empty
       expect(tree.descendants(Markbridge::AST::Image)).to contain_exactly(img)
