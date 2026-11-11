@@ -93,6 +93,33 @@ RSpec.describe Markbridge::Normalizer do
       )
     end
 
+    it "unwraps a link in a mail address, a mail address in a link and one in another" do
+      email = ->(*children) do
+        node = Markbridge::AST::Email.new(address: "a@example.com")
+        children.each { |child| node << child }
+        node
+      end
+      default = described_class.default
+
+      expect(default.violations(doc(email.call(url(text("x")))))).to contain_exactly(
+        { parent: "Email", child: "Url", strategy: :unwrap },
+      )
+      expect(default.violations(doc(url(email.call(text("x")))))).to contain_exactly(
+        { parent: "Url", child: "Email", strategy: :unwrap },
+      )
+      expect(default.violations(doc(email.call(email.call(text("x")))))).to contain_exactly(
+        { parent: "Email", child: "Email", strategy: :unwrap },
+      )
+    end
+
+    it "counts a mail address, a color and a size as inline containers" do
+      expect(described_class::INLINE_CONTAINERS).to include(
+        Markbridge::AST::Email,
+        Markbridge::AST::Color,
+        Markbridge::AST::Size,
+      )
+    end
+
     it "flags every block node inside every inline container" do
       described_class::INLINE_CONTAINERS.each do |container|
         described_class::BLOCK_NODES.each do |block|

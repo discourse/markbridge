@@ -30,10 +30,14 @@ module RoundTripKnownBugs
   # Seeds of BrokenAstGenerator, checked with NormalizerRepairChecker.
   REPAIR = [
     entry(
-      "a block that leaves bold inside a color or an inline spoiler lands in the color or the " \
-        "spoiler, which are no inline containers for the normalizer; in a list item the list " \
-        "cooks loose then",
-      cases: [929, 1578],
+      "a block that leaves bold inside an inline spoiler lands in the spoiler, which is no " \
+        "inline container for the normalizer; in a list item the list cooks loose then",
+      cases: [1578, 1810],
+    ),
+    entry(
+      "a list that leaves bold in a paragraph lands in the paragraph, in front of a list that " \
+        "follows the paragraph, and the two cook as one list",
+      cases: [1543],
     ),
   ].freeze
 

@@ -34,9 +34,12 @@ module Markbridge
     private_constant :EMPTY_STACK
 
     # Containers that hold inline content only: a link's text (CommonMark
-    # §6.3), and emphasis and heading content.
+    # §6.3), and emphasis and heading content. A color and a size are
+    # written as a BBCode tag or as nothing around a line of text, like
+    # emphasis, and a mail address is a link.
     INLINE_CONTAINERS = [
       AST::Url,
+      AST::Email,
       AST::Bold,
       AST::Italic,
       AST::Strikethrough,
@@ -46,8 +49,13 @@ module Markbridge
       AST::Insertion,
       AST::Deletion,
       AST::Highlight,
+      AST::Color,
+      AST::Size,
       AST::Heading,
     ].freeze
+
+    # The nodes that are written as a link.
+    LINKS = [AST::Url, AST::Email].freeze
 
     # AST nodes the Discourse renderer prints as block-level Markdown (their
     # output has blank lines around it). One inside an inline container breaks
@@ -110,8 +118,10 @@ module Markbridge
         rules = RuleSet.new
 
         # §6.3 A link may not contain another link, at any depth. Unwrap the
-        # inner link and keep its text.
-        rules.add(parent: AST::Url, child: AST::Url, strategy: :unwrap)
+        # inner link and keep its text. A mail address is a link too.
+        LINKS.each do |outer|
+          LINKS.each { |inner| rules.add(parent: outer, child: inner, strategy: :unwrap) }
+        end
 
         INLINE_CONTAINERS.each do |container|
           rules.add(parent: container, child: AST::Code, strategy: KEEP_INLINE_CODE)
