@@ -152,17 +152,17 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Reordering do
 
   context "when an item without a list is open in the element" do
     it "ends the item with the element" do
-      quote = Markbridge::AST::Quote.new
-      context.push(quote)
+      outer = Markbridge::AST::Bold.new
+      context.push(outer)
       context.push(Markbridge::AST::ListItem.new)
-      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
 
-      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "quote", pos: 0, source: "[/quote]")
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "b", pos: 0, source: "[/b]")
 
       strategy.handle_close(token:, context:, registry:)
 
       expect(context.current).to eq(root)
-      expect(quote.children.first.children.map(&:class)).to eq([Markbridge::AST::Bold])
+      expect(outer.children.first.children.map(&:class)).to eq([Markbridge::AST::Italic])
       expect(context.auto_closed_count).to eq(1)
     end
   end

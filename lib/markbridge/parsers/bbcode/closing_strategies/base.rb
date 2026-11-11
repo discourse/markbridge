@@ -9,9 +9,10 @@ module Markbridge
           end
 
           def handle_close(token:, context:, registry:, tokens: nil)
-            @reconciler.close_item_without_list(handler: registry[token.tag], context:)
-            current_handler = registry.handler_for_element(context.current)
             closing_handler = registry[token.tag]
+            @reconciler.close_inside_block(handler: closing_handler, context:)
+            @reconciler.close_item_without_list(handler: closing_handler, context:)
+            current_handler = registry.handler_for_element(context.current)
 
             if current_handler == closing_handler
               context.pop

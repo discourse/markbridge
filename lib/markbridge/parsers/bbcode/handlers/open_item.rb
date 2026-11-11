@@ -4,8 +4,7 @@ module Markbridge
   module Parsers
     module BBCode
       module Handlers
-        # For the handlers that end a list item: a new item and the end of
-        # the list.
+        # For the handler that ends a list item with a new item.
         module OpenItem
           private
 
@@ -25,20 +24,6 @@ module Markbridge
 
             context.auto_close!(depth)
             (depth + 1).times { context.pop }
-          end
-
-          # Ends what is still open directly in the list, outside of an
-          # item: `[list]text [b]bold[/list]`. Without a list around it
-          # nothing is closed.
-          #
-          # @param context [ParserState]
-          def close_to_list(context)
-            depth =
-              context.elements_from_current.index { |element| element.instance_of?(AST::List) }
-            return unless depth
-
-            context.auto_close!(depth)
-            depth.times { context.pop }
           end
         end
       end

@@ -12,6 +12,94 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
     Markbridge::Parsers::BBCode::PeekableEnumerator.new(scanner)
   end
 
+  describe "#close_inside_block" do
+    let(:quote) { Markbridge::AST::Quote.new }
+
+    it "ends what is open inside the block and leaves the block open" do
+      context.push(quote)
+      context.push(Markbridge::AST::List.new)
+      context.push(Markbridge::AST::ListItem.new)
+      context.push(Markbridge::AST::Bold.new)
+
+      reconciler.close_inside_block(handler: registry["quote"], context:)
+
+      expect(context.current).to eq(quote)
+    end
+
+    it "counts what it ends, without the items, rows and cells" do
+      context.push(quote)
+      context.push(Markbridge::AST::Table.new)
+      context.push(Markbridge::AST::TableRow.new)
+      context.push(Markbridge::AST::TableCell.new)
+      context.push(Markbridge::AST::List.new)
+      context.push(Markbridge::AST::ListItem.new)
+      context.push(Markbridge::AST::Bold.new)
+
+      reconciler.close_inside_block(handler: registry["quote"], context:)
+
+      expect(context.auto_closed_count).to eq(3)
+    end
+
+    {
+      "quote" => Markbridge::AST::Quote.new,
+      "spoiler" => Markbridge::AST::Spoiler.new,
+      "center" => Markbridge::AST::Align.new(alignment: "center"),
+      "list" => Markbridge::AST::List.new,
+      "table" => Markbridge::AST::Table.new,
+      "tr" => Markbridge::AST::TableRow.new,
+      "td" => Markbridge::AST::TableCell.new,
+    }.each do |tag, block|
+      it "ends bold that is open in a #{tag}" do
+        context.push(block)
+        context.push(Markbridge::AST::Bold.new)
+
+        reconciler.close_inside_block(handler: registry[tag], context:)
+
+        expect(context.current).to eq(block)
+        expect(context.auto_closed_count).to eq(1)
+      end
+    end
+
+    it "ends up to the innermost block of that kind" do
+      inner = Markbridge::AST::Quote.new
+      context.push(quote)
+      context.push(inner)
+      context.push(Markbridge::AST::List.new)
+
+      reconciler.close_inside_block(handler: registry["quote"], context:)
+
+      expect(context.current).to eq(inner)
+    end
+
+    it "does nothing for the closing tag of an inline element" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(quote)
+
+      reconciler.close_inside_block(handler: registry["b"], context:)
+
+      expect(context.current).to eq(quote)
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "does nothing when the block is not open" do
+      context.push(Markbridge::AST::List.new)
+
+      reconciler.close_inside_block(handler: registry["quote"], context:)
+
+      expect(context.current).to be_a(Markbridge::AST::List)
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "does nothing when the block is the current element" do
+      context.push(quote)
+
+      reconciler.close_inside_block(handler: registry["quote"], context:)
+
+      expect(context.current).to eq(quote)
+      expect(context.auto_closed_count).to eq(0)
+    end
+  end
+
   describe "#close_item_without_list" do
     let(:quote) { Markbridge::AST::Quote.new }
     let(:item) { Markbridge::AST::ListItem.new }

@@ -6,8 +6,6 @@ module Markbridge
       module Handlers
         # Handler for list tags (list, ul, ol, etc.)
         class ListHandler < BaseHandler
-          include OpenItem
-
           def initialize
             @element_class = AST::List
           end
@@ -19,12 +17,6 @@ module Markbridge
 
             element = AST::List.new(ordered:)
             context.push(element, token:)
-          end
-
-          def on_close(token:, context:, registry:, tokens: nil)
-            close_open_item(context)
-            close_to_list(context)
-            super
           end
 
           attr_reader :element_class
