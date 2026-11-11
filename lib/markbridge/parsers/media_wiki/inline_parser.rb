@@ -58,6 +58,7 @@ module Markbridge
           @length = text.bytesize
           @parent = parent
           @text_buffer = +""
+          @unclosed = []
 
           while (span_end = @input.byteindex(INTERESTING, @pos))
             # Unconditional on purpose: when the interesting byte sits at
@@ -204,14 +205,21 @@ module Markbridge
           end
         end
 
-        # Count consecutive apostrophes starting at position.
-        # getbyte past end-of-input returns nil, which ends the run.
+        # Nobody asks for more than five apostrophes, or whether a run
+        # has exactly three. Counting stops here, so a line of thousands
+        # of apostrophes is not counted to its end from every position.
+        MAX_APOSTROPHES = 6
+        private_constant :MAX_APOSTROPHES
+
+        # Count consecutive apostrophes starting at position, up to
+        # MAX_APOSTROPHES. getbyte past end-of-input returns nil, which
+        # ends the run.
         #
         # @param pos [Integer]
         # @return [Integer]
         def consecutive_apostrophes_at(pos)
           count = 0
-          count += 1 while @input.getbyte(pos + count) == APOSTROPHE
+          count += 1 while count < MAX_APOSTROPHES && @input.getbyte(pos + count) == APOSTROPHE
           count
         end
 
@@ -475,9 +483,21 @@ module Markbridge
         # The end tag of +tag_name+ behind the cursor, in any case:
         # MediaWiki reads `</S>` like `</s>`.
         #
+        # A tag that had no end tag behind the cursor has none later in
+        # the text either, so the search is done once per tag: a line of
+        # `<nowiki>` with no end would be read to its end from each one.
+        #
         # @param tag_name [String] letters only, see HTML_TAG_AT_CURSOR
         # @return [Array(Integer, Integer), nil] its position and size
         def find_close(tag_name)
+          return if @unclosed.include?(tag_name)
+
+          found = search_close(tag_name)
+          @unclosed << tag_name unless found
+          found
+        end
+
+        def search_close(tag_name)
           position = @input.byteindex(%r{</#{tag_name}>}i, @pos)
           [position, Regexp.last_match(0).bytesize] if position
         end
