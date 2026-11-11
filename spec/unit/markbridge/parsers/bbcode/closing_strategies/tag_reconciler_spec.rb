@@ -26,6 +26,18 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
       expect(context.current).to eq(quote)
     end
 
+    it "expects the closing tags of what it ends, and not the one of the block" do
+      context.push(quote)
+      context.push(Markbridge::AST::List.new)
+      context.push(Markbridge::AST::ListItem.new)
+
+      reconciler.close_inside_block(handler: registry["quote"], context:)
+
+      expect(context.closing_tag_due?(registry["list"])).to be true
+      expect(context.closing_tag_due?(registry["*"])).to be true
+      expect(context.closing_tag_due?(registry["quote"])).to be false
+    end
+
     it "counts what it ends, without the items, rows and cells" do
       context.push(quote)
       context.push(Markbridge::AST::Table.new)
@@ -182,6 +194,17 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
     let(:bold_handler) { registry["b"] }
     let(:italic_handler) { registry["i"] }
 
+    it "closes a target that is not auto-closeable, with what is open in it" do
+      context.push(Markbridge::AST::Url.new(href: "https://example.com"))
+      context.push(Markbridge::AST::Bold.new)
+
+      result = reconciler.try_auto_close(handler: registry["url"], context:)
+
+      expect(result).to be true
+      expect(context.current).to eq(root)
+      expect(context.auto_closed_count).to eq(2)
+    end
+
     it "closes the current element when its handler matches the closing handler" do
       context.push(Markbridge::AST::Bold.new)
 
@@ -262,6 +285,20 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
   describe "#try_reopen" do
     let(:bold_handler) { registry["b"] }
     let(:italic_handler) { registry["i"] }
+
+    it "closes a target that is not auto-closeable and reopens what was open in it" do
+      link = Markbridge::AST::Url.new(href: "https://example.com")
+      context.push(link)
+      context.push(Markbridge::AST::Bold.new)
+
+      result =
+        reconciler.try_reopen(handler: registry["url"], context:, tokens: tokens_for(" more"))
+
+      expect(result).to be true
+      expect(context.elements_from_current.map(&:class)).to eq(
+        [Markbridge::AST::Bold, Markbridge::AST::Document],
+      )
+    end
 
     it "closes target and reopens intervening tags when content follows" do
       context.push(Markbridge::AST::Bold.new)

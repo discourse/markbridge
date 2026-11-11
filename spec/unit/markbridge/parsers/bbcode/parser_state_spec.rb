@@ -201,6 +201,31 @@ RSpec.describe Markbridge::Parsers::BBCode::ParserState do
     end
   end
 
+  describe "#end_early and #closing_tag_due?" do
+    it "expects no closing tag when nothing was ended early" do
+      expect(context.closing_tag_due?(:list)).to be false
+    end
+
+    it "expects the closing tag of what was ended early, once" do
+      context.end_early(:list)
+
+      expect(context.closing_tag_due?(:quote)).to be false
+      expect(context.closing_tag_due?(:list)).to be true
+      expect(context.closing_tag_due?(:list)).to be false
+    end
+
+    it "expects one closing tag for each element that was ended early" do
+      context.end_early(:bold)
+      context.end_early(:list)
+      context.end_early(:list)
+
+      expect(context.closing_tag_due?(:list)).to be true
+      expect(context.closing_tag_due?(:list)).to be true
+      expect(context.closing_tag_due?(:list)).to be false
+      expect(context.closing_tag_due?(:bold)).to be true
+    end
+  end
+
   describe "#elements_from_current" do
     it "returns an empty array when the node stack has no entries" do
       empty_state = described_class.allocate

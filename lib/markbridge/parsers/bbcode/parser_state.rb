@@ -17,6 +17,28 @@ module Markbridge
           @auto_closed_count = 0
           @depth_exceeded_count = 0
           @unclosed_raw_tags = Hash.new(0)
+          @ended_early = []
+        end
+
+        # Remember an element that was ended by the closing tag of an
+        # element around it, by what identifies its own closing tag.
+        # @param key [Object]
+        def end_early(key)
+          @ended_early << key
+        end
+
+        # Whether an element with this key was ended early and its
+        # closing tag has not come yet. The answer is yes only once per
+        # element: the closing tag that comes for it is taken as that
+        # one.
+        # @param key [Object]
+        # @return [Boolean]
+        def closing_tag_due?(key)
+          index = @ended_early.index(key)
+          return false unless index
+
+          @ended_early.delete_at(index)
+          true
         end
 
         # Add element as child to current node and push the element onto the stack

@@ -78,6 +78,27 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Strict do
     end
   end
 
+  context "when the closing tag comes for an element that a block has ended" do
+    it "is no text, once" do
+      quote = Markbridge::AST::Quote.new
+      context.push(quote)
+      context.push(Markbridge::AST::List.new)
+      quote_end =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "quote", pos: 0, source: "[/quote]")
+      list_end =
+        Markbridge::Parsers::BBCode::TagEndToken.new(tag: "list", pos: 0, source: "[/list]")
+
+      strategy.handle_close(token: quote_end, context:, registry:)
+      strategy.handle_close(token: list_end, context:, registry:)
+
+      expect(root.children).to eq([quote])
+
+      strategy.handle_close(token: list_end, context:, registry:)
+
+      expect(root.children.last.text).to eq("[/list]")
+    end
+  end
+
   context "when a list is open in the block that closes" do
     it "ends the list with the block" do
       quote = Markbridge::AST::Quote.new

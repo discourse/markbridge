@@ -20,10 +20,14 @@ module Markbridge
               open.index do |element|
                 element.instance_of?(AST::ListItem) || element.instance_of?(AST::List)
               end
-            return unless depth && open.fetch(depth).instance_of?(AST::ListItem)
+            return unless depth
 
+            # With no item open, what is open directly in the list ends
+            # here too: `[list][b]a[*]b` has two items, and the first
+            # one is the bold.
+            item = open.fetch(depth).instance_of?(AST::ListItem)
             context.auto_close!(depth)
-            (depth + 1).times { context.pop }
+            (item ? depth + 1 : depth).times { context.pop }
           end
         end
       end
