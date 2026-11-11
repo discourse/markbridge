@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../spec/support/cook_process"
+require_relative "../spec/support/line_process"
 
 module Markbridge
   module Playground
@@ -54,9 +54,9 @@ module Markbridge
         when :discourse
           plugins = plugins_for(features)
           command = [ENGINE_SCRIPT, "--engine", ENGINE, "--plugins", plugins.join(",")]
-          Cooked.new(engine: :discourse, html: process(command).cook(markdown), plugins:)
+          Cooked.new(engine: :discourse, html: cook_with(command, markdown), plugins:)
         when :markdown_it
-          html = process([MARKDOWN_IT_SCRIPT]).cook(markdown)
+          html = cook_with([MARKDOWN_IT_SCRIPT], markdown)
           Cooked.new(engine: :markdown_it, html:, plugins: [])
         end
       end
@@ -64,15 +64,16 @@ module Markbridge
       private
 
       def node?
-        CookProcess.node?
+        LineProcess.program?("node")
       end
 
       def plugins_for(features)
         STOCK_PLUGINS + FEATURE_PLUGINS.filter_map { |feature, plugin| plugin if features[feature] }
       end
 
-      def process(command)
-        @lock.synchronize { @processes[command] ||= CookProcess.new(*command) }
+      def cook_with(command, markdown)
+        process = @lock.synchronize { @processes[command] ||= LineProcess.new("node", *command) }
+        process.ask(markdown:).fetch("html")
       end
     end
   end
