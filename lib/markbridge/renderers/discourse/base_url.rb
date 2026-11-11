@@ -17,7 +17,10 @@ module Markbridge
       #   base.resolve("/files/a.png") # => "https://wiki.example.com/files/a.png"
       #   base.resolve("https://example.org/") # => "https://example.org/"
       class BaseUrl
-        PARTS = %r{\A(https?://[^/?#\s]+)([^?#\s]*)}i
+        # The origin and the path. A query and a fragment may follow and
+        # are not used. Whitespace anywhere is no URL: a base that is cut
+        # off at a space would resolve to the wrong directory.
+        PARTS = %r{\A(https?://[^/?#\s]+)([^?#\s]*)(?:[?#]\S*)?\z}i
         SCHEME = /\A[a-z][a-z0-9+.-]*:/i
         private_constant :PARTS, :SCHEME
 
