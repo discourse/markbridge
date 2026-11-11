@@ -66,6 +66,22 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ListItemHandler do
       expect(context.auto_closed_count).to eq(0)
     end
 
+    it "closes what is open directly in the list, and counts it" do
+      list = Markbridge::AST::List.new
+      bold = Markbridge::AST::Bold.new
+      context.push(list)
+      context.push(bold)
+      context.push(Markbridge::AST::Italic.new)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      # The list puts what is no item into an item of its own.
+      expect(list.children.map(&:class)).to eq([Markbridge::AST::ListItem] * 2)
+      expect(list.children.first.children).to eq([bold])
+      expect(list.children.last).to eq(context.current)
+      expect(context.auto_closed_count).to eq(2)
+    end
+
     it "leaves the item around a nested list open" do
       context.push(Markbridge::AST::List.new)
       outer_item = Markbridge::AST::ListItem.new

@@ -65,7 +65,7 @@ module Markbridge
 
             match_depth = find_matching_handler_depth(handler, context)
             return false if match_depth.nil? || match_depth.zero?
-            return false unless all_auto_closeable?(context, match_depth)
+            return false unless all_auto_closeable?(context, match_depth - 1)
 
             intervening = context.elements_from_current(match_depth - 1).map(&:class)
 
@@ -93,7 +93,11 @@ module Markbridge
             depth = open.index { |element| @registry.handler_for_element(element) == handler }
             return unless depth
 
-            context.auto_close!(open.first(depth).count { |element| !implied_end?(element) })
+            inside = open.first(depth)
+            context.auto_close!(inside.count { |element| !implied_end?(element) })
+            # The closing tags of what ends here may still come. They
+            # are no text then.
+            inside.each { |element| context.end_early(@registry.handler_for_element(element)) }
             depth.times { context.pop }
           end
 
@@ -152,13 +156,15 @@ module Markbridge
 
           # Number of stack elements to pop in order to close `handler`, or nil
           # when the handler is not on the stack within MAX_AUTO_CLOSE_DEPTH or
-          # any intervening element is not auto-closeable.
+          # any intervening element is not auto-closeable. The element that
+          # is closed need not be: `[url=…][b]text[/url]` ends the bold with
+          # the link.
           def auto_close_count(handler, context)
             context
               .elements_from_current(MAX_AUTO_CLOSE_DEPTH - 1)
               .each_with_index do |element, depth|
-                return nil unless @registry.auto_closeable?(element.class)
                 return depth + 1 if @registry.handler_for_element(element) == handler
+                return nil unless @registry.auto_closeable?(element.class)
               end
 
             nil

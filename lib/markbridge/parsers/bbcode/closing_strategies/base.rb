@@ -18,7 +18,7 @@ module Markbridge
               context.pop
             elsif @reconciler.try_auto_close(handler: closing_handler, context:)
               # Auto-close succeeded
-            else
+            elsif !context.closing_tag_due?(closing_handler)
               context.add_child(AST::Text.new(token.source))
             end
           end
