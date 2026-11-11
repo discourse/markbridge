@@ -2,7 +2,7 @@
 
 require "json"
 require "nokogiri"
-require "open3"
+require_relative "cook_process"
 
 # Cooks Markdown with Discourse's own engine: the pretty-text bundle of a
 # Discourse checkout, with the bundled plugins and discourse-bbcode (see
@@ -106,15 +106,8 @@ module DiscourseEngineCooker
     Profile.new(name)
   end
 
-  def self.node?
-    ENV
-      .fetch("PATH", "")
-      .split(File::PATH_SEPARATOR)
-      .any? { |dir| File.executable?(File.join(dir, "node")) }
-  end
-
   def self.missing
-    if !node?
+    if !CookProcess.node?
       "node is not on the PATH"
     elsif !File.file?(File.join(ENGINE, "engine.json"))
       "the Discourse engine is not built, run `#{SETUP}`"
@@ -130,21 +123,12 @@ module DiscourseEngineCooker
     end
 
   @processes = {}
-  @next_id = 0
 
   # @param markdown [String]
   # @param profile [Symbol] a key of PROFILES
   # @return [String] the HTML Discourse cooks from +markdown+ on that site
   def self.cook(markdown, profile: :stock)
-    stdin, stdout = process(profile)
-    id = (@next_id += 1)
-
-    stdin.puts(JSON.generate(id:, markdown:))
-    line = stdout.gets or raise "cook.mjs stopped without an answer for #{markdown.inspect}"
-    answer = JSON.parse(line)
-    raise "cook.mjs answered request #{answer["id"]}, expected #{id}" unless answer["id"] == id
-
-    answer["html"]
+    process(profile).cook(markdown)
   end
 
   # @param profile [Symbol] a key of PROFILES
@@ -164,27 +148,16 @@ module DiscourseEngineCooker
     reason = missing
     raise "Discourse engine cooker: #{reason}" if reason
 
-    stdin, stdout, thread =
-      Open3.popen2(
-        "node",
-        SCRIPT,
-        "--engine",
-        ENGINE,
-        "--plugins",
-        profile.fetch(:plugins).join(","),
-        "--settings",
-        JSON.generate(profile.fetch(:settings)),
-      )
-    stdin.set_encoding(Encoding::UTF_8)
-    stdout.set_encoding(Encoding::UTF_8)
-    stdin.sync = true
-    at_exit do
-      stdin.close
-      thread.join
-    end
-
-    [stdin, stdout]
+    CookProcess.new(
+      SCRIPT,
+      "--engine",
+      ENGINE,
+      "--plugins",
+      profile.fetch(:plugins).join(","),
+      "--settings",
+      JSON.generate(profile.fetch(:settings)),
+    )
   end
 
-  private_class_method :process, :start, :node?
+  private_class_method :process, :start
 end

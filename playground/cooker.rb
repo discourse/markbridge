@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require "json"
-require "open3"
+require_relative "../spec/support/cook_process"
 
 module Markbridge
   module Playground
@@ -10,9 +9,7 @@ module Markbridge
     # has built it, plain markdown-it otherwise. Without Node or
     # markdown-it there is no preview, and +unavailable_reason+ says why.
     #
-    # One Node process per set of plugins, started with the first cook. A
-    # request holds the lock while it talks to a process, because the
-    # server answers requests on several threads.
+    # One Node process per set of plugins, started with the first cook.
     class Cooker
       ROOT = File.expand_path("..", __dir__)
       ENGINE = File.join(ROOT, "tmp", "discourse_engine")
@@ -30,7 +27,6 @@ module Markbridge
       def initialize
         @lock = Mutex.new
         @processes = {}
-        @next_id = 0
       end
 
       # @return [Symbol, nil] :discourse, :markdown_it or nil
@@ -57,10 +53,10 @@ module Markbridge
         case engine
         when :discourse
           plugins = plugins_for(features)
-          command = ["node", ENGINE_SCRIPT, "--engine", ENGINE, "--plugins", plugins.join(",")]
-          Cooked.new(engine: :discourse, html: ask(command, markdown), plugins:)
+          command = [ENGINE_SCRIPT, "--engine", ENGINE, "--plugins", plugins.join(",")]
+          Cooked.new(engine: :discourse, html: process(command).cook(markdown), plugins:)
         when :markdown_it
-          html = ask(["node", MARKDOWN_IT_SCRIPT], markdown)
+          html = process([MARKDOWN_IT_SCRIPT]).cook(markdown)
           Cooked.new(engine: :markdown_it, html:, plugins: [])
         end
       end
@@ -68,43 +64,15 @@ module Markbridge
       private
 
       def node?
-        ENV
-          .fetch("PATH", "")
-          .split(File::PATH_SEPARATOR)
-          .any? { |dir| File.executable?(File.join(dir, "node")) }
+        CookProcess.node?
       end
 
       def plugins_for(features)
         STOCK_PLUGINS + FEATURE_PLUGINS.filter_map { |feature, plugin| plugin if features[feature] }
       end
 
-      def ask(command, markdown)
-        @lock.synchronize do
-          stdin, stdout = @processes[command] ||= start(command)
-          id = (@next_id += 1)
-
-          begin
-            stdin.puts(JSON.generate(id:, markdown:))
-            line = stdout.gets
-          rescue Errno::EPIPE
-            line = nil
-          end
-
-          unless line
-            @processes.delete(command)
-            raise "the cook script stopped without an answer"
-          end
-
-          JSON.parse(line).fetch("html")
-        end
-      end
-
-      def start(command)
-        stdin, stdout, = Open3.popen2(*command)
-        stdin.set_encoding(Encoding::UTF_8)
-        stdout.set_encoding(Encoding::UTF_8)
-        stdin.sync = true
-        [stdin, stdout]
+      def process(command)
+        @lock.synchronize { @processes[command] ||= CookProcess.new(*command) }
       end
     end
   end
