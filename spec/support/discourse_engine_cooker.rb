@@ -2,7 +2,7 @@
 
 require "json"
 require "nokogiri"
-require_relative "cook_process"
+require_relative "line_process"
 
 # Cooks Markdown with Discourse's own engine: the pretty-text bundle of a
 # Discourse checkout, with the bundled plugins and discourse-bbcode (see
@@ -107,7 +107,7 @@ module DiscourseEngineCooker
   end
 
   def self.missing
-    if !CookProcess.node?
+    if !LineProcess.program?("node")
       "node is not on the PATH"
     elsif !File.file?(File.join(ENGINE, "engine.json"))
       "the Discourse engine is not built, run `#{SETUP}`"
@@ -128,7 +128,7 @@ module DiscourseEngineCooker
   # @param profile [Symbol] a key of PROFILES
   # @return [String] the HTML Discourse cooks from +markdown+ on that site
   def self.cook(markdown, profile: :stock)
-    process(profile).cook(markdown)
+    process(profile).ask(markdown:).fetch("html")
   end
 
   # @param profile [Symbol] a key of PROFILES
@@ -148,7 +148,8 @@ module DiscourseEngineCooker
     reason = missing
     raise "Discourse engine cooker: #{reason}" if reason
 
-    CookProcess.new(
+    LineProcess.new(
+      "node",
       SCRIPT,
       "--engine",
       ENGINE,

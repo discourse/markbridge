@@ -2,7 +2,7 @@
 
 require "json"
 require "nokogiri"
-require_relative "cook_process"
+require_relative "line_process"
 
 # Cooks Markdown with markdown-it, set up like Discourse (see
 # spec/support/markdown_it/cook.mjs).
@@ -22,7 +22,7 @@ module MarkdownItCooker
   SETUP = "npm ci --prefix spec/support/markdown_it"
 
   def self.missing
-    if !CookProcess.node?
+    if !LineProcess.program?("node")
       "node is not on the PATH"
     elsif !File.directory?(File.join(DIRECTORY, "node_modules", "markdown-it"))
       "markdown-it is not installed, run `#{SETUP}`"
@@ -57,7 +57,7 @@ module MarkdownItCooker
   # @param markdown [String]
   # @return [String] the HTML that markdown-it cooks from +markdown+
   def self.cook(markdown)
-    process.cook(markdown)
+    process.ask(markdown:).fetch("html")
   end
 
   def self.process
@@ -66,7 +66,7 @@ module MarkdownItCooker
         reason = missing
         raise "markdown-it cooker: #{reason}" if reason
 
-        CookProcess.new(SCRIPT)
+        LineProcess.new("node", SCRIPT)
       end
   end
 
