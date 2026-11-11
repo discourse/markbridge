@@ -118,13 +118,15 @@ module Markbridge
           rules.add(parent: container, child: AST::Spoiler, strategy: KEEP_INLINE_SPOILER)
 
           BLOCK_NODES.each do |block|
-            next if container == block
-
             rules.add(parent: container, child: block, strategy: :hoist_after)
           end
         end
 
-        rules
+        # Heading is a container and a block. A heading in a heading does
+        # not move out, it is one heading, like a link in a link is one
+        # link: the text stays where it is. This replaces the rule the
+        # loop above has added for the pair. (+add+ returns the rule set.)
+        rules.add(parent: AST::Heading, child: AST::Heading, strategy: :unwrap)
       end
     end
 

@@ -29,8 +29,9 @@ The default rules are what CommonMark allows. Markdown that breaks one of them i
 - **A block inside an inline container is moved out.** Inline containers are the nodes that hold a line of text: links, headings, and the formatting nodes (`Bold`, `Italic`, `Underline`, …). The blocks are `List`, `Table`, `Quote`, `Details`, `HorizontalRule`, `Align`, `Poll` and `Event`.
 - **A fenced or multi-line code block inside an inline container is moved out.** A one-line code span is fine.
 - **A block spoiler inside an inline container is moved out.** That is an `AST::Spoiler` with `block: true`. An inline spoiler is fine.
+- **No heading inside a heading.** The inner heading is removed and its text stays in the outer one.
 
-When a block is moved out and the texts on its two sides would touch, a space goes between them. With the block there they were on two lines, and an HTML parser has trimmed the whitespace at the line edges: `<i>Run <pre>…</pre> and wait</i>` becomes `*Run and wait*` and the code block.
+When a block is moved out and the texts on its two sides would touch, a space goes between them. This also holds for the text in front of the container when the block was the first thing in it. With the block there they were on two lines, and an HTML parser has trimmed the whitespace at the line edges: `<i>Run <pre>…</pre> and wait</i>` becomes `*Run and wait*` and the code block.
 
 Rules that are a matter of taste are not built in. An image inside a link, `[![alt](src)](url)`, is valid Markdown, so the default keeps it. If you want images moved out of links, add a rule (see below).
 

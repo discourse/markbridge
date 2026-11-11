@@ -155,13 +155,22 @@ RSpec.describe Markbridge::Normalizer do
       end
     end
 
-    it "does not flag a node that is both an inline container and a block against itself" do
+    it "unwraps a heading in a heading and does not move it out" do
       # Heading is in INLINE_CONTAINERS and in BLOCK_NODES. build_rules must not
       # add a (Heading, Heading) hoist rule, or a heading in a heading would move.
       heading = Markbridge::AST::Heading
-      tree = doc(wrap(heading, instance(heading)))
+      inner = heading.new(level: 2) << Markbridge::AST::Text.new("b")
+      outer = heading.new(level: 1) << Markbridge::AST::Text.new("a") << inner
+      tree = doc(outer)
 
-      expect(described_class.default.violations(tree)).to eq([])
+      expect(described_class.default.violations(tree)).to eq(
+        [{ parent: "Heading", child: "Heading", strategy: :unwrap }],
+      )
+
+      described_class.default.normalize(tree)
+
+      expect(tree.children).to eq([outer])
+      expect(outer.children.map(&:text)).to eq(["a b"])
     end
 
     it "does not add Discourse policy: an image or mention in a link is not flagged" do

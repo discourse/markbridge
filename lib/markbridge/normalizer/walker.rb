@@ -53,7 +53,9 @@ module Markbridge
       GAP = Object.new.freeze
       EDGE_SPACE_BEFORE = /[[:space:]]\z/
       EDGE_SPACE_AFTER = /\A[[:space:]]/
-      private_constant :GAP, :EDGE_SPACE_BEFORE, :EDGE_SPACE_AFTER
+      # Elements that take one kind of child and no text.
+      ROWS_ONLY = [AST::List, AST::Table, AST::TableRow].freeze
+      private_constant :GAP, :EDGE_SPACE_BEFORE, :EDGE_SPACE_AFTER, :ROWS_ONLY
 
       # @param rule_set [RuleSet]
       # @param report [Report]
@@ -70,7 +72,7 @@ module Markbridge
       # Normalize +document+'s subtree in place.
       # @param document [AST::Document]
       def call(document)
-        _element, bubble = normalize_element(document, [])
+        _element, bubble, = normalize_element(document, [])
         # Defensive: anything that never reached its boundary becomes a
         # trailing sibling rather than being lost. Well-formed rule tables
         # do not get here.
@@ -89,11 +91,14 @@ module Markbridge
       end
 
       # Normalize a node's descendants. Elements recurse; leaves are
-      # returned untouched. Returns +[node_or_nil, bubble]+ — +nil+ when the
-      # element was pruned, and +bubble+ is the list of +[node, boundary]+
-      # pairs to hoist above this node.
+      # returned untouched. Returns +[node_or_nil, bubble, before, after]+ —
+      # +nil+ when the element was pruned, +bubble+ is the list of
+      # +[node, boundary]+ pairs to hoist above this node. +before+ says
+      # that a block left the start of the node, so what stands in front
+      # of the node was on another line, and +after+ says the same for its
+      # end and what follows it.
       def normalize_node(node, stack)
-        return node, EMPTY unless node.is_a?(AST::Element)
+        return node, EMPTY, false, false unless node.is_a?(AST::Element)
 
         normalize_element(node, stack)
       end
@@ -113,11 +118,13 @@ module Markbridge
           strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
 
           if strategy.nil? || strategy == :keep
-            normalized, child_bubble = normalize_node(child, stack)
-            next if unchanged?(out, normalized, child, child_bubble)
+            normalized, child_bubble, before, after = normalize_node(child, stack)
+            next if !before && !after && unchanged?(out, normalized, child, child_bubble)
 
             out ||= children[0, index]
+            out << GAP if before
             bubble = append_kept(normalized, child_bubble, child, out, bubble)
+            out << GAP if after
           else
             out ||= children[0, index]
             bubble = emit(child, strategy, boundary, stack, out, bubble)
@@ -125,15 +132,20 @@ module Markbridge
         end
 
         stack.pop
+        before = after = false
         if out
-          out = coalesce(out)
+          # A block starts and ends a line itself, whatever is in it.
+          inline = !own_lines?(element)
+          before = inline && out.first.equal?(GAP)
+          after = inline && out.last.equal?(GAP)
+          out = coalesce(out, spaces: !ROWS_ONLY.include?(element.class))
           element.replace_children(out)
         end
 
         raised = bubble || EMPTY
-        return nil, raised if prune?(element, out, children)
+        return nil, raised, false, false if prune?(element, out, children)
 
-        [element, raised]
+        [element, raised, before, after]
       end
 
       # An element is removed when it ends up with no children and is one of
@@ -151,8 +163,11 @@ module Markbridge
         strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
 
         if strategy.nil? || strategy == :keep
-          child2, child_bubble = normalize_node(child, stack)
-          append_kept(child2, child_bubble, child, out, bubble)
+          child2, child_bubble, before, after = normalize_node(child, stack)
+          out << GAP if before
+          bubble = append_kept(child2, child_bubble, child, out, bubble)
+          out << GAP if after
+          bubble
         else
           emit(child, strategy, boundary, stack, out, bubble)
         end
@@ -197,11 +212,11 @@ module Markbridge
         # Walk the relocated subtree against its destination stack (the
         # ancestors strictly above the boundary) so its interior never sees
         # the boundary it is leaving.
-        child2, child_bubble = normalize_node(child, ancestors_above(boundary, stack))
+        child2, child_bubble, = normalize_node(child, ancestors_above(boundary, stack))
         bubble ||= []
         bubble << [child2, boundary] unless child2.nil?
-        # For the built-in tables a hoisted subtree yields no escaping
-        # bubbles; carry any (from a custom rule) up as a best effort.
+        # What leaves the hoisted subtree itself comes after it, so it
+        # lands behind it (see #land).
         child_bubble.each { |entry| bubble << entry }
         bubble
       end
@@ -219,7 +234,11 @@ module Markbridge
         # Unwrap: run the child's children through the current +out+, resolved
         # against the current stack. Resolving them again in the same pass is
         # what fixes deeply nested links in one go.
+        # A block that is unwrapped had its content on lines of its own.
+        apart = block?(child)
+        out << GAP if apart
         child.children.each { |grandchild| bubble = resolve_into(grandchild, stack, out, bubble) }
+        out << GAP if apart
         bubble
       end
 
@@ -228,10 +247,16 @@ module Markbridge
       # propagate the rest upward. A block that goes on upward stood at
       # the end of +child+ or behind it, so it leaves a gap here too:
       # what follows +child+ was on a line of its own.
+      #
+      # A node that lands here can be the boundary of a later one: a table
+      # in a heading in bold leaves the heading, and the heading leaves
+      # the bold. The table lands behind the heading then.
       def land(child_bubble, child, out, bubble)
+        landed = nil
         child_bubble.each do |node, boundary|
-          if boundary.equal?(child)
+          if boundary.equal?(child) || landed&.any? { |earlier| earlier.equal?(boundary) }
             out << node
+            (landed ||= []) << node
           else
             out << GAP if block?(node)
             bubble ||= []
@@ -254,7 +279,11 @@ module Markbridge
       # its two neighbors would touch. With the block between them they
       # were on two lines, and an HTML parser has trimmed the whitespace
       # at such a line edge.
-      def coalesce(nodes)
+      #
+      # +spaces+ is false for a list, a table and a row: they hold items,
+      # rows and cells, and a text between two of them would be a child
+      # that does not belong there.
+      def coalesce(nodes, spaces:)
         nodes
           .each_with_index
           .with_object([]) do |(node, index), acc|
@@ -262,7 +291,7 @@ module Markbridge
 
             # For the first node this looks at the last one, which does no
             # harm: nothing is in front of the first node to touch.
-            gap = nodes.fetch(index - 1).equal?(GAP)
+            gap = spaces && nodes.fetch(index - 1).equal?(GAP)
             append(acc, AST::Text.new(" ")) if gap && touching?(acc.last, node)
             append(acc, node)
           end
@@ -287,12 +316,27 @@ module Markbridge
           BLOCK_NODES.any? { |klass| node.is_a?(klass) }
       end
 
+      # Whether a node that stays where it is has lines of its own. Not
+      # every code and not every spoiler has: a code span and an inline
+      # spoiler are a part of their line.
+      def own_lines?(node)
+        case node
+        when AST::Code
+          KEEP_INLINE_CODE.call(nil, node) == :hoist_after
+        when AST::Spoiler
+          KEEP_INLINE_SPOILER.call(nil, node) == :hoist_after
+        else
+          BLOCK_NODES.any? { |klass| node.is_a?(klass) }
+        end
+      end
+
       # Whether +left+ and +right+ stand next to each other without
       # whitespace or a line break between them. Only text is looked into,
-      # an element counts as something visible.
+      # an inline element counts as something visible. A block is on lines
+      # of its own, nothing touches it.
       def touching?(left, right)
-        return false if left.nil? || left.instance_of?(AST::LineBreak)
-        return false if right.instance_of?(AST::LineBreak)
+        return false if left.nil? || left.instance_of?(AST::LineBreak) || own_lines?(left)
+        return false if right.instance_of?(AST::LineBreak) || own_lines?(right)
         return false if left.instance_of?(AST::Text) && left.text.match?(EDGE_SPACE_BEFORE)
 
         !(right.instance_of?(AST::Text) && right.text.match?(EDGE_SPACE_AFTER))
