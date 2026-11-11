@@ -12,6 +12,84 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
     Markbridge::Parsers::BBCode::PeekableEnumerator.new(scanner)
   end
 
+  describe "#close_implied_ends" do
+    it "closes a list with its last item, and expects the closing tag of the item" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+      context.push(Markbridge::AST::ListItem.new)
+
+      result = reconciler.close_implied_ends(handler: registry["list"], context:)
+
+      expect(result).to be true
+      expect(context.current).to eq(root)
+      expect(context.auto_closed_count).to eq(0)
+      expect(context.closing_tag_due?(registry["*"])).to be true
+      expect(context.closing_tag_due?(registry["list"])).to be false
+    end
+
+    it "closes a table with its last row and cell" do
+      context.push(Markbridge::AST::Table.new)
+      context.push(Markbridge::AST::TableRow.new)
+      context.push(Markbridge::AST::TableCell.new)
+
+      result = reconciler.close_implied_ends(handler: registry["table"], context:)
+
+      expect(result).to be true
+      expect(context.current).to eq(root)
+      expect(context.closing_tag_due?(registry["td"])).to be true
+      expect(context.closing_tag_due?(registry["tr"])).to be true
+    end
+
+    it "closes a row with its last cell and leaves the table open" do
+      table = Markbridge::AST::Table.new
+      context.push(table)
+      context.push(Markbridge::AST::TableRow.new)
+      context.push(Markbridge::AST::TableCell.new)
+
+      result = reconciler.close_implied_ends(handler: registry["tr"], context:)
+
+      expect(result).to be true
+      expect(context.current).to eq(table)
+    end
+
+    it "leaves everything as it is when something else is open in the item" do
+      context.push(Markbridge::AST::List.new)
+      context.push(Markbridge::AST::ListItem.new)
+      bold = Markbridge::AST::Bold.new
+      context.push(bold)
+
+      result = reconciler.close_implied_ends(handler: registry["list"], context:)
+
+      expect(result).to be false
+      expect(context.current).to eq(bold)
+      expect(context.closing_tag_due?(registry["*"])).to be false
+    end
+
+    it "leaves everything as it is when the item is in something else" do
+      context.push(Markbridge::AST::Quote.new)
+      item = Markbridge::AST::ListItem.new
+      context.push(item)
+
+      result = reconciler.close_implied_ends(handler: registry["list"], context:)
+
+      expect(result).to be false
+      expect(context.current).to eq(item)
+      expect(context.closing_tag_due?(registry["*"])).to be false
+    end
+
+    it "leaves the current element to the caller" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+
+      expect(reconciler.close_implied_ends(handler: registry["list"], context:)).to be false
+      expect(context.current).to eq(list)
+    end
+
+    it "does nothing when nothing is open" do
+      expect(reconciler.close_implied_ends(handler: registry["list"], context:)).to be false
+    end
+  end
+
   describe "#close_inside_block" do
     let(:quote) { Markbridge::AST::Quote.new }
 
