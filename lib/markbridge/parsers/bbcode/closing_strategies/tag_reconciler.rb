@@ -63,6 +63,27 @@ module Markbridge
             true
           end
 
+          # Ends an item that has no list around it, with what is still
+          # open in it, when the closing tag is for an element around the
+          # item: in `[quote][*]a[/quote]` the item ends with the quote.
+          # Nothing else ends such an item, so without this the closing
+          # tag would be text. An item in a list is left to the list.
+          #
+          # @param handler [BaseHandler] the handler for the closing tag
+          # @param context [ParserState]
+          def close_item_without_list(handler:, context:)
+            open = context.elements_from_current
+            item = open.index { |element| element.instance_of?(AST::ListItem) }
+            return unless item
+
+            around = open.drop(item + 1)
+            return if around.first.instance_of?(AST::List)
+            return if around.none? { |element| @registry.handler_for_element(element) == handler }
+
+            context.auto_close!(item)
+            (item + 1).times { context.pop }
+          end
+
           # Attempt to reorder closing tags
           #
           # @param handler [BaseHandler] the handler for the closing tag

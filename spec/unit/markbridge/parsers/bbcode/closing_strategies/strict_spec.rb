@@ -77,4 +77,33 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::Strict do
       expect(result.children.first.text).to eq("[/b]")
     end
   end
+
+  context "when an item without a list is open in the element" do
+    it "leaves the item open for a closing tag that nothing opened" do
+      item = Markbridge::AST::ListItem.new
+      context.push(item)
+
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "b", pos: 0, source: "[/b]")
+
+      strategy.handle_close(token:, context:, registry:)
+
+      expect(context.current).to eq(item)
+      expect(item.children.map(&:text)).to eq(["[/b]"])
+    end
+
+    it "ends the item with the element" do
+      quote = Markbridge::AST::Quote.new
+      context.push(quote)
+      context.push(Markbridge::AST::ListItem.new)
+      context.push(Markbridge::AST::Bold.new)
+
+      token = Markbridge::Parsers::BBCode::TagEndToken.new(tag: "quote", pos: 0, source: "[/quote]")
+
+      strategy.handle_close(token:, context:, registry:)
+
+      expect(context.current).to eq(root)
+      expect(quote.children.first.children.map(&:class)).to eq([Markbridge::AST::Bold])
+      expect(context.auto_closed_count).to eq(1)
+    end
+  end
 end
