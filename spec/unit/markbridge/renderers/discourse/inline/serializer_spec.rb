@@ -1066,6 +1066,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
       ).to eq("a\n\nhttps://e.com/   b")
     end
 
+    it "leaves out spaces and tabs after a space or a tab" do
+      expect(write_groups([[:a, "a "], [:b, " "], [:c, "\t "], [:d, "b"]])).to eq("a b")
+      expect(write_groups([[:a, "a\t"], [:b, " "], [:c, "b"]])).to eq("a\tb")
+      expect(write_groups([[:a, "a "], [:b, " b"], [:c, " "]])).to eq("a  b ")
+      expect(write_groups([[:a, "a"], [:b, " "], [:c, "b"]])).to eq("a b")
+      expect(write_groups([[:a, "a "], [:b, " \n"], [:c, "b"]])).to eq("a  \nb")
+      expect(write_groups([[:a, "a "], [:b, " "]], html_mode: true)).to eq("a  ")
+      expect(write_groups([[:a, " "], [:b, " "], [:c, "b"]])).to eq(" b")
+    end
+
     it "goes on after an output that is empty, without a word to the hook" do
       seen = []
 

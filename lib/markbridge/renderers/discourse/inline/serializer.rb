@@ -89,6 +89,7 @@ module Markbridge
           # Spaces and tabs at the start of a piece. Not a no-break space:
           # the escaper writes one where it wants indentation kept.
           LEADING_BLANKS = /\A[ \t]+/
+          ONLY_BLANKS = /\A[ \t]+\z/
           NEWLINE = 10
           SPACE = 32
           TAB = 9
@@ -117,6 +118,7 @@ module Markbridge
                            :BR,
                            :GT,
                            :LEADING_BLANKS,
+                           :ONLY_BLANKS,
                            :TRAILING_BREAKS,
                            :NEWLINE,
                            :SPACE,
@@ -367,11 +369,21 @@ module Markbridge
 
               "<br>#{piece.byteslice(1, piece.bytesize - 1)}"
             else
-              blanks = first == SPACE || first == TAB
-              return piece unless blanks && trailing_blank_lines(buffer, blank) == 2
+              return piece unless first == SPACE || first == TAB
+              return "" if more_blanks?(buffer, piece)
+              return piece unless trailing_blank_lines(buffer, blank) == 2
 
               piece.sub(LEADING_BLANKS, "")
             end
+          end
+
+          # Spaces and tabs after a space or a tab. They show nothing, and
+          # a buffer that grows by them is read back to its last visible
+          # character for every piece: a line of empty elements with a
+          # space between them took time with the square of its length.
+          def more_blanks?(buffer, piece)
+            last = buffer.getbyte(-1)
+            (last == SPACE || last == TAB) && piece.match?(ONLY_BLANKS)
           end
 
           def after_break?(buffer)
