@@ -45,7 +45,7 @@ jobs:
       # The checkout of Discourse and the built bundle, keyed by the commits
       # in discourse.json and the builder itself.
       - name: Cache the engine
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: tmp/discourse_engine
           key: discourse-engine-${{ hashFiles('spec/support/markdown_it/discourse.json', 'spec/support/discourse_engine/build.mjs') }}
