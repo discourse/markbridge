@@ -441,6 +441,170 @@ RSpec.describe Markbridge::Normalizer::Walker do
       expect(texts_after_normalizing(text("a"), el(italic, code), text("b"))).to eq(["a b"])
     end
 
+    it "gets a space in front of an element that starts with the block" do
+      tree = doc(text("a"), bold(code, text("b")), text("c"))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.map(&:class)).to eq(
+        [
+          Markbridge::AST::Text,
+          Markbridge::AST::Bold,
+          Markbridge::AST::Code,
+          Markbridge::AST::Text,
+        ],
+      )
+      expect(tree.children.first.text).to eq("a ")
+      expect(tree.children[1].children.map(&:text)).to eq(["b"])
+    end
+
+    it "gets a space in front of an element in an element that starts with the block" do
+      italic = Markbridge::AST::Italic
+
+      expect(texts_after_normalizing(text("a"), el(italic, code, text("b")))).to eq(["a ", italic])
+    end
+
+    it "gets one in front of the outermost element when both start with the block" do
+      italic = Markbridge::AST::Italic
+      tree = doc(text("a"), bold(el(italic, code, text("b"))))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.first.text).to eq("a ")
+      expect(tree.children[1].children.map(&:class)).to eq([italic])
+    end
+
+    it "gets no space in front of an element that is empty then" do
+      tree = doc(text("a"), bold(code), text("b"))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::Code, Markbridge::AST::Text],
+      )
+      expect(tree.children.first.text).to eq("a")
+    end
+
+    it "gets no space in front of an element whose block is not at its start" do
+      tree = doc(text("a"), bold(text("b"), code))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.first.text).to eq("a")
+    end
+
+    it "gets a space in front of an element that is unwrapped around one that starts with the block" do
+      tree = doc(url(text("a"), url(bold(code, text("b")), href: "https://ex.com/2")))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      link = tree.children.first
+      expect(link.children.map(&:class)).to eq([Markbridge::AST::Text, Markbridge::AST::Bold])
+      expect(link.children.first.text).to eq("a ")
+    end
+
+    it "gets a space on both sides of the content of a block that is unwrapped" do
+      heading = Markbridge::AST::Heading
+      inner = el(heading, text("b"), level: 2)
+      tree = doc(text("x"), el(heading, text("a"), inner, text("c"), level: 1))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.first.text).to eq("x")
+      expect(tree.children.last.children.map(&:text)).to eq(["a b c"])
+    end
+
+    it "gets no space in front of a block that starts with a block that is unwrapped" do
+      heading = Markbridge::AST::Heading
+      tree = doc(text("x"), el(heading, el(heading, text("b"), level: 2), text("c"), level: 1))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.first.text).to eq("x")
+      expect(tree.children.last.children.map(&:text)).to eq(["b c"])
+    end
+
+    it "gets a space around an element whose only content was a block that is unwrapped" do
+      heading = Markbridge::AST::Heading
+      deletion = el(Markbridge::AST::Deletion, el(heading, text("b"), level: 2))
+      outer = el(heading, text("a"), deletion, text("c"), level: 1)
+      Markbridge::Normalizer.default.normalize(doc(outer))
+
+      expect(outer.children.map(&:class)).to eq(
+        [Markbridge::AST::Text, Markbridge::AST::Deletion, Markbridge::AST::Text],
+      )
+      expect(outer.children.first.text).to eq("a ")
+      expect(outer.children.last.text).to eq(" c")
+    end
+
+    it "gets no space between a block that landed and the text behind it" do
+      tree = doc(bold(text("a"), code), text("b"))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.last.text).to eq("b")
+    end
+
+    it "gets no space between an element and the block behind it" do
+      # A custom rule: with the default rules a block is hoisted, and
+      # the block that lands is what stands in front of the next block.
+      custom =
+        Markbridge::Normalizer.default.rule(
+          parent: Markbridge::AST::Bold,
+          child: Markbridge::AST::Quote,
+          strategy: :unwrap,
+        )
+      quote = el(Markbridge::AST::Quote, text("q"))
+      tree = doc(bold(quote), el(Markbridge::AST::Paragraph, text("p")))
+      custom.normalize(tree)
+
+      expect(tree.children.map(&:class)).to eq([Markbridge::AST::Bold, Markbridge::AST::Paragraph])
+    end
+
+    it "gets a space behind an element in a block that is unwrapped, when it ended with a block" do
+      heading = Markbridge::AST::Heading
+      deletion = el(Markbridge::AST::Deletion, el(heading, text("b"), level: 3))
+      outer = el(heading, el(heading, deletion, text("c"), level: 2), level: 1)
+      Markbridge::Normalizer.default.normalize(doc(outer))
+
+      expect(outer.children.map(&:class)).to eq([Markbridge::AST::Deletion, Markbridge::AST::Text])
+      expect(outer.children.last.text).to eq(" c")
+    end
+
+    it "gets a space in front of a code span and of an inline spoiler" do
+      span = el(Markbridge::AST::Code, text("c"))
+      spoiler = el(Markbridge::AST::Spoiler, text("s"))
+
+      expect(texts_after_normalizing(text("a"), list, span)).to eq(["a ", Markbridge::AST::Code])
+      expect(texts_after_normalizing(text("a"), list, spoiler)).to eq(
+        ["a ", Markbridge::AST::Spoiler],
+      )
+    end
+
+    it "gets no space around the content of a link that is unwrapped" do
+      tree = doc(url(text("a"), url(text("b"), href: "https://ex.com/2"), text("c")))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.first.children.map(&:text)).to eq(["abc"])
+    end
+
+    it "gets no space between the items of a list, the rows of a table and the cells of a row" do
+      item = Markbridge::AST::ListItem
+      cell = Markbridge::AST::TableCell
+      row = Markbridge::AST::TableRow
+      # A custom rule, so the code leaves its item, its row or its cell.
+      leaving = ->(parent) do
+        Markbridge::Normalizer.default.rule(
+          parent:,
+          child: Markbridge::AST::Code,
+          strategy: :hoist_after,
+        )
+      end
+      list = el(Markbridge::AST::List, el(item, bold(text("a"), code)), el(item, text("b")))
+      cells = el(row, el(cell, bold(text("a"), code)), el(cell, text("b")))
+      rows = el(Markbridge::AST::Table, el(row, el(cell, bold(code))), el(row, el(cell, text("b"))))
+
+      leaving.call(item).normalize(doc(list))
+      leaving.call(cell).normalize(doc(el(Markbridge::AST::Table, cells)))
+      leaving.call(row).normalize(doc(rows))
+
+      expect(list.children.map(&:class)).to eq([item, Markbridge::AST::Code, item])
+      expect(cells.children.map(&:class)).to eq([cell, Markbridge::AST::Code, cell])
+      expect(rows.children.map(&:class)).to eq([row, Markbridge::AST::Code, row])
+    end
+
     it "gets no space behind an element that a node that is no block was hoisted through" do
       italic = Markbridge::AST::Italic
       tree = doc(url(el(italic, text("a"), image), text("b")))
@@ -448,6 +612,46 @@ RSpec.describe Markbridge::Normalizer::Walker do
 
       expect(tree.children.first.children.map(&:class)).to eq([italic, Markbridge::AST::Text])
       expect(tree.children.first.children.last.text).to eq("b")
+    end
+  end
+
+  describe "a block that leaves a block that leaves its place too" do
+    def bold(*children) = el(Markbridge::AST::Bold, *children)
+
+    it "goes on upward behind a node that landed, when its own boundary is further up" do
+      italic = el(Markbridge::AST::Italic, url(image, el(Markbridge::AST::Code, text("a\nb"))))
+      tree = doc(italic)
+
+      normalizer.normalize(tree)
+
+      expect(tree.children.map(&:class)).to eq([Markbridge::AST::Italic, Markbridge::AST::Code])
+      expect(italic.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Image])
+    end
+
+    it "lands behind the block it was in" do
+      table =
+        el(
+          Markbridge::AST::Table,
+          el(Markbridge::AST::TableRow, el(Markbridge::AST::TableCell, text("t"))),
+        )
+      quote = el(Markbridge::AST::Quote, text("q"))
+      heading = el(Markbridge::AST::Heading, text("h"), table, quote, level: 2)
+      tree = doc(el(Markbridge::AST::Paragraph, bold(text("a"), heading), text("b")), text("end"))
+
+      Markbridge::Normalizer.default.normalize(tree)
+
+      paragraph = tree.children.first
+      expect(paragraph.children.map(&:class)).to eq(
+        [
+          Markbridge::AST::Bold,
+          Markbridge::AST::Heading,
+          Markbridge::AST::Table,
+          Markbridge::AST::Quote,
+          Markbridge::AST::Text,
+        ],
+      )
+      expect(paragraph.children[1].children.map(&:text)).to eq(["h"])
+      expect(tree.children.map(&:class)).to eq([Markbridge::AST::Paragraph, Markbridge::AST::Text])
     end
   end
 
