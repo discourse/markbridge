@@ -89,6 +89,62 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ListItemHandler do
       expect(context.auto_closed_count).to eq(0)
     end
 
+    [
+      Markbridge::AST::Quote,
+      Markbridge::AST::Spoiler,
+      Markbridge::AST::Align,
+      Markbridge::AST::TableCell,
+    ].each do |klass|
+      it "is text in a #{klass.name.split("::").last} that is open inside an item" do
+        item = Markbridge::AST::ListItem.new
+        block = klass == Markbridge::AST::Align ? klass.new(alignment: "center") : klass.new
+        context.push(Markbridge::AST::List.new)
+        context.push(item)
+        context.push(block)
+        context.push(Markbridge::AST::Bold.new)
+
+        handler.on_open(token: tag_start(source: "[*]"), context:, registry:)
+
+        expect(context.current).to be_a(Markbridge::AST::Bold)
+        expect(context.current.children.map(&:text)).to eq(["[*]"])
+        expect(context.auto_closed_count).to eq(0)
+      end
+    end
+
+    it "starts an item in a quote that has no list around it" do
+      quote = Markbridge::AST::Quote.new
+      context.push(quote)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(quote.children).to eq([context.current])
+      expect(context.current).to be_a(Markbridge::AST::ListItem)
+    end
+
+    it "starts an item in a list that is inside a quote" do
+      list = Markbridge::AST::List.new
+      context.push(Markbridge::AST::List.new)
+      context.push(Markbridge::AST::ListItem.new)
+      context.push(Markbridge::AST::Quote.new)
+      context.push(list)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(list.children).to eq([context.current])
+    end
+
+    it "closes an item whose list is inside a quote" do
+      list = Markbridge::AST::List.new
+      first = Markbridge::AST::ListItem.new
+      context.push(Markbridge::AST::Quote.new)
+      context.push(list)
+      context.push(first)
+
+      handler.on_open(token: tag_start, context:, registry:)
+
+      expect(list.children).to eq([first, context.current])
+    end
+
     it "nests inside a List when current is a List (does not pop the List)" do
       list = Markbridge::AST::List.new
       context.push(list)
