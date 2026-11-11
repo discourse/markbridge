@@ -274,6 +274,16 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::SpoilerTag do
         )
       end
 
+      it "writes a div without the class in html_mode without the plugin" do
+        tag = described_class.new(bbcode: false)
+        interface = interface_for(html_mode: true)
+
+        expect(tag.render(block_spoiler("hidden"), interface)).to eq("<div>hidden</div>")
+        expect(tag.render(block_spoiler("hidden", title: "T"), interface)).to eq(
+          "T:<div>hidden</div>",
+        )
+      end
+
       it "writes the content as a block of its own without the plugin" do
         tag = described_class.new(bbcode: false)
 

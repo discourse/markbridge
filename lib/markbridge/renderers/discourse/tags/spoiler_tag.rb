@@ -76,10 +76,12 @@ module Markbridge
           # `[spoiler]` and `[/spoiler]` on lines of their own are a block
           # spoiler to Discourse, with blocks inside. The title is a
           # paragraph in front of it. Without the plugin the content is a
-          # block of its own too.
+          # block of its own too, in html_mode a <div> without the class.
           def render_block(element, interface, content)
             title = title_text(element, interface)&.rstrip
-            return "#{title}<div class=\"spoiler\">#{content}</div>" if interface.html_mode?
+            if interface.html_mode?
+              return "#{title}<div#{' class="spoiler"' if @bbcode}>#{content}</div>"
+            end
 
             content = content.gsub(/\A\n+|\n+\z/, "")
             content = "[spoiler]\n#{content}\n[/spoiler]" if @bbcode
