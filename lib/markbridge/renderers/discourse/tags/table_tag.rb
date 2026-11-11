@@ -22,22 +22,27 @@ module Markbridge
           ].freeze
           private_constant :BLOCK_NODES
 
+          # The cells are rendered once when the place or the content of
+          # the table already says that it has to be HTML. A table in a
+          # table is such a case, and rendering each of them twice would
+          # double the work with every level.
           def render(element, interface)
             child_context = interface.with_parent(element)
-            rows_data = extract_rows(element, interface, child_context)
 
-            return "" if rows_data.empty?
-
-            if markdown_compatible?(element, rows_data, interface)
-              render_markdown(rows_data)
-            else
-              # Re-render cells in html_mode so inline Markdown like **bold** becomes
-              # <strong>bold</strong>; CommonMark would not parse Markdown inside an HTML block.
-              html_rows = extract_rows(element, interface, child_context.with_html_mode(true))
-              html = render_html(html_rows)
-              # Inside an HTML block a blank line would end the block.
-              interface.html_mode? ? html : "\n\n#{html}\n\n"
+            if markdown_possible?(element, interface)
+              rows_data = extract_rows(element, interface, child_context)
+              return "" if rows_data.empty?
+              return render_markdown(rows_data) if markdown_rows?(rows_data)
             end
+
+            # Cells in html_mode, so inline Markdown like **bold** becomes
+            # <strong>bold</strong>; CommonMark would not parse Markdown inside an HTML block.
+            html_rows = extract_rows(element, interface, child_context.with_html_mode(true))
+            return "" if html_rows.empty?
+
+            html = render_html(html_rows)
+            # Inside an HTML block a blank line would end the block.
+            interface.html_mode? ? html : "\n\n#{html}\n\n"
           end
 
           private
@@ -63,14 +68,16 @@ module Markbridge
             end
           end
 
-          # Check if the table can be rendered as Markdown: not nested in a
-          # table, no block in a cell, the header row (when there is one)
-          # first, every row as wide as the first, no cell on two lines and
-          # no cell over several columns or rows.
-          def markdown_compatible?(element, rows_data, interface)
-            return false if interface.has_parent?(AST::Table)
-            return false if block_in_cell?(element)
+          # What can be said without rendering a cell: a Markdown table
+          # is not nested in a table and has no block in a cell.
+          def markdown_possible?(element, interface)
+            !interface.has_parent?(AST::Table) && !block_in_cell?(element)
+          end
 
+          # What the rendered cells say: the header row (when there is
+          # one) first, every row as wide as the first, no cell on two
+          # lines and no cell over several columns or rows.
+          def markdown_rows?(rows_data)
             header_idx = rows_data.index { |r| r[:cells].all? { |c| c[:header] } }
             return false if header_idx&.positive?
 
