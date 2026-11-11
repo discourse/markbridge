@@ -241,6 +241,13 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(doc.children[1]).to be_a(Markbridge::AST::Image)
       expect(doc.children[1].src).to eq("./Special:FilePath/b.png")
     end
+
+    it "writes a ? in the name of a file as %3F" do
+      doc = parse("[[File:Why?.png]] [[File:Why?.pdf]]")
+
+      expect(doc.children.first.src).to eq("./Special:FilePath/Why%3F.png")
+      expect(doc.children.last.href).to eq("./File:Why%3F.pdf")
+    end
   end
 
   describe "bold inside italic" do
@@ -306,6 +313,21 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
       expect(url).to be_a(Markbridge::AST::Url)
       expect(url.href).to eq("./Page_Name")
       expect(url.children.first.text).to eq("display text")
+    end
+
+    it "writes a ? in the title as %3F, so it does not start a query" do
+      doc = parse("[[Who is it? Or what?]]")
+
+      url = doc.children.first
+      expect(url.href).to eq("./Who_is_it%3F_Or_what%3F")
+      expect(url.children.first.text).to eq("Who is it? Or what?")
+    end
+
+    it "leaves a ? in the section of a page as it is" do
+      doc = parse("[[Why?#How? And when?|text]] [[FAQ#Why#How?]]")
+      links = doc.children.grep(Markbridge::AST::Url)
+
+      expect(links.map(&:href)).to eq(%w[./Why%3F#How?_And_when? ./FAQ#Why#How?])
     end
 
     it "preserves pipes after the first in the display text" do
