@@ -67,13 +67,15 @@ module Markbridge
             return false if match_depth.nil? || match_depth.zero?
             return false unless all_auto_closeable?(context, match_depth - 1)
 
-            intervening = context.elements_from_current(match_depth - 1).map(&:class)
+            intervening = context.elements_from_current(match_depth - 1)
 
             count = match_depth + 1
             count.times { context.pop }
             context.auto_close!(count)
 
-            intervening.reverse_each { |klass| context.push(klass.new) }
+            # A copy without the children, so a color keeps its color and
+            # a link its address.
+            intervening.reverse_each { |element| context.push(element.dup.replace_children([])) }
 
             true
           end

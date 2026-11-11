@@ -195,10 +195,10 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
     let(:italic_handler) { registry["i"] }
 
     it "closes a target that is not auto-closeable, with what is open in it" do
-      context.push(Markbridge::AST::Url.new(href: "https://example.com"))
+      context.push(Markbridge::AST::Quote.new)
       context.push(Markbridge::AST::Bold.new)
 
-      result = reconciler.try_auto_close(handler: registry["url"], context:)
+      result = reconciler.try_auto_close(handler: registry["quote"], context:)
 
       expect(result).to be true
       expect(context.current).to eq(root)
@@ -286,13 +286,44 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
     let(:bold_handler) { registry["b"] }
     let(:italic_handler) { registry["i"] }
 
-    it "closes a target that is not auto-closeable and reopens what was open in it" do
+    it "returns false when the element right inside the target is not auto-closeable" do
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::List.new)
+      context.push(Markbridge::AST::Italic.new)
+      context.push(Markbridge::AST::Underline.new)
+
+      result = reconciler.try_reopen(handler: bold_handler, context:, tokens: tokens_for("text"))
+
+      expect(result).to be false
+      expect(context.current).to be_a(Markbridge::AST::Underline)
+    end
+
+    it "reopens a color with its color and a link with its address" do
+      color = Markbridge::AST::Color.new(color: "red")
       link = Markbridge::AST::Url.new(href: "https://example.com")
+      color << Markbridge::AST::Text.new("x")
+      context.push(Markbridge::AST::Bold.new)
+      context.push(color)
       context.push(link)
+
+      reconciler.try_reopen(handler: bold_handler, context:, tokens: tokens_for(" more"))
+
+      reopened_link, reopened_color = context.elements_from_current
+      expect(reopened_link).to be_a(Markbridge::AST::Url)
+      expect(reopened_link.href).to eq("https://example.com")
+      expect(reopened_color).to be_a(Markbridge::AST::Color)
+      expect(reopened_color.color).to eq("red")
+      expect(reopened_color).not_to equal(color)
+      expect(reopened_color.children).to eq([reopened_link])
+      expect(color.children.map(&:class)).to eq([Markbridge::AST::Text, Markbridge::AST::Url])
+    end
+
+    it "closes a target that is not auto-closeable and reopens what was open in it" do
+      context.push(Markbridge::AST::Quote.new)
       context.push(Markbridge::AST::Bold.new)
 
       result =
-        reconciler.try_reopen(handler: registry["url"], context:, tokens: tokens_for(" more"))
+        reconciler.try_reopen(handler: registry["quote"], context:, tokens: tokens_for(" more"))
 
       expect(result).to be true
       expect(context.elements_from_current.map(&:class)).to eq(
