@@ -1,5 +1,5 @@
 {
-  "commit": "f4da27dd1ca906c1a7ac7eb853a8a53346fe4482",
+  "commit": "ae65e05533380219967c9e49bdb1f5868b177910",
   "packages": {
     "linkify-it": "6.1.0",
     "markdown-it": "15.0.3"
@@ -13,12 +13,12 @@
   },
   "sources": {
     "frontend/discourse-markdown-it/src/setup.js": "3739a7817e41ddef8c6e03f6f24065de0eca03ab74e62a124a80c3364bac5810",
-    "frontend/discourse-markdown-it/src/engine.js": "b0f99477271ac3b0f8e0bd5eedc25e9c3b4d86ef1f0dcb2a6fcff85f72f57f00",
+    "frontend/discourse-markdown-it/src/engine.js": "89862b3db12b15c9ca3b450ff685cafa126ee538c9a8e152f347dcd949dfefbf",
     "frontend/discourse-markdown-it/src/features/newline.js": "395daf8b21dd7ae7bf0bb0c6022bf5df53d9a033ed79d9e486fb8af97eef4f74",
     "frontend/discourse-markdown-it/src/features/paragraph.js": "90f25e079b7417f64cef64f1b60e54e546fa2e2c1a2e47506f5d85ae828f22c4",
     "frontend/discourse-markdown-it/src/features/custom-typographer-replacements.js": "c4f51afab19ff27d93f42350d635b2d2682ac1ad9ea9e7223d62f6484358babb",
-    "lib/pretty_text/core_bundle.rb": "aa67ffc1b420c1823a78bf3fcebf5ce92e25c0d5fee2bc9599de4d40a15a9aaa",
-    "frontend/pretty-text-processor/build.mjs": "cc7e3ec381601db431e8dcc88643a59a77e51c571a22663124eda1af73ce1993",
+    "lib/pretty_text/core_bundle.rb": "8edc7aaab4e2ccfb45cb4f8d42202ccc4e89b905430c09c4e33253098bc08112",
+    "frontend/pretty-text-processor/build.mjs": "17f77697348cf483e538ef7f2f392e3bfd92904dd4b2149c37b405d83c4880da",
     "frontend/pretty-text-processor/pretty-text-ruby-interface.js": "8a84c2cf32b9f71cda14a715d924c834b2e514a7c2ff519e4c1c0abc85a1ef72",
     "frontend/pretty-text-processor/shims/i18n.js": "4978f9d1d7d80d2351df8dd6c4f077003bf127476b7571944b54a35bb4708973",
     "plugins/discourse-details/assets/javascripts/lib/discourse-markdown/details.js": "6b4eefc15eda4d7d3a3b17c137bc1240e77672029049b5d5b16aeed13aa0977b",

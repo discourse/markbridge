@@ -42,7 +42,6 @@ const CORE_PLUGINS = ["discourse-details", "spoiler-alert", "poll", "discourse-e
 // frontend/pretty-text-processor/build.mjs in Discourse.
 const DISCOURSE_PATHS = [
   "frontend/pretty-text-processor",
-  "frontend/pretty-text",
   "frontend/discourse-markdown-it",
   "frontend/discourse",
   "frontend/discourse-i18n",
@@ -134,7 +133,9 @@ function checkout(repo, commit, dir, paths = null) {
 
 // `pnpm install` for the packages the bundle is built from, with the pnpm
 // version the checkout names. The root postinstall script needs files
-// outside the sparse checkout, so no scripts run.
+// outside the sparse checkout, so no scripts run. The `discourse` package
+// is one of them since the sanitizer and the other pretty-text files
+// are a part of it, and their imports resolve from its node_modules.
 function installPackages(root) {
   const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const pnpm = manifest.packageManager || "pnpm";
@@ -152,9 +153,9 @@ function installPackages(root) {
       "--filter",
       "discourse-markdown-it",
       "--filter",
-      "pretty-text",
-      "--filter",
       "discourse-i18n",
+      "--filter",
+      "discourse",
     ],
     { cwd: root, stdio: ["ignore", "inherit", "inherit"] },
   );
