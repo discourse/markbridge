@@ -74,6 +74,8 @@ What the parser does with a tag it has no handler for depends on the tag:
 - **Transparent:** `<thead>`, `<tbody>`, `<tfoot>`. Their children are processed as if the tag were not there.
 - **Unknown:** every other tag, like `<div>`, `<font>` or `<iframe>`. Its children are processed too, and `unknown_tags` counts the tag.
 
+A block-level tag among them, like `<div>` or `<section>`, still keeps its content on a line of its own: `<div>a</div><div>b</div>` is `a`, a line break and `b`. Which tags are block-level is the `block_level_tags` set of the registry.
+
 So the only difference between transparent and unknown is the count. When your source is full of a wrapper you expect, add it to the transparent tags. Then `unknown_tags` only shows what you did not expect:
 
 ```ruby
