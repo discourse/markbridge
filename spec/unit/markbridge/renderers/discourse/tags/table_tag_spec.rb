@@ -393,6 +393,39 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
     end
   end
 
+  describe "a table in a table in a table" do
+    def nest(content)
+      cell = Markbridge::AST::TableCell.new
+      cell << content
+      Markbridge::AST::Table.new << (Markbridge::AST::TableRow.new << cell)
+    end
+
+    it "renders the content of the innermost cell once" do
+      seen = 0
+      library = Markbridge::Renderers::Discourse::TagLibrary.default
+      library.register(
+        Markbridge::AST::Bold,
+        Markbridge::Renderers::Discourse::Tag.new do |_element, _interface|
+          seen += 1
+          "<strong>x</strong>"
+        end,
+      )
+      document = Markbridge::AST::Document.new
+      bold = Markbridge::AST::Bold.new << Markbridge::AST::Text.new("x")
+      document << nest(nest(nest(bold)))
+
+      markdown =
+        Markbridge.render(
+          document,
+          renderer: Markbridge.discourse_renderer(tag_library: library),
+        ).markdown
+
+      expect(seen).to eq(1)
+      expect(markdown.scan("<table>").size).to eq(3)
+      expect(markdown).to include("<td><strong>x</strong></td>")
+    end
+  end
+
   describe "edge cases" do
     it "returns empty string for table with no rows" do
       table = Markbridge::AST::Table.new
