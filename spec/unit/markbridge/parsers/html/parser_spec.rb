@@ -182,7 +182,9 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
       doc = parser.parse("<div><b>x</b></div><section>y</section>")
 
       expect(parser.unknown_tags).to eq("section" => 1)
-      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Bold, Markbridge::AST::Text])
+      expect(doc.children.map(&:class)).to eq(
+        [Markbridge::AST::Bold, Markbridge::AST::LineBreak, Markbridge::AST::Text],
+      )
     end
 
     it "counts a table section again when it is taken off the transparent tags" do
@@ -369,6 +371,89 @@ RSpec.describe Markbridge::Parsers::HTML::Parser do
 
       expect(doc.children[0]).to be_a(Markbridge::AST::Paragraph)
       expect(doc.children[0].children[0].text).to eq("via to_s")
+    end
+  end
+
+  describe "#parse with block-level tags that have no handler" do
+    def shape(html, with: parser)
+      names = ->(node) do
+        next node.text if node.instance_of?(Markbridge::AST::Text)
+        next :br if node.instance_of?(Markbridge::AST::LineBreak)
+
+        children = node.is_a?(Markbridge::AST::Element) ? node.children.map(&names) : []
+        [node.class.name.split("::").last.downcase.to_sym, *children]
+      end
+      with.parse(html).children.map(&names)
+    end
+
+    it "puts a line break between two blocks" do
+      expect(shape("<div>a</div><div>b</div>")).to eq(["a", :br, "b"])
+    end
+
+    it "puts a line break between text and a block, on both sides" do
+      expect(shape("a<div>b</div>c")).to eq(["a", :br, "b", :br, "c"])
+    end
+
+    it "puts one line break where several blocks start or end" do
+      expect(shape("<div><div>a</div></div><section><div>b</div></section>")).to eq(["a", :br, "b"])
+    end
+
+    it "adds nothing around a block that stands alone" do
+      expect(shape("<div><div>a</div></div>")).to eq(["a"])
+    end
+
+    it "adds nothing for a block without content" do
+      expect(shape("a<div></div><div> </div>")).to eq(["a"])
+    end
+
+    it "drops the whitespace between the blocks" do
+      expect(shape("<div>a </div>\n <div> b</div>")).to eq(["a", :br, "b"])
+    end
+
+    it "puts the line break in front of an inline element and an image" do
+      expect(shape("<div>a</div><b>b</b>")).to eq(["a", :br, [:bold, "b"]])
+      expect(shape(%(<div>a</div><img src="i.png">))).to eq(["a", :br, [:image]])
+    end
+
+    it "puts the line break in front of preserved text" do
+      expect(shape("<div>a</div><code> b</code>")).to eq(["a", :br, [:code, " b"]])
+      expect(shape("<div>a</div><textarea> b</textarea>")).to eq(["a", :br, " b"])
+    end
+
+    it "puts the line break where the content that follows goes" do
+      expect(shape("<b><div>a</div></b>c")).to eq([[:bold, "a"], :br, "c"])
+      expect(shape("<b>a<div>b</div></b>")).to eq([[:bold, "a", :br, "b"]])
+    end
+
+    it "adds no line break next to a block that has a handler" do
+      expect(shape("<div>a</div><p>b</p><div>c</div>")).to eq(["a", [:paragraph, "b"], "c"])
+      expect(shape("<div>a</div><hr><div>b</div>")).to eq(["a", [:horizontalrule], "b"])
+    end
+
+    it "keeps the cells and the items of a list free of line breaks" do
+      expect(shape("<ul><li><div>a</div></li><li><div>b</div></li></ul>")).to eq(
+        [[:list, [:listitem, "a"], [:listitem, "b"]]],
+      )
+    end
+
+    it "takes a <br> in front of a block as its line break" do
+      expect(shape("a<br><div>b</div>")).to eq(["a", :br, "b"])
+    end
+
+    it "keeps a <br> after a block as a line of its own" do
+      expect(shape("<div>a</div><br>b")).to eq(["a", :br, :br, "b"])
+    end
+
+    it "does the same for a transparent tag" do
+      transparent = described_class.new { |registry| registry.transparent_tags << "div" }
+
+      expect(shape("<div>a</div><div>b</div>", with: transparent)).to eq(["a", :br, "b"])
+    end
+
+    it "starts every parse without a line break from the one before" do
+      parser.parse("<div>a</div>")
+
+      expect(shape("b")).to eq(["b"])
     end
   end
 

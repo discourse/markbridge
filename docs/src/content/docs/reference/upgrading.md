@@ -21,6 +21,7 @@ Most projects update without a change to their code. What changes is the output 
 
 ### HTML
 
+- **Block-level tags without a handler** keep their content on a line of its own. `<div>a</div><div>b</div>` is `a`, a line break and `b`, like a browser shows it. It was `ab`. This applies to `<div>`, `<section>`, `<dd>`, `<figcaption>` and the other tags in `block_level_tags` of the registry, also when they are in `transparent_tags`. A block with a handler next to it (a paragraph, a list) needs no line break and gets none.
 - **`thead`, `tbody` and `tfoot`** are no longer in `unknown_tags` of the HTML parser. The set is `HandlerRegistry#transparent_tags`, add the wrappers you expect.
 
 ### MediaWiki

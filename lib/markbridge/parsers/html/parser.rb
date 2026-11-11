@@ -81,6 +81,7 @@ module Markbridge
           # end-of-line trim), or nil.
           @line_start = true
           @space_tail = nil
+          @pending_break = false
 
           # Process all nodes
           children.each { |node| process_node(node, document) }
@@ -128,6 +129,7 @@ module Markbridge
           text = node.text
 
           if @preserve_depth.positive?
+            add_pending_break(parent)
             parent << AST::Text.new(text)
             # Preserved whitespace is content: it neither starts a line
             # nor collapses against a space that follows it.
@@ -140,6 +142,7 @@ module Markbridge
           text = text.lstrip if @line_start || @space_tail
           return if text.empty?
 
+          add_pending_break(parent)
           parent << AST::Text.new(text)
           @line_start = false
           @space_tail = (parent if text.end_with?(" "))
@@ -165,7 +168,7 @@ module Markbridge
           # is registered, so unknown tags like <div> or <section> still
           # end lines.
           block = @handlers.block_level_tags.include?(tag_name)
-          end_line if block
+          block_boundary(tag_name) if block
 
           preserving = @handlers.whitespace_preserving_tags.include?(tag_name)
           @preserve_depth += 1 if preserving
@@ -173,7 +176,30 @@ module Markbridge
           dispatch_element(node, tag_name, parent)
 
           @preserve_depth -= 1 if preserving
-          end_line if block
+          block_boundary(tag_name) if block
+        end
+
+        # The start or the end of a block-level tag. A tag with a handler
+        # builds a block node, which the renderer keeps apart from its
+        # neighbors. A tag without one, a <div> for example, builds
+        # nothing, so content on the line in front of the boundary gets a
+        # line break before the content that follows:
+        # <div>a</div><div>b</div> is two lines in a browser.
+        # @param tag_name [String]
+        def block_boundary(tag_name)
+          @pending_break = !@handlers[tag_name] && (@pending_break || !@line_start)
+          end_line
+        end
+
+        # Writes the line break of a block without a handler in front of
+        # the content that follows it. A <br> that already ends the line
+        # is enough.
+        # @param parent [AST::Element]
+        def add_pending_break(parent)
+          return unless @pending_break
+
+          @pending_break = false
+          parent << AST::LineBreak.new unless parent.children.last.instance_of?(AST::LineBreak)
         end
 
         # Dispatch an element to its handler (or the unknown-tag path) and
@@ -184,6 +210,8 @@ module Markbridge
         def dispatch_element(node, tag_name, parent)
           handler = @handlers[tag_name]
           return handle_unknown_tag(node, parent) unless handler
+
+          add_pending_break(parent)
 
           # Handler returns element if children should be processed, nil otherwise
           size = parent.children.size
