@@ -6,7 +6,8 @@
 #
 # An entry names its reason and the cases it covers. A case in the
 # adjacency list is a case id (see AdjacencyGenerator) or a Regexp that
-# matches ids; in the structure list it is a seed of AstGenerator. The
+# matches ids; in the structure list it is a seed of AstGenerator, in the
+# repair list a seed of BrokenAstGenerator. The
 # specs run every case named outright, a Regexp only covers the cases a
 # spec runs anyway.
 module RoundTripKnownBugs
@@ -26,6 +27,20 @@ module RoundTripKnownBugs
     ),
   ].freeze
 
+  # Seeds of BrokenAstGenerator, checked with NormalizerRepairChecker.
+  REPAIR = [
+    entry(
+      "a block that leaves bold inside a color or an inline spoiler lands in the color or the " \
+        "spoiler, which are no inline containers for the normalizer; in a list item the list " \
+        "cooks loose then",
+      cases: [929, 1578],
+    ),
+  ].freeze
+
+  # Seeds of AstGenerator, written as HTML and checked with
+  # HtmlRoundTripChecker.
+  HTML = [].freeze
+
   # The same cases cooked with the Discourse engine (any profile; the
   # reason names the profile when it matters).
   ADJACENCY_ENGINE = [].freeze
@@ -37,9 +52,11 @@ module RoundTripKnownBugs
     structure: STRUCTURE,
     adjacency_engine: ADJACENCY_ENGINE,
     structure_engine: STRUCTURE_ENGINE,
+    repair: REPAIR,
+    html: HTML,
   }.freeze
 
-  # @param list [Symbol] :adjacency or :structure
+  # @param list [Symbol] a key of LISTS
   # @param id [String, Integer] a case id or a seed
   # @return [String, nil] the reason the case is expected to fail
   def self.reason(list, id)
