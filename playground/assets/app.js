@@ -748,13 +748,18 @@
     }
     const lineStart = input.lastIndexOf("\n", position) + 1;
     const start = Math.max(lineStart, position - 30);
-    let line = input.slice(start, start + 90).split("\n")[0];
-    let html = escapeHtml(line);
-    terms.forEach((term) => {
-      const pattern = new RegExp(escapeHtml(term).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-      html = html.replace(pattern, (match) => `<mark>${match}</mark>`);
-    });
-    return (start > lineStart ? "…" : "") + html;
+    const line = input.slice(start, start + 90).split("\n")[0];
+    // One pattern for all terms, over the text and not over its HTML: a
+    // term must not match in the name of an entity or in a <mark> that
+    // another term has put there.
+    const pattern = new RegExp(terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "gi");
+    let html = "";
+    let last = 0;
+    for (const match of line.matchAll(pattern)) {
+      html += `${escapeHtml(line.slice(last, match.index))}<mark>${escapeHtml(match[0])}</mark>`;
+      last = match.index + match[0].length;
+    }
+    return (start > lineStart ? "…" : "") + html + escapeHtml(line.slice(last));
   }
 
   function searchExamples(query) {
