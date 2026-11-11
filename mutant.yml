@@ -281,7 +281,17 @@ matcher:
     # zeroth-byte check changes nothing. Killing it would require
     # calling the helper on a non-apostrophe position, which no public
     # input can produce.
+    # The same method stops counting at MAX_APOSTROPHES. Every caller
+    # asks for five at most, or for exactly three, so counting further
+    # gives the same answers and is only slower on a long run.
     - Markbridge::Parsers::MediaWiki::InlineParser#consecutive_apostrophes_at
+
+    # InlineParser#find_close remembers the tags that had no end tag
+    # behind the cursor and does not search for them again. Without the
+    # memory every search runs to the end of the text and finds nothing,
+    # which is the same answer, only slower. The search itself is
+    # #search_close, which is not on this list.
+    - Markbridge::Parsers::MediaWiki::InlineParser#find_close
 
     # TagLibrary#initialize_copy's `super` call. Ruby's default
     # Object#initialize_copy is a no-op for our purposes (we re-dup
