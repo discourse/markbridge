@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Puts s9e\TextFormatter into tmp/s9e, at the commit the fixture
+# spec/fixtures/s9e/cases.json was generated from, with its PHP
+# packages. S9eParser and spec/support/s9e/generate.php use it. Needs
+# git, PHP with the dom extension and composer.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+commit=$(ruby -rjson -e 'puts JSON.parse(File.read("spec/fixtures/s9e/cases.json")).fetch("s9e")')
+target=tmp/s9e
+
+if [ "$(git -C "$target" rev-parse HEAD 2>/dev/null || true)" != "$commit" ]; then
+  rm -rf "$target"
+  mkdir -p "$target"
+  git -C "$target" init -q
+  git -C "$target" remote add origin https://github.com/s9e/TextFormatter.git
+  git -C "$target" fetch -q --depth 1 origin "$commit"
+  git -C "$target" checkout -q FETCH_HEAD
+fi
+
+composer install --no-dev --no-interaction --quiet --working-dir "$target"
+echo "s9e\\TextFormatter $commit is in $target"

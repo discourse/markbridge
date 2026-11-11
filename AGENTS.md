@@ -297,14 +297,51 @@ expect(token).to match_tag_end("b")
   two specs share the `round-trip cases` shared example
   (`spec/support/round_trip_examples.rb`); the support code has a smoke
   spec next to them (`round_trip_support_spec.rb`).
+- `spec/integration/markbridge/normalizer_repair_spec.rb` is the round
+  trip for the normalizer. `BrokenAstGenerator` takes a tree of
+  `AstGenerator` and puts what does not belong there into an inline
+  element (a block into bold, a list into a link, a heading into a
+  heading). `NormalizerRepairChecker` lets the default normalizer repair
+  it and checks that no two words are one word afterwards, that nothing
+  is lost, that a second run changes nothing and that the repaired tree
+  round-trips. The structure round trip finds nothing in a repair: its
+  trees need none.
+- `spec/integration/markbridge/html_roundtrip_spec.rb` is the round trip
+  that starts with HTML. `AstHtmlWriter` writes the trees of
+  `AstGenerator` as HTML in five styles (`<p>` or `<div>`, `<b>` or
+  `<strong>`, a wrapper around everything, line breaks between the
+  tags), `HtmlRoundTripChecker` converts the HTML, cooks the Markdown
+  and compares structure, text and links with the HTML it started from.
 - `bin/fuzz-render` runs every inline pair, every block pair and as many
-  seeds as asked for outside RSpec (`--only pairs|blocks|trees`,
+  seeds as asked for outside RSpec (`--only pairs|blocks|trees|repairs|html`,
   `--sample N`, `--seeds N`, `--all` to run the known bugs too). Every
   failure is shrunk, and failures whose shrunk trees have the same shape
   are one group with one report, so a long run reads as a short list of
   distinct bugs; `--output DIR` writes the reports to a file. The
   nightly `fuzz-render.yml` workflow runs it and uploads the reports
   when a case fails.
+- `bin/fuzz-parse` runs the two checks that start with text, and the
+  `fuzz-parse` job of the same nightly workflow runs it:
+  - `--only time`: `RunTimeChecker` (`spec/support/run_time_checker.rb`)
+    repeats a short piece of markup n times and 4n times and compares
+    the time of the two conversions. Time that grows with the square of
+    the length gives sixteen, the limit is nine. It finds a parser or a
+    tag that reads the rest of the input for every token.
+    `spec/integration/markbridge/run_time_spec.rb` runs a part of the
+    cases, not under `COVERAGE=1` and on CRuby only. Add a piece to
+    `TOKENS` when a parser learns new markup; a case that is slow and
+    stays slow goes into `KNOWN` with the reason.
+  - `--only s9e`: `BBCodeGenerator` writes random BBCode with the
+    mistakes people make (a closing tag missing, two in the wrong
+    order, one too many). `S9eDifferentialChecker` reads it with the
+    BBCode parser and with s9e\TextFormatter plus the TextFormatter
+    parser and compares the Markdown.
+    `BBCodeGenerator.intended_difference` names the inputs the two read
+    differently on purpose, `S9eDifferentialChecker::KNOWN` the seeds
+    that differ today.
+    `spec/integration/markbridge/parsers/bbcode/s9e_differential_spec.rb`
+    runs 300 seeds. It needs PHP and `bin/s9e-setup`, which puts s9e
+    into `tmp/s9e`, and skips without them (`S9E_REQUIRED=1` fails).
 - When a test is about structure (nesting, blank lines, indentation),
   assert on the cooked HTML (`spec/support/cooked_output.rb`), not on
   the exact Markdown string. A Markdown expectation written from the
