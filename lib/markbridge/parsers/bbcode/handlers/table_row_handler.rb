@@ -20,13 +20,6 @@ module Markbridge
             context.push(element, token:)
           end
 
-          def on_close(token:, context:, registry:, tokens: nil)
-            # Auto-close open cell before closing row
-            context.pop if context.current.instance_of?(AST::TableCell)
-
-            super
-          end
-
           attr_reader :element_class
         end
       end

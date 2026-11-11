@@ -8,6 +8,21 @@ module Markbridge
         class TagReconciler
           MAX_AUTO_CLOSE_DEPTH = 5
 
+          # The elements whose closing tag ends what is open inside.
+          BLOCKS = [
+            AST::Quote,
+            AST::Spoiler,
+            AST::Align,
+            AST::List,
+            AST::Table,
+            AST::TableRow,
+            AST::TableCell,
+          ].freeze
+          # The elements that need no closing tag of their own: the next
+          # item, cell or row ends them, or the end of what they are in.
+          IMPLIED_END = [AST::ListItem, AST::TableRow, AST::TableCell].freeze
+          private_constant :BLOCKS, :IMPLIED_END
+
           def initialize(registry:)
             @registry = registry
           end
@@ -63,6 +78,25 @@ module Markbridge
             true
           end
 
+          # Ends everything that is still open inside a block when the
+          # closing tag of the block comes: `[quote][list][*]a[/quote]`
+          # ends the item and the list with the quote. A block has its own
+          # content, so nothing that was opened in it goes on behind it.
+          # The closing tag of the block itself is left to the caller.
+          #
+          # @param handler [BaseHandler] the handler for the closing tag
+          # @param context [ParserState]
+          def close_inside_block(handler:, context:)
+            return unless BLOCKS.include?(handler.element_class)
+
+            open = context.elements_from_current
+            depth = open.index { |element| @registry.handler_for_element(element) == handler }
+            return unless depth
+
+            context.auto_close!(open.first(depth).count { |element| !implied_end?(element) })
+            depth.times { context.pop }
+          end
+
           # Ends an item that has no list around it, with what is still
           # open in it, when the closing tag is for an element around the
           # item: in `[quote][*]a[/quote]` the item ends with the quote.
@@ -111,6 +145,10 @@ module Markbridge
           end
 
           private
+
+          def implied_end?(element)
+            IMPLIED_END.include?(element.class)
+          end
 
           # Number of stack elements to pop in order to close `handler`, or nil
           # when the handler is not on the stack within MAX_AUTO_CLOSE_DEPTH or
