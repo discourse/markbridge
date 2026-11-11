@@ -80,6 +80,33 @@ module Markbridge
             true
           end
 
+          # Closes the target when only items, cells and rows are open in
+          # it, which end without a closing tag of their own:
+          # `[list][*]a[/list]`. {#close_inside_block} and the caller do
+          # the same with more work; this is for the closing tag of every
+          # well-formed list and table.
+          #
+          # @param handler [BaseHandler] the handler for the closing tag
+          # @param context [ParserState]
+          # @return [Boolean] true if the target was closed
+          def close_implied_ends(handler:, context:)
+            open = context.elements_from_current
+            depth =
+              open.index do |element|
+                @registry.handler_for_element(element) == handler || !implied_end?(element)
+              end
+            # Not the current element: the caller has looked at it.
+            return false unless depth&.positive?
+            return false unless @registry.handler_for_element(open.fetch(depth)) == handler
+
+            # Like in #close_inside_block: their closing tags may still come.
+            depth.times do |index|
+              context.end_early(@registry.handler_for_element(open.fetch(index)))
+            end
+            (depth + 1).times { context.pop }
+            true
+          end
+
           # Ends everything that is still open inside a block when the
           # closing tag of the block comes: `[quote][list][*]a[/quote]`
           # ends the item and the list with the quote. A block has its own

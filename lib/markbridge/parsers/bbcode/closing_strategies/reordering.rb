@@ -18,6 +18,11 @@ module Markbridge
               return
             end
 
+            # The second common case: the last item of a list, or the last
+            # cell and row of a table, is still open when the closing tag
+            # of the list or the table comes.
+            return if @reconciler.close_implied_ends(handler: closing_handler, context:)
+
             return if tokens && @reconciler.try_reorder(handler: closing_handler, tokens:, context:)
             return if @reconciler.try_reopen(handler: closing_handler, context:, tokens:)
 

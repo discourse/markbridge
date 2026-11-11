@@ -286,6 +286,17 @@ matcher:
     # gives the same answers and is only slower on a long run.
     - Markbridge::Parsers::MediaWiki::InlineParser#consecutive_apostrophes_at
 
+    # BBCode TagReconciler#close_implied_ends closes a list or a table
+    # part whose last item, row or cell is still open. Without it the
+    # closing tag goes through #try_reorder, #try_reopen and
+    # #close_inside_block and ends the same elements, counts the same
+    # and expects the same closing tags; the method only saves that
+    # work for the closing tag of every well-formed list (the list
+    # report of bench/bench.rb was 25% slower without it). So a
+    # mutation that makes it answer false is equivalent. Its examples in
+    # tag_reconciler_spec.rb pin what it does when it answers true.
+    - Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler#close_implied_ends
+
     # InlineParser#find_close remembers the tags that had no end tag
     # behind the cursor and does not search for them again. Without the
     # memory every search runs to the end of the text and finds nothing,
@@ -331,6 +342,12 @@ matcher:
 
 mutation:
   ignore_patterns:
+    # Reordering#handle_close asks TagReconciler#close_implied_ends
+    # first. Never asking gives the same tree through the slower
+    # strategies, see the entry for that method above. It is the only
+    # call of the method.
+    - "if{condition=send{selector=close_implied_ends}}"
+
     # AST::Url#bare? and UrlTag#bare_tokens compare the text with the
     # href before they take whitespace off it. The comparison only saves
     # the gsub or the regex match for the common link without
