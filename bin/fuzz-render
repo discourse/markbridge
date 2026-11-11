@@ -3,11 +3,15 @@
 
 # Runs the renderer round-trip checks over more cases than the specs do:
 # every adjacency pair instead of a sample, and as many structure seeds
-# as asked for. Known bugs (spec/support/round_trip_known_bugs.rb) are
+# as asked for. The same seeds also build trees that the normalizer has
+# to repair first (see NormalizerRepairChecker), and trees that are
+# written as HTML and go through the HTML parser (HtmlRoundTripChecker). Known bugs (spec/support/round_trip_known_bugs.rb) are
 # skipped, and a known bug that passes is reported, as in the specs.
 #
 #   bin/fuzz-render                           # every pair and 300 seeds
 #   bin/fuzz-render --only pairs
+#   bin/fuzz-render --only repairs --seeds 3000   # trees the normalizer repairs
+#   bin/fuzz-render --only html --seeds 3000      # trees written as HTML
 #   bin/fuzz-render --seeds 3000 --only trees --output tmp/fuzz-render
 #   bin/fuzz-render --sample 5000             # a random subset of the pairs
 #   bin/fuzz-render --sample 5000 --sample-seed 7   # another subset
@@ -35,14 +39,18 @@ require "markbridge/all"
 require_relative "../spec/support/ast_generator"
 require_relative "../spec/support/adjacency_generator"
 require_relative "../spec/support/round_trip_checker"
+require_relative "../spec/support/broken_ast_generator"
+require_relative "../spec/support/normalizer_repair_checker"
+require_relative "../spec/support/html_round_trip_checker"
 require_relative "../spec/support/round_trip_known_bugs"
 require_relative "../spec/support/discourse_engine_cooker"
 
 class FuzzRender
-  Family = Data.define(:name, :list, :cases)
+  # +build+ turns a case into its document, +checker+ checks it.
+  Family = Data.define(:name, :list, :cases, :build, :checker)
   Result = Data.define(:family, :id, :checks, :reason)
 
-  FAMILIES = %w[pairs blocks trees].freeze
+  FAMILIES = %w[pairs blocks trees repairs html].freeze
 
   def initialize(argv)
     @seeds = 300
@@ -84,9 +92,11 @@ class FuzzRender
       .new do |opts|
         opts.banner = "usage: bin/fuzz-render [options]"
         opts.on("--seeds N", Integer, "structure seeds to run (default: 300)") { |n| @seeds = n }
-        opts.on("--only FAMILY", FAMILIES, "run only pairs, blocks or trees") do |family|
-          @only = [family]
-        end
+        opts.on(
+          "--only FAMILY",
+          FAMILIES,
+          "run only pairs, blocks, trees, repairs or html",
+        ) { |family| @only = [family] }
         opts.on("--sample N", Integer, "run N random pairs instead of all of them") do |n|
           @sample = n
         end
@@ -108,6 +118,7 @@ class FuzzRender
 
   def families
     list = []
+    from_case = ->(kase) { kase.document }
     if @only.include?("pairs")
       cases =
         if @sample
@@ -115,20 +126,34 @@ class FuzzRender
         else
           AdjacencyGenerator.inline_cases
         end
-      list << Family.new(name: "pairs", list: known_bugs(:adjacency), cases:)
+      list << family("pairs", known_bugs(:adjacency), cases, from_case)
     end
     if @only.include?("blocks")
-      list <<
-        Family.new(
-          name: "blocks",
-          list: known_bugs(:adjacency),
-          cases: AdjacencyGenerator.block_cases,
-        )
+      list << family("blocks", known_bugs(:adjacency), AdjacencyGenerator.block_cases, from_case)
     end
-    if @only.include?("trees") && @seeds.positive?
-      list << Family.new(name: "trees", list: known_bugs(:structure), cases: (1..@seeds))
+    return list unless @seeds.positive?
+
+    if @only.include?("trees")
+      build = ->(seed) { AstGenerator.new(seed, attributed_quotes: !@engine.nil?).document }
+      list << family("trees", known_bugs(:structure), (1..@seeds), build)
+    end
+    if @only.include?("repairs")
+      build = ->(seed) { BrokenAstGenerator.new(seed).document }
+      # The known repairs are listed for markdown-it only.
+      known = @engine ? nil : :repair
+      list << family("repairs", known, (1..@seeds), build, NormalizerRepairChecker.new(@checker))
+    end
+    # The HTML round trip compares with plain HTML, so it cooks with
+    # markdown-it only: the engine adds what the input never had.
+    if @only.include?("html") && !@engine
+      build = ->(seed) { AstHtmlWriter.lower(AstGenerator.new(seed).document) }
+      list << family("html", :html, (1..@seeds), build, HtmlRoundTripChecker.new)
     end
     list
+  end
+
+  def family(name, list, cases, build, checker = @checker)
+    Family.new(name:, list:, cases:, build:, checker:)
   end
 
   # The known-bug list of the cooker, see RoundTripKnownBugs::LISTS.
@@ -148,14 +173,8 @@ class FuzzRender
   # @param kase [AdjacencyGenerator::InlineCase, AdjacencyGenerator::BlockCase, Integer]
   def run_case(family, kase)
     id = kase.is_a?(Integer) ? kase : kase.id
-    build =
-      if kase.is_a?(Integer)
-        -> { AstGenerator.new(kase, attributed_quotes: !@engine.nil?).document }
-      else
-        -> { kase.document }
-      end
-    reason = @all ? nil : RoundTripKnownBugs.reason(family.list, id)
-    checks = @checker.failures(build.call).map(&:check)
+    reason = (RoundTripKnownBugs.reason(family.list, id) if family.list && !@all)
+    checks = family.checker.failures(family.build.call(kase)).map(&:check)
 
     if checks.empty?
       @stale << Result.new(family: family.name, id:, checks:, reason:) if reason
@@ -163,7 +182,7 @@ class FuzzRender
       @known << Result.new(family: family.name, id:, checks:, reason:)
     else
       @failed << Result.new(family: family.name, id:, checks:, reason: nil)
-      group(family, id, build.call, checks)
+      group(family, id, family.build.call(kase), checks)
     end
   end
 
@@ -172,14 +191,18 @@ class FuzzRender
   # group in the summary.
   def group(family, id, document, checks)
     before = document.descendants.size
-    @checker.shrink(document)
-    signature = AstDump.signature(document)
+    family.checker.shrink(document)
+    signature = "#{family.name}\n#{AstDump.signature(document)}"
     group = @groups[signature]
     if group
       group[1] << "#{family.name} #{id}"
     else
       label = "#{family.name} #{id}, shrunk from #{before} to #{document.descendants.size} nodes"
-      @groups[signature] = [@checker.report(document, label:), ["#{family.name} #{id}"], checks]
+      @groups[signature] = [
+        family.checker.report(document, label:),
+        ["#{family.name} #{id}"],
+        checks,
+      ]
     end
   end
 
