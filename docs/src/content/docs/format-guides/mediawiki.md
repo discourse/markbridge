@@ -70,6 +70,7 @@ A link like `[[Main Page]]` names a page, not an address. The parser gives it an
 
 - A namespace and a section stay in the address: `[[Help:Contents#Hiking]]` is `./Help:Contents#Hiking`.
 - A link to a section of the same page keeps its target: `[[#History]]` is `#History`.
+- A `?` in the title is written as `%3F`, so it does not start the query of the URL: `[[Who is it?]]` is `./Who_is_it%3F`.
 
 A relative address is of no use in Discourse, which drops an address without a scheme and without a leading slash and shows the link as text. Give the renderer the address of the wiki as `base_url:`, and the links point to the wiki:
 

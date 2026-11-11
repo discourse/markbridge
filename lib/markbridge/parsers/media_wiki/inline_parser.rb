@@ -342,11 +342,14 @@ module Markbridge
         # link stays a link, and a consumer finds every page link by the
         # `./` and can put the address of the wiki in front. A link to a
         # section of the same page, `#History`, and an empty target stay
-        # as they are.
+        # as they are. A `?` in the title is written as `%3F`, like
+        # Parsoid does: left as it is, it would start the query of the
+        # URL and the link would go to the page without it.
         def page_href(target)
           return target if target.empty? || target.start_with?("#")
 
-          "./#{target.delete_prefix(":").tr(" ", "_")}"
+          title, hash, section = target.delete_prefix(":").tr(" ", "_").partition("#")
+          "./#{title.gsub("?", "%3F")}#{hash}#{section}"
         end
 
         # Parse [url display text] external link.
