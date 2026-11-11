@@ -8,6 +8,30 @@ RSpec.describe Markbridge::Renderers::Discourse::BaseUrl do
       expect(described_class.new("HTTP://Example.com").resolve("a")).to eq("HTTP://Example.com/a")
     end
 
+    it "takes a URL with a query or a fragment, also an empty one" do
+      %w[
+        https://e.org/a/b?x=1
+        https://e.org/a/b#y
+        https://e.org/a/b?
+        https://e.org/a/b#
+      ].each { |url| expect(described_class.new(url).resolve("c")).to eq("https://e.org/a/c") }
+    end
+
+    it "raises for a URL with whitespace in it or after it" do
+      [
+        "https://example.com/my forum/",
+        "https://example.com/a?x y",
+        "https://example.com/a#x y",
+        "https://example.com/a\n",
+        "https://example.com/a ",
+      ].each do |url|
+        expect { described_class.new(url) }.to raise_error(
+          ArgumentError,
+          "base_url must be an http or https URL, got #{url.inspect}",
+        )
+      end
+    end
+
     it "raises for what is no http or https URL" do
       ["ftp://example.com", "example.com", "/wiki/", "", nil, " https://example.com"].each do |url|
         expect { described_class.new(url) }.to raise_error(
