@@ -103,7 +103,8 @@ RSpec.describe Markbridge::Playground::App do
 
       preview = convert("[b]Hello[/b]").fetch(:preview)
 
-      expect(preview.fetch(:html)).to eq("<p><strong>Hello</strong></p>")
+      # markdown-it ends the HTML with a newline, the Discourse engine does not.
+      expect(preview.fetch(:html).strip).to eq("<p><strong>Hello</strong></p>")
       expect(preview.fetch(:engine)).to eq(described_class::COOKER.engine)
     end
   end
