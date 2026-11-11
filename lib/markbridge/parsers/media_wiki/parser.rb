@@ -56,6 +56,11 @@ module Markbridge
 
         private
 
+        PRE_TAG_OPEN = /\A\s*<pre\b[^>]*>/i
+        PRE_TAG_CLOSE = %r{</pre\s*>}i
+        PRE_TAG_CLOSE_TRAILING = %r{</pre\s*>\s*\z}i
+        private_constant :PRE_TAG_OPEN, :PRE_TAG_CLOSE, :PRE_TAG_CLOSE_TRAILING
+
         NOWIKI_OPEN = /<nowiki>/i
         NOWIKI_CLOSE = %r{</nowiki>}i
         private_constant :NOWIKI_OPEN, :NOWIKI_CLOSE
@@ -69,27 +74,40 @@ module Markbridge
         # until one of them closes it. A search for the closing line from
         # every open tag would read the rest of the text again each time.
         #
+        # The lines of a <pre> block are code and open nothing. Without
+        # that a <nowiki> in the code would take the lines up to the next
+        # </nowiki> in the text, and the </pre> with them.
+        #
         # @param lines [Array<String>]
         # @return [Array<String>]
         def join_nowiki_lines(lines)
           joined = []
           waiting = []
           open = false
+          pre = false
           lines.each do |line|
             if !open
               joined << line
+              code = pre || pre_block_start?(line)
+              pre = code && !line.match?(PRE_TAG_CLOSE)
+              open = !code && open_nowiki?(line)
             elsif line.match?(NOWIKI_CLOSE)
               joined << [joined.pop, *waiting, line].join("\n")
               waiting.clear
+              # The line that closed a tag is the last one of the joined
+              # line, so it alone says whether a tag is open again.
+              open = open_nowiki?(line)
             else
               waiting << line
-              next
             end
-            # The line that closed a tag is the last one of the joined
-            # line, so it alone says whether a tag is open again.
-            open = open_nowiki?(line)
           end
           joined.concat(waiting)
+        end
+
+        # Whether {#process_lines} starts a <pre> block with this line. A
+        # line with a space in front is preformatted text there.
+        def pre_block_start?(line)
+          pre_tag_line?(line) && !preformatted_line?(line)
         end
 
         # Whether the last <nowiki> of the line has no end on the line.
@@ -424,11 +442,6 @@ module Markbridge
 
           start_index + consumed.length - 1
         end
-
-        PRE_TAG_OPEN = /\A\s*<pre\b[^>]*>/i
-        PRE_TAG_CLOSE = %r{</pre\s*>}i
-        PRE_TAG_CLOSE_TRAILING = %r{</pre\s*>\s*\z}i
-        private_constant :PRE_TAG_OPEN, :PRE_TAG_CLOSE, :PRE_TAG_CLOSE_TRAILING
 
         # Process a <pre>...</pre> block that may span multiple lines.
         #

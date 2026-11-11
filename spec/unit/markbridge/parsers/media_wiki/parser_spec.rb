@@ -435,6 +435,56 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
     end
   end
 
+  describe "<nowiki> inside a <pre> block" do
+    def shape(doc)
+      doc.children.map { |child| [child.class.name.split("::").last, child.children.first.text] }
+    end
+
+    it "does not take the lines after the block" do
+      doc = parse("<pre>\na <nowiki> b\n</pre>\nmiddle\nx </nowiki> y")
+
+      expect(shape(doc)).to eq(
+        [["Code", "a <nowiki> b\n"], %w[Paragraph middle], ["Paragraph", "x </nowiki> y"]],
+      )
+    end
+
+    it "does not take them when the tag is on the line of the <pre>" do
+      doc = parse("<pre>a <nowiki> b\nc</pre>\nmiddle\nx </nowiki> y")
+
+      expect(shape(doc).map(&:first)).to eq(%w[Code Paragraph Paragraph])
+    end
+
+    it "does not take them when the tag is on the line of the </pre>" do
+      doc = parse("<pre>a\nc</pre> <nowiki>\nmiddle\nx </nowiki> y")
+
+      expect(shape(doc).map(&:first)).to eq(%w[Code Paragraph Paragraph])
+    end
+
+    it "joins the lines of a tag that opens after the block" do
+      doc = parse("<pre>\na\n</pre>\n<nowiki>b\nc</nowiki>")
+
+      expect(shape(doc)).to eq([["Code", "a\n"], ["Paragraph", "b\nc"]])
+    end
+
+    it "joins the lines of a tag after a <pre> block on one line" do
+      doc = parse("<pre>a</pre>\n<nowiki>b\nc</nowiki>")
+
+      expect(shape(doc)).to eq([%w[Code a], ["Paragraph", "b\nc"]])
+    end
+
+    it "joins the lines of a tag in preformatted text that starts with <pre>" do
+      doc = parse(" <pre> <nowiki>a\nb</nowiki>")
+
+      expect(doc.children.size).to eq(1)
+    end
+
+    it "joins the lines of a tag with a <pre> in it" do
+      doc = parse("<nowiki>a\n<pre>\nb</nowiki>\n<nowiki>c\nd</nowiki>")
+
+      expect(shape(doc)).to eq([["Paragraph", "a\n<pre>\nb"], ["Paragraph", "c\nd"]])
+    end
+  end
+
   describe "inline formatting in text lines" do
     it "parses bold in text" do
       doc = parse("This is '''bold''' text")
