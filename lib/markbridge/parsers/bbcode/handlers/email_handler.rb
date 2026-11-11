@@ -17,6 +17,11 @@ module Markbridge
             context.push(element, token:)
           end
 
+          # Like a link, see UrlHandler.
+          def auto_closeable?
+            true
+          end
+
           attr_reader :element_class
         end
       end

@@ -147,15 +147,45 @@ RSpec.describe "BBCode Tag Auto-Correction" do
       expect(bold).to be_a(Markbridge::AST::Bold)
     end
 
-    it "stops at first non-auto-closeable tag in stack" do
+    it "ends a link with the tag it was opened in" do
       result = parser.parse("[b][url=http://example.com][i]text[/b]")
 
-      # [url] is not auto-closeable, so [/b] becomes text (merged)
       bold = result.children.first
       url = bold.children.first
       italic = url.children.first
 
-      expect(italic.children.last.text).to eq("text[/b]")
+      expect(result.children).to eq([bold])
+      expect(italic.children.map(&:text)).to eq(["text"])
+    end
+
+    it "stops at first non-auto-closeable tag in stack" do
+      result = parser.parse("[b][code][i]text[/b]")
+
+      # [code] takes everything up to its own end, so [/b] is text
+      code = result.children.first.children.first
+
+      expect(code.children.map(&:text)).to eq(["[i]text[/b]"])
+    end
+
+    it "opens a link again behind the tag it was opened in, with its address" do
+      result = parser.parse("[u][url=http://example.com]a[/u] b[/url] c")
+
+      underline, link, rest = result.children
+
+      expect(underline.children.first.href).to eq("http://example.com")
+      expect(link.href).to eq("http://example.com")
+      expect(link.children.map(&:text)).to eq([" b"])
+      expect(rest.text).to eq(" c")
+    end
+
+    it "opens a color again behind the tag it was opened in, with its color" do
+      result = parser.parse("[b][color=red]a[/b] b[/color]")
+
+      bold, color = result.children
+
+      expect(bold.children.first.color).to eq("red")
+      expect(color.color).to eq("red")
+      expect(color.children.map(&:text)).to eq([" b"])
     end
   end
 

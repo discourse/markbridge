@@ -24,6 +24,12 @@ module Markbridge
             context.add_child(AST::Url.new(href: content) << AST::Text.new(content))
           end
 
+          # A link ends with the element it was opened in, and goes on
+          # behind it when text follows: `[u][url=…]a[/u] b[/url]`.
+          def auto_closeable?
+            true
+          end
+
           attr_reader :element_class
 
           private

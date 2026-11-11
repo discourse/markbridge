@@ -297,13 +297,13 @@ RSpec.describe Markbridge::Parsers::BBCode::HandlerRegistry do
         Markbridge::AST::Attachment,
         false,
       ],
-      "url" => [Markbridge::Parsers::BBCode::Handlers::UrlHandler, Markbridge::AST::Url, false],
-      "link" => [Markbridge::Parsers::BBCode::Handlers::UrlHandler, Markbridge::AST::Url, false],
-      "iurl" => [Markbridge::Parsers::BBCode::Handlers::UrlHandler, Markbridge::AST::Url, false],
+      "url" => [Markbridge::Parsers::BBCode::Handlers::UrlHandler, Markbridge::AST::Url, true],
+      "link" => [Markbridge::Parsers::BBCode::Handlers::UrlHandler, Markbridge::AST::Url, true],
+      "iurl" => [Markbridge::Parsers::BBCode::Handlers::UrlHandler, Markbridge::AST::Url, true],
       "email" => [
         Markbridge::Parsers::BBCode::Handlers::EmailHandler,
         Markbridge::AST::Email,
-        false,
+        true,
       ],
       "quote" => [
         Markbridge::Parsers::BBCode::Handlers::QuoteHandler,
