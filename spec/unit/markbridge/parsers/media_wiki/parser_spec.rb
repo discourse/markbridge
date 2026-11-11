@@ -401,6 +401,27 @@ RSpec.describe Markbridge::Parsers::MediaWiki::Parser do
       expect(texts(doc)).to eq(["x</nowiki> a\nb"])
     end
 
+    it "joins the lines of two tags, each with the lines between its own tags" do
+      doc = parse("<nowiki>a\nb\nc</nowiki>\nx\n<nowiki>d\ne\nf</nowiki>\ny")
+
+      expect(texts(doc)).to eq(["a\nb\nc", "x", "d\ne\nf", "y"])
+    end
+
+    it "joins up to the closing line when a line between has no tag at all" do
+      doc = parse("<nowiki>a\n* b\n<nowiki>c\n* d</nowiki>\n* e")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Paragraph, Markbridge::AST::List])
+      expect(doc.children.first.children.map(&:text)).to eq(["a\n* b\n<nowiki>c\n* d"])
+    end
+
+    it "leaves the lines after the last closed tag apart when a tag opens again" do
+      doc = parse("<nowiki>a\nb</nowiki> <nowiki>c\n* d\n* e")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Paragraph, Markbridge::AST::List])
+      expect(doc.children.first.children.map(&:text)).to eq(["a\nb <nowiki>c"])
+      expect(doc.children.last.children.size).to eq(2)
+    end
+
     it "joins the lines of a tag in any case" do
       doc = parse("<NOWIKI>a\nb</NoWiki>")
 

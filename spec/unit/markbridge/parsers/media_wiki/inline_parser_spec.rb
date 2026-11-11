@@ -225,6 +225,22 @@ RSpec.describe Markbridge::Parsers::MediaWiki::InlineParser do
 
       expect(doc.children.first.text).to eq("[[File:a.png|x ")
     end
+
+    it "reads a file with three links nested in its caption" do
+      doc = parse("[[File:a.png|1 [[File:b.png|2 [[File:c.png|3 [[x]]]]]]]] after")
+
+      expect(doc.children.map(&:class)).to eq([Markbridge::AST::Image, Markbridge::AST::Text])
+      expect(doc.children.first.src).to eq("./Special:FilePath/a.png")
+      expect(doc.children.last.text).to eq(" after")
+    end
+
+    it "is text when four links are nested in it, and reads the links inside" do
+      doc = parse("[[File:a.png|1 [[File:b.png|2 [[File:c.png|3 [[File:d.png|4 [[x]]]]]]]]]]")
+
+      expect(doc.children.first.text).to eq("[[File:a.png|1 ")
+      expect(doc.children[1]).to be_a(Markbridge::AST::Image)
+      expect(doc.children[1].src).to eq("./Special:FilePath/b.png")
+    end
   end
 
   describe "bold inside italic" do
