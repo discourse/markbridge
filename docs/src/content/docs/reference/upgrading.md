@@ -17,6 +17,10 @@ Most projects update without a change to their code. What changes is the output 
 
 - **Unquoted BBCode options with spaces.** `[quote=John Doe]` quotes "John Doe", not "John"; `[url=https://example.com/a b]` keeps the whole address; `[spoiler=What went wrong]` is a spoiler with that title and no longer text. The option ends at the `]` or at the first `name=`.
 - **A tag that is never closed in a BBCode list item** ends with the item. `[list][*]one [b]bold[*]two[/list]` has two items now. Before, the second item was nested in the bold of the first and the `[/list]` showed as text. The same goes for a tag that is still open when the list ends.
+- **A closing tag ends what is still open inside.** `[quote][list][*]one[/quote]` ends the list with the quote, and `[url=…][b]text[/url]` ends the bold with the link. Before, the closing tag showed as text and the rest of the post stayed in the list or in the link. A closing tag that comes later for an element that was ended this way is dropped.
+- **A link ends with the tag it was opened in**, like bold does. `[u][url=…]a[/u] b[/url]` is an underlined link, and the link goes on behind it for ` b`. A color, a size and a link that are opened again this way keep their value.
+- **A `[*]` in a quote, a spoiler, an aligned block or a table cell** that is open in a list item is text. Before, it ended the quote and the item. A `[*]` with no list around it still starts an item, and that item ends with the element around it: `[quote][*]one[/quote]` is a quote with one item.
+- **A `[td]` or a `[tr]`** ends the cell or the row before it with everything that is open inside: `[td][b]one[td]two` has two cells.
 - **The line break right after a code tag** is not a first, empty line of the code anymore: `[code]`, `[pre]`, HTML `<pre>` and `<pre>` in wikitext drop one line break after the tag. HTML itself says so for `<pre>`. A second line break stays, and so does one after `[tt]` or `<code>`.
 
 ### HTML
@@ -45,6 +49,8 @@ Most projects update without a change to their code. What changes is the output 
 ### Normalizer and renderer
 
 - **Text around a block that was moved out.** When the normalizer moves a block out of bold, a link or another inline container, the texts on its two sides get a space between them when they would touch.
+- **More trees are repaired.** A mail link (`AST::Email`), a color and a size are inline containers now, so a quote or a list in one of them is moved out. A heading in a heading is one heading. A block that was the first thing in bold leaves a space in front of the bold when the text there would touch it.
+- **Spaces between elements.** Spaces and tabs that follow a space or a tab from another element are left out: `a ` and ` b` from two elements are `a b`.
 - **A URL right in front of a closing `~~` or a closing BBCode tag.** Discourse takes `~~`, `[/u]`, `[/color]`, `[/size]` and `[/spoiler]` into a URL that stands right in front of them, so the link was wrong and the closing tag showed as text. A link whose text is its URL is written as `[url](url)` there, and a URL in plain text gets an empty comment after it: `~~see https://example.com/a<!---->~~`.
 - **A `<` in front of a scheme at the end of a text** gets a backslash, `\<mailto:`. With a link right after it the two cooked as one broken autolink.
 - **An image with only a width** is written without a size, `![alt](src)`. Discourse reads a size only as `WIDTHxHEIGHT`, so the `100` of `![alt|100](src)` stayed in the alt text.
