@@ -6,13 +6,14 @@ module Markbridge
       module Handlers
         # Handler for table cell tags (td, th)
         class TableCellHandler < BaseHandler
+          include OpenTablePart
+
           def initialize
             @element_class = AST::TableCell
           end
 
           def on_open(token:, context:, registry:, tokens: nil)
-            # Auto-close previous cell if still open
-            context.pop if context.current.instance_of?(AST::TableCell)
+            close_open_cell(context)
 
             element =
               AST::TableCell.new(

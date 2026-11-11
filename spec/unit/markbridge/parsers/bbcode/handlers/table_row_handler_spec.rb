@@ -58,20 +58,75 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::TableRowHandler do
       expect(old_row.children.last).to eq(cell)
     end
 
-    it "does NOT pop when current is a non-table-container element" do
-      # A stray non-table element (e.g. Paragraph) must not be popped
-      # by [tr]; the new row is inserted as its child instead. Kills
-      # `if true` / `if context.is_a?(...)` mutations that would pop
-      # the wrong thing.
+    it "ends what is open in the cell of the row before, and counts it without the cell" do
       table = Markbridge::AST::Table.new
       context.push(table)
-      stray = Markbridge::AST::Paragraph.new
+      context.push(Markbridge::AST::TableRow.new)
+      context.push(Markbridge::AST::TableCell.new)
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      handler.on_open(token: open_token, context:, registry:)
+
+      expect(table.children.last).to eq(context.current)
+      expect(table.children.size).to eq(2)
+      expect(context.auto_closed_count).to eq(2)
+    end
+
+    it "ends what is open directly in the table, and counts it" do
+      table = Markbridge::AST::Table.new
+      context.push(table)
+      stray = Markbridge::AST::Bold.new
       context.push(stray)
 
       handler.on_open(token: open_token, context:, registry:)
 
-      expect(context.current).to be_a(Markbridge::AST::TableRow)
-      expect(stray.children.last).to eq(context.current)
+      expect(table.children).to eq([stray, context.current])
+      expect(context.auto_closed_count).to eq(1)
+    end
+
+    it "leaves the row around a table in a cell open" do
+      context.push(Markbridge::AST::Table.new)
+      context.push(Markbridge::AST::TableRow.new)
+      context.push(Markbridge::AST::TableCell.new)
+      nested = Markbridge::AST::Table.new
+      context.push(nested)
+
+      handler.on_open(token: open_token, context:, registry:)
+
+      expect(nested.children).to eq([context.current])
+    end
+
+    [
+      Markbridge::AST::Quote,
+      Markbridge::AST::Spoiler,
+      Markbridge::AST::Align,
+      Markbridge::AST::List,
+      Markbridge::AST::ListItem,
+    ].each do |klass|
+      it "ends nothing from inside a #{klass.name.split("::").last} in a cell" do
+        block = klass == Markbridge::AST::Align ? klass.new(alignment: "center") : klass.new
+        context.push(Markbridge::AST::Table.new)
+        context.push(Markbridge::AST::TableRow.new)
+        context.push(Markbridge::AST::TableCell.new)
+        context.push(block)
+        bold = Markbridge::AST::Bold.new
+        context.push(bold)
+
+        handler.on_open(token: open_token, context:, registry:)
+
+        expect(bold.children).to eq([context.current])
+        expect(context.auto_closed_count).to eq(0)
+      end
+    end
+
+    it "ends nothing without a table" do
+      bold = Markbridge::AST::Bold.new
+      context.push(bold)
+
+      handler.on_open(token: open_token, context:, registry:)
+
+      expect(bold.children).to eq([context.current])
     end
   end
 
