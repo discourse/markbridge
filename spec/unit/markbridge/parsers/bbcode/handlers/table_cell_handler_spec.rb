@@ -98,6 +98,75 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::TableCellHandler do
       expect(row_before.children.last).to eq(context.current)
     end
 
+    def cell_token
+      Markbridge::Parsers::BBCode::TagStartToken.new(tag: "td", attrs: {}, pos: 0, source: "[td]")
+    end
+
+    it "ends what is open in the cell before, and counts it" do
+      row = context.current
+      context.push(Markbridge::AST::TableCell.new)
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      handler.on_open(token: cell_token, context:, registry:)
+
+      expect(row.children.size).to eq(2)
+      expect(row.children.last).to eq(context.current)
+      expect(context.auto_closed_count).to eq(2)
+    end
+
+    it "ends what is open directly in the row, and counts it" do
+      row = context.current
+      stray = Markbridge::AST::Bold.new
+      context.push(stray)
+
+      handler.on_open(token: cell_token, context:, registry:)
+
+      expect(row.children).to eq([stray, context.current])
+      expect(context.auto_closed_count).to eq(1)
+    end
+
+    it "leaves the cell around a table in it open" do
+      context.push(Markbridge::AST::TableCell.new)
+      nested = Markbridge::AST::Table.new
+      context.push(nested)
+
+      handler.on_open(token: cell_token, context:, registry:)
+
+      expect(nested.children).to eq([context.current])
+    end
+
+    [
+      Markbridge::AST::Quote,
+      Markbridge::AST::Spoiler,
+      Markbridge::AST::Align,
+      Markbridge::AST::List,
+      Markbridge::AST::ListItem,
+    ].each do |klass|
+      it "ends nothing from inside a #{klass.name.split("::").last} in a cell" do
+        block = klass == Markbridge::AST::Align ? klass.new(alignment: "center") : klass.new
+        context.push(Markbridge::AST::TableCell.new)
+        context.push(block)
+        bold = Markbridge::AST::Bold.new
+        context.push(bold)
+
+        handler.on_open(token: cell_token, context:, registry:)
+
+        expect(bold.children).to eq([context.current])
+        expect(context.auto_closed_count).to eq(0)
+      end
+    end
+
+    it "ends nothing without a table" do
+      state = Markbridge::Parsers::BBCode::ParserState.new(Markbridge::AST::Document.new)
+      bold = Markbridge::AST::Bold.new
+      state.push(bold)
+
+      handler.on_open(token: cell_token, context: state, registry:)
+
+      expect(bold.children).to eq([state.current])
+    end
+
     it "creates distinct cells for sequential `td`/`th` mix" do
       # Previous td → new th: both must still end up as siblings.
       td_token =

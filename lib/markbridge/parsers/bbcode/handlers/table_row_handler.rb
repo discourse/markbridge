@@ -6,15 +6,14 @@ module Markbridge
       module Handlers
         # Handler for table row tags (tr)
         class TableRowHandler < BaseHandler
+          include OpenTablePart
+
           def initialize
             @element_class = AST::TableRow
           end
 
           def on_open(token:, context:, registry:, tokens: nil)
-            # Auto-close open cell before starting new row
-            context.pop if context.current.instance_of?(AST::TableCell)
-            # Auto-close previous row if still open
-            context.pop if context.current.instance_of?(AST::TableRow)
+            close_open_row(context)
 
             element = AST::TableRow.new
             context.push(element, token:)
