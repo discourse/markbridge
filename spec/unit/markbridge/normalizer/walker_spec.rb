@@ -428,6 +428,27 @@ RSpec.describe Markbridge::Normalizer::Walker do
 
       expect(tree.children.first.children.map(&:text)).to eq(["ab"])
     end
+
+    it "gets a space behind an element that the block was hoisted through" do
+      italic = Markbridge::AST::Italic
+
+      expect(texts_after_normalizing(el(italic, text("a"), code), text("b"))).to eq([italic, " b"])
+    end
+
+    it "gets a space when the element the block was hoisted through is empty then" do
+      italic = Markbridge::AST::Italic
+
+      expect(texts_after_normalizing(text("a"), el(italic, code), text("b"))).to eq(["a b"])
+    end
+
+    it "gets no space behind an element that a node that is no block was hoisted through" do
+      italic = Markbridge::AST::Italic
+      tree = doc(url(el(italic, text("a"), image), text("b")))
+      normalizer.normalize(tree)
+
+      expect(tree.children.first.children.map(&:class)).to eq([italic, Markbridge::AST::Text])
+      expect(tree.children.first.children.last.text).to eq("b")
+    end
   end
 
   describe "copy-on-write" do

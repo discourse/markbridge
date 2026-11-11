@@ -225,12 +225,15 @@ module Markbridge
 
       # Land inbound bubbles whose boundary is +child+ (this level is the
       # boundary's parent), each after the previous to preserve order;
-      # propagate the rest upward.
+      # propagate the rest upward. A block that goes on upward stood at
+      # the end of +child+ or behind it, so it leaves a gap here too:
+      # what follows +child+ was on a line of its own.
       def land(child_bubble, child, out, bubble)
         child_bubble.each do |node, boundary|
           if boundary.equal?(child)
             out << node
           else
+            out << GAP if block?(node)
             bubble ||= []
             bubble << [node, boundary]
           end
