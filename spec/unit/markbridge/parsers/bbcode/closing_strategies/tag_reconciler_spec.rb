@@ -12,6 +12,84 @@ RSpec.describe Markbridge::Parsers::BBCode::ClosingStrategies::TagReconciler do
     Markbridge::Parsers::BBCode::PeekableEnumerator.new(scanner)
   end
 
+  describe "#close_item_without_list" do
+    let(:quote) { Markbridge::AST::Quote.new }
+    let(:item) { Markbridge::AST::ListItem.new }
+
+    it "ends the item, with what is open in it, for an element around it" do
+      context.push(quote)
+      context.push(item)
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      reconciler.close_item_without_list(handler: registry["quote"], context:)
+
+      expect(context.current).to eq(quote)
+      expect(context.auto_closed_count).to eq(2)
+    end
+
+    it "ends the item for an element further out" do
+      context.push(quote)
+      context.push(Markbridge::AST::Bold.new)
+      context.push(item)
+
+      reconciler.close_item_without_list(handler: registry["quote"], context:)
+
+      expect(context.current).to be_a(Markbridge::AST::Bold)
+      expect(context.auto_closed_count).to eq(0)
+    end
+
+    it "leaves the item open for an element inside of it" do
+      context.push(quote)
+      context.push(item)
+      context.push(Markbridge::AST::Bold.new)
+      context.push(Markbridge::AST::Italic.new)
+
+      reconciler.close_item_without_list(handler: registry["b"], context:)
+
+      expect(context.current).to be_a(Markbridge::AST::Italic)
+    end
+
+    it "leaves the item open for a tag that nothing around it opened" do
+      context.push(item)
+
+      reconciler.close_item_without_list(handler: registry["quote"], context:)
+
+      expect(context.current).to eq(item)
+    end
+
+    it "leaves an item in a list open" do
+      context.push(quote)
+      context.push(Markbridge::AST::List.new)
+      context.push(item)
+
+      reconciler.close_item_without_list(handler: registry["quote"], context:)
+
+      expect(context.current).to eq(item)
+    end
+
+    it "looks at the innermost item only" do
+      context.push(quote)
+      context.push(Markbridge::AST::ListItem.new)
+      context.push(Markbridge::AST::List.new)
+      context.push(item)
+
+      reconciler.close_item_without_list(handler: registry["quote"], context:)
+
+      expect(context.current).to eq(item)
+    end
+
+    it "does nothing without an item" do
+      context.push(quote)
+      context.push(Markbridge::AST::Bold.new)
+
+      reconciler.close_item_without_list(handler: registry["quote"], context:)
+
+      expect(context.current).to be_a(Markbridge::AST::Bold)
+      expect(context.auto_closed_count).to eq(0)
+    end
+  end
+
   describe "#try_auto_close" do
     let(:bold_handler) { registry["b"] }
     let(:italic_handler) { registry["i"] }
