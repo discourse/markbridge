@@ -65,21 +65,31 @@ module Markbridge
         # which the inline parser reads as the text of the tag. A
         # <nowiki> that is never closed is left as it is.
         #
+        # One pass over the lines: the lines behind an open <nowiki> wait
+        # until one of them closes it. A search for the closing line from
+        # every open tag would read the rest of the text again each time.
+        #
         # @param lines [Array<String>]
         # @return [Array<String>]
         def join_nowiki_lines(lines)
           joined = []
-          index = 0
-          while index < lines.length
-            line = lines.fetch(index)
-            while open_nowiki?(line) && (close = closing_line(lines, index + 1))
-              line = "#{line}\n#{lines[(index + 1)..close].join("\n")}"
-              index = close
+          waiting = []
+          open = false
+          lines.each do |line|
+            if !open
+              joined << line
+            elsif line.match?(NOWIKI_CLOSE)
+              joined << [joined.pop, *waiting, line].join("\n")
+              waiting.clear
+            else
+              waiting << line
+              next
             end
-            joined << line
-            index += 1
+            # The line that closed a tag is the last one of the joined
+            # line, so it alone says whether a tag is open again.
+            open = open_nowiki?(line)
           end
-          joined
+          joined.concat(waiting)
         end
 
         # Whether the last <nowiki> of the line has no end on the line.
@@ -89,12 +99,6 @@ module Markbridge
 
           close = line.rindex(NOWIKI_CLOSE)
           close.nil? || close < open
-        end
-
-        # @return [Integer, nil] the first line from +from+ on that closes
-        #   a <nowiki>
-        def closing_line(lines, from)
-          (from...lines.length).find { |index| lines.fetch(index).match?(NOWIKI_CLOSE) }
         end
 
         LINE_ENDING_RE = /\r\n?|[\u2028\u2029]+/

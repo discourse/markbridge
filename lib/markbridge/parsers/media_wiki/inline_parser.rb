@@ -272,14 +272,25 @@ module Markbridge
                          :FILE_PARAMETER,
                          :WIKI_MARKUP
 
+        # A link in a link in the caption of a file is as deep as wikitext
+        # goes. The limit also keeps the search short for a row of `[[`
+        # that nothing closes: without it every one of them would look
+        # through all the others.
+        MAX_LINK_NESTING = 3
+        LINK_EDGE = /\[\[|\]\]/
+        private_constant :MAX_LINK_NESTING, :LINK_EDGE
+
         # The `]]` that closes the link whose content starts at +from+. A
         # link inside, in the caption of a file for example, has its own.
         #
-        # @return [Integer, nil]
+        # @return [Integer, nil] nil when nothing closes the link, or when
+        #   more than MAX_LINK_NESTING links are open inside of it
         def link_close(from)
           depth = 0
-          while (index = @input.byteindex(/\[\[|\]\]/, from))
+          while (index = @input.byteindex(LINK_EDGE, from))
             if @input.getbyte(index) == BRACKET_OPEN
+              return if depth == MAX_LINK_NESTING
+
               depth += 1
             elsif depth.zero?
               return index
