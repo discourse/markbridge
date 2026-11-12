@@ -82,6 +82,74 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::ListItemHandler do
       expect(context.auto_closed_count).to eq(2)
     end
 
+    it "opens what it has ended again in the new item, with its values" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+      context.push(Markbridge::AST::ListItem.new)
+      context.push(Markbridge::AST::Color.new(color: "red"))
+      context.push(Markbridge::AST::Bold.new)
+
+      handler.on_open(
+        token: tag_start,
+        context:,
+        registry: Markbridge::Parsers::BBCode::HandlerRegistry.default,
+      )
+
+      bold, color, item = context.elements_from_current
+      expect([bold.class, color.class]).to eq([Markbridge::AST::Bold, Markbridge::AST::Color])
+      expect(color.color).to eq("red")
+      expect(item).to eq(list.children.last)
+      expect(list.children.first.children.first).not_to equal(color)
+    end
+
+    it "opens what was open directly in the list again in the item" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+      context.push(Markbridge::AST::Bold.new)
+
+      handler.on_open(
+        token: tag_start,
+        context:,
+        registry: Markbridge::Parsers::BBCode::HandlerRegistry.default,
+      )
+
+      expect(context.current).to be_a(Markbridge::AST::Bold)
+      expect(list.children.last.children).to eq([context.current])
+    end
+
+    it "does not open an element again that does not end on its own" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+      context.push(Markbridge::AST::ListItem.new)
+      context.push(Markbridge::AST::Table.new)
+      context.push(Markbridge::AST::Bold.new)
+
+      handler.on_open(
+        token: tag_start,
+        context:,
+        registry: Markbridge::Parsers::BBCode::HandlerRegistry.default,
+      )
+
+      bold, item = context.elements_from_current
+      expect(bold).to be_a(Markbridge::AST::Bold)
+      expect(item).to eq(list.children.last)
+    end
+
+    it "opens nothing again for a [*] that ends nothing" do
+      quote = Markbridge::AST::Quote.new
+      context.push(quote)
+      context.push(Markbridge::AST::Bold.new)
+
+      handler.on_open(
+        token: tag_start,
+        context:,
+        registry: Markbridge::Parsers::BBCode::HandlerRegistry.default,
+      )
+
+      expect(context.current).to be_a(Markbridge::AST::ListItem)
+      expect(context.current.children).to eq([])
+    end
+
     it "leaves the item around a nested list open" do
       context.push(Markbridge::AST::List.new)
       outer_item = Markbridge::AST::ListItem.new

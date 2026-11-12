@@ -126,6 +126,61 @@ RSpec.describe Markbridge::Parsers::BBCode::Handlers::TableCellHandler do
       expect(context.auto_closed_count).to eq(1)
     end
 
+    it "opens what it has ended again in the new cell, with its values" do
+      row = context.current
+      context.push(Markbridge::AST::TableCell.new)
+      context.push(Markbridge::AST::Color.new(color: "red"))
+      context.push(Markbridge::AST::Bold.new)
+
+      handler.on_open(
+        token: cell_token,
+        context:,
+        registry: Markbridge::Parsers::BBCode::HandlerRegistry.default,
+      )
+
+      bold, color, cell = context.elements_from_current
+      expect([bold.class, color.class]).to eq([Markbridge::AST::Bold, Markbridge::AST::Color])
+      expect(color.color).to eq("red")
+      expect(cell).to eq(row.children.last)
+      expect(row.children.first.children.first).not_to equal(color)
+    end
+
+    it "opens nothing again that is open around the table" do
+      state = Markbridge::Parsers::BBCode::ParserState.new(Markbridge::AST::Document.new)
+      state.push(Markbridge::AST::Bold.new)
+      state.push(Markbridge::AST::Table.new)
+      state.push(Markbridge::AST::TableRow.new)
+      state.push(Markbridge::AST::TableCell.new)
+      state.push(Markbridge::AST::Italic.new)
+
+      handler.on_open(
+        token: cell_token,
+        context: state,
+        registry: Markbridge::Parsers::BBCode::HandlerRegistry.default,
+      )
+
+      expect(state.elements_from_current.first(2).map(&:class)).to eq(
+        [Markbridge::AST::Italic, Markbridge::AST::TableCell],
+      )
+    end
+
+    it "does not open an element again that does not end on its own" do
+      row = context.current
+      context.push(Markbridge::AST::TableCell.new)
+      context.push(Markbridge::AST::Code.new)
+      context.push(Markbridge::AST::Bold.new)
+
+      handler.on_open(
+        token: cell_token,
+        context:,
+        registry: Markbridge::Parsers::BBCode::HandlerRegistry.default,
+      )
+
+      bold, cell = context.elements_from_current
+      expect(bold).to be_a(Markbridge::AST::Bold)
+      expect(cell).to eq(row.children.last)
+    end
+
     it "leaves the cell around a table in it open" do
       context.push(Markbridge::AST::TableCell.new)
       nested = Markbridge::AST::Table.new

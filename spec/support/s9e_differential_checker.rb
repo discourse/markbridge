@@ -30,12 +30,9 @@ class S9eDifferentialChecker
     611 =>
       "the closing tag of an aligned block that the end of a quote has ended: Markbridge " \
         "drops it, s9e keeps it as text",
-    640 =>
-      "a link that the end of a list ends: s9e opens it again behind the list for the space " \
-        "that follows and writes a link with no text",
     853 =>
-      "a size that is open directly in a list, in front of the first item: s9e opens it again " \
-        "in every item, Markbridge ends it with the first `[*]`",
+      "a size that is open in the last item when the list ends: s9e opens it again behind " \
+        "the list, Markbridge ends it with the list",
   }.freeze
 
   # With the BBCode plugin on, so a color, a size and an aligned block

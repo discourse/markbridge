@@ -24,8 +24,11 @@ module Markbridge
         # Push a copy of an element that a mismatched closing tag has
         # ended, so what follows is still inside of it (see
         # TagReconciler#try_reopen).
+        # At the depth limit nothing is opened again.
         # @param element [AST::Element] the copy, without children
         def reopen(element)
+          return if @depth == MAX_DEPTH
+
           holder = @current
           push(element)
           # A list puts what is no item into an item of its own.
