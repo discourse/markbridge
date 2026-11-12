@@ -198,7 +198,6 @@ bundle exec rubocop           # Lint Ruby/RSpec (VerifiedDoubles enabled)
 bundle exec rspec             # Run all tests
 bundle exec rspec spec/unit/  # Run unit tests
 bin/lint                      # Auto-fix style (RuboCop + Syntax Tree)
-bin/rubycritic                # Run tests with coverage + RubyCritic analysis
 ```
 
 ### Pre-commit
