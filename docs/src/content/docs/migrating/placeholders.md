@@ -297,7 +297,7 @@ The second one breaks once the importer puts `@alice` there: `x**@alice**` doesn
 A poll or an event ends up as a block of its own, so nothing stands next to it on its line and `like:` has nothing to decide. What matters is that the renderer treats it as a block:
 
 - The tag returns the placeholder through `interface.markdown_island(text, block: true)`, like the built-in `PollTag` and `EventTag` do. That is the placeholder with a blank line on both sides, `"\n\n[poll|3]\n\n"`, and inside a table the renderer writes as HTML the island form from [HTML mode and placeholders](#html-mode-and-placeholders). Inside a quote or a list item, the quote and the list item tags put `> ` in front of it or indent it like any block.
-- The normalizer moves blocks out of bold, italic, links and headings before the renderer runs. It decides that by the AST class: `AST::Poll` and `AST::Event` are blocks. For your own AST class, tell it:
+- The normalizer takes blocks out of bold, italic, links and headings before the renderer runs (see [Normalization](/concepts/normalization/)). It decides that by the AST class: `AST::Poll` and `AST::Event` are blocks. For your own AST class, tell it:
 
 <!-- spec:before
 Tokens = Markbridge::Renderers::Discourse::Inline::Tokens
@@ -336,7 +336,7 @@ Markbridge.render(document, renderer:).markdown
 # Tell the normalizer that the placeholder is a block.
 normalizer = Markbridge::Normalizer.default
 Markbridge::Normalizer::INLINE_CONTAINERS.each do |container|
-  normalizer.rule(parent: container, child: ForumMigration::PollPlaceholder, strategy: :hoist_after)
+  normalizer.rule(parent: container, child: ForumMigration::PollPlaceholder, strategy: :split)
 end
 
 Markbridge.render(document, renderer:, normalize: normalizer).markdown

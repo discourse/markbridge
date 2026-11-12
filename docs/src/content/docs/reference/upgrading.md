@@ -48,9 +48,9 @@ Most projects update without a change to their code. What changes is the output 
 
 ### Normalizer and renderer
 
-- **Text around a block that was moved out.** When the normalizer moves a block out of bold, a link or another inline container, the texts on its two sides get a space between them when they would touch.
 - **Formatting around a block goes into the block.** `[b]Buy [list][*]milk[/list] today[/b]` was bold text and a plain list behind it. Now the bold ends in front of the list and starts again behind it, the items are bold, and the order of the text stays as it was. The same goes for a link, a color, a size and the other inline formatting, in every input format, and for a block in a paragraph or in an inline spoiler. The normalizer reports these as `:split`, not as `:hoist_after`. Only a block in a heading is still moved behind the heading.
-- **More trees are repaired.** A mail link (`AST::Email`), a color and a size are inline containers now, so a quote or a list in one of them is moved out. A heading in a heading is one heading. A block that was the first thing in bold leaves a space in front of the bold when the text there would touch it.
+- **More trees are repaired.** A mail link (`AST::Email`), a color and a size are inline containers now, so a quote or a list in one of them is split out the same way. A heading in a heading is one heading.
+- **Text around a block in a heading.** When a block is moved behind its heading, the texts on its two sides get a space between them when they would touch.
 - **Spaces between elements.** Spaces and tabs that follow a space or a tab from another element are left out: `a ` and ` b` from two elements are `a b`.
 - **A URL right in front of a closing `~~` or a closing BBCode tag.** Discourse takes `~~`, `[/u]`, `[/color]`, `[/size]` and `[/spoiler]` into a URL that stands right in front of them, so the link was wrong and the closing tag showed as text. A link whose text is its URL is written as `[url](url)` there, and a URL in plain text gets an empty comment after it: `~~see https://example.com/a<!---->~~`.
 - **A `<` in front of a scheme at the end of a text** gets a backslash, `\<mailto:`. With a link right after it the two cooked as one broken autolink.
