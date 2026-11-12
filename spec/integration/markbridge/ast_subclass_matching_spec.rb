@@ -27,7 +27,7 @@ RSpec.describe "AST subclass matching" do
     conversion = Markbridge.render(document_with_legacy_code_in_bold)
 
     expect(conversion.diagnostics[:normalization]).to eq(
-      [{ parent: "Bold", child: "LegacyCode", strategy: :hoist_after, count: 1 }],
+      [{ parent: "Bold", child: "LegacyCode", strategy: :split, count: 1 }],
     )
   end
 

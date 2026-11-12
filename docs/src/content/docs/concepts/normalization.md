@@ -26,12 +26,30 @@ parse → yield(ast) → normalize → render
 The default rules are what CommonMark allows. Markdown that breaks one of them is not read back as the tree it was written from:
 
 - **No link inside a link**, at any depth. The inner link is removed and its text stays in the outer link. A mail address (`AST::Email`) counts as a link here.
-- **A block inside an inline container is moved out.** Inline containers are the nodes that hold a line of text: links, mail addresses, headings, and the formatting nodes (`Bold`, `Italic`, `Underline`, `Color`, `Size`, …). The blocks are `List`, `Table`, `Quote`, `Details`, `HorizontalRule`, `Align`, `Poll` and `Event`.
-- **A fenced or multi-line code block inside an inline container is moved out.** A one-line code span is fine.
-- **A block spoiler inside an inline container is moved out.** That is an `AST::Spoiler` with `block: true`. An inline spoiler is fine.
+- **A block inside an inline container is split out.** Inline containers are the nodes that hold a line of text: links, mail addresses, and the formatting nodes (`Bold`, `Italic`, `Underline`, `Color`, `Size`, …). A paragraph and an inline spoiler are treated the same way. The blocks are `List`, `Table`, `Quote`, `Details`, `Heading`, `Paragraph`, `HorizontalRule`, `Align`, `Poll` and `Event`.
+- **A fenced or multi-line code block inside an inline container is split out.** A one-line code span is fine.
+- **A block spoiler inside an inline container is split out.** That is an `AST::Spoiler` with `block: true`. An inline spoiler is fine.
+- **A block inside a heading is moved behind the heading.** A heading stays one heading.
 - **No heading inside a heading.** The inner heading is removed and its text stays in the outer one.
 
-When a block is moved out and the texts on its two sides would touch, a space goes between them. This also holds for the text in front of the container when the block was the first thing in it. With the block there they were on two lines, and an HTML parser has trimmed the whitespace at the line edges: `<i>Run <pre>…</pre> and wait</i>` becomes `*Run and wait*` and the code block.
+### What "split out" means
+
+The container ends in front of the block and starts again behind it, and the text in the block gets a copy of the container. Bold text with a list in the middle becomes bold text, a list with bold items, and bold text again:
+
+```ruby
+Markbridge.bbcode_to_markdown("[b]Buy [list][*]milk[*]eggs[/list] today[/b]").markdown
+# => "**Buy**\n\n- **milk**\n- **eggs**\n\n**today**"
+```
+
+That is what a browser shows for `<b>Buy <ul>…</ul> today</b>`, and what forum software shows for the BBCode: the whole list is bold. The order of the text stays as it was. The copies go around every line of text in the block, in a paragraph, a list item or a table cell, at any depth. Code gets none, it shows no formatting. A link is copied the same way, so every line of a quote in a link is a link.
+
+A part of the container that is left with nothing but whitespace is removed.
+
+### A block in a heading
+
+A heading is not split, two headings for one would be worse. The block goes behind the heading, and the text in it gets no copy of anything.
+
+When the texts on the two sides of that block would touch, a space goes between them. This also holds for the text in front of an element inside the heading when the block was the first thing in it. With the block there they were on two lines, and an HTML parser has trimmed the whitespace at the line edges: `<h2>Run <pre>…</pre> and wait</h2>` becomes `## Run and wait` and the code block.
 
 Rules that are a matter of taste are not built in. An image inside a link, `[![alt](src)](url)`, is valid Markdown, so the default keeps it. If you want images moved out of links, add a rule (see below).
 
@@ -42,11 +60,12 @@ A rule names a parent class, a child class and what to do with the child, the st
 | Strategy | Effect |
 |---|---|
 | `:keep` | Leave it where it is. Nothing is reported. |
-| `:hoist_after` | Move the node out and put it right after the outermost parent the rule matches. An image in bold text in a link, with a rule for images in links, goes after the whole link. The order of the document stays the same. |
+| `:split` | End every element from the outermost parent the rule matches down to the node in front of the node, and start copies of them behind it. The node stands between the two halves, and the lines of text in it get copies of the formatting and links it was in. See above. |
+| `:hoist_after` | Move the node out and put it right after the outermost parent the rule matches. An image in bold text in a link, with a rule for images in links, goes after the whole link. The text around the node stays in one piece, the node comes after it. |
 | `:unwrap` | Remove the element and put its children in its place. This is what happens to a link in a link: `[[text](inner)](outer)` becomes `[text](outer)`. |
 | `:textify` | Replace the node and everything in it with its plain text (`@name` for a mention). |
 | `:drop` | Remove it. |
-| a lambda | `->(boundary, node) { … }` returns one of the symbols above, an Array of nodes to put in its place, or `nil` to remove it. `boundary` is the parent the rule matched. |
+| a lambda | `->(boundary, node) { … }` returns one of the symbols above, an Array of nodes to put in its place, or `nil` to remove it. `boundary` is the parent the rule matched. It can also return `:pass`: this parent has no say, and the rules of the parents inside of it are asked. The default rules do that for a block spoiler, which may hold blocks. |
 
 A formatting node (bold, italic, color, …) that is empty after a move is removed, so no `****` is left behind. A link is kept even when empty, because it is written as its URL.
 
