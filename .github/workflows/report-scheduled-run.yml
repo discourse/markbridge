@@ -1,0 +1,60 @@
+name: Report a scheduled run
+
+# Called at the end of every workflow that runs on a schedule. Nobody
+# looks at the Actions tab every morning, and GitHub mails a failed
+# scheduled run only to the person who last changed the workflow file.
+# So a run that fails opens an issue, a run that fails again adds a
+# comment to it, and the first run that passes closes it.
+#
+# The caller gives the job `issues: write` and says whether one of its
+# jobs failed:
+#
+#   report:
+#     needs: [the, other, jobs]
+#     if: always() && github.event_name == 'schedule'
+#     permissions:
+#       issues: write
+#     uses: ./.github/workflows/report-scheduled-run.yml
+#     with:
+#       failed: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+on:
+  workflow_call:
+    inputs:
+      failed:
+        description: Whether a job of the calling workflow failed or was cancelled
+        type: boolean
+        required: true
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+
+    permissions:
+      issues: write
+
+    steps:
+      - name: Open, update or close the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: "Scheduled run fails: ${{ github.workflow }}"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FAILED: ${{ inputs.failed }}
+        run: |
+          gh label create scheduled-run --description "A workflow that runs on a schedule fails" --color B60205 --force
+
+          number=$(gh issue list --state open --label scheduled-run --limit 100 --json number,title \
+            --jq 'map(select(.title == env.TITLE)) | .[0].number // empty')
+
+          if [ "$FAILED" = "true" ]; then
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --body "It failed again: $RUN_URL"
+            else
+              gh issue create --title "$TITLE" --label scheduled-run \
+                --body "The scheduled run of this workflow failed: $RUN_URL
+
+          Every run that fails adds a comment here, and the first run that passes closes the issue."
+            fi
+          elif [ -n "$number" ]; then
+            gh issue close "$number" --comment "The run passes again: $RUN_URL"
+          fi
