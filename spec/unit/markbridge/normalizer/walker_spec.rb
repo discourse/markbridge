@@ -573,6 +573,63 @@ RSpec.describe Markbridge::Normalizer::Walker do
       )
     end
 
+    it "gets a space behind an element that ended with a block that is unwrapped" do
+      heading = Markbridge::AST::Heading
+      deletion = el(Markbridge::AST::Deletion, text("x"), el(heading, text("b"), level: 2))
+      outer = el(heading, text("a "), deletion, text("c"), level: 1)
+      Markbridge::Normalizer.default.normalize(doc(outer))
+
+      expect(deletion.children.map(&:text)).to eq(["x b"])
+      expect(outer.children.first.text).to eq("a ")
+      expect(outer.children.last.text).to eq(" c")
+    end
+
+    it "gets a space in front of an element that started with a block that is unwrapped" do
+      heading = Markbridge::AST::Heading
+      deletion = el(Markbridge::AST::Deletion, el(heading, text("b"), level: 2), text("x"))
+      outer = el(heading, text("a"), deletion, text("c"), level: 1)
+      Markbridge::Normalizer.default.normalize(doc(outer))
+
+      expect(deletion.children.map(&:text)).to eq(["b x"])
+      expect(outer.children.first.text).to eq("a ")
+      expect(outer.children.last.text).to eq("c")
+    end
+
+    it "gets no space between a subclass of a block and an element that starts with the block" do
+      quote_class = stub_const("PullQuote", Class.new(Markbridge::AST::Quote))
+      tree = doc(el(quote_class, text("q")), bold(code, text("b")))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.map(&:class)).to eq(
+        [quote_class, Markbridge::AST::Bold, Markbridge::AST::Code],
+      )
+    end
+
+    it "gets no space between a block spoiler and an element that starts with the block" do
+      spoiler = el(Markbridge::AST::Spoiler, text("s"), block: true)
+      tree = doc(spoiler, bold(code, text("b")))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.map(&:class)).to eq(
+        [Markbridge::AST::Spoiler, Markbridge::AST::Bold, Markbridge::AST::Code],
+      )
+    end
+
+    it "gets a space between a code span and an element that starts with the block" do
+      span = el(Markbridge::AST::Code, text("c"))
+      tree = doc(span, bold(code, text("b")))
+      Markbridge::Normalizer.default.normalize(tree)
+
+      expect(tree.children.map(&:class)).to eq(
+        [
+          Markbridge::AST::Code,
+          Markbridge::AST::Text,
+          Markbridge::AST::Bold,
+          Markbridge::AST::Code,
+        ],
+      )
+    end
+
     it "gets no space around the content of a link that is unwrapped" do
       tree = doc(url(text("a"), url(text("b"), href: "https://ex.com/2"), text("c")))
       Markbridge::Normalizer.default.normalize(tree)

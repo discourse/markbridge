@@ -718,6 +718,14 @@ RSpec.describe Markbridge::Renderers::Discourse::Tags::TableTag do
   end
 
   describe "with rows-less children" do
+    it "returns the empty string for a table in a table that has no rows" do
+      outer = Markbridge::AST::Table.new
+      table = Markbridge::AST::Table.new
+      table << Markbridge::AST::Text.new("no rows")
+
+      expect(tag.render(table, interface_for(outer))).to eq("")
+    end
+
     it "returns the empty string for a table whose children are all non-Row" do
       # The render method's empty_table? predicate must check that no
       # child is an AST::TableRow specifically — not just that the

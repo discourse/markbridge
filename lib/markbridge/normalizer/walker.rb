@@ -53,9 +53,7 @@ module Markbridge
       GAP = Object.new.freeze
       EDGE_SPACE_BEFORE = /[[:space:]]\z/
       EDGE_SPACE_AFTER = /\A[[:space:]]/
-      # Elements that take one kind of child and no text.
-      ROWS_ONLY = [AST::List, AST::Table, AST::TableRow].freeze
-      private_constant :GAP, :EDGE_SPACE_BEFORE, :EDGE_SPACE_AFTER, :ROWS_ONLY
+      private_constant :GAP, :EDGE_SPACE_BEFORE, :EDGE_SPACE_AFTER
 
       # @param rule_set [RuleSet]
       # @param report [Report]
@@ -134,11 +132,11 @@ module Markbridge
         stack.pop
         before = after = false
         if out
-          # A block starts and ends a line itself, whatever is in it.
-          inline = !own_lines?(element)
-          before = inline && out.first.equal?(GAP)
-          after = inline && out.last.equal?(GAP)
-          out = coalesce(out, spaces: !ROWS_ONLY.include?(element.class))
+          # For a block the two say nothing new: the parent puts no
+          # space next to a block anyway (see #touching?).
+          before = out.first.equal?(GAP)
+          after = out.last.equal?(GAP)
+          out = coalesce(out)
           element.replace_children(out)
         end
 
@@ -280,10 +278,9 @@ module Markbridge
       # were on two lines, and an HTML parser has trimmed the whitespace
       # at such a line edge.
       #
-      # +spaces+ is false for a list, a table and a row: they hold items,
-      # rows and cells, and a text between two of them would be a child
-      # that does not belong there.
-      def coalesce(nodes, spaces:)
+      # A list, a table and a row get no space: their items, rows and
+      # cells are blocks, and nothing touches a block (see #touching?).
+      def coalesce(nodes)
         nodes
           .each_with_index
           .with_object([]) do |(node, index), acc|
@@ -291,7 +288,7 @@ module Markbridge
 
             # For the first node this looks at the last one, which does no
             # harm: nothing is in front of the first node to touch.
-            gap = spaces && nodes.fetch(index - 1).equal?(GAP)
+            gap = nodes.fetch(index - 1).equal?(GAP)
             append(acc, AST::Text.new(" ")) if gap && touching?(acc.last, node)
             append(acc, node)
           end

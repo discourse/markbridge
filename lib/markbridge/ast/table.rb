@@ -74,7 +74,7 @@ module Markbridge
       private
 
       def span(value)
-        number = value.is_a?(Integer) ? value : Integer(value.to_s, 10, exception: false)
+        number = Integer(value.to_s, 10, exception: false)
         number if number && number > 1
       end
     end
