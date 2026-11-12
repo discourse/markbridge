@@ -54,6 +54,10 @@ add_entry() {
   # Squash-commit subjects already carry a trailing " (#N)"; strip it so
   # the reference below doesn't double up.
   title=$(printf '%s' "${title}" | sed -E 's/ \(#[0-9]+\)$//')
+  # A subject can name an HTML tag ("Read <del> as a deletion").
+  # GitHub would render it as HTML and the entry would lose its words,
+  # so a tag that is not in a code span already gets one.
+  title=$(printf '%s' "${title}" | sed -E 's/(^|[^`])(<\/?[A-Za-z][^>]*>)/\1`\2`/g')
 
   pr=$(gh api "repos/${REPO}/commits/${sha}/pulls" -q '.[0].number' 2>/dev/null || true)
   # gh can emit error JSON on stdout (e.g. for commits GitHub doesn't
