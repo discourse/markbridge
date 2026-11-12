@@ -226,6 +226,85 @@ RSpec.describe Markbridge::Parsers::BBCode::ParserState do
     end
   end
 
+  describe "#reopen and #drop_empty_reopened" do
+    let(:bold) { Markbridge::AST::Bold.new }
+
+    it "pushes the element" do
+      context.reopen(bold)
+
+      expect(context.current).to eq(bold)
+      expect(root.children).to eq([bold])
+    end
+
+    it "takes a reopened element away that stayed empty" do
+      context.add_child(Markbridge::AST::Text.new("a"))
+      context.reopen(bold)
+      context.pop
+      context.add_child(Markbridge::AST::Text.new("b"))
+
+      context.drop_empty_reopened
+
+      expect(root.children.map(&:class).uniq).to eq([Markbridge::AST::Text])
+    end
+
+    it "keeps a reopened element that something was put into" do
+      context.reopen(bold)
+      context.add_child(Markbridge::AST::Text.new("x"))
+
+      context.drop_empty_reopened
+
+      expect(root.children).to eq([bold])
+    end
+
+    it "keeps an empty element that was not reopened" do
+      italic = Markbridge::AST::Italic.new
+      context.push(italic)
+      context.pop
+      context.reopen(bold)
+      context.pop
+
+      context.drop_empty_reopened
+
+      expect(root.children).to eq([italic])
+    end
+
+    it "takes a reopened element away that holds only an empty reopened one" do
+      context.reopen(bold)
+      context.reopen(Markbridge::AST::Italic.new)
+
+      context.drop_empty_reopened
+
+      expect(root.children).to eq([])
+    end
+
+    it "takes only the reopened element out of what holds it" do
+      quote = Markbridge::AST::Quote.new
+      context.push(quote)
+      context.add_child(Markbridge::AST::LineBreak.new)
+      context.reopen(bold)
+      context.pop
+      context.reopen(Markbridge::AST::Italic.new)
+      context.add_child(Markbridge::AST::Text.new("x"))
+
+      context.drop_empty_reopened
+
+      expect(quote.children.map(&:class)).to eq(
+        [Markbridge::AST::LineBreak, Markbridge::AST::Italic],
+      )
+    end
+
+    it "finds a reopened element in the item a list has put it into" do
+      list = Markbridge::AST::List.new
+      context.push(list)
+      context.reopen(bold)
+
+      context.drop_empty_reopened
+
+      expect(list.children.map(&:class)).to eq([Markbridge::AST::ListItem])
+      expect(list.children.first.children).to eq([])
+    end
+  end
+
   describe "#elements_from_current" do
     it "returns an empty array when the node stack has no entries" do
       empty_state = described_class.allocate
