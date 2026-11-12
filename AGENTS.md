@@ -419,10 +419,12 @@ few minutes the first time):
   Markdown for the site it cooks on.
 - Tag an example group with `:discourse_engine` and guard it with
   `DiscourseEngineCooker::SKIP_REASON`. Without the engine the examples
-  skip; `DISCOURSE_ENGINE_REQUIRED=1` makes that a failure. The nightly
+  skip; `DISCOURSE_ENGINE_REQUIRED=1` makes that a failure. The
   `discourse-engine.yml` workflow builds the engine and runs
-  `rspec --tag discourse_engine`. The normal test job does not build it,
-  the build needs network and minutes.
+  `rspec --tag discourse_engine` for every pull request, every push to
+  main and every night. The build needs network and minutes, but it is
+  cached by the commits in `discourse.json`, so the job takes half a
+  minute. The test jobs of `main.yml` do not build it.
 - `sync.mjs` records the discourse-bbcode commit and hashes the files the
   engine is built from, next to the markdown-it ones, so the weekly check
   reports when Discourse changes them.

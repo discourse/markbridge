@@ -1,15 +1,25 @@
 name: Cook with the Discourse engine
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
   schedule:
     # Every night at 04:00 UTC.
     - cron: '0 4 * * *'
   workflow_dispatch:
 
-# The specs cook with plain markdown-it. This job builds Discourse's own
-# engine (bin/discourse-engine fetches the parts of Discourse it is built
-# from, which takes a few minutes) and runs the examples that cook with
-# it, so the BBCode of the plugins is checked the way Discourse cooks it.
+# The specs in CI cook with plain markdown-it. This job builds
+# Discourse's own engine and runs the examples that cook with it, so the
+# BBCode of the plugins is checked the way Discourse cooks it.
+#
+# bin/discourse-engine fetches the parts of Discourse the engine is
+# built from, which takes a few minutes. The result is cached by the
+# commits in discourse.json and by the build script, so that happens
+# once after a sync with Discourse. With the cache the whole job takes
+# half a minute. A pull request reads the cache of main, which the run
+# for the push to main and the nightly run fill.
 jobs:
   discourse-engine:
     runs-on: ubuntu-latest
