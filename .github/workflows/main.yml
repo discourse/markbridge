@@ -172,6 +172,8 @@ jobs:
 
     permissions:
       contents: write
+      # To start the docs workflow after the release, see below.
+      actions: write
 
     steps:
       - name: Checkout
@@ -193,6 +195,11 @@ jobs:
           if ! gh release view "${TAG}" > /dev/null 2>&1; then
             NOTES=$(bin/generate-release-notes)
             gh release create "${TAG}" --notes "${NOTES}" --latest
+          else
+            # The changelog page of the docs is built from the releases.
+            # The docs build for the version bump ran before this one
+            # existed, so build the docs again, from main.
+            gh workflow run docs.yml --ref main
           else
             echo "Release ${TAG} already exists, skipping."
           fi

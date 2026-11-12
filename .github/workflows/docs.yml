@@ -12,8 +12,11 @@ on:
       - 'docs/**'
       - 'lib/markbridge/version.rb'
       - '.github/workflows/docs.yml'
-  release:
-    types: [published, edited, deleted]
+  # The changelog page is built from the GitHub releases. A release
+  # event cannot deploy: its run belongs to the tag, and the Pages
+  # environment lets only main deploy. So the publish job of main.yml
+  # starts this workflow on main after it has created a release. After
+  # an edit of release notes, start it by hand.
   workflow_dispatch:
 
 permissions:
@@ -43,7 +46,8 @@ jobs:
 
   deploy:
     needs: build
-    # PRs validate the build only; deploy happens on push to main / release.
+    # PRs validate the build only; deploy happens on push to main and
+    # when the workflow is started on main.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
