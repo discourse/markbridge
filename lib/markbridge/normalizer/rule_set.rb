@@ -81,6 +81,28 @@ module Markbridge
         scan_ancestors(candidates, ancestors)
       end
 
+      # {#resolve} with a callable strategy asked for its answer. A
+      # callable that answers +:pass+ has no say about this child: the
+      # search goes on with the ancestors inside of its boundary. A rule
+      # for an inline spoiler does that for a block spoiler, which may
+      # hold blocks.
+      #
+      # @param child [AST::Node]
+      # @param ancestors [Array<AST::Element>] root-first ancestor stack
+      # @param walk_cache [Hash{Class => Array<Class>}] see {#resolve}
+      # @return [Array(Object, AST::Element), Array(nil, nil)] a strategy
+      #   that is no callable, and its boundary
+      def decide(child, ancestors, walk_cache)
+        strategy, boundary = resolve(child, ancestors, walk_cache)
+        return strategy, boundary unless strategy.respond_to?(:call)
+
+        strategy = strategy.call(boundary, child)
+        return strategy, boundary unless strategy == :pass
+
+        inside = ancestors.drop(ancestors.index { |ancestor| ancestor.equal?(boundary) } + 1)
+        decide(child, inside, walk_cache)
+      end
+
       # Freeze so a shared instance raises if something tries to change it.
       # Freezing +@by_parent+ and its inner hashes is enough: {#add} writes
       # there before it touches +@child_classes+, so a frozen instance raises

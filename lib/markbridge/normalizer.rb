@@ -3,6 +3,7 @@
 require_relative "normalizer/rule_set"
 require_relative "normalizer/report"
 require_relative "normalizer/text_projection"
+require_relative "normalizer/carrier"
 require_relative "normalizer/walker"
 
 module Markbridge
@@ -28,7 +29,7 @@ module Markbridge
   #   Markbridge::Normalizer.default.violations(ast) # => [...]
   class Normalizer
     # The strategy symbols a rule may resolve to.
-    STRATEGIES = %i[keep hoist_after unwrap textify drop].freeze
+    STRATEGIES = %i[keep split hoist_after unwrap textify drop].freeze
 
     EMPTY_STACK = [].freeze
     private_constant :EMPTY_STACK
@@ -78,25 +79,83 @@ module Markbridge
       AST::Event,
     ].freeze
 
+    # The inline elements whose formatting goes with a block that is
+    # split out of them (see {Carrier}): the block was shown bold, in a
+    # color or as a link, and its text still is. A heading and a
+    # paragraph are split too, but there is nothing to take along.
+    CARRIED = [
+      AST::Url,
+      AST::Email,
+      AST::Bold,
+      AST::Italic,
+      AST::Strikethrough,
+      AST::Underline,
+      AST::Superscript,
+      AST::Subscript,
+      AST::Insertion,
+      AST::Deletion,
+      AST::Highlight,
+      AST::Color,
+      AST::Size,
+      # An inline one: a block spoiler is a block and never around one
+      # that is split out.
+      AST::Spoiler,
+    ].freeze
+
+    # How a block leaves the container +boundary+. A heading stays one
+    # heading and the block goes behind it. A block spoiler may hold
+    # blocks, so it passes the question on to what is inside of it.
+    # Everything else is split around the block, which keeps the order
+    # of the text.
+    MOVE =
+      lambda do |boundary|
+        if boundary.is_a?(AST::Heading)
+          :hoist_after
+        elsif boundary.is_a?(AST::Spoiler) && boundary.block
+          :pass
+        else
+          :split
+        end
+      end
+
     # A code span may stay inside an inline container while it is on one line.
     # A fenced or multi-line block is moved out. This matches
     # +RenderingInterface#block_context?+: Code prints as a fenced block when
     # its +block+ flag is set or a Text child has a newline (the language alone
     # does not make it a block).
-    KEEP_INLINE_CODE =
-      lambda do |_boundary, node|
-        block =
-          node.block ||
-            node.children.any? { |c| c.instance_of?(AST::Text) && c.text.include?("\n") }
-        block ? :hoist_after : :keep
-      end
+    KEEP_INLINE_CODE = ->(boundary, node) { block_code?(node) ? MOVE.call(boundary) : :keep }
 
     # A spoiler inside a line of text may stay in an inline container. One
     # with its +block+ flag set is written on lines of its own and is
     # moved out.
-    KEEP_INLINE_SPOILER = ->(_boundary, node) { node.block ? :hoist_after : :keep }
+    KEEP_INLINE_SPOILER = ->(boundary, node) { node.block ? MOVE.call(boundary) : :keep }
+
+    # A block in a block or a block in a container, by the class of the
+    # container.
+    MOVE_BLOCK = ->(boundary, _node) { MOVE.call(boundary) }
 
     class << self
+      # @param node [AST::Code]
+      # @return [Boolean] whether the code is written as a fenced block
+      def block_code?(node)
+        node.block || node.children.any? { |c| c.instance_of?(AST::Text) && c.text.include?("\n") }
+      end
+
+      # @param node [AST::Node]
+      # @return [Boolean] whether the node is written on lines of its own.
+      #   Not every code and not every spoiler is: a code span and an
+      #   inline spoiler are a part of their line.
+      def own_lines?(node)
+        case node
+        when AST::Code
+          block_code?(node)
+        when AST::Spoiler
+          node.block ? true : false
+        else
+          BLOCK_NODES.any? { |klass| node.is_a?(klass) }
+        end
+      end
+
       # A fresh, customizable normalizer with the default rules. Add more with
       # {#rule}.
       # @return [Normalizer]
@@ -123,12 +182,16 @@ module Markbridge
           LINKS.each { |inner| rules.add(parent: outer, child: inner, strategy: :unwrap) }
         end
 
-        INLINE_CONTAINERS.each do |container|
+        # A paragraph is a line of text too. It is no inline container,
+        # it is a block itself, but a block in it is split out the same
+        # way. So is a block in an inline spoiler (see MOVE for a block
+        # spoiler).
+        [*INLINE_CONTAINERS, AST::Paragraph, AST::Spoiler].each do |container|
           rules.add(parent: container, child: AST::Code, strategy: KEEP_INLINE_CODE)
           rules.add(parent: container, child: AST::Spoiler, strategy: KEEP_INLINE_SPOILER)
 
           BLOCK_NODES.each do |block|
-            rules.add(parent: container, child: block, strategy: :hoist_after)
+            rules.add(parent: container, child: block, strategy: MOVE_BLOCK)
           end
         end
 
@@ -192,8 +255,7 @@ module Markbridge
     def collect_violations(element, ancestors, found, walk_cache)
       stack = ancestors + [element]
       element.children.each do |child|
-        strategy, boundary = @rules.resolve(child, stack, walk_cache)
-        strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
+        strategy, boundary = @rules.decide(child, stack, walk_cache)
         unless strategy.nil? || strategy == :keep
           found << {
             parent: Report.short_name(boundary.class),

@@ -68,6 +68,41 @@ RSpec.describe Markbridge::Normalizer do
     end
   end
 
+  describe ".block_code? and .own_lines?" do
+    it "takes code with the block flag or with a line break for a block" do
+      span = el(Markbridge::AST::Code, text("x"))
+      flagged = el(Markbridge::AST::Code, text("x"), block: true)
+      lines = el(Markbridge::AST::Code, text("a"), text("b\nc"))
+      # A child that is no text is not looked into.
+      odd = el(Markbridge::AST::Code, Markbridge::AST::MarkdownText.new("a\nb"))
+
+      expect([span, flagged, lines, odd].map { |code| described_class.block_code?(code) }).to eq(
+        [false, true, true, false],
+      )
+      expect([span, flagged, lines].map { |code| described_class.own_lines?(code) }).to eq(
+        [false, true, true],
+      )
+    end
+
+    it "takes a spoiler with the block flag for a block" do
+      inline = el(Markbridge::AST::Spoiler, text("x"))
+      block = el(Markbridge::AST::Spoiler, text("x"), block: true)
+
+      expect(described_class.own_lines?(inline)).to be(false)
+      expect(described_class.own_lines?(block)).to be(true)
+    end
+
+    it "takes the block nodes and their subclasses for blocks, and nothing else" do
+      subclass = Class.new(Markbridge::AST::Quote)
+
+      expect(described_class.own_lines?(Markbridge::AST::Quote.new)).to be(true)
+      expect(described_class.own_lines?(subclass.new)).to be(true)
+      expect(described_class.own_lines?(Markbridge::AST::HorizontalRule.new)).to be(true)
+      expect(described_class.own_lines?(Markbridge::AST::Bold.new)).to be(false)
+      expect(described_class.own_lines?(text("x"))).to be(false)
+    end
+  end
+
   describe ".shared_default" do
     it "returns the same frozen instance on every call" do
       expect(described_class.shared_default).to be_a(described_class)
@@ -120,6 +155,51 @@ RSpec.describe Markbridge::Normalizer do
       )
     end
 
+    # A heading stays one heading and the block goes behind it. Every
+    # other container is split around the block.
+    def moved_out_of(container)
+      container == Markbridge::AST::Heading ? :hoist_after : :split
+    end
+
+    it "splits a paragraph around every block node, like an inline container" do
+      paragraph = Markbridge::AST::Paragraph
+      described_class::BLOCK_NODES.each do |block|
+        found = described_class.default.violations(doc(wrap(paragraph, instance(block))))
+        expect(found).to include({ parent: "Paragraph", child: short(block), strategy: :split }),
+        "(Paragraph, #{block}) not flagged"
+      end
+      fenced = el(Markbridge::AST::Code, text("a\nb"))
+      spoiler = el(Markbridge::AST::Spoiler, text("x"), block: true)
+      expect(described_class.default.violations(doc(wrap(paragraph, fenced)))).to eq(
+        [{ parent: "Paragraph", child: "Code", strategy: :split }],
+      )
+      expect(described_class.default.violations(doc(wrap(paragraph, spoiler)))).to eq(
+        [{ parent: "Paragraph", child: "Spoiler", strategy: :split }],
+      )
+    end
+
+    it "splits an inline spoiler around a block, and leaves a block in a block spoiler" do
+      quote = -> { el(Markbridge::AST::Quote, text("q")) }
+      inline = el(Markbridge::AST::Spoiler, quote.call)
+      block = el(Markbridge::AST::Spoiler, quote.call, block: true)
+      in_bold = el(Markbridge::AST::Spoiler, el(Markbridge::AST::Bold, quote.call), block: true)
+
+      expect(described_class.default.violations(doc(inline))).to eq(
+        [{ parent: "Spoiler", child: "Quote", strategy: :split }],
+      )
+      expect(described_class.default.violations(doc(block))).to eq([])
+      expect(described_class.default.violations(doc(in_bold))).to eq(
+        [{ parent: "Bold", child: "Quote", strategy: :split }],
+      )
+    end
+
+    it "takes the formatting, the links and a spoiler along with a block, not a heading" do
+      expect(described_class::CARRIED).to match_array(
+        described_class::INLINE_CONTAINERS - [Markbridge::AST::Heading] +
+          [Markbridge::AST::Spoiler],
+      )
+    end
+
     it "flags every block node inside every inline container" do
       described_class::INLINE_CONTAINERS.each do |container|
         described_class::BLOCK_NODES.each do |block|
@@ -127,7 +207,7 @@ RSpec.describe Markbridge::Normalizer do
 
           found = described_class.default.violations(doc(wrap(container, instance(block))))
           expect(found).to include(
-            { parent: short(container), child: short(block), strategy: :hoist_after },
+            { parent: short(container), child: short(block), strategy: moved_out_of(container) },
           ),
           "(#{container}, #{block}) not flagged"
         end
@@ -142,7 +222,7 @@ RSpec.describe Markbridge::Normalizer do
         expect(described_class.default.violations(doc(wrap(container, inline)))).to eq([]),
         "inline code in #{container}"
         expect(described_class.default.violations(doc(wrap(container, fenced)))).to contain_exactly(
-          { parent: short(container), child: "Code", strategy: :hoist_after },
+          { parent: short(container), child: "Code", strategy: moved_out_of(container) },
         ),
         "fenced code in #{container}"
       end
@@ -153,7 +233,7 @@ RSpec.describe Markbridge::Normalizer do
       bold = el(Class.new(Markbridge::AST::Bold), rule)
 
       expect(described_class.default.violations(doc(bold))).to eq(
-        [{ parent: "Bold", child: "HorizontalRule", strategy: :hoist_after }],
+        [{ parent: "Bold", child: "HorizontalRule", strategy: :split }],
       )
     end
 
@@ -165,7 +245,7 @@ RSpec.describe Markbridge::Normalizer do
         expect(described_class.default.violations(doc(wrap(container, inline)))).to eq([]),
         "inline spoiler in #{container}"
         expect(described_class.default.violations(doc(wrap(container, block)))).to contain_exactly(
-          { parent: short(container), child: "Spoiler", strategy: :hoist_after },
+          { parent: short(container), child: "Spoiler", strategy: moved_out_of(container) },
         ),
         "block spoiler in #{container}"
       end
@@ -176,7 +256,7 @@ RSpec.describe Markbridge::Normalizer do
         forced = el(Markbridge::AST::Code, text("x"), block: true)
 
         expect(described_class.default.violations(doc(wrap(container, forced)))).to contain_exactly(
-          { parent: short(container), child: "Code", strategy: :hoist_after },
+          { parent: short(container), child: "Code", strategy: moved_out_of(container) },
         ),
         "forced block code in #{container}"
       end
@@ -336,17 +416,19 @@ RSpec.describe Markbridge::Normalizer do
   end
 
   describe "#normalize ordering (moved subtrees walk against their new-place stack)" do
-    it "keeps a legally-nested quote-in-quote intact when the outer quote is hoisted" do
+    it "keeps a legally-nested quote-in-quote intact when the outer quote leaves a link" do
       inner_quote = el(Markbridge::AST::Quote, text("deep"))
       outer_quote = el(Markbridge::AST::Quote, inner_quote)
       tree = doc(url(outer_quote))
       normalizer.normalize(tree)
 
-      # outer quote hoisted after the (empty) link; inner quote STILL nested
-      expect(tree.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Quote])
-      hoisted = tree.children.last
-      expect(hoisted.children).to contain_exactly(be_a(Markbridge::AST::Quote))
-      expect(hoisted.children.first.children.first.text).to eq("deep")
+      # the link held nothing else and is gone; the inner quote is STILL
+      # nested, and its text has the link now
+      expect(tree.children).to eq([outer_quote])
+      expect(outer_quote.children).to eq([inner_quote])
+      link = inner_quote.children.first
+      expect(link).to be_a(Markbridge::AST::Url)
+      expect(link.children.first.text).to eq("deep")
     end
 
     it "leaves an image inside a quote inside a link where it is (in the quote)" do
@@ -354,10 +436,11 @@ RSpec.describe Markbridge::Normalizer do
       tree = doc(url(quote))
       normalizer.normalize(tree)
 
-      # quote hoists out of the link; image stays IN the quote (not ripped out)
-      hoisted_quote = tree.children.last
-      expect(hoisted_quote).to be_a(Markbridge::AST::Quote)
-      expect(hoisted_quote.children).to contain_exactly(be_a(Markbridge::AST::Image))
+      # the quote leaves the link; the image stays IN the quote (not ripped
+      # out). The copy of the link around it is left empty by the rule of
+      # this normalizer, which moves an image out of a link, and is gone.
+      expect(tree.children).to eq([quote])
+      expect(quote.children).to contain_exactly(be_a(Markbridge::AST::Image))
     end
 
     it "preserves document order for multiple hoists to one link" do
@@ -407,7 +490,7 @@ RSpec.describe Markbridge::Normalizer do
       tree = doc(url(code))
       normalizer.normalize(tree)
 
-      expect(tree.children.map(&:class)).to eq([Markbridge::AST::Url, Markbridge::AST::Code])
+      expect(tree.children).to eq([code])
     end
   end
 
@@ -444,7 +527,7 @@ RSpec.describe Markbridge::Normalizer do
       found = normalizer.violations(tree)
 
       expect(found).to contain_exactly(
-        { parent: "Url", child: "Quote", strategy: :hoist_after },
+        { parent: "Url", child: "Quote", strategy: :split },
         { parent: "Url", child: "Image", strategy: :hoist_after },
       )
     end
@@ -472,7 +555,7 @@ RSpec.describe Markbridge::Normalizer do
 
       expect(normalizer.violations(inline)).to eq([])
       expect(normalizer.violations(block)).to contain_exactly(
-        { parent: "Url", child: "Code", strategy: :hoist_after },
+        { parent: "Url", child: "Code", strategy: :split },
       )
     end
 

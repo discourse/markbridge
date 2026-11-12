@@ -53,7 +53,20 @@ module Markbridge
       GAP = Object.new.freeze
       EDGE_SPACE_BEFORE = /[[:space:]]\z/
       EDGE_SPACE_AFTER = /\A[[:space:]]/
-      private_constant :GAP, :EDGE_SPACE_BEFORE, :EDGE_SPACE_AFTER
+      # Stands in the child list where a block is split out: the children
+      # behind it go into a copy of the element, and +node+ goes on
+      # upward until it stands next to +boundary+.
+      Split = Struct.new(:node, :boundary)
+      BLANK = /\A[[:space:]]*\z/
+      SPACE_AT_START = /\A[[:space:]]+/
+      SPACE_AT_END = /[[:space:]]+\z/
+      private_constant :GAP,
+                       :EDGE_SPACE_BEFORE,
+                       :EDGE_SPACE_AFTER,
+                       :Split,
+                       :BLANK,
+                       :SPACE_AT_START,
+                       :SPACE_AT_END
 
       # @param rule_set [RuleSet]
       # @param report [Report]
@@ -65,15 +78,27 @@ module Markbridge
         # analyzed at most once per run while the RuleSet itself stays
         # free of per-call state.
         @walk_cache = {}
+        # The copies of inline elements that {Carrier} has put into a
+        # block. One that ends up empty is removed, whatever it is.
+        @copies = Set.new.compare_by_identity
       end
 
       # Normalize +document+'s subtree in place.
       # @param document [AST::Document]
       def call(document)
-        _element, bubble, = normalize_element(document, [])
+        _element, bubble, _before, _after, tail = normalize_element(document, [])
         # Defensive: anything that never reached its boundary becomes a
         # trailing sibling rather than being lost. Well-formed rule tables
         # do not get here.
+        tail.each do |part|
+          # A rule that splits the document itself has nowhere to put the
+          # parts: they stay its children, in their order.
+          if part.instance_of?(Split)
+            document << part.node
+          else
+            part.children.each { |c| document << c }
+          end
+        end
         bubble.each { |node, _boundary| document << node }
       end
 
@@ -89,14 +114,17 @@ module Markbridge
       end
 
       # Normalize a node's descendants. Elements recurse; leaves are
-      # returned untouched. Returns +[node_or_nil, bubble, before, after]+ —
-      # +nil+ when the element was pruned, +bubble+ is the list of
+      # returned untouched. Returns +[node_or_nil, bubble, before, after,
+      # tail]+ — +nil+ when the element was pruned, +bubble+ is the list of
       # +[node, boundary]+ pairs to hoist above this node. +before+ says
       # that a block left the start of the node, so what stands in front
       # of the node was on another line, and +after+ says the same for its
-      # end and what follows it.
+      # end and what follows it. +tail+ is what follows the node when it
+      # was split: the blocks that were split out of it, each as a {Split}
+      # until it has reached its boundary, and between them the copies of
+      # the node with the children that stood behind each block.
       def normalize_node(node, stack)
-        return node, EMPTY, false, false unless node.is_a?(AST::Element)
+        return node, EMPTY, false, false, EMPTY unless node.is_a?(AST::Element)
 
         normalize_element(node, stack)
       end
@@ -112,16 +140,18 @@ module Markbridge
         bubble = nil
 
         children.each_with_index do |child, index|
-          strategy, boundary = @rules.resolve(child, stack, @walk_cache)
-          strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
+          strategy, boundary = @rules.decide(child, stack, @walk_cache)
 
           if strategy.nil? || strategy == :keep
-            normalized, child_bubble, before, after = normalize_node(child, stack)
-            next if !before && !after && unchanged?(out, normalized, child, child_bubble)
+            normalized, child_bubble, before, after, tail = normalize_node(child, stack)
+            if !before && !after && tail.empty? && unchanged?(out, normalized, child, child_bubble)
+              next
+            end
 
             out ||= children[0, index]
             out << GAP if before
             bubble = append_kept(normalized, child_bubble, child, out, bubble)
+            append_tail(tail, child, out)
             out << GAP if after
           else
             out ||= children[0, index]
@@ -130,40 +160,93 @@ module Markbridge
         end
 
         stack.pop
-        before = after = false
-        if out
-          # For a block the two say nothing new: the parent puts no
-          # space next to a block anyway (see #touching?).
-          before = out.first.equal?(GAP)
-          after = out.last.equal?(GAP)
-          out = coalesce(out)
-          element.replace_children(out)
+        raised = bubble || EMPTY
+        unless out
+          kept = prune?(element, nil, children) ? nil : element
+          return kept, raised, false, false, EMPTY
         end
 
-        raised = bubble || EMPTY
-        return nil, raised, false, false if prune?(element, out, children)
+        # For a block the two say nothing new: the parent puts no
+        # space next to a block anyway (see #touching?).
+        before = out.first.equal?(GAP)
+        after = out.last.equal?(GAP)
+        return in_parts(element, out, raised, before, after) if out.any?(Split)
 
-        [element, raised, before, after]
+        out = coalesce(out)
+        element.replace_children(out)
+        kept = prune?(element, out, children) ? nil : element
+        [kept, raised, before, after, EMPTY]
+      end
+
+      # The element whose children hold a {Split}: it keeps the children
+      # in front of the first one, and a copy of it gets the children
+      # behind each. A part that shows nothing is left out, the element
+      # itself too, whatever it is: what it held is in the block now.
+      def in_parts(element, out, raised, before, after)
+        parts = [[]]
+        out.each { |node| node.instance_of?(Split) ? parts.push(node, []) : parts.last << node }
+        first, *rest = parts
+
+        children = coalesce(first)
+        trim(children, -1, SPACE_AT_END)
+        element.replace_children(children)
+        tail =
+          rest.each_with_index.filter_map do |part, index|
+            next part if part.instance_of?(Split)
+
+            children_of_copy = coalesce(part)
+            trim(children_of_copy, 0, SPACE_AT_START)
+            trim(children_of_copy, -1, SPACE_AT_END) if index < rest.size - 1
+            element.dup.replace_children(children_of_copy) unless blank?(children_of_copy)
+          end
+        kept = blank?(children) ? nil : element
+        [kept, raised, before, after, tail]
+      end
+
+      # Takes the whitespace off a text that stands next to a block that
+      # was split out: it is at the end or at the start of a line now.
+      # A text that was nothing else is removed.
+      def trim(nodes, index, pattern)
+        node = nodes[index]
+        return unless node.instance_of?(AST::Text)
+
+        text = node.text.sub(pattern, "")
+        text.empty? ? nodes.delete_at(index) : nodes[index] = AST::Text.new(text)
+      end
+
+      # Whether the nodes show nothing: there are none, or they are
+      # whitespace.
+      def blank?(nodes)
+        nodes.all? { |node| node.instance_of?(AST::Text) && node.text.match?(BLANK) }
+      end
+
+      # Put what follows a child that was split behind it. A block that
+      # has reached its boundary, which is the child, lands here. One
+      # that has not goes on as a {Split} and splits this element too.
+      def append_tail(tail, child, out)
+        tail.each do |part|
+          out << (part.instance_of?(Split) && part.boundary.equal?(child) ? part.node : part)
+        end
       end
 
       # An element is removed when it ends up with no children and is one of
-      # the wrappers in {PRUNE_WHEN_EMPTY}.
+      # the wrappers in {PRUNE_WHEN_EMPTY}, or a copy that a split has made.
       def prune?(element, out, children)
         empty = out ? out.empty? : children.empty?
-        empty && PRUNE_WHEN_EMPTY.include?(element.class)
+        empty && (PRUNE_WHEN_EMPTY.include?(element.class) || @copies.include?(element))
       end
 
       # Resolve one child (against +stack+) and place it into an existing
       # +out+ — the shared entry point used by {#emit}'s +:unwrap+ recursion,
       # where +out+ already exists.
       def resolve_into(child, stack, out, bubble)
-        strategy, boundary = @rules.resolve(child, stack, @walk_cache)
-        strategy = strategy.call(boundary, child) if strategy.respond_to?(:call)
+        strategy, boundary = @rules.decide(child, stack, @walk_cache)
 
         if strategy.nil? || strategy == :keep
-          child2, child_bubble, before, after = normalize_node(child, stack)
+          child2, child_bubble, before, after, tail = normalize_node(child, stack)
           out << GAP if before
           bubble = append_kept(child2, child_bubble, child, out, bubble)
+          append_tail(tail, child, out)
           out << GAP if after
           bubble
         else
@@ -183,6 +266,8 @@ module Markbridge
       # returning the (possibly newly allocated) +bubble+.
       def emit(child, strategy, boundary, stack, out, bubble)
         case strategy
+        when :split
+          split(child, boundary, stack, out, bubble)
         when :hoist_after
           out << GAP if block?(child)
           hoist(child, boundary, stack, bubble)
@@ -205,14 +290,41 @@ module Markbridge
         end
       end
 
+      # Split the elements from the boundary down to here around the
+      # block. The block takes copies of the inline formatting it was in
+      # with it (see {Carrier}), then it is walked against the stack it
+      # will have, like a hoisted one. It goes into +out+ as a {Split}:
+      # this element and every one up to the boundary is cut there.
+      def split(child, boundary, stack, out, bubble)
+        @report.record(boundary.class, child.class, :split)
+        above = ancestors_above(boundary, stack)
+        carried = stack.drop(above.size).select { |ancestor| carried?(ancestor) }
+        Carrier.call(child, carried, @copies)
+        node, child_bubble, _before, _after, tail = normalize_node(child, above)
+        out << Split.new(node, boundary) unless node.nil?
+        # What the block itself was split into stays behind it.
+        tail.each { |part| out << (part.instance_of?(Split) ? part : Split.new(part, boundary)) }
+        return bubble if child_bubble.empty?
+
+        bubble ||= []
+        child_bubble.each { |entry| bubble << entry }
+        bubble
+      end
+
+      def carried?(element)
+        CARRIED.any? { |klass| element.is_a?(klass) }
+      end
+
       def hoist(child, boundary, stack, bubble)
         @report.record(boundary.class, child.class, :hoist_after)
         # Walk the relocated subtree against its destination stack (the
         # ancestors strictly above the boundary) so its interior never sees
         # the boundary it is leaving.
-        child2, child_bubble, = normalize_node(child, ancestors_above(boundary, stack))
+        child2, child_bubble, _before, _after, tail =
+          normalize_node(child, ancestors_above(boundary, stack))
         bubble ||= []
         bubble << [child2, boundary] unless child2.nil?
+        tail.each { |part| bubble << [part.instance_of?(Split) ? part.node : part, boundary] }
         # What leaves the hoisted subtree itself comes after it, so it
         # lands behind it (see #land).
         child_bubble.each { |entry| bubble << entry }
@@ -313,18 +425,8 @@ module Markbridge
           BLOCK_NODES.any? { |klass| node.is_a?(klass) }
       end
 
-      # Whether a node that stays where it is has lines of its own. Not
-      # every code and not every spoiler has: a code span and an inline
-      # spoiler are a part of their line.
       def own_lines?(node)
-        case node
-        when AST::Code
-          KEEP_INLINE_CODE.call(nil, node) == :hoist_after
-        when AST::Spoiler
-          KEEP_INLINE_SPOILER.call(nil, node) == :hoist_after
-        else
-          BLOCK_NODES.any? { |klass| node.is_a?(klass) }
-        end
+        Normalizer.own_lines?(node)
       end
 
       # Whether +left+ and +right+ stand next to each other without

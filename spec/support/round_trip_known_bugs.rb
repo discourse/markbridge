@@ -28,18 +28,7 @@ module RoundTripKnownBugs
   ].freeze
 
   # Seeds of BrokenAstGenerator, checked with NormalizerRepairChecker.
-  REPAIR = [
-    entry(
-      "a block that leaves bold inside an inline spoiler lands in the spoiler, which is no " \
-        "inline container for the normalizer; in a list item the list cooks loose then",
-      cases: [1578, 1810],
-    ),
-    entry(
-      "a list that leaves bold in a paragraph lands in the paragraph, in front of a list that " \
-        "follows the paragraph, and the two cook as one list",
-      cases: [1543],
-    ),
-  ].freeze
+  REPAIR = [].freeze
 
   # Seeds of AstGenerator, written as HTML and checked with
   # HtmlRoundTripChecker.

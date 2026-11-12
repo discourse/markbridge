@@ -290,6 +290,79 @@ RSpec.describe Markbridge::Normalizer::RuleSet do
     end
   end
 
+  describe "#decide" do
+    let(:image) { Markbridge::AST::Image.new }
+    let(:outer) { Markbridge::AST::Url.new }
+    let(:inner) { Markbridge::AST::Bold.new }
+
+    it "returns a strategy that is no callable as it is" do
+      rule_set.add(parent: Markbridge::AST::Url, child: Markbridge::AST::Image, strategy: :drop)
+
+      expect(rule_set.decide(image, [outer, inner], walk_cache)).to eq([:drop, outer])
+    end
+
+    it "returns [nil, nil] when no rule matches" do
+      expect(rule_set.decide(image, [outer, inner], walk_cache)).to eq([nil, nil])
+    end
+
+    it "asks a callable with the boundary and the child, and returns its answer" do
+      seen = []
+      rule_set.add(
+        parent: Markbridge::AST::Url,
+        child: Markbridge::AST::Image,
+        strategy:
+          lambda do |boundary, node|
+            seen << [boundary, node]
+            :textify
+          end,
+      )
+
+      expect(rule_set.decide(image, [outer, inner], walk_cache)).to eq([:textify, outer])
+      expect(seen).to eq([[outer, image]])
+    end
+
+    it "goes on with the ancestors inside when a callable answers :pass" do
+      rule_set.add(
+        parent: Markbridge::AST::Url,
+        child: Markbridge::AST::Image,
+        strategy: ->(_boundary, _node) { :pass },
+      )
+      rule_set.add(parent: Markbridge::AST::Bold, child: Markbridge::AST::Image, strategy: :drop)
+      italic = Markbridge::AST::Italic.new
+
+      expect(rule_set.decide(image, [italic, outer, italic, inner], walk_cache)).to eq(
+        [:drop, inner],
+      )
+    end
+
+    it "does not ask an ancestor that is the same as the one that passed, further out" do
+      asked = []
+      rule_set.add(
+        parent: Markbridge::AST::Url,
+        child: Markbridge::AST::Image,
+        strategy:
+          lambda do |boundary, _node|
+            asked << boundary
+            :pass
+          end,
+      )
+      second = Markbridge::AST::Url.new
+
+      expect(rule_set.decide(image, [outer, second, inner], walk_cache)).to eq([nil, nil])
+      expect(asked).to eq([outer, second])
+    end
+
+    it "returns [nil, nil] when the innermost ancestor passes" do
+      rule_set.add(
+        parent: Markbridge::AST::Bold,
+        child: Markbridge::AST::Image,
+        strategy: ->(_boundary, _node) { :pass },
+      )
+
+      expect(rule_set.decide(image, [outer, inner], walk_cache)).to eq([nil, nil])
+    end
+  end
+
   describe "#add override" do
     it "replaces an earlier rule for the same (parent, child) pair" do
       rule_set.add(
