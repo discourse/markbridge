@@ -33,3 +33,12 @@ jobs:
         run: node spec/support/markdown_it/sync.mjs --check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  report:
+    needs: [check]
+    if: always() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    uses: ./.github/workflows/report-scheduled-run.yml
+    with:
+      failed: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}

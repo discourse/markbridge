@@ -342,6 +342,11 @@ expect(token).to match_tag_end("b")
     `spec/integration/markbridge/parsers/bbcode/s9e_differential_spec.rb`
     runs 300 seeds. It needs PHP and `bin/s9e-setup`, which puts s9e
     into `tmp/s9e`, and skips without them (`S9E_REQUIRED=1` fails).
+- A workflow that runs on a schedule ends with a `report` job that calls
+  `.github/workflows/report-scheduled-run.yml`. A run that fails opens
+  an issue with the label `scheduled-run` (or adds a comment to the open
+  one), the first run that passes closes it. Give a new scheduled
+  workflow the same job, or nobody sees it fail.
 - When a test is about structure (nesting, blank lines, indentation),
   assert on the cooked HTML (`spec/support/cooked_output.rb`), not on
   the exact Markdown string. A Markdown expectation written from the
