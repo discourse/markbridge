@@ -44,6 +44,7 @@ module Markbridge
 
           scanner = Scanner.new(normalized)
           parse_tokens(scanner, context)
+          context.drop_empty_reopened
 
           @auto_closed_tags_count = context.auto_closed_count
           @depth_exceeded_count = context.depth_exceeded_count

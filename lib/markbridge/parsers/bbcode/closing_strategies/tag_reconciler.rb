@@ -75,7 +75,7 @@ module Markbridge
 
             # A copy without the children, so a color keeps its color and
             # a link its address.
-            intervening.reverse_each { |element| context.push(element.dup.replace_children([])) }
+            intervening.reverse_each { |element| context.reopen(element.dup.replace_children([])) }
 
             true
           end

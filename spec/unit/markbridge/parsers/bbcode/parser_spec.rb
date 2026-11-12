@@ -62,6 +62,14 @@ RSpec.describe Markbridge::Parsers::BBCode::Parser do
   end
 
   describe "tag reconciliation" do
+    it "leaves no empty copy of a link that was opened again and ended at once" do
+      doc = described_class.new.parse("[list][s][url=https://example.com]a[/s][*]b[/list]")
+
+      links = doc.descendants(Markbridge::AST::Url)
+      expect(links.size).to eq(1)
+      expect(links.first.children.map(&:text)).to eq(["a"])
+    end
+
     let(:parser) { described_class.new }
 
     it "forwards the registry to opening handlers" do

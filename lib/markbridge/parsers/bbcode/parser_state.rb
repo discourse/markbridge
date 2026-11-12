@@ -18,6 +18,32 @@ module Markbridge
           @depth_exceeded_count = 0
           @unclosed_raw_tags = Hash.new(0)
           @ended_early = []
+          @reopened = []
+        end
+
+        # Push a copy of an element that a mismatched closing tag has
+        # ended, so what follows is still inside of it (see
+        # TagReconciler#try_reopen).
+        # @param element [AST::Element] the copy, without children
+        def reopen(element)
+          holder = @current
+          push(element)
+          # A list puts what is no item into an item of its own.
+          holder = holder.children.last unless holder.children.last.equal?(element)
+          @reopened << [holder, element]
+        end
+
+        # Take the reopened elements away that nothing was put into:
+        # `[list][s][url=…]a[/s][*]b` opens the link again behind the
+        # `[/s]`, and the `[*]` ends it at once. An empty link would be
+        # written as its address. The last one first, so an element
+        # that held only an empty one goes too.
+        def drop_empty_reopened
+          @reopened.reverse_each do |holder, element|
+            next unless element.children.empty?
+
+            holder.replace_children(holder.children.reject { |child| child.equal?(element) })
+          end
         end
 
         # Remember an element that was ended by the closing tag of an
