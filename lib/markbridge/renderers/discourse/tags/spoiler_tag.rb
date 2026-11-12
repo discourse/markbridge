@@ -59,9 +59,10 @@ module Markbridge
           private_constant :INLINE_CLOSE
 
           # The closing tag when it follows the content on the same line.
-          # A bare URL in front of it would take it into the link.
+          # A bare URL in front of it would take it into the link. (In
+          # html_mode a URL is an <a> in any case, so nobody asks there.)
           def inline_close(element, interface)
-            return if !@bbcode || element.block || interface.html_mode? || inside_link?(interface)
+            return if !@bbcode || element.block || inside_link?(interface)
 
             INLINE_CLOSE
           end
