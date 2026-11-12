@@ -630,6 +630,11 @@ module Markbridge
 
             at_start = core.start_with?(char)
             at_end = core.end_with?(char) && !Joins.escaped_end?(core)
+            # A pair that is nested at an edge explains an asterisk there
+            # and no tilde: the pair may be bold with nothing in it, in
+            # front of a text that starts with `~`.
+            return at_start || at_end unless char == ASTERISK
+
             (at_start && !pair_start) || (at_end && !pair_end) || (at_start && at_end && !spanning)
           end
 

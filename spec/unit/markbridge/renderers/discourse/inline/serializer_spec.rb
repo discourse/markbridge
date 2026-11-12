@@ -326,6 +326,15 @@ RSpec.describe Markbridge::Renderers::Discourse::Inline::Serializer do
 
       it "falls back to HTML for strikethrough with a raw tilde at an edge" do
         expect(write(tokens.open(:s), tokens.raw("~a"), tokens.close(:s))).to eq("<s>~a</s>")
+        # A nested pair at the edge does not explain the tilde, bold
+        # with nothing in it for example.
+        empty = [tokens.open(:strong), tokens.close(:strong)]
+        expect(write(tokens.open(:s), *empty, tokens.raw("~a"), tokens.close(:s))).to eq(
+          "<s>~a</s>",
+        )
+        expect(write(tokens.open(:s), tokens.raw("a~"), *empty, tokens.close(:s))).to eq(
+          "<s>a~</s>",
+        )
       end
 
       it "falls back to HTML for strikethrough with a nested strikethrough at an edge" do
