@@ -1,15 +1,14 @@
 name: Full mutation run
 
 on:
-  schedule:
-    # Mondays at 04:00 UTC.
-    - cron: '0 4 * * 1'
   workflow_dispatch:
 
 # The per-push `mutation` job in main.yml only mutates subjects that the
 # diff touched, so a commit that changes no Ruby mutates nothing. This
 # job drops `--since` and mutates every subject the matcher in
-# `mutant.yml` selects.
+# `mutant.yml` selects. It is started by hand, before a release for
+# example: the per-push job has kept the coverage at 100% for months,
+# and a weekly run of an hour found nothing it did not.
 jobs:
   mutation-full:
     runs-on: ubuntu-latest
