@@ -195,7 +195,6 @@ jobs:
           if ! gh release view "${TAG}" > /dev/null 2>&1; then
             NOTES=$(bin/generate-release-notes)
             gh release create "${TAG}" --notes "${NOTES}" --latest
-          else
             # The changelog page of the docs is built from the releases.
             # The docs build for the version bump ran before this one
             # existed, so build the docs again, from main.
