@@ -72,7 +72,7 @@ RSpec.describe Markbridge::Normalizer do
     it "takes code with the block flag or with a line break for a block" do
       span = el(Markbridge::AST::Code, text("x"))
       flagged = el(Markbridge::AST::Code, text("x"), block: true)
-      lines = el(Markbridge::AST::Code, text("a"), text("b\nc"))
+      lines = el(Markbridge::AST::Code, Markbridge::AST::MarkdownText.new("a"), text("b\nc"))
       # A child that is no text is not looked into.
       odd = el(Markbridge::AST::Code, Markbridge::AST::MarkdownText.new("a\nb"))
 

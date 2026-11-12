@@ -35,10 +35,8 @@ module Markbridge
         #   was in, the outermost first. Copies of them are made, without
         #   their children.
         # @param copies [#<<] gets every copy that is made
-        # @return [void]
+        # @return [void] without wrappers the block stays as it is
         def call(block, wrappers, copies)
-          return if wrappers.empty?
-
           if LINES.any? { |klass| block.is_a?(klass) }
             block.replace_children(wrapped(block.children, wrappers, copies))
           elsif CONTAINERS.any? { |klass| block.is_a?(klass) }
