@@ -57,14 +57,12 @@ module Markbridge
       # behind it go into a copy of the element, and +node+ goes on
       # upward until it stands next to +boundary+.
       Split = Struct.new(:node, :boundary)
-      BLANK = /\A[[:space:]]*\z/
       SPACE_AT_START = /\A[[:space:]]+/
       SPACE_AT_END = /[[:space:]]+\z/
       private_constant :GAP,
                        :EDGE_SPACE_BEFORE,
                        :EDGE_SPACE_AFTER,
                        :Split,
-                       :BLANK,
                        :SPACE_AT_START,
                        :SPACE_AT_END
 
@@ -80,7 +78,7 @@ module Markbridge
         @walk_cache = {}
         # The copies of inline elements that {Carrier} has put into a
         # block. One that ends up empty is removed, whatever it is.
-        @copies = Set.new.compare_by_identity
+        @copies = Set.new
       end
 
       # Normalize +document+'s subtree in place.
@@ -162,7 +160,7 @@ module Markbridge
         stack.pop
         raised = bubble || EMPTY
         unless out
-          kept = prune?(element, nil, children) ? nil : element
+          kept = element unless prune?(element, children)
           return kept, raised, false, false, EMPTY
         end
 
@@ -174,14 +172,15 @@ module Markbridge
 
         out = coalesce(out)
         element.replace_children(out)
-        kept = prune?(element, out, children) ? nil : element
+        kept = element unless prune?(element, out)
         [kept, raised, before, after, EMPTY]
       end
 
       # The element whose children hold a {Split}: it keeps the children
       # in front of the first one, and a copy of it gets the children
-      # behind each. A part that shows nothing is left out, the element
-      # itself too, whatever it is: what it held is in the block now.
+      # behind each. The whitespace at a cut is taken off (see #trim). A
+      # part that is empty then is left out, the element itself too,
+      # whatever it is: what it held is in the block now.
       def in_parts(element, out, raised, before, after)
         parts = [[]]
         out.each { |node| node.instance_of?(Split) ? parts.push(node, []) : parts.last << node }
@@ -191,15 +190,15 @@ module Markbridge
         trim(children, -1, SPACE_AT_END)
         element.replace_children(children)
         tail =
-          rest.each_with_index.filter_map do |part, index|
+          rest.filter_map do |part|
             next part if part.instance_of?(Split)
 
             children_of_copy = coalesce(part)
             trim(children_of_copy, 0, SPACE_AT_START)
-            trim(children_of_copy, -1, SPACE_AT_END) if index < rest.size - 1
-            element.dup.replace_children(children_of_copy) unless blank?(children_of_copy)
+            trim(children_of_copy, -1, SPACE_AT_END) unless part.equal?(rest.last)
+            element.dup.replace_children(children_of_copy) unless children_of_copy.empty?
           end
-        kept = blank?(children) ? nil : element
+        kept = element unless children.empty?
         [kept, raised, before, after, tail]
       end
 
@@ -207,17 +206,11 @@ module Markbridge
       # was split out: it is at the end or at the start of a line now.
       # A text that was nothing else is removed.
       def trim(nodes, index, pattern)
-        node = nodes[index]
+        node = nodes.at(index)
         return unless node.instance_of?(AST::Text)
 
         text = node.text.sub(pattern, "")
         text.empty? ? nodes.delete_at(index) : nodes[index] = AST::Text.new(text)
-      end
-
-      # Whether the nodes show nothing: there are none, or they are
-      # whitespace.
-      def blank?(nodes)
-        nodes.all? { |node| node.instance_of?(AST::Text) && node.text.match?(BLANK) }
       end
 
       # Put what follows a child that was split behind it. A block that
@@ -231,9 +224,8 @@ module Markbridge
 
       # An element is removed when it ends up with no children and is one of
       # the wrappers in {PRUNE_WHEN_EMPTY}, or a copy that a split has made.
-      def prune?(element, out, children)
-        empty = out ? out.empty? : children.empty?
-        empty && (PRUNE_WHEN_EMPTY.include?(element.class) || @copies.include?(element))
+      def prune?(element, children)
+        children.empty? && (PRUNE_WHEN_EMPTY.include?(element.class) || @copies.include?(element))
       end
 
       # Resolve one child (against +stack+) and place it into an existing
@@ -302,13 +294,23 @@ module Markbridge
         Carrier.call(child, carried, @copies)
         node, child_bubble, _before, _after, tail = normalize_node(child, above)
         out << Split.new(node, boundary) unless node.nil?
-        # What the block itself was split into stays behind it.
-        tail.each { |part| out << (part.instance_of?(Split) ? part : Split.new(part, boundary)) }
-        return bubble if child_bubble.empty?
-
-        bubble ||= []
-        child_bubble.each { |entry| bubble << entry }
+        # The block may have been split itself: a paragraph with a quote
+        # in it. Its parts, and what was split out of it, go the same way
+        # as the block and stay behind it. Only what has a boundary of
+        # its own further up keeps that one.
+        tail.each do |part|
+          out << (travels_on?(part, child) ? part : Split.new(plain(part), boundary))
+        end
+        child_bubble.each { |entry| (bubble ||= []) << entry }
         bubble
+      end
+
+      def travels_on?(part, child)
+        part.instance_of?(Split) && !part.boundary.equal?(child)
+      end
+
+      def plain(part)
+        part.instance_of?(Split) ? part.node : part
       end
 
       def carried?(element)
@@ -324,7 +326,7 @@ module Markbridge
           normalize_node(child, ancestors_above(boundary, stack))
         bubble ||= []
         bubble << [child2, boundary] unless child2.nil?
-        tail.each { |part| bubble << [part.instance_of?(Split) ? part.node : part, boundary] }
+        tail.each { |part| bubble << [plain(part), boundary] }
         # What leaves the hoisted subtree itself comes after it, so it
         # lands behind it (see #land).
         child_bubble.each { |entry| bubble << entry }

@@ -335,6 +335,24 @@ RSpec.describe Markbridge::Normalizer::RuleSet do
       )
     end
 
+    it "asks an ancestor that passes once, wherever it stands" do
+      asked = []
+      rule_set.add(
+        parent: Markbridge::AST::Url,
+        child: Markbridge::AST::Image,
+        strategy:
+          lambda do |boundary, _node|
+            asked << boundary
+            :pass
+          end,
+      )
+      italic = Markbridge::AST::Italic.new
+
+      rule_set.decide(image, [italic, italic, outer, inner], walk_cache)
+
+      expect(asked).to eq([outer])
+    end
+
     it "does not ask an ancestor that is the same as the one that passed, further out" do
       asked = []
       rule_set.add(

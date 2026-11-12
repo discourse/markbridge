@@ -146,6 +146,109 @@ RSpec.describe Markbridge::Normalizer::Walker do
       )
     end
 
+    it "takes the whitespace off the last text of a part, not off its first one" do
+      middle = [text(" b "), italic(text("i")), text(" c ")]
+      tree = bold(text("a"), quote(text("1")), *middle, quote(text("2")), text("d"))
+
+      expect(normalized(tree)).to eq(
+        [
+          %w[Bold a],
+          ["Quote", %w[Bold 1]],
+          ["Bold", "b ", %w[Italic i], " c"],
+          ["Quote", %w[Bold 2]],
+          %w[Bold d],
+        ],
+      )
+    end
+
+    it "takes it off at every cut but not at the end of the last part" do
+      tree =
+        bold(
+          text("a "),
+          quote(text("1")),
+          text("b "),
+          quote(text("2")),
+          text("c "),
+          quote(text("3")),
+          text("d "),
+        )
+
+      expect(normalized(tree).select { |part| part.first == "Bold" }).to eq(
+        [%w[Bold a], %w[Bold b], %w[Bold c], ["Bold", "d "]],
+      )
+    end
+
+    it "takes a subclass of bold along like bold" do
+      strong = stub_const("Strong", Class.new(ast::Bold))
+
+      expect(normalized(el(strong, text("a"), quote(text("q"))))).to eq(
+        [%w[Strong a], ["Quote", %w[Strong q]]],
+      )
+    end
+
+    it "cuts nothing for a block that is removed because it is empty" do
+      tree = bold(text("a"), el(ast::Align, alignment: "center"), text("b"))
+
+      expect(normalized(tree)).to eq([%w[Bold ab]])
+    end
+
+    it "keeps a block that leaves a paragraph that leaves bold inside the quote they are in" do
+      paragraph = el(ast::Paragraph, text("a"), quote(text("q")), text("b"))
+
+      expect(normalized(quote(bold(text("x"), paragraph, text("y"))))).to eq(
+        [
+          [
+            "Quote",
+            %w[Bold x],
+            ["Paragraph", %w[Bold a]],
+            ["Quote", %w[Bold q]],
+            ["Paragraph", %w[Bold b]],
+            %w[Bold y],
+          ],
+        ],
+      )
+    end
+
+    it "lets a node go on upward that leaves the block for a boundary further out" do
+      custom = Markbridge::Normalizer.default
+      custom.rule(parent: ast::Quote, child: ast::Image, strategy: :hoist_after)
+      item = -> { el(ast::ListItem, image, text("x")) }
+      tree = quote(bold(el(ast::List, item.call), el(ast::List, item.call)))
+
+      expect(normalized(tree, with: custom)).to eq(
+        [
+          ["Quote", ["List", ["ListItem", %w[Bold x]]], ["List", ["ListItem", %w[Bold x]]]],
+          ["Image"],
+          ["Image"],
+        ],
+      )
+    end
+
+    it "lets a node that is split out of the block keep its own boundary further out" do
+      custom = Markbridge::Normalizer.default
+      custom.rule(parent: ast::Quote, child: ast::Image, strategy: :split)
+      list = el(ast::List, el(ast::ListItem, text("x"), image, text("y")))
+
+      expect(normalized(quote(bold(list)), with: custom)).to eq(
+        [
+          ["Quote", ["List", ["ListItem", %w[Bold x]]]],
+          ["Image"],
+          ["Quote", ["List", ["ListItem", %w[Bold y]]]],
+        ],
+      )
+    end
+
+    it "lands a block next to an element that an unwrapped element held" do
+      custom = Markbridge::Normalizer.default
+      custom.rule(parent: ast::Quote, child: ast::Italic, strategy: :unwrap)
+      list = el(ast::List, el(ast::ListItem, text("l")))
+      tree = quote(italic(bold(text("a"), list, text("b"))))
+
+      expect(normalized(tree, with: custom)).to eq(
+        [["Quote", %w[Bold a], ["List", ["ListItem", %w[Bold l]]], %w[Bold b]]],
+      )
+    end
+
     it "cuts at every block" do
       first = quote(text("1"))
       second = quote(text("2"))
@@ -254,8 +357,8 @@ RSpec.describe Markbridge::Normalizer::Walker do
       paragraph = el(ast::Paragraph, text("a"), quote(text("q")), text("b"))
       heading = el(ast::Heading, text("h"), paragraph, level: 2)
 
-      expect(normalized(heading)).to eq(
-        [%w[Heading h], %w[Paragraph a], %w[Quote q], %w[Paragraph b]],
+      expect(normalized(quote(heading))).to eq(
+        [["Quote", %w[Heading h], %w[Paragraph a], %w[Quote q], %w[Paragraph b]]],
       )
     end
 

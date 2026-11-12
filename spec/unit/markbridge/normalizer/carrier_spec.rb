@@ -63,10 +63,12 @@ RSpec.describe Markbridge::Normalizer::Carrier do
     expect(copies).to include(quote.children.first, quote.children.first.children.first)
   end
 
-  it "does nothing without a wrapper" do
+  it "leaves the block as it is without a wrapper" do
     paragraph = el(ast::Paragraph, text("a"))
+    quote = el(ast::Quote, text("b"), el(ast::Paragraph, text("c")))
 
     expect(carry(paragraph)).to eq(%w[Paragraph a])
+    expect(carry(quote)).to eq(["Quote", "b", %w[Paragraph c]])
     expect(copies).to eq([])
   end
 
