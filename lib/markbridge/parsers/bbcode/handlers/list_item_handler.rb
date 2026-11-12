@@ -6,6 +6,8 @@ module Markbridge
       module Handlers
         # Handler for list item tags (*, li)
         class ListItemHandler < BaseHandler
+          include ContinuedFormatting
+
           def initialize
             @element_class = AST::ListItem
           end
@@ -35,10 +37,12 @@ module Markbridge
               else
                 context.auto_close!(depth)
                 (limit == AST::ListItem ? depth + 1 : depth).times { context.pop }
+                formatting = open.first(depth)
               end
             end
 
             context.push(AST::ListItem.new, token:)
+            continue_formatting(formatting, context, registry) if formatting
           end
 
           attr_reader :element_class

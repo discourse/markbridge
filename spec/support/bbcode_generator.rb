@@ -59,11 +59,12 @@ class BBCodeGenerator
   #   the row it belongs to. s9e keeps the tag as text. Markbridge
   #   reads an item, and drops the tag of a row or a cell.
   # - :block_in_inline: a quote, an aligned block, a list or a table
-  #   that opens inside bold, a link or another inline tag. s9e ends
-  #   the inline tag in front of the block and opens it again inside
-  #   the block and behind it. Markbridge moves the block out of the
-  #   inline tag, and the text in the block loses the formatting.
-  #
+  #   that opens inside bold, a link or another inline tag. Both sides
+  #   end the inline tag in front of the block and give the text in the
+  #   block a copy of it, and for a quote or a list the result is the
+  #   same. The details differ: s9e takes nothing into a table and does
+  #   not go on with the tag behind one, and it writes a link with
+  #   nothing in it as its address.
   # - :link_in_link: a link that opens inside a link. s9e keeps the
   #   inner tag as text, Markbridge keeps its text only.
   # - :close_after_close: a closing tag that ends an inline tag with

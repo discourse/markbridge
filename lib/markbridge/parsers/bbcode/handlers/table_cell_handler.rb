@@ -7,13 +7,14 @@ module Markbridge
         # Handler for table cell tags (td, th)
         class TableCellHandler < BaseHandler
           include OpenTablePart
+          include ContinuedFormatting
 
           def initialize
             @element_class = AST::TableCell
           end
 
           def on_open(token:, context:, registry:, tokens: nil)
-            close_open_cell(context)
+            formatting = close_open_cell(context)
 
             element =
               AST::TableCell.new(
@@ -22,6 +23,7 @@ module Markbridge
                 rowspan: token.attrs[:rowspan],
               )
             context.push(element, token:)
+            continue_formatting(formatting, context, registry)
           end
 
           attr_reader :element_class

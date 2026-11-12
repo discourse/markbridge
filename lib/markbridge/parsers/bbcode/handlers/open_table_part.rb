@@ -20,18 +20,21 @@ module Markbridge
           # the row ends. A cell of a table in the cell is left alone.
           #
           # @param context [ParserState]
+          # @return [Array<AST::Element>] what was open in the cell or in
+          #   the row, the innermost first
           def close_open_cell(context)
             open = context.elements_from_current
             depth =
               open.index do |element|
                 element.instance_of?(AST::TableCell) || row_or_beyond?(element)
               end
-            return unless depth && !beyond_row?(open.fetch(depth))
+            return [] unless depth && !beyond_row?(open.fetch(depth))
 
             context.auto_close!(depth)
             (open.fetch(depth).instance_of?(AST::TableCell) ? depth + 1 : depth).times do
               context.pop
             end
+            open.first(depth)
           end
 
           # Ends the row that is open, with its cell and everything that

@@ -520,11 +520,23 @@ RSpec.describe "BBCode to Markdown Conversion" do
   end
 
   describe "lists with tags that are never closed" do
-    it "ends an open tag with its item" do
+    it "ends an open tag with its item and opens it again in the next one" do
       result = Markbridge.bbcode_to_markdown("[list][*]one [b]bold[*]two[/list] after")
 
-      expect(result.markdown).to eq("- one **bold**\n- two\n\nafter")
-      expect(result.diagnostics[:auto_closed_tags_count]).to eq(1)
+      expect(result.markdown).to eq("- one **bold**\n- **two**\n\nafter")
+      expect(result.diagnostics[:auto_closed_tags_count]).to eq(2)
+    end
+
+    it "makes every item bold for a tag that is open around the items" do
+      result = Markbridge.bbcode_to_markdown("[list][b][*]one[*]two[/b][/list] after")
+
+      expect(result.markdown).to eq("- **one**\n- **two**\n\nafter")
+    end
+
+    it "makes every cell bold for a tag that is open in the first one" do
+      result = Markbridge.bbcode_to_markdown("[table][tr][td][b]one[td]two[/td][/tr][/table]")
+
+      expect(result.markdown).to eq("| **one** | **two** |\n| --- | --- |")
     end
 
     it "ends an open tag with the list" do

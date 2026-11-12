@@ -236,6 +236,17 @@ RSpec.describe Markbridge::Parsers::BBCode::ParserState do
       expect(root.children).to eq([bold])
     end
 
+    it "opens nothing again at the depth limit" do
+      described_class::MAX_DEPTH.times { context.push(Markbridge::AST::Italic.new) }
+      innermost = context.current
+
+      context.reopen(bold)
+
+      expect(context.current).to eq(innermost)
+      expect(innermost.children).to eq([])
+      expect(context.depth).to eq(described_class::MAX_DEPTH)
+    end
+
     it "takes a reopened element away that stayed empty" do
       context.add_child(Markbridge::AST::Text.new("a"))
       context.reopen(bold)
