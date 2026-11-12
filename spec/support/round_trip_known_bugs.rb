@@ -17,7 +17,31 @@ module RoundTripKnownBugs
     Entry.new(reason:, cases:)
   end
 
-  ADJACENCY = [].freeze
+  ADJACENCY = [
+    entry(
+      "an underline that starts with a line break and then an element with a space at its " \
+        "start: the break is left out and the space stays inside the element. Discourse cooks " \
+        "`[u]` to a span and the space at the start of the line shows nothing (the engine " \
+        "runs pass). To plain markdown-it `[u]` is text, so the space stands between it and " \
+        "the word",
+      cases: %w[
+        underline/break+sup(space)
+        underline/break+sup(nbsp)
+        underline/break+sub(space)
+        underline/break+sub(nbsp)
+        underline/break+ins(space)
+        underline/break+ins(nbsp)
+        underline/break+del(space)
+        underline/break+del(nbsp)
+        underline/break+mark(space)
+        underline/break+mark(nbsp)
+        underline/break+code(space)
+        underline/break+code(nbsp)
+        underline/break+image(space)
+        underline/break+image(nbsp)
+      ],
+    ),
+  ].freeze
 
   STRUCTURE = [
     entry(
