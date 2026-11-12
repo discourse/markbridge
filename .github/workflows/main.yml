@@ -73,6 +73,47 @@ jobs:
           MARKDOWN_IT_REQUIRED: ${{ startsWith(matrix.ruby, 'jruby') && '0' || '1' }}
         run: bundle exec rake spec
 
+  # Random BBCode, read by Markbridge and by s9e\TextFormatter (see
+  # bin/fuzz-parse). The comparison takes a second and gives the same
+  # result on every run, so it runs for every push. The other half of
+  # bin/fuzz-parse measures time and stays in the nightly workflow: a
+  # busy runner must not fail a pull request.
+  s9e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, xsl
+          tools: composer
+
+      - name: Fetch s9e\TextFormatter
+        run: bin/s9e-setup
+
+      - name: Compare with s9e
+        run: bin/fuzz-parse --only s9e --seeds 1000 --output tmp/fuzz-parse
+
+      - name: Upload the failure reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-parse
+          path: tmp/fuzz-parse/
+          retention-days: 14
+
   mutation:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')

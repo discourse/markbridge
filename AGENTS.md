@@ -320,8 +320,11 @@ expect(token).to match_tag_end("b")
   distinct bugs; `--output DIR` writes the reports to a file. The
   nightly `fuzz-render.yml` workflow runs it and uploads the reports
   when a case fails.
-- `bin/fuzz-parse` runs the two checks that start with text, and the
-  `fuzz-parse` job of the same nightly workflow runs it:
+- `bin/fuzz-parse` runs the two checks that start with text. The
+  `fuzz-parse` job of the same nightly workflow runs both, and the `s9e`
+  job of `main.yml` runs the s9e one for every push (it takes a second
+  and gives the same result on every run; the time check could fail a
+  pull request on a busy runner):
   - `--only time`: `RunTimeChecker` (`spec/support/run_time_checker.rb`)
     repeats a short piece of markup n times and 4n times and compares
     the time of the two conversions. Time that grows with the square of
