@@ -68,3 +68,12 @@ jobs:
           MARKDOWN_IT_REQUIRED: '1'
           DISCOURSE_ENGINE_REQUIRED: '1'
         run: bundle exec rspec --tag discourse_engine
+
+  report:
+    needs: [discourse-engine]
+    if: always() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    uses: ./.github/workflows/report-scheduled-run.yml
+    with:
+      failed: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
