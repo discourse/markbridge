@@ -1,5 +1,5 @@
 {
-  "commit": "ae65e05533380219967c9e49bdb1f5868b177910",
+  "commit": "a672f97a50b352e3ff18caccb6a4cf89c53d115f",
   "packages": {
     "linkify-it": "6.1.0",
     "markdown-it": "15.0.3"
@@ -17,11 +17,11 @@
     "frontend/discourse-markdown-it/src/features/newline.js": "395daf8b21dd7ae7bf0bb0c6022bf5df53d9a033ed79d9e486fb8af97eef4f74",
     "frontend/discourse-markdown-it/src/features/paragraph.js": "90f25e079b7417f64cef64f1b60e54e546fa2e2c1a2e47506f5d85ae828f22c4",
     "frontend/discourse-markdown-it/src/features/custom-typographer-replacements.js": "c4f51afab19ff27d93f42350d635b2d2682ac1ad9ea9e7223d62f6484358babb",
-    "lib/pretty_text/core_bundle.rb": "8edc7aaab4e2ccfb45cb4f8d42202ccc4e89b905430c09c4e33253098bc08112",
+    "lib/pretty_text/core_bundle.rb": "19e619a945a32f75ad2a1f5d3e94206ae6ffee86fd9d30cdfa4dfab28f6f6a9c",
     "frontend/pretty-text-processor/build.mjs": "17f77697348cf483e538ef7f2f392e3bfd92904dd4b2149c37b405d83c4880da",
-    "frontend/pretty-text-processor/pretty-text-ruby-interface.js": "8a84c2cf32b9f71cda14a715d924c834b2e514a7c2ff519e4c1c0abc85a1ef72",
+    "frontend/pretty-text-processor/pretty-text-ruby-interface.js": "159fc34d3b8a46b77cb40f9e5e898db84eb67d6cb55c9978cf7fe0366d755487",
     "frontend/pretty-text-processor/shims/i18n.js": "4978f9d1d7d80d2351df8dd6c4f077003bf127476b7571944b54a35bb4708973",
-    "plugins/discourse-details/assets/javascripts/lib/discourse-markdown/details.js": "6b4eefc15eda4d7d3a3b17c137bc1240e77672029049b5d5b16aeed13aa0977b",
+    "plugins/discourse-details/assets/javascripts/lib/discourse-markdown/details.js": "3f20f47b38f8a80c960cf188c0e5f8bdde254a2d6e1f62dd5ccb0909420575d1",
     "plugins/spoiler-alert/assets/javascripts/lib/discourse-markdown/spoiler-alert.js": "ff60240fed180297ab7e1cef10efbc0619bf38ca975e9f3f55c168dbd265f378",
     "plugins/poll/assets/javascripts/lib/discourse-markdown/poll.js": "35e119043e8cf87da16c199bc00325f58784ef453a6bcf8a9f53d4cb1619bca2",
     "plugins/discourse-events/assets/javascripts/discourse/lib/discourse-markdown/discourse-post-event-block.js": "5197af23c126ea1d1229bb0fb1ad894f6092218f41547d55913d721ce13e534d"
